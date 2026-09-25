@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus, Search, UserRound, BriefcaseBusiness, WalletCards } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useState } from "react";
 
 export const Route = createFileRoute("/funcionarios")({ component: Employees });
 
