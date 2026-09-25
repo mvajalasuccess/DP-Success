@@ -28,6 +28,9 @@ function periodDates(period: any) {
 function labelForType(type: string) {
   return Object.values(calculationRules).find(r => r.code === type)?.label ?? type;
 }
+function keyForType(type: string) {
+  return Object.entries(calculationRules).find(([, rule]) => rule.code === type)?.[0] ?? "Hora extra 60%";
+}
 
 export function Launches() {
   const [open, setOpen] = useState(false);
@@ -97,7 +100,7 @@ export function Launches() {
     setEmployeeId(row.employee_id);
     const rowHours = String(Math.floor(row.minutes / 60)).padStart(2, "0") + ":" + String(row.minutes % 60).padStart(2, "0");
     setDebitHours(row.direction === "DEBITO" ? rowHours : "00:00");
-    setCreditLines(row.direction === "CREDITO" ? [{ type: labelForType(row.type), hours: rowHours }] : [{ type: "Hora extra 60%", hours: "00:00" }]);
+    setCreditLines(row.direction === "CREDITO" ? [{ type: keyForType(row.type), hours: rowHours }] : [{ type: "Hora extra 60%", hours: "00:00" }]);
     setLaunchDate(row.launch_date);
     setOpen(true);
   }
@@ -199,7 +202,7 @@ export function Launches() {
         <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Horas</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filtered.map(row => <tr key={row.source + row.id}><td className="px-5 py-4 font-medium">{row.employee?.full_name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{date(row.launch_date)}</td><td className="px-5 py-4">{labelForType(row.type)}</td><td className={"px-5 py-4 font-bold " + (row.direction === "DEBITO" ? "text-destructive" : "text-primary")}>{fmt(row.direction === "DEBITO" ? -row.minutes : row.minutes)}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => openEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"><Pencil className="h-3 w-3" />Editar</button><button onClick={() => void deleteLaunch(row)} className="inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive"><Trash2 className="h-3 w-3" />Excluir</button></div></td></tr>)}</tbody></table>{!loading && !filtered.length && <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento encontrado.</div>}</div>
       </Card>
     </main>
-    {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-5">
+    {open && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"><Card className="w-full max-w-2xl p-6">
       <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">{editing ? "Editar lançamento" : "Novo lançamento"}</h2><p className="text-xs text-muted-foreground">{competence ? "Competência atual" : "Cadastre uma competência primeiro."}</p></div><button onClick={() => setOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <label className="grid gap-1 text-sm font-medium">Funcionário<select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
@@ -207,19 +210,19 @@ export function Launches() {
         <div className="rounded-lg border p-3 md:col-span-2">
           <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">1. Crédito</p><p className="text-xs text-muted-foreground">Começa sempre em 60%. Use + somente se precisar adicionar outro tipo de crédito.</p></div><button type="button" onClick={addCreditLine} className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-primary hover:bg-primary/10" title="Adicionar tipo"><Plus className="h-4 w-4" /></button></div>
           <div className="mt-3 grid gap-2">
-            {creditLines.map((line,index) => <div key={index} className="grid grid-cols-[1fr_110px_32px] items-end gap-2">
-              <label className="grid gap-1 text-xs font-medium">{index === 0 ? "Tipo principal" : "Tipo adicional"}<select value={line.type} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,type:e.target.value} : item))} className="rounded-lg border bg-background px-2 py-2 text-sm font-normal">
+            {creditLines.map((line,index) => <div key={index} className="grid min-w-0 grid-cols-[minmax(0,1fr)_120px_32px] items-end gap-3">
+              <label className="grid min-w-0 gap-1 text-xs font-medium">{index === 0 ? "Tipo principal" : "Tipo adicional"}<select value={line.type} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,type:e.target.value} : item))} className="w-full min-w-0 rounded-lg border bg-background px-2 py-2 text-sm font-normal">
                 <option value="Hora extra 60%">60%</option>{creditOptions.map(option => <option key={option} value={option}>{option === "Hora extra noturna" ? "60% + 20%" : option === "Adicional noturno 20%" ? "20%" : option === "Domingo / feriado 100%" ? "100%" : "Interjornada 50%"}</option>)}
               </select></label>
-              <label className="grid gap-1 text-xs font-medium">Horas<input value={line.hours} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,hours:e.target.value} : item))} className="rounded-lg border bg-background px-2 py-2 text-sm font-normal" placeholder="00:00" /></label>
+              <label className="grid min-w-0 gap-1 text-xs font-medium">Horas<input value={line.hours} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,hours:e.target.value} : item))} className="w-full min-w-0 rounded-lg border bg-background px-2 py-2 text-sm font-normal" placeholder="00:00" /></label>
               <button type="button" disabled={creditLines.length === 1} onClick={() => removeCreditLine(index)} className="mb-0.5 h-9 w-8 rounded-md border text-muted-foreground disabled:opacity-30">×</button>
             </div>)}
           </div>
-          <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">Total de crédito</span><strong>{String(Math.floor(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)/60)).padStart(2,"0")}:{String(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)%60).padStart(2,"0")}</strong></div>
+          <div className="mt-4 flex items-center justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">Total de crédito</span><strong>{String(Math.floor(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)/60)).padStart(2,"0")}:{String(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)%60).padStart(2,"0")}</strong></div>
         </div>
         <div className="rounded-lg border p-3 md:col-span-2">
           <div><p className="text-sm font-semibold">2. Débito</p><p className="text-xs text-muted-foreground">Informe as horas que serão descontadas do saldo.</p></div>
-          <label className="mt-3 grid gap-1 text-xs font-medium">Horas do débito<input value={debitHours} onChange={e => setDebitHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm font-normal" placeholder="00:00" /></label>
+          <label className="mt-4 grid gap-1 text-xs font-medium">Horas do débito<input value={debitHours} onChange={e => setDebitHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm font-normal" placeholder="00:00" /></label>
         </div>
       </div>
       <div className="mt-4 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void saveLaunch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar lançamento"}</button></div>
