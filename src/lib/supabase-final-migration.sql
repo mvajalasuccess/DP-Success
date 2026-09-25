@@ -403,3 +403,94 @@ for all to authenticated using (true) with check (true);
 drop policy if exists calculation_parameters_authenticated_all on calculation_parameters;
 create policy calculation_parameters_authenticated_all on calculation_parameters
 for all to authenticated using (true) with check (true);
+
+
+-- Fechamento transacional da competência.
+-- O saldo final de cada funcionário vira a abertura da próxima competência.
+create table if not exists competence_employee_balances (
+  id uuid primary key default gen_random_uuid(),
+  competence_id uuid not null references competencies(id) on delete cascade,
+  employee_id uuid not null references employees(id) on delete cascade,
+  opening_minutes integer not null default 0,
+  credit_minutes integer not null default 0,
+  debit_minutes integer not null default 0,
+  closing_minutes integer not null default 0,
+  estimated_value numeric(12,2) not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(competence_id,employee_id)
+);
+create index if not exists idx_competence_balances_competence on competence_employee_balances(competence_id);
+
+create or replace function close_competence(p_competence_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status text;
+  v_end date;
+  v_next_id uuid;
+  v_next_start date;
+  v_next_end date;
+begin
+  select status,end_date into v_status,v_end
+  from competencies where id=p_competence_id for update;
+  if v_status is null then raise exception 'Competência não encontrada.'; end if;
+  if v_status='FECHADA' then return; end if;
+
+  insert into competence_employee_balances(
+    competence_id,employee_id,opening_minutes,credit_minutes,debit_minutes,closing_minutes,estimated_value
+  )
+  select
+    p_competence_id,e.id,e.initial_bank_minutes,
+    coalesce(sum(case when bm.minutes>0 then bm.minutes else 0 end),0),
+    coalesce(sum(case when bm.minutes<0 then abs(bm.minutes) else 0 end),0),
+    e.initial_bank_minutes+coalesce(sum(bm.minutes),0),
+    coalesce(sum(pl.financial_value),0)
+  from employees e
+  left join bank_movements bm on bm.employee_id=e.id and bm.competence_id=p_competence_id
+  left join point_launches pl on pl.id=bm.launch_id
+  where e.active=true
+  group by e.id,e.initial_bank_minutes
+  on conflict(competence_id,employee_id) do update set
+    opening_minutes=excluded.opening_minutes,
+    credit_minutes=excluded.credit_minutes,
+    debit_minutes=excluded.debit_minutes,
+    closing_minutes=excluded.closing_minutes,
+    estimated_value=excluded.estimated_value,
+    updated_at=now();
+
+  update competencies set status='FECHADA',closed_at=now(),updated_at=now()
+  where id=p_competence_id;
+
+  v_next_start := v_end + 1;
+  v_next_end := (v_next_start + interval '1 month')::date - 1;
+
+  insert into competencies(name,start_date,end_date,status)
+  values(to_char(v_next_start,'DD/MM/YYYY') || ' → ' || to_char(v_next_end,'DD/MM/YYYY'),
+         v_next_start,v_next_end,'ABERTA')
+  on conflict(start_date,end_date) do nothing
+  returning id into v_next_id;
+
+  if v_next_id is null then
+    select id into v_next_id from competencies where start_date=v_next_start and end_date=v_next_end;
+  end if;
+
+  -- O saldo de fechamento passa a ser o saldo inicial da próxima competência.
+  update employees e
+  set initial_bank_minutes=b.closing_minutes, updated_at=now()
+  from competence_employee_balances b
+  where b.competence_id=p_competence_id and b.employee_id=e.id;
+end;
+$$;
+
+alter table competence_employee_balances enable row level security;
+drop policy if exists competence_employee_balances_authenticated_all on competence_employee_balances;
+create policy competence_employee_balances_authenticated_all on competence_employee_balances
+for all to authenticated using (true) with check (true);
+
+drop trigger if exists trg_balance_updated_at on competence_employee_balances;
+create trigger trg_balance_updated_at before update on competence_employee_balances
+for each row execute function set_updated_at();
