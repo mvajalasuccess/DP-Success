@@ -119,79 +119,34 @@ export function BankHours() {
 
     const periodIds = periodList.map(p => p.id);
 
-    const [timeRes, overtimeRes, bankRes, occurrenceRes, settingsRes] = await Promise.all([
+    const [timeRes, overtimeRes] = await Promise.all([
       supabase.from("time_records").select("period_id,negative_minutes").eq("employee_id", employeeId).in("period_id", periodIds),
-      supabase.from("overtime_records").select("period_id,minutes,rate_percent,estimated_value,notes").eq("employee_id", employeeId).in("period_id", periodIds),
-      supabase.from("bank_hours").select("period_id,kind,minutes,justification").eq("employee_id", employeeId).in("period_id", periodIds),
-      supabase.from("occurrences").select("period_id,quantity,unit,occurrence_type_id,occurrence_types(code,name)").eq("employee_id", employeeId).in("period_id", periodIds),
-      supabase.from("app_settings").select("key,value").eq("key", "company_name").limit(1),
+      supabase.from("overtime_records").select("period_id,minutes,rate_percent,notes").eq("employee_id", employeeId).in("period_id", periodIds),
     ]);
 
-    if (timeRes.error) { setError(timeRes.error.message); setLoading(false); return; }
-    if (overtimeRes.error) { setError(overtimeRes.error.message); setLoading(false); return; }
-    if (bankRes.error) { setError(bankRes.error.message); setLoading(false); return; }
-    if (occurrenceRes.error) { setError(occurrenceRes.error.message); setLoading(false); return; }
-
-    const setting = settingsRes.data?.[0] as any;
-    if (setting?.value) {
-      const value = typeof setting.value === "string" ? setting.value : setting.value?.name;
-      if (value) setCompanyName(value);
+    if (timeRes.error) {
+      setError(timeRes.error.message);
+      setLoading(false);
+      return;
+    }
+    if (overtimeRes.error) {
+      setError(overtimeRes.error.message);
+      setLoading(false);
+      return;
     }
 
-    const delays = new Map<string, number>();
+    const debits = new Map<string, number>();
     for (const item of timeRes.data ?? []) {
-      delays.set(item.period_id, (delays.get(item.period_id) ?? 0) + Number(item.negative_minutes || 0));
+      debits.set(item.period_id, (debits.get(item.period_id) ?? 0) + Number(item.negative_minutes || 0));
     }
 
-    const overtime = new Map<string, { he60: number; heNoturna: number; he100: number; he100Noturna: number; noturno: number; interjornada: number; salary: number }>();
+    const credits = new Map<string, any>();
     for (const item of overtimeRes.data ?? []) {
       if (!item.period_id) continue;
-      const current = overtime.get(item.period_id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0, salary: 0 };
+      const current = credits.get(item.period_id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0 };
       const key = classifyOvertime(item);
       current[key] += Number(item.minutes || 0);
-      if (key !== "interjornada") current.salary += Number(item.estimated_value || 0);
-      overtime.set(item.period_id, current);
-    }
-
-    // Créditos lançados no Banco de Horas também alimentam as colunas de natureza.
-    // A justificativa preserva o tipo escolhido no lançamento consolidado.
-    const bankCategories = new Map<string, { he60: number; heNoturna: number; he100: number; he100Noturna: number; noturno: number; interjornada: number }>();
-    const bankMovement = new Map<string, number>();
-
-    function classifyBankCredit(justification: string | null) {
-      const note = String(justification || "").toLowerCase();
-      if (note.includes("100% + 20%")) return "he100Noturna";
-      if (note.includes("60% + 20%")) return "heNoturna";
-      if (note.includes("interjornada")) return "interjornada";
-      if (note.includes("100%")) return "he100";
-      if (note.includes("20%")) return "noturno";
-      return "he60";
-    }
-
-    for (const item of bankRes.data ?? []) {
-      if (!item.period_id) continue;
-      const minutes = Math.abs(Number(item.minutes || 0));
-
-      if (item.kind === "credito") {
-        const current = bankCategories.get(item.period_id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0 };
-        const key = classifyBankCredit((item as any).justification);
-        current[key] += minutes;
-        bankCategories.set(item.period_id, current);
-      } else {
-        const signed = item.kind === "debito" ? -minutes : minutes;
-        bankMovement.set(item.period_id, (bankMovement.get(item.period_id) ?? 0) + signed);
-      }
-    }
-
-    const folga = new Map<string, number>();
-    for (const item of occurrenceRes.data ?? []) {
-      if (!item.period_id) continue;
-      const type = (item as any).occurrence_types;
-      if (type?.code === "folga") {
-        const quantity = Number(item.quantity || 0);
-        const minutes = item.unit === "horas" ? quantity * 60 : 0;
-        folga.set(item.period_id, (folga.get(item.period_id) ?? 0) + minutes);
-      }
+      credits.set(item.period_id, current);
     }
 
     let running = 0;
@@ -199,37 +154,25 @@ export function BankHours() {
       .slice()
       .sort((a, b) => a.reference_year - b.reference_year || a.reference_month - b.reference_month)
       .map(period => {
-        const extra = overtime.get(period.id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0, salary: 0 };
-        const categorizedBank = bankCategories.get(period.id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0 };
-        const delay = delays.get(period.id) ?? 0;
-        const movement = bankMovement.get(period.id) ?? 0;
-        const totalFolga = folga.get(period.id) ?? 0;
-        const he60 = extra.he60 + categorizedBank.he60;
-        const heNoturna = extra.heNoturna + categorizedBank.heNoturna;
-        const he100 = extra.he100 + categorizedBank.he100;
-        const he100Noturna = extra.he100Noturna + categorizedBank.he100Noturna;
-        const noturno = extra.noturno + categorizedBank.noturno;
-        const interjornada = extra.interjornada + categorizedBank.interjornada;
-        const creditMinutes = he60 + heNoturna + he100 + he100Noturna + noturno;
-        const totalBalance = creditMinutes - delay + movement - totalFolga;
-        running += totalBalance;
+        const credit = credits.get(period.id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0 };
+        const debit = debits.get(period.id) ?? 0;
+        const creditMinutes = credit.he60 + credit.heNoturna + credit.he100 + credit.he100Noturna + credit.noturno;
+        const monthlyBalance = creditMinutes - debit;
+        running += monthlyBalance;
+
         return {
           period,
           label: periodLabel(period),
-          range: periodRange(period).label,
-          delay,
-          he60,
-          heNoturna,
-          he100,
-          he100Noturna,
-          noturno,
-          interjornada,
-          bankMovement: movement,
-          totalSalary: extra.salary,
-          totalFolga,
-          totalBalance,
+          range: periodRange(period),
+          debit,
+          he60: credit.he60,
+          heNoturna: credit.heNoturna,
+          he100: credit.he100,
+          he100Noturna: credit.he100Noturna,
+          noturno: credit.noturno,
+          interjornada: credit.interjornada,
+          monthlyBalance,
           finalBalance: running,
-          openHours: period.status === "aberto" ? Math.max(totalBalance, 0) : 0,
         };
       });
 
@@ -259,18 +202,18 @@ export function BankHours() {
 
   return <div className="min-h-screen bg-background">
     <header className="border-b px-6 py-4">
-      <div className="mx-auto flex max-w-[1700px] items-center justify-between">
+      <div className="mx-auto flex max-w-[1100px] items-center justify-between">
         <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a>
         <span className="font-semibold">DP Success · Banco de Horas</span>
       </div>
     </header>
 
-    <main className="mx-auto max-w-[1700px] px-4 py-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <main className="mx-auto max-w-[1100px] px-4 py-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm font-medium text-primary">Operação</p>
           <h1 className="mt-1 text-3xl font-bold">Banco de Horas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Visão por competência inspirada na sua planilha, com saldo, adicionais e horas em aberto.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Visualize os saldos por competência de forma simples.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -286,77 +229,58 @@ export function BankHours() {
       {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
 
       <Card className="mt-6 overflow-hidden">
-        <div className="grid grid-cols-2 border-b bg-muted/20 md:grid-cols-4">
-          <div className="border-r p-3 text-center"><p className="text-[10px] font-bold uppercase text-muted-foreground">Empresa</p><p className="mt-1 font-semibold">{companyName}</p></div>
-          <div className="border-r p-3 text-center"><p className="text-[10px] font-bold uppercase text-muted-foreground">Funcionário</p><p className="mt-1 font-semibold">{employee?.full_name ?? "Selecione um funcionário"}</p></div>
-          <div className="border-r p-3 text-center"><p className="text-[10px] font-bold uppercase text-muted-foreground">Competências</p><p className="mt-1 font-semibold">{periods.length}</p></div>
-          <div className="p-3 text-center"><p className="text-[10px] font-bold uppercase text-muted-foreground">Saldo final</p><p className={"mt-1 font-bold " + (finalBalance < 0 ? "text-destructive" : "text-primary")}>{loading ? "..." : minutesToHours(finalBalance)}</p></div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-[1550px] w-full border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-700 text-white">
-                <th className="sticky left-0 z-10 border-r border-slate-500 px-3 py-2 text-left">COMPETÊNCIA</th>
-                <th className="border-r border-slate-500 px-3 py-2 text-left">MÊS (TRAB)</th>
-                <th className="border-r border-slate-500 px-3 py-2">ATRASOS NO MÊS</th>
-                <th className="border-r border-slate-500 px-3 py-2">60%</th>
-                <th className="border-r border-slate-500 px-3 py-2">60% + 20% NOT</th>
-                <th className="border-r border-slate-500 px-3 py-2">100%</th>
-                <th className="border-r border-slate-500 px-3 py-2">100% + 20% NOT</th>
-                <th className="border-r border-slate-500 px-3 py-2">NOT</th>
-                <th className="border-r border-slate-500 px-3 py-2">TOTAL SALDO</th>
-                <th className="border-r border-slate-500 px-3 py-2">TOTAL $</th>
-                <th className="border-r border-slate-500 px-3 py-2">TOTAL FOLGA</th>
-                <th className="border-r border-slate-500 px-3 py-2">SALDO FINAL</th>
-                <th className="border-r border-slate-500 px-3 py-2">HORAS EM ABERTO</th>
-                <th className="px-3 py-2">INTERJ 50%</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(row => <tr key={row.period.id} className="border-b">
-                <td className="sticky left-0 z-[1] border-r bg-background px-3 py-2 font-semibold">{row.label}</td>
-                <td className="border-r px-3 py-2 whitespace-nowrap">{row.range}</td>
-                <td className="border-r px-3 py-2 text-center text-red-600 font-semibold">{minutesToHours(row.delay)}</td>
-                <td className="border-r bg-muted/30 px-3 py-2 text-center">{minutesToHours(row.he60)}</td>
-                <td className="border-r bg-muted/30 px-3 py-2 text-center">{minutesToHours(row.heNoturna)}</td>
-                <td className="border-r bg-muted/30 px-3 py-2 text-center">{minutesToHours(row.he100)}</td>
-                <td className="border-r bg-muted/30 px-3 py-2 text-center">{minutesToHours(row.he100Noturna)}</td>
-                <td className="border-r bg-muted/30 px-3 py-2 text-center">{minutesToHours(row.noturno)}</td>
-                <td className={"border-r px-3 py-2 text-center font-bold " + (row.totalBalance < 0 ? "text-red-600" : "")}>{minutesToHours(row.totalBalance)}</td>
-                <td className="border-r px-3 py-2 text-center whitespace-nowrap">{money(row.totalSalary)}</td>
-                <td className="border-r px-3 py-2 text-center">{minutesToHours(row.totalFolga)}</td>
-                <td className={"border-r px-3 py-2 text-center font-bold " + (row.finalBalance < 0 ? "text-red-600" : "")}>{minutesToHours(row.finalBalance)}</td>
-                <td className={"border-r px-3 py-2 text-center font-semibold " + (row.openHours > 0 ? "bg-orange-100 text-orange-700" : "bg-emerald-50 text-emerald-700")}>{minutesToHours(row.openHours)}</td>
-                <td className="px-3 py-2 text-center text-red-600">{minutesToHours(row.interjornada)}</td>
-              </tr>)}
-              {!loading && !rows.length && <tr><td colSpan={14} className="p-10 text-center text-muted-foreground">Nenhuma competência encontrada para este funcionário.</td></tr>}
-            </tbody>
-            <tfoot>
-              <tr className="bg-slate-100 font-bold">
-                <td colSpan={2} className="px-3 py-3 text-right">TOTAL</td>
-                <td className="px-3 py-3 text-center text-red-600">{minutesToHours(totals.delay)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(totals.he60)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(totals.heNoturna)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(totals.he100)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(totals.he100Noturna)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(totals.noturno)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(totals.balance)}</td>
-                <td className="px-3 py-3 text-center">{money(totals.salary)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(totals.folga)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(finalBalance)}</td>
-                <td className="px-3 py-3 text-center">{minutesToHours(totals.open)}</td>
-                <td className="px-3 py-3 text-center text-red-600">{minutesToHours(totals.interjornada)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 p-4 text-xs text-muted-foreground">
-          <span>As colunas seguem a lógica da sua planilha: atrasos reduzem o saldo; adicionais aumentam; o saldo final acumula competência a competência.</span>
-          <span>{loading ? "Carregando..." : "Atualizado agora"}</span>
+        <div className="grid grid-cols-1 divide-y md:grid-cols-3 md:divide-x md:divide-y-0">
+          <div className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Funcionário</p><p className="mt-1 text-lg font-bold">{employee?.full_name ?? "Selecione um funcionário"}</p></div>
+          <div className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Competências</p><p className="mt-1 text-lg font-bold">{periods.length}</p></div>
+          <div className="p-5"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Saldo acumulado</p><p className={`mt-1 text-lg font-bold ${finalBalance < 0 ? "text-destructive" : "text-primary"}`}>{loading ? "..." : minutesToHours(finalBalance)}</p></div>
         </div>
       </Card>
+
+      <div className="mt-6 space-y-3">
+        {loading ? <Card className="p-8 text-center text-muted-foreground">Carregando saldos...</Card> :
+        rows.length === 0 ? <Card className="p-8 text-center text-muted-foreground">Nenhuma competência encontrada para este funcionário.</Card> :
+        rows.map(row => {
+          const expanded = expandedId === row.period.id;
+          return <Card key={row.period.id} className="overflow-hidden">
+            <button type="button" onClick={() => setExpandedId(expanded ? "" : row.period.id)} className="flex w-full flex-col gap-4 p-5 text-left transition-colors hover:bg-muted/30 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-lg font-bold">{row.label}</span>
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">{row.range}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${row.period.status === "fechado" ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-700"}`}>{row.period.status}</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">Débito = horas em atraso · Interjornada fica somente no histórico.</p>
+              </div>
+              <div className="flex items-center gap-5 md:shrink-0">
+                <div className="text-right"><p className="text-xs text-muted-foreground">Saldo do mês</p><p className={`text-2xl font-bold ${row.monthlyBalance < 0 ? "text-destructive" : "text-primary"}`}>{minutesToHours(row.monthlyBalance)}</p></div>
+                <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado</p><p className={`font-semibold ${row.finalBalance < 0 ? "text-destructive" : ""}`}>{minutesToHours(row.finalBalance)}</p></div>
+                {expanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+              </div>
+            </button>
+
+            {expanded && <div className="border-t bg-muted/10 px-5 py-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border bg-background p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Débito / atraso</p><p className="mt-1 text-xl font-bold text-destructive">{minutesToHours(row.debit)}</p></div>
+                <div className="rounded-xl border bg-background p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Crédito 60%</p><p className="mt-1 text-xl font-bold">{minutesToHours(row.he60)}</p></div>
+                <div className="rounded-xl border bg-background p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">60% + 20% noturno</p><p className="mt-1 text-xl font-bold">{minutesToHours(row.heNoturna)}</p></div>
+                <div className="rounded-xl border bg-background p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">100%</p><p className="mt-1 text-xl font-bold">{minutesToHours(row.he100)}</p></div>
+                <div className="rounded-xl border bg-background p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">100% + 20% noturno</p><p className="mt-1 text-xl font-bold">{minutesToHours(row.he100Noturna)}</p></div>
+                <div className="rounded-xl border bg-background p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Adicional noturno 20%</p><p className="mt-1 text-xl font-bold">{minutesToHours(row.noturno)}</p></div>
+                <div className="rounded-xl border bg-background p-4 sm:col-span-2">
+                  <div className="flex items-center gap-2"><History className="h-4 w-4 text-muted-foreground" /><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Interjornada 50% · histórico</p></div>
+                  <p className="mt-1 text-xl font-bold text-muted-foreground">{minutesToHours(row.interjornada)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Não altera o saldo do mês nem o saldo acumulado.</p>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between rounded-xl border bg-background px-4 py-3">
+                <span className="text-sm text-muted-foreground">Créditos − débitos</span>
+                <span className={`text-lg font-bold ${row.monthlyBalance < 0 ? "text-destructive" : "text-primary"}`}>{minutesToHours(row.monthlyBalance)}</span>
+              </div>
+            </div>}
+          </Card>;
+        })}
+      </div>
     </main>
   </div>;
+
 }
