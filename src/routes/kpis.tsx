@@ -5,31 +5,31 @@ function Kpis(){
  const[m,setM]=useState({employees:0,credits:0,debits:0,positive:0,negative:0,absence:0,certificates:0,absenteeism:0,overtimeValue:0}),[period,setPeriod]=useState(""),[error,setError]=useState("");
  useEffect(()=>{void(async()=>{
   const db=supabase as any;
-  const [e,c,o,a,comp,params]=await Promise.all([
-   db.from("employees").select("id,current_bank_minutes,initial_bank_minutes,work_schedule_id",{count:"exact"}).eq("active",true),
-   db.from("bank_movements").select("minutes"),
-   db.from("occurrences").select("minutes,type,occurrence_date"),
-   db.from("medical_certificates").select("id"),
-   db.from("competencies").select("id,name,start_date,end_date").order("end_date",{ascending:false}).limit(1),
+  const {data:comp,error:ce}=await db.from("competencies").select("id,name,start_date,end_date").order("end_date",{ascending:false}).limit(1).maybeSingle();
+  if(ce){setError(ce.message);return}
+  if(comp)setPeriod(comp.name);
+  const [e,m,o,a,params]=await Promise.all([
+   db.from("employees").select("id,current_bank_minutes,initial_bank_minutes,work_schedule_id").eq("active",true),
+   db.from("bank_movements").select("minutes").eq("competence_id",comp?.id??"00000000-0000-0000-0000-000000000000"),
+   db.from("occurrences").select("minutes,type,occurrence_date").gte("occurrence_date",comp?.start_date??"1900-01-01").lte("occurrence_date",comp?.end_date??"1900-01-01"),
+   db.from("medical_certificates").select("id").gte("start_date",comp?.start_date??"1900-01-01").lte("start_date",comp?.end_date??"1900-01-01"),
    db.from("calculation_parameters").select("code,rate_factor").in("code",["ABS_FALTA","ABS_ATRASO","ABS_SAIDA_ANTECIPADA","ABS_ATESTADO"])
   ]);
-  const err=[e,c,o,a,comp,params].find(x=>x.error);if(err){setError(err.error.message);return}
-  const employees=e.data??[];const mov=c.data??[];const occ=o.data??[];const current=comp.data?.[0];const p=new Map<string,number>((params.data??[]).map((x:any)=>[x.code,Number(x.rate_factor)]));
-  if(current)setPeriod(current.name);
+  const err=[e,m,o,a,params].find(x=>x.error);if(err){setError(err.error.message);return}
+  const employees=e.data??[],mov=m.data??[],occ=o.data??[],p=new Map<string,number>((params.data??[]).map((x:any)=>[x.code,Number(x.rate_factor)]));
   const credits=mov.filter((x:any)=>x.minutes>0).reduce((s:number,x:any)=>s+x.minutes,0);
   const debits=mov.filter((x:any)=>x.minutes<0).reduce((s:number,x:any)=>s+Math.abs(x.minutes),0);
   const positive=employees.filter((x:any)=>(x.current_bank_minutes??x.initial_bank_minutes??0)>0).length;
   const negative=employees.filter((x:any)=>(x.current_bank_minutes??x.initial_bank_minutes??0)<0).length;
   const absence=occ.reduce((s:number,x:any)=>{const code=x.type==="Falta"?"ABS_FALTA":x.type==="Atraso"?"ABS_ATRASO":x.type==="Saída antecipada"?"ABS_SAIDA_ANTECIPADA":"";return s+((code&&p.get(code)!==0)?(x.minutes||0):0)},0);
   let scheduled=0;
-  if(current){
-    const start=new Date(current.start_date+"T12:00:00"),end=new Date(current.end_date+"T12:00:00");
+  if(comp){
+    const start=new Date(comp.start_date+"T12:00:00"),end=new Date(comp.end_date+"T12:00:00");
     const weekdays=Math.max(1,Array.from({length:Math.floor((end.getTime()-start.getTime())/86400000)+1},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d.getDay()}).filter(d=>d!==0&&d!==6).length);
     const schedules=await Promise.all(employees.map((x:any)=>x.work_schedule_id?db.from("work_schedules").select("weekly_minutes").eq("id",x.work_schedule_id).maybeSingle():Promise.resolve({data:null})));
     scheduled=schedules.reduce((s:number,x:any)=>s+(x.data?.weekly_minutes?x.data.weekly_minutes/5*weekdays:0),0);
   }
-  const absenteeism=scheduled?absence/scheduled*100:0;
-  setM({employees:employees.length,credits,debits,positive,negative,absence,certificates:(a.data??[]).length,absenteeism,overtimeValue:0});
+  setM({employees:employees.length,credits,debits,positive,negative,absence,certificates:(a.data??[]).length,absenteeism:scheduled?absence/scheduled*100:0,overtimeValue:0});
  })()},[]);
  return <div className="min-h-screen bg-background"><header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] justify-between"><Link to="/" className="text-sm text-muted-foreground"><ArrowLeft className="inline h-4 w-4 mr-1"/>Voltar</Link><b>DP Success · KPIs</b></div></header>
  <main className="mx-auto max-w-[1500px] px-6 py-7"><p className="text-sm text-primary">Gestão</p><h1 className="text-3xl font-bold">KPIs de RH e DP</h1><p className="mt-1 text-sm text-muted-foreground">{period||"Competência atual"}</p>{error&&<p className="mt-4 text-sm text-destructive">{error}</p>}
