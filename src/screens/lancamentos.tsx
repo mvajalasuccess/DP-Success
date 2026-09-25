@@ -9,6 +9,7 @@ const calculationRules: Record<string, { code: string; label: string }> = {
   "Adicional noturno 20%": { code: "ADICIONAL_NOTURNO", label: "Adicional noturno" },
   "Domingo / feriado 100%": { code: "DOMINGO_FERIADO", label: "Domingo / feriado" },
   "Interjornada 50%": { code: "INTERJORNADA", label: "Interjornada" },
+  "Domingo / feriado 100% + 20%": { code: "DOMINGO_FERIADO_NOTURNO", label: "HE 100% + 20% noturno" },
   "Crédito / débito": { code: "CREDITO", label: "Crédito / débito" },
 };
 const types = [
@@ -43,9 +44,6 @@ export function Launches() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const [h, m] = hours.split(":").map(Number);
-  const minutes = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-
 
   async function loadData() {
     setLoading(true); setError("");
@@ -60,14 +58,24 @@ export function Launches() {
     if (!period) { setLaunches([]); setLoading(false); return; }
 
     const [otRes, bankRes] = await Promise.all([
-      supabase.from("overtime_records").select("id,employee_id,reference_date,minutes,notes").eq("period_id", period.id).order("reference_date", { ascending: false }),
+      supabase.from("overtime_records").select("id,employee_id,reference_date,minutes,rate_percent,notes").eq("period_id", period.id).order("reference_date", { ascending: false }),
       supabase.from("bank_hours").select("id,employee_id,entry_date,kind,minutes,justification").eq("period_id", period.id).order("entry_date", { ascending: false }),
     ]);
     if (otRes.error) { setError(otRes.error.message); setLoading(false); return; }
     if (bankRes.error) { setError(bankRes.error.message); setLoading(false); return; }
     const names = new Map((empRes.data ?? []).map((e: any) => [e.id, e.full_name]));
-    const overtime = (otRes.data ?? []).map((r: any): Launch => ({ id: r.id, source: "overtime", employee_id: r.employee_id, launch_date: r.reference_date, type: "HE_60", direction: "CREDITO", minutes: Number(r.minutes || 0), description: r.notes, employee: { full_name: names.get(r.employee_id) } }));
-    const bank = (bankRes.data ?? []).map((r: any): Launch => ({ id: r.id, source: "bank", employee_id: r.employee_id, launch_date: r.entry_date, type: "CREDITO", direction: r.kind === "debito" ? "DEBITO" : "CREDITO", minutes: Number(r.minutes || 0), description: r.justification, employee: { full_name: names.get(r.employee_id) } }));
+    const overtime = (otRes.data ?? []).map((r: any): Launch => ({
+      id: r.id, source: "overtime", employee_id: r.employee_id, launch_date: r.reference_date,
+      type: r.rate_percent === 100 ? (String(r.notes || "").includes("noturna") ? "HE_100_NOTURNA" : "DOMINGO_FERIADO")
+        : r.rate_percent === 50 ? "INTERJORNADA" : r.rate_percent === 20 ? "ADICIONAL_NOTURNO"
+        : String(r.notes || "").includes("60% + 20%") || String(r.notes || "").includes("noturna") ? "HE_NOTURNA" : "HE_60",
+      direction: "CREDITO", minutes: Number(r.minutes || 0), description: r.notes, employee: { full_name: names.get(r.employee_id) }
+    }));
+    const bank = (bankRes.data ?? []).map((r: any): Launch => ({
+      id: r.id, source: "bank", employee_id: r.employee_id, launch_date: r.entry_date,
+      type: String(r.justification || "").includes("Débito") ? "DEBITO" : "CREDITO",
+      direction: r.kind === "debito" ? "DEBITO" : "CREDITO", minutes: Number(r.minutes || 0), description: r.justification, employee: { full_name: names.get(r.employee_id) }
+    }));
     setLaunches([...overtime, ...bank].sort((a, b) => b.launch_date.localeCompare(a.launch_date)));
     if (!launchDate) setLaunchDate(periodDates(period).end);
     setLoading(false);
@@ -130,6 +138,7 @@ export function Launches() {
     }
 
     const debitMinutes = parseHours(debitHours);
+    const debitMinutes = parseHours(debitHours);
     const validLines = creditLines.map(line => ({ type: line.type, minutes: parseHours(line.hours) })).filter(line => line.minutes > 0);
     if (!validLines.length && debitMinutes <= 0) {
       setError("Informe pelo menos um crédito ou débito.");
@@ -146,10 +155,7 @@ export function Launches() {
     for (const line of validLines) {
       const rule = calculationRules[line.type] ?? calculationRules["Hora extra 60%"];
       const result = await supabase.from("overtime_records").insert({
-        employee_id: employeeId,
-        period_id: competence.id,
-        reference_date: launchDate,
-        minutes: line.minutes,
+        employee_id: employeeId, period_id: competence.id, reference_date: launchDate, minutes: line.minutes,
         rate_percent: rule.code === "DOMINGO_FERIADO" ? 100 : rule.code === "INTERJORNADA" ? 50 : rule.code === "ADICIONAL_NOTURNO" ? 20 : 60,
         notes: rule.label,
       });
@@ -158,40 +164,8 @@ export function Launches() {
 
     if (debitMinutes > 0) {
       const result = await supabase.from("bank_hours").insert({
-        employee_id: employeeId,
-        period_id: competence.id,
-        entry_date: launchDate,
-        kind: "debito",
-        minutes: debitMinutes,
-        previous_balance_minutes: 0,
-        balance_minutes: -debitMinutes,
-        justification: "Débito do lançamento",
-      });
-      if (result.error) { setError(result.error.message); setSaving(false); return; }
-    }
-
-    const validLines = creditLines.map(line => ({ type: line.type, minutes: parseHours(line.hours) })).filter(line => line.minutes > 0);
-    if (!validLines.length) {
-      setError("Informe pelo menos uma quantidade de horas.");
-      setSaving(false); return;
-    }
-
-    if (editing) {
-      const del = editing.source === "overtime"
-        ? await supabase.from("overtime_records").delete().eq("id", editing.id)
-        : await supabase.from("bank_hours").delete().eq("id", editing.id);
-      if (del.error) { setError(del.error.message); setSaving(false); return; }
-    }
-
-    for (const line of validLines) {
-      const rule = calculationRules[line.type] ?? calculationRules["Hora extra 60%"];
-      const result = await supabase.from("overtime_records").insert({
-        employee_id: employeeId,
-        period_id: competence.id,
-        reference_date: launchDate,
-        minutes: line.minutes,
-        rate_percent: rule.code === "DOMINGO_FERIADO" ? 100 : rule.code === "INTERJORNADA" ? 50 : rule.code === "ADICIONAL_NOTURNO" ? 20 : 60,
-        notes: rule.label + (description.trim() ? " · " + description.trim() : ""),
+        employee_id: employeeId, period_id: competence.id, entry_date: launchDate, kind: "debito", minutes: debitMinutes,
+        previous_balance_minutes: 0, balance_minutes: -debitMinutes, justification: "Débito do lançamento",
       });
       if (result.error) { setError(result.error.message); setSaving(false); return; }
     }
