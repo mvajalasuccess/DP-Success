@@ -12,7 +12,7 @@ export function Schedules() {
   const [error, setError] = useState("");
 
   async function load() {
-    const { data, error } = await (supabase).from("work_schedules").select("id,name,weekly_minutes,divisor,active").order("name");
+    const { data, error } = await (supabase).from("work_schedules").select("id,name,weekly_minutes,active").order("name");
     if (error) setError(error.message); else setRows(data ?? []);
   }
   useEffect(() => { void load(); }, []);
@@ -59,7 +59,7 @@ export function Schedules() {
       <div className="mt-5 grid gap-3">
         <label className="grid gap-1 text-sm font-medium">Nome<input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border px-3 py-2 font-normal" placeholder="Ex.: Administrativo 44h" /></label>
         <label className="grid gap-1 text-sm font-medium">Horas semanais<input type="number" min="1" step="0.01" value={form.weekly} onChange={(e) => setForm({ ...form, weekly: e.target.value })} className="rounded-lg border px-3 py-2 font-normal" /></label>
-        <label className="grid gap-1 text-sm font-medium">Divisor mensal<input type="number" min="1" step="0.01" value={form.divisor} onChange={(e) => setForm({ ...form, divisor: e.target.value })} className="rounded-lg border px-3 py-2 font-normal" /></label>
+        
       </div>
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
       <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2">Cancelar</button><button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar jornada"}</button></div>
