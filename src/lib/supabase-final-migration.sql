@@ -699,3 +699,480 @@ drop trigger if exists trg_log_competence_close on competencies;
 create trigger trg_log_competence_close
 after update on competencies
 for each row execute function log_competence_close();
+
+
+-- ============================================================
+-- HARDENING DE SEGURANÇA - ACESSO POR USUÁRIO/ROLE
+-- Corrige políticas amplas (USING/WITH CHECK true) e restringe
+-- os dados do DP a usuários autorizados no próprio banco.
+-- ============================================================
+
+create schema if not exists private;
+
+create table if not exists public.app_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  role text not null default 'RH'
+    check (role in ('ADMIN','RH','CONSULTA')),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table public.app_users enable row level security;
+revoke all on table public.app_users from anon, authenticated;
+
+create or replace function private.has_app_access()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.app_users au
+    where au.user_id = (select auth.uid())
+      and au.active = true
+  );
+$$;
+
+create or replace function private.has_role(p_role text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.app_users au
+    where au.user_id = (select auth.uid())
+      and au.active = true
+      and (au.role = p_role or au.role = 'ADMIN')
+  );
+$$;
+
+revoke all on function private.has_app_access() from public, anon;
+revoke all on function private.has_role(text) from public, anon;
+grant usage on schema private to authenticated;
+grant execute on function private.has_app_access() to authenticated;
+grant execute on function private.has_role(text) to authenticated;
+
+-- Remove políticas amplas antigas e torna este bloco reaplicável.
+drop policy if exists departments_authenticated_all on public.departments;
+drop policy if exists positions_authenticated_all on public.positions;
+drop policy if exists work_schedules_authenticated_all on public.work_schedules;
+drop policy if exists employees_authenticated_all on public.employees;
+drop policy if exists competencies_authenticated_all on public.competencies;
+drop policy if exists point_launches_authenticated_all on public.point_launches;
+drop policy if exists bank_movements_authenticated_all on public.bank_movements;
+drop policy if exists salary_history_authenticated_all on public.salary_history;
+drop policy if exists calculation_parameters_authenticated_all on public.calculation_parameters;
+drop policy if exists competence_employee_balances_authenticated_all on public.competence_employee_balances;
+drop policy if exists audit_logs_authenticated_select on public.audit_logs;
+drop policy if exists audit_logs_authenticated_insert on public.audit_logs;
+
+drop policy if exists departments_app_select on public.departments;
+drop policy if exists departments_app_insert on public.departments;
+drop policy if exists departments_app_update on public.departments;
+drop policy if exists departments_app_delete on public.departments;
+drop policy if exists positions_app_select on public.positions;
+drop policy if exists positions_app_insert on public.positions;
+drop policy if exists positions_app_update on public.positions;
+drop policy if exists positions_app_delete on public.positions;
+drop policy if exists work_schedules_app_select on public.work_schedules;
+drop policy if exists work_schedules_app_insert on public.work_schedules;
+drop policy if exists work_schedules_app_update on public.work_schedules;
+drop policy if exists work_schedules_app_delete on public.work_schedules;
+drop policy if exists employees_app_select on public.employees;
+drop policy if exists employees_app_insert on public.employees;
+drop policy if exists employees_app_update on public.employees;
+drop policy if exists employees_app_delete on public.employees;
+drop policy if exists salary_history_app_select on public.salary_history;
+drop policy if exists salary_history_app_insert on public.salary_history;
+drop policy if exists salary_history_app_update on public.salary_history;
+drop policy if exists salary_history_app_delete on public.salary_history;
+drop policy if exists competencies_app_select on public.competencies;
+drop policy if exists competencies_app_insert on public.competencies;
+drop policy if exists competencies_app_update on public.competencies;
+drop policy if exists competencies_app_delete on public.competencies;
+drop policy if exists point_launches_app_select on public.point_launches;
+drop policy if exists point_launches_app_insert on public.point_launches;
+drop policy if exists point_launches_app_update on public.point_launches;
+drop policy if exists point_launches_app_delete on public.point_launches;
+drop policy if exists bank_movements_app_select on public.bank_movements;
+drop policy if exists bank_movements_app_insert on public.bank_movements;
+drop policy if exists bank_movements_app_update on public.bank_movements;
+drop policy if exists bank_movements_app_delete on public.bank_movements;
+drop policy if exists occurrences_app_select on public.occurrences;
+drop policy if exists occurrences_app_insert on public.occurrences;
+drop policy if exists occurrences_app_update on public.occurrences;
+drop policy if exists occurrences_app_delete on public.occurrences;
+drop policy if exists competence_balances_app_select on public.competence_employee_balances;
+drop policy if exists competence_balances_app_insert on public.competence_employee_balances;
+drop policy if exists competence_balances_app_update on public.competence_employee_balances;
+drop policy if exists competence_balances_app_delete on public.competence_employee_balances;
+drop policy if exists calculation_parameters_app_select on public.calculation_parameters;
+drop policy if exists calculation_parameters_app_insert on public.calculation_parameters;
+drop policy if exists calculation_parameters_app_update on public.calculation_parameters;
+drop policy if exists calculation_parameters_app_delete on public.calculation_parameters;
+drop policy if exists medical_certificates_app_select on public.medical_certificates;
+drop policy if exists medical_certificates_app_insert on public.medical_certificates;
+drop policy if exists medical_certificates_app_update on public.medical_certificates;
+drop policy if exists medical_certificates_app_delete on public.medical_certificates;
+drop policy if exists audit_logs_admin_select on public.audit_logs;
+
+revoke all on table
+  public.departments,
+  public.positions,
+  public.work_schedules,
+  public.employees,
+  public.salary_history,
+  public.competencies,
+  public.point_launches,
+  public.bank_movements,
+  public.medical_certificates,
+  public.occurrences,
+  public.calculation_parameters,
+  public.competence_employee_balances,
+  public.audit_logs
+from anon;
+
+grant select, insert, update, delete on table
+  public.departments,
+  public.positions,
+  public.work_schedules,
+  public.employees,
+  public.salary_history,
+  public.competencies,
+  public.point_launches,
+  public.bank_movements,
+  public.medical_certificates,
+  public.occurrences,
+  public.calculation_parameters,
+  public.competence_employee_balances
+to authenticated;
+
+grant select on table public.audit_logs to authenticated;
+
+alter table public.departments enable row level security;
+alter table public.positions enable row level security;
+alter table public.work_schedules enable row level security;
+alter table public.employees enable row level security;
+alter table public.salary_history enable row level security;
+alter table public.competencies enable row level security;
+alter table public.point_launches enable row level security;
+alter table public.bank_movements enable row level security;
+alter table public.medical_certificates enable row level security;
+alter table public.occurrences enable row level security;
+alter table public.calculation_parameters enable row level security;
+alter table public.competence_employee_balances enable row level security;
+alter table public.audit_logs enable row level security;
+
+create policy departments_app_select on public.departments
+for select to authenticated
+using ((select private.has_app_access()));
+create policy departments_app_insert on public.departments
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy departments_app_update on public.departments
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy departments_app_delete on public.departments
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy positions_app_select on public.positions
+for select to authenticated
+using ((select private.has_app_access()));
+create policy positions_app_insert on public.positions
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy positions_app_update on public.positions
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy positions_app_delete on public.positions
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy work_schedules_app_select on public.work_schedules
+for select to authenticated
+using ((select private.has_app_access()));
+create policy work_schedules_app_insert on public.work_schedules
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy work_schedules_app_update on public.work_schedules
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy work_schedules_app_delete on public.work_schedules
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy employees_app_select on public.employees
+for select to authenticated
+using ((select private.has_app_access()));
+create policy employees_app_insert on public.employees
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy employees_app_update on public.employees
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy employees_app_delete on public.employees
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy salary_history_app_select on public.salary_history
+for select to authenticated
+using ((select private.has_app_access()));
+create policy salary_history_app_insert on public.salary_history
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy salary_history_app_update on public.salary_history
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy salary_history_app_delete on public.salary_history
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy competencies_app_select on public.competencies
+for select to authenticated
+using ((select private.has_app_access()));
+create policy competencies_app_insert on public.competencies
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy competencies_app_update on public.competencies
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy competencies_app_delete on public.competencies
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy point_launches_app_select on public.point_launches
+for select to authenticated
+using ((select private.has_app_access()));
+create policy point_launches_app_insert on public.point_launches
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy point_launches_app_update on public.point_launches
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy point_launches_app_delete on public.point_launches
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy bank_movements_app_select on public.bank_movements
+for select to authenticated
+using ((select private.has_app_access()));
+create policy bank_movements_app_insert on public.bank_movements
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy bank_movements_app_update on public.bank_movements
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy bank_movements_app_delete on public.bank_movements
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy occurrences_app_select on public.occurrences
+for select to authenticated
+using ((select private.has_app_access()));
+create policy occurrences_app_insert on public.occurrences
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy occurrences_app_update on public.occurrences
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy occurrences_app_delete on public.occurrences
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy competence_balances_app_select on public.competence_employee_balances
+for select to authenticated
+using ((select private.has_app_access()));
+create policy competence_balances_app_insert on public.competence_employee_balances
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy competence_balances_app_update on public.competence_employee_balances
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy competence_balances_app_delete on public.competence_employee_balances
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy calculation_parameters_app_select on public.calculation_parameters
+for select to authenticated
+using ((select private.has_app_access()));
+create policy calculation_parameters_app_insert on public.calculation_parameters
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy calculation_parameters_app_update on public.calculation_parameters
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy calculation_parameters_app_delete on public.calculation_parameters
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+-- Atestados: dado médico sensível, somente ADMIN/RH.
+create policy medical_certificates_app_select on public.medical_certificates
+for select to authenticated
+using ((select private.has_role('RH')));
+create policy medical_certificates_app_insert on public.medical_certificates
+for insert to authenticated
+with check ((select private.has_role('RH')));
+create policy medical_certificates_app_update on public.medical_certificates
+for update to authenticated
+using ((select private.has_role('RH')))
+with check ((select private.has_role('RH')));
+create policy medical_certificates_app_delete on public.medical_certificates
+for delete to authenticated
+using ((select private.has_role('ADMIN')));
+
+create policy audit_logs_admin_select on public.audit_logs
+for select to authenticated
+using ((select private.has_role('ADMIN')));
+
+-- Funções SECURITY DEFINER só podem ser chamadas pela aplicação autenticada.
+revoke execute on function public.create_competence_for_date(date) from public, anon, authenticated;
+revoke execute on function public.close_competence(uuid) from public, anon, authenticated;
+grant execute on function public.create_competence_for_date(date) to authenticated;
+grant execute on function public.close_competence(uuid) to authenticated;
+
+create or replace function public.create_competence_for_date(p_date date)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_start date;
+  v_end date;
+  v_id uuid;
+begin
+  if not (select private.has_role('RH')) then
+    raise exception 'Usuário sem permissão para criar competência.';
+  end if;
+
+  if extract(day from p_date) >= 21 then
+    v_start := make_date(extract(year from p_date)::int, extract(month from p_date)::int, 21);
+    v_end := (v_start + interval '1 month')::date - 1;
+  else
+    v_end := make_date(extract(year from p_date)::int, extract(month from p_date)::int, 20);
+    v_start := (v_end - interval '1 month')::date + 1;
+  end if;
+
+  insert into public.competencies(name,start_date,end_date,status)
+  values (
+    to_char(v_start,'DD/MM/YYYY') || ' → ' || to_char(v_end,'DD/MM/YYYY'),
+    v_start,v_end,'EM_ANDAMENTO'
+  )
+  on conflict(start_date,end_date) do update set name = excluded.name
+  returning id into v_id;
+
+  if v_id is null then
+    select id into v_id
+    from public.competencies
+    where start_date=v_start and end_date=v_end;
+  end if;
+
+  return v_id;
+end;
+$$;
+
+create or replace function public.close_competence(p_competence_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_status text;
+  v_end date;
+  v_next_start date;
+  v_next_end date;
+begin
+  if not (select private.has_role('RH')) then
+    raise exception 'Usuário sem permissão para fechar competência.';
+  end if;
+
+  select status,end_date into v_status,v_end
+  from public.competencies
+  where id=p_competence_id
+  for update;
+
+  if v_status is null then raise exception 'Competência não encontrada.'; end if;
+  if v_status='FECHADA' then return; end if;
+
+  insert into public.competence_employee_balances(
+    competence_id,employee_id,opening_minutes,credit_minutes,debit_minutes,closing_minutes,estimated_value
+  )
+  select
+    p_competence_id,
+    e.id,
+    coalesce(prev.closing_minutes, e.current_bank_minutes, e.initial_bank_minutes, 0),
+    coalesce(sum(case when bm.minutes>0 then bm.minutes else 0 end),0),
+    coalesce(sum(case when bm.minutes<0 then abs(bm.minutes) else 0 end),0),
+    coalesce(prev.closing_minutes, e.current_bank_minutes, e.initial_bank_minutes, 0) + coalesce(sum(bm.minutes),0),
+    coalesce(sum(pl.financial_value),0)
+  from public.employees e
+  left join lateral (
+    select b.closing_minutes
+    from public.competence_employee_balances b
+    join public.competencies pc on pc.id=b.competence_id
+    where b.employee_id=e.id
+      and pc.end_date < (select start_date from public.competencies where id=p_competence_id)
+    order by pc.end_date desc
+    limit 1
+  ) prev on true
+  left join public.bank_movements bm
+    on bm.employee_id=e.id and bm.competence_id=p_competence_id
+  left join public.point_launches pl on pl.id=bm.launch_id
+  where e.active=true
+  group by e.id, prev.closing_minutes, e.current_bank_minutes, e.initial_bank_minutes
+  on conflict(competence_id,employee_id) do update set
+    opening_minutes=excluded.opening_minutes,
+    credit_minutes=excluded.credit_minutes,
+    debit_minutes=excluded.debit_minutes,
+    closing_minutes=excluded.closing_minutes,
+    estimated_value=excluded.estimated_value,
+    updated_at=now();
+
+  update public.competencies
+  set status='FECHADA',closed_at=now(),updated_at=now()
+  where id=p_competence_id;
+
+  v_next_start := v_end + 1;
+  v_next_end := (v_next_start + interval '1 month')::date - 1;
+
+  insert into public.competencies(name,start_date,end_date,status)
+  values(
+    to_char(v_next_start,'DD/MM/YYYY') || ' → ' || to_char(v_next_end,'DD/MM/YYYY'),
+    v_next_start,v_next_end,'ABERTA'
+  )
+  on conflict(start_date,end_date) do nothing;
+
+  update public.employees e
+  set current_bank_minutes=b.closing_minutes, updated_at=now()
+  from public.competence_employee_balances b
+  where b.competence_id=p_competence_id and b.employee_id=e.id;
+end;
+$$;
+
+-- Funções usadas exclusivamente por triggers não devem ser expostas via API.
+revoke execute on function public.validate_point_launch() from public, anon, authenticated;
+revoke execute on function public.sync_bank_movement_from_launch() from public, anon, authenticated;
+revoke execute on function public.delete_bank_movement_from_launch() from public, anon, authenticated;
+revoke execute on function public.set_updated_at() from public, anon, authenticated;
+revoke execute on function public.validate_salary_history() from public, anon, authenticated;
+revoke execute on function public.snapshot_point_launch() from public, anon, authenticated;
+revoke execute on function public.initialize_employee_current_bank() from public, anon, authenticated;
+revoke execute on function public.log_competence_close() from public, anon, authenticated;
