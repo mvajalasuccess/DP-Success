@@ -24,7 +24,7 @@ const types = [
   { label: "Crédito / débito", icon: ArrowDownUp },
 ];
 
-type Employee = { id: string; full_name: string; salary?: number; department?: { name?: string } | null };
+type Employee = { id: string; full_name: string; salary?: number; divisor?: number; department?: { name?: string } | null };
 type Launch = {
   id: string;
   launch_date: string;
@@ -53,7 +53,7 @@ function Launches() {
   const [error, setError] = useState("");
 
   const selectedEmployee = employees.find(e => e.id === employeeId);
-  const hourlyRate = (selectedEmployee?.salary ?? 0) / 220;
+  const hourlyRate = (selectedEmployee?.salary ?? 0) / (selectedEmployee?.divisor ?? 220);
   const [h, m] = hours.split(":").map(Number);
   const minutes = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
   const rule = calculationRules[selectedType] ?? calculationRules["Crédito / débito"];
@@ -64,7 +64,7 @@ function Launches() {
     setError("");
     const db = supabase as any;
     const [empRes, compRes] = await Promise.all([
-      db.from("employees").select("id,full_name,department_id").eq("active", true).order("full_name"),
+      db.from("employees").select("id,full_name,department_id,work_schedule_id").eq("active", true).order("full_name"),
       db.from("competencies").select("id,name,start_date,end_date,status").order("end_date", { ascending: false }).limit(1),
     ]);
 
@@ -82,7 +82,7 @@ function Launches() {
           .eq("employee_id", employee.id)
           .order("valid_from", { ascending: false })
           .limit(1);
-        return { ...employee, salary: data?.[0]?.salary ?? 0 };
+        const schedule = await db.from("work_schedules").select("divisor").eq("id", employee.work_schedule_id).maybeSingle();\n        return { ...employee, salary: data?.[0]?.salary ?? 0, divisor: schedule.data?.divisor ?? 220 };
       }),
     );
 
@@ -198,7 +198,7 @@ function Launches() {
         <div className="grid grid-cols-2 border-b text-center text-sm"><div className="p-3"><p className="text-xs text-muted-foreground">Lançamentos</p><p className="font-bold">{loading ? "…" : filtered.length}</p></div><div className="border-l p-3"><p className="text-xs text-muted-foreground">Saldo dos lançamentos</p><p className={totalMinutes < 0 ? "font-bold text-destructive" : "font-bold text-primary"}>{formatMinutes(totalMinutes)}</p></div></div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Horas</th><th className="px-5 py-3">Valor estimado</th></tr></thead>
-          <tbody className="divide-y">{filtered.map(row => <tr key={row.id}><td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{formatDate(row.launch_date)}</td><td className="px-5 py-4">{row.type}</td><td className={`px-5 py-4 font-bold ${row.direction === "DEBITO" ? "text-destructive" : "text-primary"}`}>{formatMinutes(row.direction === "DEBITO" ? -row.minutes : row.minutes)}</td><td className="px-5 py-4">{formatMoney(row.financial_value)}</td></tr>)}</tbody>
+          <tbody className="divide-y">{filtered.map(row => <tr key={row.id}><td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{formatDate(row.launch_date)}</td><td className="px-5 py-4">{({HE_60:"HE 60%",HE_NOTURNA:"HE noturna",ADICIONAL_NOTURNO:"Adicional noturno",DOMINGO_FERIADO:"Domingo / feriado",INTERJORNADA:"Interjornada",CREDITO:"Crédito / débito"} as Record<string,string>)[row.type] ?? row.type}</td><td className={`px-5 py-4 font-bold ${row.direction === "DEBITO" ? "text-destructive" : "text-primary"}`}>{formatMinutes(row.direction === "DEBITO" ? -row.minutes : row.minutes)}</td><td className="px-5 py-4">{formatMoney(row.financial_value)}</td></tr>)}</tbody>
           </table>
           {!loading && filtered.length === 0 && <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento encontrado.</div>}
         </div>
@@ -216,7 +216,7 @@ function Launches() {
           <label className="grid gap-1 text-sm font-medium">Horas<input value={hours} onChange={e => setHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="02:30"/></label>
           <label className="grid gap-1 text-sm font-medium">Observação<input value={description} onChange={e => setDescription(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"/></label>
         </div>
-        <div className="mt-4 rounded-lg border bg-muted/30 p-4 text-sm"><div className="flex justify-between"><span className="text-muted-foreground">Valor hora</span><strong>{hourlyRate.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</strong></div><div className="mt-2 flex justify-between"><span className="text-muted-foreground">Valor estimado</span><strong>{estimatedValue.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</strong></div></div>
+        <div className="mt-4 rounded-lg border bg-muted/30 p-4 text-sm"><div className="flex justify-between"><span className="text-muted-foreground">Valor hora (prévia)</span><strong>{hourlyRate.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</strong></div><div className="mt-2 flex justify-between"><span className="text-muted-foreground">Valor estimado (prévia)</span><strong>{estimatedValue.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</strong></div></div>
         <div className="mt-5 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void createLaunch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar lançamento"}</button></div>
       </Card>
     </div>}
