@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Plus, Search, UserRound, BriefcaseBusiness, WalletCards, X } from "lucide-react";
+import { ArrowLeft, Plus, Search, UserRound, BriefcaseBusiness, WalletCards, Pencil, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
