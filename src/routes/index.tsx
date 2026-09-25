@@ -69,7 +69,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       setUserEmail(sessionData.session.user.email || "Usuário RH");
       const db = supabase;
       const [emps, comp, overtimeRows, bankRows, occ, cert] = await Promise.all([
-        db.from("employees").select("id,full_name,department_id,departments(name)").eq("active", true),
+        db.from("employees").select("id,full_name,department_id,departments(name)").eq("status", "ativo"),
         db.from("time_periods").select("id,reference_year,reference_month,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
         db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
         db.from("bank_hours").select("employee_id,balance_minutes,entry_date").order("entry_date", { ascending: false }),
