@@ -67,24 +67,49 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         return;
       }
       setUserEmail(sessionData.session.user.email || "Usuário RH");
-      const db = supabase as any;
-      const [emps, comp, launch, occ, cert] = await Promise.all([
-        db.from("employees").select("id,full_name,department_id,current_bank_minutes,initial_bank_minutes,departments(name)").eq("active", true),
-        db.from("competencies").select("id,name,status").order("end_date", { ascending: false }).limit(1),
-        db.from("point_launches").select("employee_id,type,minutes").order("launch_date", { ascending: false }),
-        db.from("occurrences").select("employee_id,type,minutes"),
+      const db = supabase;
+      const [emps, comp, overtimeRows, bankRows, occ, cert] = await Promise.all([
+        db.from("employees").select("id,full_name,department_id,departments(name)").eq("status", "ativo"),
+        db.from("time_periods").select("id,reference_year,reference_month,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
+        db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
+        db.from("bank_hours").select("employee_id,balance_minutes,entry_date").order("entry_date", { ascending: false }),
+        db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_types(code)").order("occurrence_date", { ascending: false }),
         db.from("medical_certificates").select("id"),
       ]);
+
       const employees = emps.data ?? [];
       const competence = comp.data?.[0];
-      const launches = launch.data ?? [];
+      const overtimeData = overtimeRows.data ?? [];
+      const bankData = bankRows.data ?? [];
       const occurrences = occ.data ?? [];
-      const overtimeTypes = ["HE_60", "HE_NOTURNA", "DOMINGO_FERIADO", "INTERJORNADA"];
-      const overtime = launches.filter((x: any) => overtimeTypes.includes(x.type)).reduce((s: number, x: any) => s + (x.minutes || 0), 0);
-      const absence = occurrences.filter((x: any) => x.type === "Falta").reduce((s: number, x: any) => s + (x.minutes || 0), 0);
-      const bank = employees.reduce((s: number, x: any) => s + (x.current_bank_minutes ?? x.initial_bank_minutes ?? 0), 0);
+
+      const currentOvertime = competence
+        ? overtimeData.filter((x: any) => x.period_id === competence.id)
+        : overtimeData;
+      const overtime = currentOvertime.reduce((sum: number, row: any) => sum + (row.minutes || 0), 0);
+
+      const latestBankByEmployee = new Map<string, number>();
+      for (const row of bankData as any[]) {
+        if (!latestBankByEmployee.has(row.employee_id)) {
+          latestBankByEmployee.set(row.employee_id, row.balance_minutes || 0);
+        }
+      }
+      const bank = employees.reduce(
+        (sum: number, row: any) => sum + (latestBankByEmployee.get(row.id) || 0),
+        0,
+      );
+
+      const absence = occurrences
+        .filter((x: any) => x.occurrence_types?.code === "falta")
+        .reduce((sum: number, x: any) => {
+          const quantity = Number(x.quantity || 0);
+          return sum + (x.unit === "horas" ? quantity * 60 : quantity * 480);
+        }, 0);
+
       const byEmployee = new Map<string, number>();
-      launches.filter((x: any) => overtimeTypes.includes(x.type)).forEach((x: any) => byEmployee.set(x.employee_id, (byEmployee.get(x.employee_id) || 0) + (x.minutes || 0)));
+      currentOvertime.forEach((row: any) => {
+        byEmployee.set(row.employee_id, (byEmployee.get(row.employee_id) || 0) + (row.minutes || 0));
+      });
       setTop(employees.map((x: any) => ({ name: x.full_name, minutes: byEmployee.get(x.id) || 0 })).filter(x => x.minutes > 0).sort((a, b) => b.minutes - a.minutes).slice(0, 5));
       const deptMap = new Map<string, { name: string; employees: number; minutes: number }>();
       employees.forEach((x: any) => {
@@ -99,7 +124,18 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         if (deptMap.has(name)) deptMap.get(name)!.minutes += x.minutes || 0;
       });
       setDepartments([...deptMap.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 6));
-      setMetrics({ employees: employees.length, overtime, bank, absence, certificates: (cert.data ?? []).length, absenteeism: 0, period: competence?.name || "Nenhuma competência" });
+      const periodLabel = competence
+        ? `Competência ${String(competence.reference_month).padStart(2, "0")}/${competence.reference_year}`
+        : "Nenhuma competência";
+      setMetrics({
+        employees: employees.length,
+        overtime,
+        bank,
+        absence,
+        certificates: (cert.data ?? []).length,
+        absenteeism: 0,
+        period: periodLabel,
+      });
       setAlerts(competence && competence.status !== "FECHADA" ? ["Competência não fechada"] : []);
     })();
   }, []);
