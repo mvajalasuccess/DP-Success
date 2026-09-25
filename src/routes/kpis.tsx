@@ -5,7 +5,7 @@ function Kpis(){
  const[m,setM]=useState({employees:0,credits:0,debits:0,positive:0,negative:0,absence:0,certificates:0,absenteeism:0,overtimeValue:0}),[period,setPeriod]=useState(""),[error,setError]=useState("");
  useEffect(()=>{void(async()=>{
   const db=supabase as any;
-  const [e,c,o,a,comp]=await Promise.all([
+  const [e,c,o,a,comp,params]=await Promise.all([
    db.from("employees").select("id,current_bank_minutes,initial_bank_minutes,work_schedule_id",{count:"exact"}).eq("active",true),
    db.from("bank_movements").select("minutes"),
    db.from("occurrences").select("minutes,type,occurrence_date"),
@@ -13,7 +13,7 @@ function Kpis(){
    db.from("competencies").select("id,name,start_date,end_date").order("end_date",{ascending:false}).limit(1),
    db.from("calculation_parameters").select("code,rate_factor").in("code",["ABS_FALTA","ABS_ATRASO","ABS_SAIDA_ANTECIPADA","ABS_ATESTADO"])
   ]);
-  const err=[e,c,o,a,comp].find(x=>x.error);if(err){setError(err.error.message);return}
+  const err=[e,c,o,a,comp,params].find(x=>x.error);if(err){setError(err.error.message);return}
   const employees=e.data??[];const mov=c.data??[];const occ=o.data??[];const current=comp.data?.[0];const p=new Map<string,number>((params.data??[]).map((x:any)=>[x.code,Number(x.rate_factor)]));
   if(current)setPeriod(current.name);
   const credits=mov.filter((x:any)=>x.minutes>0).reduce((s:number,x:any)=>s+x.minutes,0);
