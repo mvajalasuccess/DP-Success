@@ -1,19 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  Outlet,
-  Link,
-  createRootRouteWithContext,
-  useRouter,
-  useNavigate,
-  useLocation,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
+import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { supabase } from "../integrations/supabase/client";
 
 function NotFoundComponent() {
   return (
@@ -89,52 +79,6 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isLoginRoute = location.pathname === "/login";
-  const [checkingAuth, setCheckingAuth] = useState(!isLoginRoute);
-  const [session, setSession] = useState<any>(null);
-
-  useEffect(() => {
-    if (isLoginRoute) return;
-
-    let mounted = true;
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-
-    const finish = (nextSession: any) => {
-      if (!mounted) return;
-      setSession(nextSession);
-      setCheckingAuth(false);
-      if (timeout) clearTimeout(timeout);
-    };
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      finish(nextSession);
-    });
-
-    timeout = setTimeout(() => finish(null), 4000);
-
-    void supabase.auth.getSession()
-      .then(({ data }) => finish(data.session))
-      .catch(() => finish(null));
-
-    return () => {
-      mounted = false;
-      if (timeout) clearTimeout(timeout);
-      listener.subscription.unsubscribe();
-    };
-  }, [isLoginRoute]);
-
-  useEffect(() => {
-    if (isLoginRoute || checkingAuth) return;
-    if (!session) {
-      void navigate({ to: "/login", replace: true });
-    }
-  }, [isLoginRoute, checkingAuth, session, navigate]);
-
-  if (checkingAuth) {
-    return <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">Verificando acesso...</div>;
-  }
 
   return (
     <QueryClientProvider client={queryClient}>
