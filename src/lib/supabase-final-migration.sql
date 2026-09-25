@@ -643,3 +643,59 @@ create trigger trg_initialize_employee_current_bank
 before insert on employees
 for each row execute function initialize_employee_current_bank();
 
+
+
+-- ============================================================
+-- DADOS COMPLEMENTARES E PARAMETRIZAÇÃO DE ABSENTEÍSMO
+-- ============================================================
+
+alter table medical_certificates add column if not exists entry_date date;
+alter table medical_certificates add column if not exists attachment_path text;
+create index if not exists idx_medical_certificates_employee_dates
+  on medical_certificates(employee_id,start_date,end_date);
+
+insert into calculation_parameters(code,label,rate_factor) values
+('ABS_FALTA','Absenteísmo: incluir faltas',1),
+('ABS_ATRASO','Absenteísmo: incluir atrasos',1),
+('ABS_SAIDA_ANTECIPADA','Absenteísmo: incluir saídas antecipadas',1),
+('ABS_ATESTADO','Absenteísmo: incluir atestados',0)
+on conflict(code) do nothing;
+
+-- Auditoria mínima de operações sensíveis.
+create table if not exists audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id),
+  action text not null,
+  entity_type text not null,
+  entity_id uuid,
+  details jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_audit_logs_entity on audit_logs(entity_type,entity_id,created_at desc);
+alter table audit_logs enable row level security;
+drop policy if exists audit_logs_authenticated_insert on audit_logs;
+create policy audit_logs_authenticated_insert on audit_logs
+for insert to authenticated with check (user_id = auth.uid());
+drop policy if exists audit_logs_authenticated_select on audit_logs;
+create policy audit_logs_authenticated_select on audit_logs
+for select to authenticated using (true);
+
+create or replace function log_competence_close()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.status is distinct from new.status and new.status='FECHADA' then
+    insert into audit_logs(user_id,action,entity_type,entity_id,details)
+    values(auth.uid(),'CLOSE','competence',new.id,jsonb_build_object('name',new.name,'closed_at',new.closed_at));
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_log_competence_close on competencies;
+create trigger trg_log_competence_close
+after update on competencies
+for each row execute function log_competence_close();
