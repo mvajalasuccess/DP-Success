@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Plus, Power, X } from "lucide-react";
+import { ArrowLeft, Plus, Power, Pencil, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function Schedules() {
   const [rows, setRows] = useState<any[]>([]);
   const [form, setForm] = useState({ name: "", weekly: "44" });
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -25,14 +26,14 @@ export function Schedules() {
       return;
     }
     setSaving(true); setError("");
-    const { error } = await (supabase).from("work_schedules").insert({
-      name, weekly_minutes: Math.round(weeklyHours * 60), active: true,
-    });
+    const { error } = editingId
+      ? await (supabase).from("work_schedules").update({ name, weekly_minutes: Math.round(weeklyHours * 60) }).eq("id", editingId)
+      : await (supabase).from("work_schedules").insert({ name, weekly_minutes: Math.round(weeklyHours * 60), active: true });
     if (error) {
       setError(error.code === "23505" ? "Já existe uma jornada com esse nome." : error.message);
       setSaving(false); return;
     }
-    setForm({ name: "", weekly: "44" }); setOpen(false); setSaving(false); await load();
+    setForm({ name: "", weekly: "44" }); setEditingId(null); setOpen(false); setSaving(false); await load();
   }
 
   async function toggle(row: any) {
@@ -47,22 +48,22 @@ export function Schedules() {
     </div></header>
     <main className="mx-auto max-w-[1500px] px-6 py-7">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Cadastro base</p><h1 className="text-3xl font-bold">Jornadas / Escalas</h1><p className="mt-1 text-sm text-muted-foreground">Cadastre jornadas e carga semanal.</p></div>
-        <button type="button" onClick={() => { setError(""); setOpen(true); }} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="mr-2 inline h-4 w-4" /> Nova jornada</button>
+        <button type="button" onClick={() => { setError(""); setEditingId(null); setForm({ name: "", weekly: "44" }); setOpen(true); }} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="mr-2 inline h-4 w-4" /> Nova jornada</button>
       </div>
       {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
       <Card className="mt-6 overflow-hidden"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Jornada</th><th className="px-5 py-3">Carga semanal</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Ação</th></tr></thead><tbody className="divide-y">
-        {rows.length === 0 ? <tr><td colSpan={4} className="px-5 py-8 text-center text-muted-foreground">Nenhuma jornada cadastrada.</td></tr> : rows.map((row) => <tr key={row.id}><td className="px-5 py-4 font-medium">{row.name}</td><td className="px-5 py-4">{Math.floor((row.weekly_minutes || 0) / 60)}h</td><td className="px-5 py-4">{row.active === false ? "Inativa" : "Ativa"}</td><td className="px-5 py-4"><button type="button" onClick={() => void toggle(row)} className="text-primary"><Power className="mr-1 inline h-4 w-4" />{row.active === false ? "Ativar" : "Inativar"}</button></td></tr>)}
+        {rows.length === 0 ? <tr><td colSpan={4} className="px-5 py-8 text-center text-muted-foreground">Nenhuma jornada cadastrada.</td></tr> : rows.map((row) => <tr key={row.id}><td className="px-5 py-4 font-medium">{row.name}</td><td className="px-5 py-4">{Math.floor((row.weekly_minutes || 0) / 60)}h</td><td className="px-5 py-4">{row.active === false ? "Inativa" : "Ativa"}</td><td className="px-5 py-4"><button type="button" onClick={() => { setError(""); setEditingId(row.id); setForm({ name: row.name, weekly: String((row.weekly_minutes || 0) / 60) }); setOpen(true); }} className="mr-3 text-primary"><Pencil className="mr-1 inline h-4 w-4" />Editar</button><button type="button" onClick={() => void toggle(row)} className="mr-3 text-primary"><Power className="mr-1 inline h-4 w-4" />{row.active === false ? "Ativar" : "Inativar"}</button></td></tr>)}
       </tbody></table></Card>
     </main>
     {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-md p-6">
-      <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">Nova jornada</h2><p className="text-xs text-muted-foreground">O cadastro será salvo no banco.</p></div><button type="button" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button></div>
+      <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">{editingId ? "Editar jornada" : "Nova jornada"}</h2><p className="text-xs text-muted-foreground">O cadastro será salvo no banco.</p></div><button type="button" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button></div>
       <div className="mt-5 grid gap-3">
         <label className="grid gap-1 text-sm font-medium">Nome<input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border px-3 py-2 font-normal" placeholder="Ex.: Administrativo 44h" /></label>
         <label className="grid gap-1 text-sm font-medium">Horas semanais<input type="number" min="1" step="0.01" value={form.weekly} onChange={(e) => setForm({ ...form, weekly: e.target.value })} className="rounded-lg border px-3 py-2 font-normal" /></label>
         
       </div>
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-      <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2">Cancelar</button><button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar jornada"}</button></div>
+      <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2">Cancelar</button><button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar jornada"}</button></div>
     </Card></div>}
   </div>;
 }
