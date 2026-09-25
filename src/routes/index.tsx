@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Clock3, Users, WalletCards, AlertTriangle, FileText, Gauge } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
@@ -23,7 +23,7 @@ function Dashboard() {
         </div>
         <nav className="space-y-1 p-3 text-sm">
           <div className="rounded-lg bg-sidebar-primary px-3 py-2.5 text-sidebar-primary-foreground">Dashboard</div>
-          {["Funcionários","Departamentos","Cargos","Jornadas / Escalas","Fechamento de Ponto","Lançamentos","Banco de Horas","Atestados","Faltas e Ocorrências","Relatórios","Comparativos","KPIs","Configurações"].map(item=><div key={item} className="rounded-lg px-3 py-2.5 text-sidebar-foreground/75 hover:bg-sidebar-accent">{item}</div>)}
+          {["Funcionários","Departamentos","Cargos","Jornadas / Escalas","Fechamento de Ponto","Lançamentos","Banco de Horas","Atestados","Faltas e Ocorrências","Relatórios","Comparativos","KPIs","Configurações"].map(item=>item==="Funcionários" ? <Link key={item} to="/funcionarios" className="block rounded-lg px-3 py-2.5 text-sidebar-foreground/75 hover:bg-sidebar-accent">{item}</Link> : <div key={item} className="rounded-lg px-3 py-2.5 text-sidebar-foreground/75 hover:bg-sidebar-accent">{item}</div>)}
         </nav>
       </aside>
       <main className="lg:pl-60">
