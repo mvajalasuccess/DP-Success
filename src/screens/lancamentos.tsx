@@ -184,7 +184,11 @@ export function Launches() {
   }
 
   const filtered = useMemo(() => launches.filter(l => (l.employee?.full_name ?? "").toLowerCase().includes(search.toLowerCase())), [launches, search]);
-  const totalMinutes = launches.reduce((sum, item) => sum + (item.direction === "DEBITO" ? -item.minutes : item.minutes), 0);
+  const totalMinutes = launches.reduce((sum, item) => {
+    if (item.type === "INTERJORNADA") return sum;
+    return sum + (item.direction === "DEBITO" ? -item.minutes : item.minutes);
+  }, 0);
+  const interjornadaMinutes = launches.reduce((sum, item) => sum + (item.type === "INTERJORNADA" ? item.minutes : 0), 0);
   const fmt = (v: number) => { const sign = v < 0 ? "-" : "+"; const a = Math.abs(v); return sign + String(Math.floor(a / 60)).padStart(2, "0") + ":" + String(a % 60).padStart(2, "0"); };
   const date = (v: string) => new Date(v + "T12:00:00").toLocaleDateString("pt-BR");
 
@@ -198,7 +202,7 @@ export function Launches() {
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{types.map(({ label, icon: Icon }) => <Card key={label} className="p-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div><span className="text-sm font-medium">{label}</span></div></Card>)}</div>
       <Card className="mt-6 overflow-hidden">
         <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between"><div><h2 className="font-display font-bold">Lançamentos da competência</h2><p className="text-xs text-muted-foreground">{competence ? (() => { const d = periodDates(competence); return date(d.start) + " → " + date(d.end); })() : "Nenhuma competência cadastrada"}</p></div><div className="flex items-center gap-2 rounded-lg border px-3 py-2 md:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={e => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div></div>
-        <div className="grid grid-cols-2 border-b text-center text-sm"><div className="p-3"><p className="text-xs text-muted-foreground">Lançamentos</p><p className="font-bold">{loading ? "…" : filtered.length}</p></div><div className="border-l p-3"><p className="text-xs text-muted-foreground">Saldo dos lançamentos</p><p className={totalMinutes < 0 ? "font-bold text-destructive" : "font-bold text-primary"}>{fmt(totalMinutes)}</p></div></div>
+        <div className="grid grid-cols-2 border-b text-center text-sm md:grid-cols-3"><div className="p-3"><p className="text-xs text-muted-foreground">Lançamentos</p><p className="font-bold">{loading ? "…" : filtered.length}</p></div><div className="border-l p-3"><p className="text-xs text-muted-foreground">Saldo dos lançamentos</p><p className={totalMinutes < 0 ? "font-bold text-destructive" : "font-bold text-primary"}>{fmt(totalMinutes)}</p></div><div className="border-l p-3"><p className="text-xs text-muted-foreground">Interjornada · histórico</p><p className="font-bold text-muted-foreground">{fmt(interjornadaMinutes)}</p></div></div>
         <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Horas</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filtered.map(row => <tr key={row.source + row.id}><td className="px-5 py-4 font-medium">{row.employee?.full_name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{date(row.launch_date)}</td><td className="px-5 py-4">{labelForType(row.type)}</td><td className={"px-5 py-4 font-bold " + (row.direction === "DEBITO" ? "text-destructive" : "text-primary")}>{fmt(row.direction === "DEBITO" ? -row.minutes : row.minutes)}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => openEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"><Pencil className="h-3 w-3" />Editar</button><button onClick={() => void deleteLaunch(row)} className="inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive"><Trash2 className="h-3 w-3" />Excluir</button></div></td></tr>)}</tbody></table>{!loading && !filtered.length && <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento encontrado.</div>}</div>
       </Card>
     </main>
@@ -218,7 +222,14 @@ export function Launches() {
               <button type="button" disabled={creditLines.length === 1} onClick={() => removeCreditLine(index)} className="mb-0.5 h-9 w-8 rounded-md border text-muted-foreground disabled:opacity-30">×</button>
             </div>)}
           </div>
-          <div className="mt-4 flex items-center justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">Total de crédito</span><strong>{String(Math.floor(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)/60)).padStart(2,"0")}:{String(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)%60).padStart(2,"0")}</strong></div>
+          <div className="mt-4 flex items-center justify-between border-t pt-3 text-sm">
+            <span className="text-muted-foreground">Total de crédito no saldo</span>
+            <strong>{(() => { const minutes = creditLines.reduce((s,l) => s + (l.type === "Interjornada 50%" ? 0 : parseHours(l.hours)), 0); return String(Math.floor(minutes / 60)).padStart(2,"0") + ":" + String(minutes % 60).padStart(2,"0"); })()}</strong>
+          </div>
+          {creditLines.some(l => l.type === "Interjornada 50%") && <div className="mt-2 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Interjornada · somente histórico</span>
+            <strong>{(() => { const minutes = creditLines.reduce((s,l) => s + (l.type === "Interjornada 50%" ? parseHours(l.hours) : 0), 0); return String(Math.floor(minutes / 60)).padStart(2,"0") + ":" + String(minutes % 60).padStart(2,"0"); })()}</strong>
+          </div>}
         </div>
         <div className="rounded-lg border p-3 md:col-span-2">
           <div><p className="text-sm font-semibold">2. Débito</p><p className="text-xs text-muted-foreground">Informe as horas que serão descontadas do saldo.</p></div>
