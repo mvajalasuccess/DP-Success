@@ -629,7 +629,9 @@ returns trigger
 language plpgsql
 as $$
 begin
-  if new.current_bank_minutes is null then
+  if coalesce(new.current_bank_minutes,0) = 0 and coalesce(new.initial_bank_minutes,0) <> 0 then
+    new.current_bank_minutes := new.initial_bank_minutes;
+  elsif new.current_bank_minutes is null then
     new.current_bank_minutes := coalesce(new.initial_bank_minutes,0);
   end if;
   return new;
