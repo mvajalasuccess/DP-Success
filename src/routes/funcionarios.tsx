@@ -25,7 +25,7 @@ function Employees() {
 
   async function loadEmployees() {
     setLoading(true);
-    const { data, error } = await supabase.from("employees").select("id,full_name,active,initial_bank_minutes,departments(name),positions(name),salary_history(salary,valid_from),work_schedules(name,divisor)").order("full_name");
+    const { data, error } = await supabase.from("employees").select("id,full_name,active,initial_bank_minutes,current_bank_minutes,departments(name),positions(name),salary_history(salary,valid_from),work_schedules(name,divisor)").order("full_name");
     if (error) setError(error.message); else setEmployees(data ?? []);
     setLoading(false);
   }
