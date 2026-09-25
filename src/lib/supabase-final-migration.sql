@@ -431,12 +431,12 @@ as $$
 declare
   v_status text;
   v_end date;
-  v_next_id uuid;
   v_next_start date;
   v_next_end date;
 begin
   select status,end_date into v_status,v_end
   from competencies where id=p_competence_id for update;
+
   if v_status is null then raise exception 'Competência não encontrada.'; end if;
   if v_status='FECHADA' then return; end if;
 
@@ -444,16 +444,27 @@ begin
     competence_id,employee_id,opening_minutes,credit_minutes,debit_minutes,closing_minutes,estimated_value
   )
   select
-    p_competence_id,e.id,e.initial_bank_minutes,
+    p_competence_id,
+    e.id,
+    coalesce(prev.closing_minutes, e.current_bank_minutes, e.initial_bank_minutes, 0),
     coalesce(sum(case when bm.minutes>0 then bm.minutes else 0 end),0),
     coalesce(sum(case when bm.minutes<0 then abs(bm.minutes) else 0 end),0),
-    e.initial_bank_minutes+coalesce(sum(bm.minutes),0),
+    coalesce(prev.closing_minutes, e.current_bank_minutes, e.initial_bank_minutes, 0) + coalesce(sum(bm.minutes),0),
     coalesce(sum(pl.financial_value),0)
   from employees e
+  left join lateral (
+    select b.closing_minutes
+    from competence_employee_balances b
+    join competencies pc on pc.id=b.competence_id
+    where b.employee_id=e.id
+      and pc.end_date < (select start_date from competencies where id=p_competence_id)
+    order by pc.end_date desc
+    limit 1
+  ) prev on true
   left join bank_movements bm on bm.employee_id=e.id and bm.competence_id=p_competence_id
   left join point_launches pl on pl.id=bm.launch_id
   where e.active=true
-  group by e.id,e.initial_bank_minutes
+  group by e.id, prev.closing_minutes, e.current_bank_minutes, e.initial_bank_minutes
   on conflict(competence_id,employee_id) do update set
     opening_minutes=excluded.opening_minutes,
     credit_minutes=excluded.credit_minutes,
@@ -462,25 +473,24 @@ begin
     estimated_value=excluded.estimated_value,
     updated_at=now();
 
-  update competencies set status='FECHADA',closed_at=now(),updated_at=now()
+  update competencies
+  set status='FECHADA',closed_at=now(),updated_at=now()
   where id=p_competence_id;
 
   v_next_start := v_end + 1;
   v_next_end := (v_next_start + interval '1 month')::date - 1;
 
   insert into competencies(name,start_date,end_date,status)
-  values(to_char(v_next_start,'DD/MM/YYYY') || ' → ' || to_char(v_next_end,'DD/MM/YYYY'),
-         v_next_start,v_next_end,'ABERTA')
-  on conflict(start_date,end_date) do nothing
-  returning id into v_next_id;
+  values(
+    to_char(v_next_start,'DD/MM/YYYY') || ' → ' || to_char(v_next_end,'DD/MM/YYYY'),
+    v_next_start,v_next_end,'ABERTA'
+  )
+  on conflict(start_date,end_date) do nothing;
 
-  if v_next_id is null then
-    select id into v_next_id from competencies where start_date=v_next_start and end_date=v_next_end;
-  end if;
-
-  -- O saldo de fechamento passa a ser o saldo inicial da próxima competência.
+  -- current_bank_minutes é o saldo operacional atual.
+  -- initial_bank_minutes permanece como histórico do saldo cadastrado inicialmente.
   update employees e
-  set initial_bank_minutes=b.closing_minutes, updated_at=now()
+  set current_bank_minutes=b.closing_minutes, updated_at=now()
   from competence_employee_balances b
   where b.competence_id=p_competence_id and b.employee_id=e.id;
 end;
@@ -521,3 +531,113 @@ create policy employees_authenticated_all on employees for all to authenticated 
 alter table employees add column if not exists current_bank_minutes integer not null default 0;
 update employees set current_bank_minutes = coalesce(initial_bank_minutes,0) where current_bank_minutes = 0;
 create index if not exists idx_competence_balances_employee on competence_employee_balances(employee_id, competence_id);
+
+-- ============================================================
+-- HARDENING FINAL - SALDO, CÁLCULO E SNAPSHOT
+-- ============================================================
+
+alter table employees add column if not exists current_bank_minutes integer not null default 0;
+update employees
+set current_bank_minutes = coalesce(initial_bank_minutes,0)
+where current_bank_minutes = 0 and coalesce(initial_bank_minutes,0) <> 0;
+
+alter table work_schedules add column if not exists divisor numeric(8,2) not null default 220;
+create index if not exists idx_salary_history_employee_validity
+  on salary_history(employee_id,valid_from,valid_to);
+
+-- Evita sobreposição de vigências salariais para o mesmo funcionário.
+create or replace function validate_salary_history()
+returns trigger
+language plpgsql
+as $$
+begin
+  if exists (
+    select 1
+    from salary_history s
+    where s.employee_id = new.employee_id
+      and s.id <> coalesce(new.id, gen_random_uuid())
+      and daterange(s.valid_from, coalesce(s.valid_to + 1, '9999-12-31'::date), '[)')
+          && daterange(new.valid_from, coalesce(new.valid_to + 1, '9999-12-31'::date), '[)')
+  ) then
+    raise exception 'Existe outro histórico salarial vigente no mesmo período.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_validate_salary_history on salary_history;
+create trigger trg_validate_salary_history
+before insert or update on salary_history
+for each row execute function validate_salary_history();
+
+-- Seleciona o salário vigente na data do lançamento e a jornada do funcionário.
+-- O resultado é congelado no lançamento para preservar o histórico.
+create or replace function snapshot_point_launch()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_salary numeric(12,2);
+  v_divisor numeric(8,2);
+  v_factor numeric(8,4);
+begin
+  select sh.salary
+    into v_salary
+  from salary_history sh
+  where sh.employee_id = new.employee_id
+    and sh.valid_from <= new.launch_date
+    and (sh.valid_to is null or sh.valid_to >= new.launch_date)
+  order by sh.valid_from desc
+  limit 1;
+
+  select coalesce(ws.divisor,220)
+    into v_divisor
+  from employees e
+  left join work_schedules ws on ws.id=e.work_schedule_id
+  where e.id=new.employee_id;
+
+  select coalesce(
+    (select cp.rate_factor from calculation_parameters cp where cp.code=new.type and cp.active=true limit 1),
+    new.rate_factor,
+    1
+  ) into v_factor;
+
+  new.rate_factor := v_factor;
+  new.salary_snapshot := v_salary;
+  new.divisor_snapshot := coalesce(v_divisor,220);
+
+  if v_salary is not null and coalesce(new.divisor_snapshot,0) > 0 then
+    new.hour_value_snapshot := round(v_salary / new.divisor_snapshot, 4);
+    new.financial_value := round((new.minutes::numeric / 60) * new.hour_value_snapshot * new.rate_factor, 2);
+  else
+    new.hour_value_snapshot := null;
+    new.financial_value := null;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_snapshot_point_launch on point_launches;
+create trigger trg_snapshot_point_launch
+before insert or update of employee_id,launch_date,type,direction,minutes,rate_factor on point_launches
+for each row execute function snapshot_point_launch();
+
+-- Garante saldo atual coerente para novos funcionários.
+create or replace function initialize_employee_current_bank()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.current_bank_minutes is null then
+    new.current_bank_minutes := coalesce(new.initial_bank_minutes,0);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_initialize_employee_current_bank on employees;
+create trigger trg_initialize_employee_current_bank
+before insert on employees
+for each row execute function initialize_employee_current_bank();
+
