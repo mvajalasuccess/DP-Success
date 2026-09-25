@@ -138,7 +138,6 @@ export function Launches() {
     }
 
     const debitMinutes = parseHours(debitHours);
-    const debitMinutes = parseHours(debitHours);
     const validLines = creditLines.map(line => ({ type: line.type, minutes: parseHours(line.hours) })).filter(line => line.minutes > 0);
     if (!validLines.length && debitMinutes <= 0) {
       setError("Informe pelo menos um crédito ou débito.");
