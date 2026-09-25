@@ -21,13 +21,13 @@ function BankHours() {
     if(ce){setError(ce.message);setLoading(false);return;}
     const comp=comps?.[0]; setCompetence(comp);
     if(!comp){setRows([]);setLoading(false);return;}
-    const {data:emps,error:ee}=await db.from("employees").select("id,full_name,initial_bank_minutes,departments(name)").eq("active",true).order("full_name");
+    const {data:balances,error:be}=await db.from("competence_employee_balances").select("employee_id,opening_minutes,credit_minutes,debit_minutes,closing_minutes").eq("competence_id",comp.id);\n    if(be){setError(be.message);setLoading(false);return;}\n    const {data:emps,error:ee}=await db.from("employees").select("id,full_name,initial_bank_minutes,current_bank_minutes,departments(name)").eq("active",true).order("full_name");
     if(ee){setError(ee.message);setLoading(false);return;}
-    const {data:movs,error:me}=await db.from("bank_movements").select("employee_id,minutes").eq("competence_id",comp.id);
+    const balanceByEmployee=new Map<string,any>((balances??[]).map((b:any)=>[b.employee_id,b]));\n    const {data:movs,error:me}=await db.from("bank_movements").select("employee_id,minutes").eq("competence_id",comp.id);
     if(me){setError(me.message);setLoading(false);return;}
     const movementByEmployee=new Map<string,number>();
     (movs??[]).forEach((m:any)=>movementByEmployee.set(m.employee_id,(movementByEmployee.get(m.employee_id)??0)+m.minutes));
-    setRows((emps??[]).map((e:any)=>{const movement=movementByEmployee.get(e.id)??0; const opening=e.initial_bank_minutes??0; return {employee_id:e.id,name:e.full_name,department:e.departments?.name??"—",opening,movement,current:opening+movement};}));
+    setRows((emps??[]).map((e:any)=>{const b=balanceByEmployee.get(e.id); const movement=movementByEmployee.get(e.id)??0; const opening=b?.opening_minutes ?? e.current_bank_minutes ?? e.initial_bank_minutes ?? 0; const current=b?.closing_minutes ?? opening+movement; return {employee_id:e.id,name:e.full_name,department:e.departments?.name??"—",opening,movement,current};}));
     setLoading(false);
   }
   useEffect(()=>{void load();},[]);
