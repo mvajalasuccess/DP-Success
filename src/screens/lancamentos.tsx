@@ -30,16 +30,9 @@ function labelForType(type: string) {
 
 export function Launches() {
   const [open, setOpen] = useState(false);
-  const [consolidatedOpen, setConsolidatedOpen] = useState(false);
-  const [consolidatedEmployeeId, setConsolidatedEmployeeId] = useState("");
-  const [consolidatedDate, setConsolidatedDate] = useState("");
-  const [creditHours, setCreditHours] = useState("00:00");
-  const [debitHours, setDebitHours] = useState("00:00");
-  const [creditType, setCreditType] = useState("HE_60");
-  const [creditBreakdown, setCreditBreakdown] = useState({ HE_60: "00:00", HE_100: "00:00", HE_NOTURNA: "00:00", HE_100_NOTURNA: "00:00", ADICIONAL_NOTURNO: "00:00", INTERJORNADA: "00:00" });
-  const [consolidatedDescription, setConsolidatedDescription] = useState("");
   const [editing, setEditing] = useState<Launch | null>(null);
   const [selectedType, setSelectedType] = useState("Hora extra 60%");
+  const [creditLines, setCreditLines] = useState([{ type: "Hora extra 60%", hours: "02:30" }]);
   const [hours, setHours] = useState("02:30");
   const [direction, setDirection] = useState<"CREDITO" | "DEBITO">("CREDITO");
   const [employeeId, setEmployeeId] = useState("");
@@ -55,6 +48,7 @@ export function Launches() {
 
   const [h, m] = hours.split(":").map(Number);
   const minutes = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+
 
   async function loadData() {
     setLoading(true); setError("");
@@ -85,15 +79,24 @@ export function Launches() {
   useEffect(() => { void loadData(); }, []);
 
   function openNew() {
-    setEditing(null); setEmployeeId(""); setSelectedType("Hora extra 60%"); setDirection("CREDITO"); setHours("02:30"); setDescription("");
+    setEditing(null);
+    setEmployeeId("");
+    setDirection("CREDITO");
+    setHours("02:30");
+    setCreditLines([{ type: "Hora extra 60%", hours: "02:30" }]);
+    setDescription("");
     if (competence) setLaunchDate(periodDates(competence).end);
     setOpen(true);
   }
+
   function openEdit(row: Launch) {
-    setEditing(row); setEmployeeId(row.employee_id); setDirection(row.direction);
+    setEditing(row);
+    setEmployeeId(row.employee_id);
+    setDirection(row.direction);
     setHours(String(Math.floor(row.minutes / 60)).padStart(2, "0") + ":" + String(row.minutes % 60).padStart(2, "0"));
-    setDescription(row.description ?? ""); setLaunchDate(row.launch_date);
-    setSelectedType(row.type === "CREDITO" ? "Crédito / débito" : (Object.entries(calculationRules).find(([, v]) => v.code === row.type)?.[0] ?? "Hora extra 60%"));
+    setCreditLines([{ type: labelForType(row.type), hours: String(Math.floor(row.minutes / 60)).padStart(2, "0") + ":" + String(row.minutes % 60).padStart(2, "0") }]);
+    setDescription(row.description ?? "");
+    setLaunchDate(row.launch_date);
     setOpen(true);
   }
 
@@ -104,25 +107,26 @@ export function Launches() {
     return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
   }
 
-  function openConsolidated() {
-    setConsolidatedEmployeeId("");
-    setConsolidatedDate(competence ? periodDates(competence).end : "");
-    setCreditHours("00:00");
-    setDebitHours("00:00");
-    setCreditType("HE_60");
-    setCreditBreakdown({ HE_60: "00:00", HE_100: "00:00", HE_NOTURNA: "00:00", HE_100_NOTURNA: "00:00", ADICIONAL_NOTURNO: "00:00", INTERJORNADA: "00:00" });
-    setConsolidatedDescription("");
-    setConsolidatedOpen(true);
+  const creditOptions = ["Adicional noturno 20%", "Hora extra noturna", "Domingo / feriado 100%", "Interjornada 50%"];
+
+  function addCreditLine() {
+    setCreditLines(lines => [...lines, { type: "Adicional noturno 20%", hours: "00:00" }]);
   }
 
-  async function saveConsolidated() {
+  function removeCreditLine(index: number) {
+    if (creditLines.length === 1) return;
+    setCreditLines(lines => lines.filter((_, i) => i !== index));
+  }
+
+
+  async function saveLaunch() {
     setSaving(true); setError("");
-    if (!consolidatedEmployeeId || !competence) {
+    if (!employeeId || !competence) {
       setError("Selecione o funcionário e a competência.");
       setSaving(false); return;
     }
     const range = periodDates(competence);
-    if (consolidatedDate < range.start || consolidatedDate > range.end) {
+    if (launchDate < range.start || launchDate > range.end) {
       setError("A data precisa estar dentro da competência.");
       setSaving(false); return;
     }
@@ -131,99 +135,44 @@ export function Launches() {
       setSaving(false); return;
     }
 
-    const credit = parseHours(creditHours);
-    const debit = parseHours(debitHours);
-    const creditTypeLabel: Record<string,string> = { HE_60: "60%", HE_100: "100%", HE_NOTURNA: "60% + 20%", HE_100_NOTURNA: "100% + 20%", ADICIONAL_NOTURNO: "20%", INTERJORNADA: "Interjornada 50%" };
-    const breakdown = Object.entries(creditBreakdown).map(([type, value]) => ({ type, minutes: parseHours(value) })).filter(x => x.minutes > 0);
-    const breakdownTotal = breakdown.reduce((sum, x) => sum + x.minutes, 0);
-    if (breakdownTotal !== credit) {
-      setError("A soma dos tipos de crédito precisa ser igual ao total de crédito informado.");
-      setSaving(false); return;
-    }
-    if (credit <= 0 && debit <= 0) {
-      setError("Informe pelo menos um valor de crédito ou débito.");
+    if (direction === "DEBITO") {
+      if (minutes <= 0) { setError("Informe as horas do débito."); setSaving(false); return; }
+      const result = editing?.source === "bank"
+        ? await supabase.from("bank_hours").update({ employee_id: employeeId, entry_date: launchDate, kind: "debito", minutes, justification: description.trim() || null }).eq("id", editing.id)
+        : await supabase.from("bank_hours").insert({ employee_id: employeeId, period_id: competence.id, entry_date: launchDate, kind: "debito", minutes, previous_balance_minutes: 0, balance_minutes: -minutes, justification: description.trim() || null });
+      if (result.error) setError(result.error.message);
+      else { setOpen(false); await loadData(); }
       setSaving(false); return;
     }
 
-    const { data: previous } = await supabase
-      .from("bank_hours")
-      .select("balance_minutes,entry_date,created_at")
-      .eq("employee_id", consolidatedEmployeeId)
-      .order("entry_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    let balance = Number(previous?.[0]?.balance_minutes || 0);
-    const description = consolidatedDescription.trim() || "Lançamento consolidado de crédito e débito";
-    const creditJustification = `Crédito ${creditTypeLabel[creditType] ?? creditType} · ${description}`;
-
-    if (credit > 0) {
-      for (const item of breakdown) {
-        const nextBalance = balance + item.minutes;
-        const label = creditTypeLabel[item.type] ?? item.type;
-        const { error: creditError } = await supabase.from("bank_hours").insert({
-          employee_id: consolidatedEmployeeId,
-          period_id: competence.id,
-          entry_date: consolidatedDate,
-          kind: "credito",
-          minutes: item.minutes,
-          previous_balance_minutes: balance,
-          balance_minutes: nextBalance,
-          justification: `Crédito ${label} · ${description}`,
-        });
-        if (creditError) {
-          setError(creditError.message); setSaving(false); return;
-        }
-        balance = nextBalance;
-      }
+    const validLines = creditLines.map(line => ({ type: line.type, minutes: parseHours(line.hours) })).filter(line => line.minutes > 0);
+    if (!validLines.length) {
+      setError("Informe pelo menos uma quantidade de horas.");
+      setSaving(false); return;
     }
 
-    if (debit > 0) {
-      const nextBalance = balance - debit;
-      const { error: debitError } = await supabase.from("bank_hours").insert({
-        employee_id: consolidatedEmployeeId,
+    if (editing) {
+      const del = editing.source === "overtime"
+        ? await supabase.from("overtime_records").delete().eq("id", editing.id)
+        : await supabase.from("bank_hours").delete().eq("id", editing.id);
+      if (del.error) { setError(del.error.message); setSaving(false); return; }
+    }
+
+    for (const line of validLines) {
+      const rule = calculationRules[line.type] ?? calculationRules["Hora extra 60%"];
+      const result = await supabase.from("overtime_records").insert({
+        employee_id: employeeId,
         period_id: competence.id,
-        entry_date: consolidatedDate,
-        kind: "debito",
-        minutes: debit,
-        previous_balance_minutes: balance,
-        balance_minutes: nextBalance,
-        justification: description,
+        reference_date: launchDate,
+        minutes: line.minutes,
+        rate_percent: rule.code === "DOMINGO_FERIADO" ? 100 : rule.code === "INTERJORNADA" ? 50 : rule.code === "ADICIONAL_NOTURNO" ? 20 : 60,
+        notes: rule.label + (description.trim() ? " · " + description.trim() : ""),
       });
-      if (debitError) {
-        setError(debitError.message); setSaving(false); return;
-      }
-      balance = nextBalance;
+      if (result.error) { setError(result.error.message); setSaving(false); return; }
     }
 
-    setConsolidatedOpen(false);
+    setOpen(false);
     await loadData();
-    setSaving(false);
-  }
-
-  async function saveLaunch() {
-    setSaving(true); setError("");
-    if (!employeeId || !competence || minutes <= 0) { setError("Selecione o funcionário, a competência e informe as horas."); setSaving(false); return; }
-    const range = periodDates(competence);
-    if (launchDate < range.start || launchDate > range.end) { setError("A data precisa estar dentro da competência."); setSaving(false); return; }
-    if (competence.status === "fechado") { setError("A competência está fechada e não aceita alterações."); setSaving(false); return; }
-
-    const rule = calculationRules[selectedType] ?? calculationRules["Crédito / débito"];
-    let result: any;
-    if (editing?.source === "overtime" && rule.code !== "CREDITO") {
-      result = await supabase.from("overtime_records").update({ employee_id: employeeId, reference_date: launchDate, minutes, notes: description.trim() || null }).eq("id", editing.id);
-    } else if (editing?.source === "bank" && rule.code === "CREDITO") {
-      result = await supabase.from("bank_hours").update({ employee_id: employeeId, entry_date: launchDate, kind: direction === "DEBITO" ? "debito" : "credito", minutes, justification: description.trim() || null }).eq("id", editing.id);
-    } else {
-      if (editing) {
-        const del = editing.source === "overtime" ? await supabase.from("overtime_records").delete().eq("id", editing.id) : await supabase.from("bank_hours").delete().eq("id", editing.id);
-        if (del.error) { setError(del.error.message); setSaving(false); return; }
-      }
-      result = rule.code === "CREDITO"
-        ? await supabase.from("bank_hours").insert({ employee_id: employeeId, period_id: competence.id, entry_date: launchDate, kind: direction === "DEBITO" ? "debito" : "credito", minutes, previous_balance_minutes: 0, balance_minutes: direction === "DEBITO" ? -minutes : minutes, justification: description.trim() || null })
-        : await supabase.from("overtime_records").insert({ employee_id: employeeId, period_id: competence.id, reference_date: launchDate, minutes, rate_percent: rule.code === "DOMINGO_FERIADO" ? 100 : rule.code === "INTERJORNADA" ? 50 : rule.code === "ADICIONAL_NOTURNO" ? 20 : 60, notes: rule.label + (description.trim() ? " · " + description.trim() : "") });
-    }
-    if (result?.error) setError(result.error.message); else { setOpen(false); await loadData(); }
     setSaving(false);
   }
 
@@ -242,7 +191,6 @@ export function Launches() {
     <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a><span className="font-semibold">DP Success · Lançamentos</span></div></header>
     <main className="mx-auto max-w-[1500px] px-6 py-7">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Operação</p><h1 className="mt-1 text-3xl font-bold">Lançamentos</h1><p className="mt-1 text-sm text-muted-foreground">Registre créditos, débitos e adicionais vinculados à competência.</p></div><div className="flex flex-wrap gap-2">
-          <button onClick={openConsolidated} className="inline-flex items-center gap-2 rounded-lg border bg-background px-4 py-2.5 text-sm font-medium"><ArrowDownUp className="h-4 w-4" /> Lançamento consolidado</button>
           <button onClick={openNew} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" /> Novo lançamento</button>
         </div></div>
       {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
@@ -253,23 +201,29 @@ export function Launches() {
         <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Horas</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filtered.map(row => <tr key={row.source + row.id}><td className="px-5 py-4 font-medium">{row.employee?.full_name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{date(row.launch_date)}</td><td className="px-5 py-4">{labelForType(row.type)}</td><td className={"px-5 py-4 font-bold " + (row.direction === "DEBITO" ? "text-destructive" : "text-primary")}>{fmt(row.direction === "DEBITO" ? -row.minutes : row.minutes)}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => openEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"><Pencil className="h-3 w-3" />Editar</button><button onClick={() => void deleteLaunch(row)} className="inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive"><Trash2 className="h-3 w-3" />Excluir</button></div></td></tr>)}</tbody></table>{!loading && !filtered.length && <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento encontrado.</div>}</div>
       </Card>
     </main>
-    {consolidatedOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-2xl p-6">
-      <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">Lançamento consolidado</h2><p className="text-sm text-muted-foreground">Informe crédito e débito de uma vez. O saldo líquido será gravado automaticamente no Banco de Horas.</p></div><button onClick={() => setConsolidatedOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div>
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <label className="grid gap-1 text-sm font-medium">Funcionário<select value={consolidatedEmployeeId} onChange={e => setConsolidatedEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
-        <label className="grid gap-1 text-sm font-medium">Data<input type="date" value={consolidatedDate} min={competence ? periodDates(competence).start : undefined} max={competence ? periodDates(competence).end : undefined} onChange={e => setConsolidatedDate(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
-        <label className="grid gap-1 text-sm font-medium">Crédito total<input value={creditHours} onChange={e => setCreditHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="10:00" /></label>
-        <div className="md:col-span-2 rounded-lg border p-4"><p className="text-sm font-semibold">Composição do crédito</p><p className="mt-1 text-xs text-muted-foreground">Você pode dividir o total entre vários tipos. A soma precisa bater com o crédito total.</p><div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {[["HE_100","100%"],["HE_60","60%"],["HE_NOTURNA","60% + 20%"],["HE_100_NOTURNA","100% + 20%"],["ADICIONAL_NOTURNO","20%"],["INTERJORNADA","Interjornada 50%"]].map(([key,label]) => <label key={key} className="grid gap-1 text-sm font-medium">{label}<input value={(creditBreakdown as any)[key]} onChange={e => setCreditBreakdown(prev => ({...prev,[key]:e.target.value}))} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="00:00" /></label>)}
-        </div><p className="mt-3 text-sm font-semibold">Total distribuído: {String(Math.floor(Object.values(creditBreakdown).reduce((sum,v)=>sum+parseHours(v),0)/60)).padStart(2,"0")}:{String(Object.values(creditBreakdown).reduce((sum,v)=>sum+parseHours(v),0)%60).padStart(2,"0")}</p></div>
-        <label className="grid gap-1 text-sm font-medium">Débito<input value={debitHours} onChange={e => setDebitHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="00:30" /></label>
-        <div className="rounded-lg border bg-muted/30 p-4 md:col-span-2"><p className="text-xs text-muted-foreground">Saldo deste lançamento</p><p className={"mt-1 text-2xl font-bold " + (parseHours(creditHours) - parseHours(debitHours) < 0 ? "text-destructive" : "text-primary")}>{parseHours(creditHours) - parseHours(debitHours) >= 0 ? "+" : "-"}{String(Math.floor(Math.abs(parseHours(creditHours) - parseHours(debitHours)) / 60)).padStart(2, "0")}:{String(Math.abs(parseHours(creditHours) - parseHours(debitHours)) % 60).padStart(2, "0")}</p><p className="mt-1 text-xs text-muted-foreground">Ex.: crédito 02:30 − débito 00:30 = saldo +02:00</p></div>
-        <label className="grid gap-1 text-sm font-medium md:col-span-2">Observação<input value={consolidatedDescription} onChange={e => setConsolidatedDescription(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="Ex.: fechamento do dia" /></label>
+    {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-5">
+      <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">{editing ? "Editar lançamento" : "Novo lançamento"}</h2><p className="text-xs text-muted-foreground">{competence ? "Competência atual" : "Cadastre uma competência primeiro."}</p></div><button onClick={() => setOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <label className="grid gap-1 text-sm font-medium">Funcionário<select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+        <label className="grid gap-1 text-sm font-medium">Data<input type="date" value={launchDate} min={competence ? periodDates(competence).start : undefined} max={competence ? periodDates(competence).end : undefined} onChange={e => setLaunchDate(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
+        <label className="grid gap-1 text-sm font-medium md:col-span-2">Movimento<select value={direction} onChange={e => setDirection(e.target.value as "CREDITO" | "DEBITO")} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="CREDITO">Crédito</option><option value="DEBITO">Débito</option></select></label>
+        {direction === "CREDITO" ? <div className="rounded-lg border p-3 md:col-span-2">
+          <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">Composição do crédito</p><p className="text-xs text-muted-foreground">Começa em 60%. Use + somente se precisar adicionar outro tipo.</p></div><button type="button" onClick={addCreditLine} className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-primary hover:bg-primary/10" title="Adicionar tipo"><Plus className="h-4 w-4" /></button></div>
+          <div className="mt-3 grid gap-2">
+            {creditLines.map((line,index) => <div key={index} className="grid grid-cols-[1fr_110px_32px] items-end gap-2">
+              <label className="grid gap-1 text-xs font-medium">{index === 0 ? "Tipo principal" : "Tipo adicional"}<select value={line.type} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,type:e.target.value} : item))} className="rounded-lg border bg-background px-2 py-2 text-sm font-normal">
+                <option value="Hora extra 60%">60%</option>{creditOptions.map(option => <option key={option} value={option}>{option === "Hora extra noturna" ? "60% + 20%" : option === "Adicional noturno 20%" ? "20%" : option === "Domingo / feriado 100%" ? "100%" : "Interjornada 50%"}</option>)}
+              </select></label>
+              <label className="grid gap-1 text-xs font-medium">Horas<input value={line.hours} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,hours:e.target.value} : item))} className="rounded-lg border bg-background px-2 py-2 text-sm font-normal" placeholder="00:00" /></label>
+              <button type="button" disabled={creditLines.length === 1} onClick={() => removeCreditLine(index)} className="mb-0.5 h-9 w-8 rounded-md border text-muted-foreground disabled:opacity-30">×</button>
+            </div>)}
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">Total de crédito</span><strong>{String(Math.floor(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)/60)).padStart(2,"0")}:{String(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)%60).padStart(2,"0")}</strong></div>
+        </div> : <label className="grid gap-1 text-sm font-medium md:col-span-2">Horas do débito<input value={hours} onChange={e => setHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="02:30" /></label>}
+        <label className="grid gap-1 text-sm font-medium md:col-span-2">Observação<input value={description} onChange={e => setDescription(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
       </div>
-      <div className="mt-5 flex justify-end gap-2"><button onClick={() => setConsolidatedOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void saveConsolidated()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar e atualizar Banco de Horas"}</button></div>
+      <div className="mt-4 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void saveLaunch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar lançamento"}</button></div>
     </Card></div>}
-    {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-2xl p-6"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">{editing ? "Editar lançamento" : "Novo lançamento"}</h2><p className="text-sm text-muted-foreground">{competence ? "Competência atual" : "Cadastre uma competência primeiro."}</p></div><button onClick={() => setOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div>
-      <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="grid gap-1 text-sm font-medium">Funcionário<select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Data<input type="date" value={launchDate} min={competence ? periodDates(competence).start : undefined} max={competence ? periodDates(competence).end : undefined} onChange={e => setLaunchDate(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label><label className="grid gap-1 text-sm font-medium">Tipo<select value={selectedType} onChange={e => setSelectedType(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal">{types.map(t => <option key={t.label}>{t.label}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Movimento<select value={direction} onChange={e => setDirection(e.target.value as "CREDITO" | "DEBITO")} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="CREDITO">Crédito</option><option value="DEBITO">Débito</option></select></label><label className="grid gap-1 text-sm font-medium md:col-span-2">Horas<input value={hours} onChange={e => setHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="02:30" /></label><label className="grid gap-1 text-sm font-medium md:col-span-2">Observação<input value={description} onChange={e => setDescription(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label></div>
-      <div className="mt-5 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void saveLaunch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar lançamento"}</button></div></Card></div>}
+
   </div>;
 }
