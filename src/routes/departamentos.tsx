@@ -1,11 +1,202 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Plus, Search, Power } from "lucide-react";
+import { ArrowLeft, Plus, Search, Power, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { useEffect,useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-export const Route=createFileRoute("/departamentos")({component:Departments});
-function Departments(){const [rows,setRows]=useState<any[]>([]);const [name,setName]=useState("");const [open,setOpen]=useState(false);const [error,setError]=useState("");
-async function load(){const {data,error}=await (supabase as any).from("departments").select("id,name,active").order("name");if(error)setError(error.message);else setRows(data??[])} useEffect(()=>{void load()},[]);
-async function save(){if(!name.trim())return;const {error}=await (supabase as any).from("departments").upsert({name:name.trim(),active:true},{onConflict:"name"});if(error)setError(error.message);else{name&&setName("");setOpen(false);await load()}}
-async function toggle(r:any){const {error}=await (supabase as any).from("departments").update({active:!r.active}).eq("id",r.id);if(error)setError(error.message);else await load()}
-return <div className="min-h-screen bg-background"><header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] justify-between"><Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4"/> Voltar</Link><b>DP Success · Cadastros</b></div></header><main className="mx-auto max-w-[1500px] px-6 py-7"><div className="flex justify-between items-end gap-4"><div><p className="text-sm font-medium text-primary">Cadastro base</p><h1 className="text-3xl font-bold">Departamentos</h1><p className="mt-1 text-sm text-muted-foreground">Estruture os centros de gestão e indicadores.</p></div><button onClick={()=>setOpen(true)} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="inline h-4 w-4 mr-2"/>Novo departamento</button></div>{error&&<p className="mt-4 text-sm text-destructive">{error}</p>}<Card className="mt-6 overflow-hidden"><div className="border-b p-4 flex items-center gap-2"><Search className="h-4 w-4 text-muted-foreground"/><input className="w-full bg-transparent outline-none text-sm" placeholder="Buscar..." onChange={e=>setName(e.target.value)}/></div><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Departamento</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Ação</th></tr></thead><tbody className="divide-y">{rows.filter(r=>r.name.toLowerCase().includes(name.toLowerCase())).map(r=><tr key={r.id}><td className="px-5 py-4 font-medium">{r.name}</td><td className="px-5 py-4">{r.active?"Ativo":"Inativo"}</td><td className="px-5 py-4"><button onClick={()=>void toggle(r)} className="text-sm text-primary"><Power className="inline h-4 w-4 mr-1"/>{r.active?"Inativar":"Ativar"}</button></td></tr>)}</tbody></table></Card></main>{open&&<div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4"><Card className="w-full max-w-md p-6"><h2 className="font-bold text-lg">Novo departamento</h2><input autoFocus value={name} onChange={e=>setName(e.target.value)} className="mt-4 w-full rounded-lg border px-3 py-2" placeholder="Nome"/><div className="mt-4 flex justify-end gap-2"><button onClick={()=>setOpen(false)} className="rounded-lg border px-4 py-2">Cancelar</button><button onClick={()=>void save()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">Salvar</button></div></Card></div>}</div>}
+
+export const Route = createFileRoute("/departamentos")({ component: Departments });
+
+function Departments() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [formName, setFormName] = useState("");
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function load() {
+    const { data, error } = await (supabase as any)
+      .from("departments")
+      .select("id,name,active")
+      .order("name");
+
+    if (error) setError(error.message);
+    else setRows(data ?? []);
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  function openNew() {
+    setError("");
+    setFormName("");
+    setOpen(true);
+  }
+
+  async function save() {
+    const value = formName.trim();
+    if (!value) {
+      setError("Informe o nome do departamento.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    const { error } = await (supabase as any)
+      .from("departments")
+      .insert({ name: value, active: true });
+
+    if (error) {
+      setError(
+        error.code === "23505"
+          ? "Já existe um departamento com esse nome."
+          : error.message
+      );
+      setSaving(false);
+      return;
+    }
+
+    setFormName("");
+    setOpen(false);
+    setSaving(false);
+    await load();
+  }
+
+  async function toggle(row: any) {
+    setError("");
+    const { error } = await (supabase as any)
+      .from("departments")
+      .update({ active: !row.active })
+      .eq("id", row.id);
+
+    if (error) setError(error.message);
+    else await load();
+  }
+
+  const filtered = rows.filter((row) =>
+    row.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b px-6 py-4">
+        <div className="mx-auto flex max-w-[1500px] justify-between">
+          <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground">
+            <ArrowLeft className="h-4 w-4" /> Voltar
+          </Link>
+          <b>DP Success · Cadastros</b>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-[1500px] px-6 py-7">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="text-sm font-medium text-primary">Cadastro base</p>
+            <h1 className="text-3xl font-bold">Departamentos</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Estruture os centros de gestão e indicadores.
+            </p>
+          </div>
+          <button type="button" onClick={openNew} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+            <Plus className="mr-2 inline h-4 w-4" /> Novo departamento
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        <Card className="mt-6 overflow-hidden">
+          <div className="flex items-center gap-2 border-b p-4">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input
+              value={search}
+              className="w-full bg-transparent text-sm outline-none"
+              placeholder="Buscar departamento..."
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-3">Departamento</th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-5 py-8 text-center text-muted-foreground">
+                      Nenhum departamento cadastrado.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((row) => (
+                    <tr key={row.id}>
+                      <td className="px-5 py-4 font-medium">{row.name}</td>
+                      <td className="px-5 py-4">{row.active ? "Ativo" : "Inativo"}</td>
+                      <td className="px-5 py-4">
+                        <button type="button" onClick={() => void toggle(row)} className="text-sm text-primary">
+                          <Power className="mr-1 inline h-4 w-4" />
+                          {row.active ? "Inativar" : "Ativar"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </main>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-md p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Novo departamento</h2>
+                <p className="mt-1 text-xs text-muted-foreground">O cadastro será salvo no banco.</p>
+              </div>
+              <button type="button" onClick={() => setOpen(false)} className="text-muted-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <label className="mt-5 grid gap-1 text-sm font-medium">
+              Nome do departamento
+              <input
+                autoFocus
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void save();
+                }}
+                className="rounded-lg border bg-background px-3 py-2 font-normal"
+                placeholder="Ex.: Recursos Humanos"
+              />
+            </label>
+
+            {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">
+                Cancelar
+              </button>
+              <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
+                {saving ? "Salvando..." : "Salvar departamento"}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
