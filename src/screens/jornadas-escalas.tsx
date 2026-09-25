@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export function Schedules() {
   const [rows, setRows] = useState<any[]>([]);
-  const [form, setForm] = useState({ name: "", weekly: "44", divisor: "220" });
+  const [form, setForm] = useState({ name: "", weekly: "44" });
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -20,20 +20,19 @@ export function Schedules() {
   async function save() {
     const name = form.name.trim();
     const weeklyHours = Number(form.weekly.replace(",", "."));
-    const divisor = Number(form.divisor.replace(",", "."));
-    if (!name || weeklyHours <= 0 || divisor <= 0) {
-      setError("Informe nome, carga semanal e divisor válidos.");
+    if (!name || weeklyHours <= 0) {
+      setError("Informe nome e carga semanal válidos.");
       return;
     }
     setSaving(true); setError("");
     const { error } = await (supabase).from("work_schedules").insert({
-      name, weekly_minutes: Math.round(weeklyHours * 60), divisor, active: true,
+      name, weekly_minutes: Math.round(weeklyHours * 60), active: true,
     });
     if (error) {
       setError(error.code === "23505" ? "Já existe uma jornada com esse nome." : error.message);
       setSaving(false); return;
     }
-    setForm({ name: "", weekly: "44", divisor: "220" }); setOpen(false); setSaving(false); await load();
+    setForm({ name: "", weekly: "44" }); setOpen(false); setSaving(false); await load();
   }
 
   async function toggle(row: any) {
@@ -47,12 +46,12 @@ export function Schedules() {
       <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a><b>DP Success · Cadastros</b>
     </div></header>
     <main className="mx-auto max-w-[1500px] px-6 py-7">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Cadastro base</p><h1 className="text-3xl font-bold">Jornadas / Escalas</h1><p className="mt-1 text-sm text-muted-foreground">Cadastre jornadas, carga semanal e divisor.</p></div>
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Cadastro base</p><h1 className="text-3xl font-bold">Jornadas / Escalas</h1><p className="mt-1 text-sm text-muted-foreground">Cadastre jornadas e carga semanal.</p></div>
         <button type="button" onClick={() => { setError(""); setOpen(true); }} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="mr-2 inline h-4 w-4" /> Nova jornada</button>
       </div>
       {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
-      <Card className="mt-6 overflow-hidden"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Jornada</th><th className="px-5 py-3">Carga semanal</th><th className="px-5 py-3">Divisor</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Ação</th></tr></thead><tbody className="divide-y">
-        {rows.length === 0 ? <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">Nenhuma jornada cadastrada.</td></tr> : rows.map((row) => <tr key={row.id}><td className="px-5 py-4 font-medium">{row.name}</td><td className="px-5 py-4">{Math.floor((row.weekly_minutes || 0) / 60)}h</td><td className="px-5 py-4">{row.divisor}h</td><td className="px-5 py-4">{row.active === false ? "Inativa" : "Ativa"}</td><td className="px-5 py-4"><button type="button" onClick={() => void toggle(row)} className="text-primary"><Power className="mr-1 inline h-4 w-4" />{row.active === false ? "Ativar" : "Inativar"}</button></td></tr>)}
+      <Card className="mt-6 overflow-hidden"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Jornada</th><th className="px-5 py-3">Carga semanal</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Ação</th></tr></thead><tbody className="divide-y">
+        {rows.length === 0 ? <tr><td colSpan={4} className="px-5 py-8 text-center text-muted-foreground">Nenhuma jornada cadastrada.</td></tr> : rows.map((row) => <tr key={row.id}><td className="px-5 py-4 font-medium">{row.name}</td><td className="px-5 py-4">{Math.floor((row.weekly_minutes || 0) / 60)}h</td><td className="px-5 py-4">{row.active === false ? "Inativa" : "Ativa"}</td><td className="px-5 py-4"><button type="button" onClick={() => void toggle(row)} className="text-primary"><Power className="mr-1 inline h-4 w-4" />{row.active === false ? "Ativar" : "Inativar"}</button></td></tr>)}
       </tbody></table></Card>
     </main>
     {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-md p-6">
