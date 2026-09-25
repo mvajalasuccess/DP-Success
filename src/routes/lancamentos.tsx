@@ -5,6 +5,15 @@ import { useState } from "react";
 
 export const Route = createFileRoute("/lancamentos")({ component: Launches });
 
+const calculationRules: Record<string, { factor: number; label: string }> = {
+  "Hora extra 60%": { factor: 1.6, label: "HE 60%" },
+  "Hora extra noturna": { factor: 1.8, label: "HE noturna (60% + 20%)" },
+  "Adicional noturno 20%": { factor: 0.2, label: "Adicional noturno" },
+  "Domingo / feriado 100%": { factor: 2, label: "Domingo / feriado" },
+  "Interjornada 50%": { factor: 1.5, label: "Interjornada" },
+  "Crédito / débito": { factor: 1, label: "Crédito / débito" },
+};
+
 const types = [
   { label: "Hora extra 60%", icon: Clock3 },
   { label: "Hora extra noturna", icon: Moon },
@@ -21,7 +30,7 @@ const rows = [
   ["Juliana Alves","17/09/2026","Domingo / feriado 100%","+04:00","Crédito"],
 ];
 
-function Launches() {\n  const [open, setOpen] = useState(false);
+function Launches() {\n  const [open, setOpen] = useState(false);\n  const [selectedType, setSelectedType] = useState("Hora extra 60%");\n  const [hours, setHours] = useState("02:30");\n  const [salary] = useState(3200);\n  const hourlyRate = salary / 220;\n  const [h, m] = hours.split(":").map(Number);\n  const decimalHours = (Number.isFinite(h) ? h : 0) + (Number.isFinite(m) ? m : 0) / 60;\n  const rule = calculationRules[selectedType] ?? calculationRules["Crédito / débito"];\n  const estimatedValue = decimalHours * hourlyRate * rule.factor;
   return <div className="min-h-screen bg-background">
     <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4"/> Voltar</Link><span className="font-semibold">DP Success · Lançamentos</span></div></header>
     <main className="mx-auto max-w-[1500px] px-6 py-7">
