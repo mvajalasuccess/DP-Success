@@ -180,7 +180,7 @@ export function BankHours() {
         const delay = delays.get(period.id) ?? 0;
         const bankMovement = bank.get(period.id) ?? 0;
         const totalFolga = folga.get(period.id) ?? 0;
-        const overtimeMinutes = extra.he60 + extra.heNoturna + extra.he100 + extra.he100Noturna + extra.noturno + extra.interjornada;
+        const overtimeMinutes = extra.he60 + extra.heNoturna + extra.he100 + extra.he100Noturna + extra.noturno;
         const totalBalance = overtimeMinutes - delay + bankMovement - totalFolga;
         running += totalBalance;
         return {
