@@ -31,13 +31,10 @@ function labelForType(type: string) {
 export function Launches() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Launch | null>(null);
-  const [selectedType, setSelectedType] = useState("Hora extra 60%");
   const [creditLines, setCreditLines] = useState([{ type: "Hora extra 60%", hours: "02:30" }]);
-  const [hours, setHours] = useState("02:30");
-  const [direction, setDirection] = useState<"CREDITO" | "DEBITO">("CREDITO");
+  const [debitHours, setDebitHours] = useState("00:00");
   const [employeeId, setEmployeeId] = useState("");
   const [launchDate, setLaunchDate] = useState("");
-  const [description, setDescription] = useState("");
   const [search, setSearch] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [launches, setLaunches] = useState<Launch[]>([]);
@@ -81,10 +78,8 @@ export function Launches() {
   function openNew() {
     setEditing(null);
     setEmployeeId("");
-    setDirection("CREDITO");
-    setHours("02:30");
+    setDebitHours("00:00");
     setCreditLines([{ type: "Hora extra 60%", hours: "02:30" }]);
-    setDescription("");
     if (competence) setLaunchDate(periodDates(competence).end);
     setOpen(true);
   }
@@ -92,10 +87,9 @@ export function Launches() {
   function openEdit(row: Launch) {
     setEditing(row);
     setEmployeeId(row.employee_id);
-    setDirection(row.direction);
-    setHours(String(Math.floor(row.minutes / 60)).padStart(2, "0") + ":" + String(row.minutes % 60).padStart(2, "0"));
-    setCreditLines([{ type: labelForType(row.type), hours: String(Math.floor(row.minutes / 60)).padStart(2, "0") + ":" + String(row.minutes % 60).padStart(2, "0") }]);
-    setDescription(row.description ?? "");
+    const rowHours = String(Math.floor(row.minutes / 60)).padStart(2, "0") + ":" + String(row.minutes % 60).padStart(2, "0");
+    setDebitHours(row.direction === "DEBITO" ? rowHours : "00:00");
+    setCreditLines(row.direction === "CREDITO" ? [{ type: labelForType(row.type), hours: rowHours }] : [{ type: "Hora extra 60%", hours: "00:00" }]);
     setLaunchDate(row.launch_date);
     setOpen(true);
   }
@@ -135,14 +129,45 @@ export function Launches() {
       setSaving(false); return;
     }
 
-    if (direction === "DEBITO") {
-      if (minutes <= 0) { setError("Informe as horas do débito."); setSaving(false); return; }
-      const result = editing?.source === "bank"
-        ? await supabase.from("bank_hours").update({ employee_id: employeeId, entry_date: launchDate, kind: "debito", minutes, justification: description.trim() || null }).eq("id", editing.id)
-        : await supabase.from("bank_hours").insert({ employee_id: employeeId, period_id: competence.id, entry_date: launchDate, kind: "debito", minutes, previous_balance_minutes: 0, balance_minutes: -minutes, justification: description.trim() || null });
-      if (result.error) setError(result.error.message);
-      else { setOpen(false); await loadData(); }
+    const debitMinutes = parseHours(debitHours);
+    const validLines = creditLines.map(line => ({ type: line.type, minutes: parseHours(line.hours) })).filter(line => line.minutes > 0);
+    if (!validLines.length && debitMinutes <= 0) {
+      setError("Informe pelo menos um crédito ou débito.");
       setSaving(false); return;
+    }
+
+    if (editing) {
+      const del = editing.source === "overtime"
+        ? await supabase.from("overtime_records").delete().eq("id", editing.id)
+        : await supabase.from("bank_hours").delete().eq("id", editing.id);
+      if (del.error) { setError(del.error.message); setSaving(false); return; }
+    }
+
+    for (const line of validLines) {
+      const rule = calculationRules[line.type] ?? calculationRules["Hora extra 60%"];
+      const result = await supabase.from("overtime_records").insert({
+        employee_id: employeeId,
+        period_id: competence.id,
+        reference_date: launchDate,
+        minutes: line.minutes,
+        rate_percent: rule.code === "DOMINGO_FERIADO" ? 100 : rule.code === "INTERJORNADA" ? 50 : rule.code === "ADICIONAL_NOTURNO" ? 20 : 60,
+        notes: rule.label,
+      });
+      if (result.error) { setError(result.error.message); setSaving(false); return; }
+    }
+
+    if (debitMinutes > 0) {
+      const result = await supabase.from("bank_hours").insert({
+        employee_id: employeeId,
+        period_id: competence.id,
+        entry_date: launchDate,
+        kind: "debito",
+        minutes: debitMinutes,
+        previous_balance_minutes: 0,
+        balance_minutes: -debitMinutes,
+        justification: "Débito do lançamento",
+      });
+      if (result.error) { setError(result.error.message); setSaving(false); return; }
     }
 
     const validLines = creditLines.map(line => ({ type: line.type, minutes: parseHours(line.hours) })).filter(line => line.minutes > 0);
@@ -206,9 +231,8 @@ export function Launches() {
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <label className="grid gap-1 text-sm font-medium">Funcionário<select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         <label className="grid gap-1 text-sm font-medium">Data<input type="date" value={launchDate} min={competence ? periodDates(competence).start : undefined} max={competence ? periodDates(competence).end : undefined} onChange={e => setLaunchDate(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
-        <label className="grid gap-1 text-sm font-medium md:col-span-2">Movimento<select value={direction} onChange={e => setDirection(e.target.value as "CREDITO" | "DEBITO")} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="CREDITO">Crédito</option><option value="DEBITO">Débito</option></select></label>
-        {direction === "CREDITO" ? <div className="rounded-lg border p-3 md:col-span-2">
-          <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">Composição do crédito</p><p className="text-xs text-muted-foreground">Começa em 60%. Use + somente se precisar adicionar outro tipo.</p></div><button type="button" onClick={addCreditLine} className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-primary hover:bg-primary/10" title="Adicionar tipo"><Plus className="h-4 w-4" /></button></div>
+        <div className="rounded-lg border p-3 md:col-span-2">
+          <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">1. Crédito</p><p className="text-xs text-muted-foreground">Começa sempre em 60%. Use + somente se precisar adicionar outro tipo de crédito.</p></div><button type="button" onClick={addCreditLine} className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-primary hover:bg-primary/10" title="Adicionar tipo"><Plus className="h-4 w-4" /></button></div>
           <div className="mt-3 grid gap-2">
             {creditLines.map((line,index) => <div key={index} className="grid grid-cols-[1fr_110px_32px] items-end gap-2">
               <label className="grid gap-1 text-xs font-medium">{index === 0 ? "Tipo principal" : "Tipo adicional"}<select value={line.type} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,type:e.target.value} : item))} className="rounded-lg border bg-background px-2 py-2 text-sm font-normal">
@@ -219,8 +243,11 @@ export function Launches() {
             </div>)}
           </div>
           <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">Total de crédito</span><strong>{String(Math.floor(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)/60)).padStart(2,"0")}:{String(creditLines.reduce((s,l)=>s+parseHours(l.hours),0)%60).padStart(2,"0")}</strong></div>
-        </div> : <label className="grid gap-1 text-sm font-medium md:col-span-2">Horas do débito<input value={hours} onChange={e => setHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="02:30" /></label>}
-        <label className="grid gap-1 text-sm font-medium md:col-span-2">Observação<input value={description} onChange={e => setDescription(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
+        </div>
+        <div className="rounded-lg border p-3 md:col-span-2">
+          <div><p className="text-sm font-semibold">2. Débito</p><p className="text-xs text-muted-foreground">Informe as horas que serão descontadas do saldo.</p></div>
+          <label className="mt-3 grid gap-1 text-xs font-medium">Horas do débito<input value={debitHours} onChange={e => setDebitHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm font-normal" placeholder="00:00" /></label>
+        </div>
       </div>
       <div className="mt-4 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void saveLaunch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar lançamento"}</button></div>
     </Card></div>}
