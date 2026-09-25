@@ -76,22 +76,70 @@ grant execute on function public.can_manage(uuid) to authenticated;
 grant execute on function public.current_roles() to authenticated;
 
 -- Remove políticas permissivas anteriores.
-do $$
-declare
-  t text;
-begin
-  foreach t in array array[
-    'departments','positions','work_schedules','holidays','occurrence_types',
-    'employees','time_periods','time_records','time_adjustments',
-    'overtime_records','bank_hours','attachments','occurrences',
-    'audit_logs','app_settings','medical_certificates'
-  ] loop
-    execute format('drop policy if exists "%s_select" on public.%I', t, t);
-    execute format('drop policy if exists "%s_insert" on public.%I', t, t);
-    execute format('drop policy if exists "%s_update" on public.%I', t, t);
-    execute format('drop policy if exists "%s_delete" on public.%I', t, t);
-  end loop;
-end $$;
+drop policy if exists departments_select on public.departments;
+drop policy if exists departments_insert on public.departments;
+drop policy if exists departments_update on public.departments;
+drop policy if exists departments_delete on public.departments;
+drop policy if exists positions_select on public.positions;
+drop policy if exists positions_insert on public.positions;
+drop policy if exists positions_update on public.positions;
+drop policy if exists positions_delete on public.positions;
+drop policy if exists work_schedules_select on public.work_schedules;
+drop policy if exists work_schedules_insert on public.work_schedules;
+drop policy if exists work_schedules_update on public.work_schedules;
+drop policy if exists work_schedules_delete on public.work_schedules;
+drop policy if exists holidays_select on public.holidays;
+drop policy if exists holidays_insert on public.holidays;
+drop policy if exists holidays_update on public.holidays;
+drop policy if exists holidays_delete on public.holidays;
+drop policy if exists occurrence_types_select on public.occurrence_types;
+drop policy if exists occurrence_types_insert on public.occurrence_types;
+drop policy if exists occurrence_types_update on public.occurrence_types;
+drop policy if exists occurrence_types_delete on public.occurrence_types;
+drop policy if exists employees_select on public.employees;
+drop policy if exists employees_insert on public.employees;
+drop policy if exists employees_update on public.employees;
+drop policy if exists employees_delete on public.employees;
+drop policy if exists time_periods_select on public.time_periods;
+drop policy if exists time_periods_insert on public.time_periods;
+drop policy if exists time_periods_update on public.time_periods;
+drop policy if exists time_periods_delete on public.time_periods;
+drop policy if exists time_records_select on public.time_records;
+drop policy if exists time_records_insert on public.time_records;
+drop policy if exists time_records_update on public.time_records;
+drop policy if exists time_records_delete on public.time_records;
+drop policy if exists time_adjustments_select on public.time_adjustments;
+drop policy if exists time_adjustments_insert on public.time_adjustments;
+drop policy if exists time_adjustments_update on public.time_adjustments;
+drop policy if exists time_adjustments_delete on public.time_adjustments;
+drop policy if exists overtime_records_select on public.overtime_records;
+drop policy if exists overtime_records_insert on public.overtime_records;
+drop policy if exists overtime_records_update on public.overtime_records;
+drop policy if exists overtime_records_delete on public.overtime_records;
+drop policy if exists bank_hours_select on public.bank_hours;
+drop policy if exists bank_hours_insert on public.bank_hours;
+drop policy if exists bank_hours_update on public.bank_hours;
+drop policy if exists bank_hours_delete on public.bank_hours;
+drop policy if exists attachments_select on public.attachments;
+drop policy if exists attachments_insert on public.attachments;
+drop policy if exists attachments_update on public.attachments;
+drop policy if exists attachments_delete on public.attachments;
+drop policy if exists occurrences_select on public.occurrences;
+drop policy if exists occurrences_insert on public.occurrences;
+drop policy if exists occurrences_update on public.occurrences;
+drop policy if exists occurrences_delete on public.occurrences;
+drop policy if exists audit_logs_select on public.audit_logs;
+drop policy if exists audit_logs_insert on public.audit_logs;
+drop policy if exists audit_logs_update on public.audit_logs;
+drop policy if exists audit_logs_delete on public.audit_logs;
+drop policy if exists app_settings_select on public.app_settings;
+drop policy if exists app_settings_insert on public.app_settings;
+drop policy if exists app_settings_update on public.app_settings;
+drop policy if exists app_settings_delete on public.app_settings;
+drop policy if exists medical_certificates_select on public.medical_certificates;
+drop policy if exists medical_certificates_insert on public.medical_certificates;
+drop policy if exists medical_certificates_update on public.medical_certificates;
+drop policy if exists medical_certificates_delete on public.medical_certificates;
 
 drop policy if exists profiles_select on public.profiles;
 drop policy if exists profiles_insert_own on public.profiles;
