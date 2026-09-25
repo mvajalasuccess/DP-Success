@@ -494,3 +494,24 @@ for all to authenticated using (true) with check (true);
 drop trigger if exists trg_balance_updated_at on competence_employee_balances;
 create trigger trg_balance_updated_at before update on competence_employee_balances
 for each row execute function set_updated_at();
+
+
+-- Cadastro de jornadas/escalas: jornada pode ser vinculada ao funcionário.
+alter table work_schedules add column if not exists active boolean not null default true;
+alter table employees add column if not exists work_schedule_id uuid references work_schedules(id);
+create index if not exists idx_employees_work_schedule on employees(work_schedule_id);
+
+-- RLS dos cadastros mestres.
+alter table departments enable row level security;
+alter table positions enable row level security;
+alter table work_schedules enable row level security;
+alter table employees enable row level security;
+
+drop policy if exists departments_authenticated_all on departments;
+create policy departments_authenticated_all on departments for all to authenticated using (true) with check (true);
+drop policy if exists positions_authenticated_all on positions;
+create policy positions_authenticated_all on positions for all to authenticated using (true) with check (true);
+drop policy if exists work_schedules_authenticated_all on work_schedules;
+create policy work_schedules_authenticated_all on work_schedules for all to authenticated using (true) with check (true);
+drop policy if exists employees_authenticated_all on employees;
+create policy employees_authenticated_all on employees for all to authenticated using (true) with check (true);
