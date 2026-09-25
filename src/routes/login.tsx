@@ -36,6 +36,16 @@ function Login() {
         return;
       }
 
+      const { error: setupError } = await supabase.rpc("ensure_user_setup", {
+        _full_name: null,
+        _email: email.trim(),
+      });
+      if (setupError) {
+        setError(setupError.message);
+        setSaving(false);
+        return;
+      }
+
       setSaving(false);
       await navigate({ to: "/" });
       return;
@@ -55,6 +65,14 @@ function Login() {
     setSaving(false);
 
     if (data.session) {
+      const { error: setupError } = await supabase.rpc("ensure_user_setup", {
+        _full_name: null,
+        _email: email.trim(),
+      });
+      if (setupError) {
+        setError(setupError.message);
+        return;
+      }
       await navigate({ to: "/" });
     } else {
       setMessage("Cadastro criado. Verifique seu e-mail para confirmar a conta e depois entre no sistema.");
