@@ -63,7 +63,7 @@ as $
     from public.user_roles
     where user_id = _user_id
   );
-$;
+$;;
 
 revoke execute on function public.has_app_access(uuid) from public, anon;
 grant execute on function public.has_app_access(uuid) to authenticated;
