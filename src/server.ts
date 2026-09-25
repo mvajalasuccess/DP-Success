@@ -1,31 +1,13 @@
-// Custom TanStack Start server entry for the Lovable preview.
-// The dynamic import avoids SSR/HMR re-export issues in the Start server facade.
+import {
+  createStartHandler,
+  defaultStreamHandler,
+} from "@tanstack/react-start/server";
+import { createServerEntry } from "@tanstack/react-start/server-entry";
 
-type StartHandler = (
-  request: Request,
-  env?: unknown,
-  ctx?: unknown,
-) => Promise<Response> | Response;
+const handler = createStartHandler({
+  handler: defaultStreamHandler,
+});
 
-let cachedFetch: StartHandler | null = null;
-
-async function getFetch(): Promise<StartHandler> {
-  if (cachedFetch) return cachedFetch;
-
-  const mod = await import("@tanstack/react-start/server");
-  cachedFetch = mod.createStartHandler(mod.defaultStreamHandler) as StartHandler;
-  return cachedFetch;
-}
-
-if (import.meta.hot) {
-  import.meta.hot.accept(() => {
-    cachedFetch = null;
-  });
-}
-
-export default {
-  async fetch(request: Request, env: unknown, ctx: unknown) {
-    const handler = await getFetch();
-    return handler(request, env, ctx);
-  },
-};
+export default createServerEntry({
+  fetch: handler,
+});
