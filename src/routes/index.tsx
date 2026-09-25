@@ -52,7 +52,9 @@ function Dashboard() {
 }
 
 function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void }) {
-  const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, bank: 0, absence: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
+  const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, bank: 0, absence: 0, certificates: 0, absenteeism: employees.length > 0
+          ? Math.round((absence / (employees.length * 22 * 480)) * 1000) / 10
+          : 0, period: "Nenhuma competência" });
   const [top, setTop] = useState<Array<{ name: string; minutes: number }>>([]);
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
@@ -69,7 +71,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       setUserEmail(sessionData.session.user.email || "Usuário RH");
       const db = supabase;
       const [emps, comp, overtimeRows, bankRows, occ, cert] = await Promise.all([
-        db.from("employees").select("id,full_name,department_id,departments(name)").eq("status", "ativo"),
+        db.from("employees").select("id,full_name,department_id,departments(name)").eq("active", true),
         db.from("time_periods").select("id,reference_year,reference_month,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
         db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
         db.from("bank_hours").select("employee_id,balance_minutes,entry_date").order("entry_date", { ascending: false }),
@@ -100,10 +102,17 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       );
 
       const absence = occurrences
-        .filter((x: any) => x.occurrence_types?.code === "falta")
+        .filter((x: any) => {
+          const code = String(x.occurrence_types?.code ?? "").toLowerCase();
+          return code === "falta" || code === "absence";
+        })
         .reduce((sum: number, x: any) => {
           const quantity = Number(x.quantity || 0);
-          return sum + (x.unit === "horas" ? quantity * 60 : quantity * 480);
+          const unit = String(x.unit ?? "").toLowerCase();
+          if (unit === "minutos" || unit === "minutes") return sum + quantity;
+          if (unit === "horas" || unit === "hours") return sum + quantity * 60;
+          if (unit === "dias" || unit === "days") return sum + quantity * 480;
+          return sum;
         }, 0);
 
       const byEmployee = new Map<string, number>();
