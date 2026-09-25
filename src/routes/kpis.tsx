@@ -10,16 +10,17 @@ function Kpis(){
    db.from("bank_movements").select("minutes"),
    db.from("occurrences").select("minutes,type,occurrence_date"),
    db.from("medical_certificates").select("id"),
-   db.from("competencies").select("id,name,start_date,end_date").order("end_date",{ascending:false}).limit(1)
+   db.from("competencies").select("id,name,start_date,end_date").order("end_date",{ascending:false}).limit(1),
+   db.from("calculation_parameters").select("code,rate_factor").in("code",["ABS_FALTA","ABS_ATRASO","ABS_SAIDA_ANTECIPADA","ABS_ATESTADO"])
   ]);
   const err=[e,c,o,a,comp].find(x=>x.error);if(err){setError(err.error.message);return}
-  const employees=e.data??[];const mov=c.data??[];const occ=o.data??[];const current=comp.data?.[0];
+  const employees=e.data??[];const mov=c.data??[];const occ=o.data??[];const current=comp.data?.[0];const p=new Map<string,number>((params.data??[]).map((x:any)=>[x.code,Number(x.rate_factor)]));
   if(current)setPeriod(current.name);
   const credits=mov.filter((x:any)=>x.minutes>0).reduce((s:number,x:any)=>s+x.minutes,0);
   const debits=mov.filter((x:any)=>x.minutes<0).reduce((s:number,x:any)=>s+Math.abs(x.minutes),0);
   const positive=employees.filter((x:any)=>(x.current_bank_minutes??x.initial_bank_minutes??0)>0).length;
   const negative=employees.filter((x:any)=>(x.current_bank_minutes??x.initial_bank_minutes??0)<0).length;
-  const absence=occ.filter((x:any)=>x.type==="Falta").reduce((s:number,x:any)=>s+(x.minutes||0),0);
+  const absence=occ.reduce((s:number,x:any)=>{const code=x.type==="Falta"?"ABS_FALTA":x.type==="Atraso"?"ABS_ATRASO":x.type==="Saída antecipada"?"ABS_SAIDA_ANTECIPADA":"";return s+((code&&p.get(code)!==0)?(x.minutes||0):0)},0);
   let scheduled=0;
   if(current){
     const start=new Date(current.start_date+"T12:00:00"),end=new Date(current.end_date+"T12:00:00");
