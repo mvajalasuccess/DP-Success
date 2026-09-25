@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { PeriodStatus, TableUpdate, TimePeriod } from "./db";
+import type { PeriodStatus, TimePeriod } from "./db";
 
 function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
   if (result.error) throw new Error(result.error.message);
@@ -42,8 +42,10 @@ export async function ensurePeriod(year: number, month: number): Promise<TimePer
     .eq("reference_year", year)
     .eq("reference_month", month)
     .maybeSingle();
+
   if (existing.error) throw new Error(existing.error.message);
   if (existing.data) return existing.data;
+
   return unwrap(
     await supabase
       .from("time_periods")
@@ -61,26 +63,47 @@ export async function setPeriodStatus(params: {
   notes?: string | null;
 }): Promise<TimePeriod> {
   const period = await ensurePeriod(params.year, params.month);
-
-  const patch: TableUpdate<"time_periods"> = {
-    status: params.status,
-    notes: params.notes ?? period.notes,
-  };
+  const now = new Date().toISOString();
 
   if (params.status === "fechado") {
-    patch["closed_by"] = params.userId;
-    patch["closed_at"] = new Date().toISOString();
+    return unwrap(
+      await supabase
+        .from("time_periods")
+        .update({
+          status: "fechado",
+          notes: params.notes ?? period.notes,
+          closed_by: params.userId,
+          closed_at: now,
+        })
+        .eq("id", period.id)
+        .select()
+        .single(),
+    );
   }
 
   if (params.status === "aberto" && period.status === "fechado") {
-    patch["reopened_by"] = params.userId;
-    patch["reopened_at"] = new Date().toISOString();
+    return unwrap(
+      await supabase
+        .from("time_periods")
+        .update({
+          status: "aberto",
+          notes: params.notes ?? period.notes,
+          reopened_by: params.userId,
+          reopened_at: now,
+        })
+        .eq("id", period.id)
+        .select()
+        .single(),
+    );
   }
 
   return unwrap(
     await supabase
       .from("time_periods")
-      .update(patch)
+      .update({
+        status: params.status,
+        notes: params.notes ?? period.notes,
+      })
       .eq("id", period.id)
       .select()
       .single(),
