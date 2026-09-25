@@ -6,13 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/funcionarios")({ component: Employees });
 
-const employees = [
-  { name: "João Pereira", role: "Analista Operacional", department: "Operacional", salary: "R$ 3.200,00", bank: "+12:35", status: "Ativo" },
-  { name: "Maria Santos", role: "Assistente Administrativo", department: "Administrativo", salary: "R$ 2.850,00", bank: "+08:20", status: "Ativo" },
-  { name: "Carlos Lima", role: "Supervisor Comercial", department: "Comercial", salary: "R$ 4.600,00", bank: "-03:15", status: "Ativo" },
-  { name: "Juliana Alves", role: "Analista Financeiro", department: "Financeiro", salary: "R$ 3.900,00", bank: "+06:40", status: "Ativo" },
-];
-
 function Employees() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [search, setSearch] = useState("");
