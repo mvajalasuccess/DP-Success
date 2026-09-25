@@ -51,6 +51,23 @@ as $$
   where user_id = (select auth.uid());
 $$;
 
+create or replace function public.has_app_access(_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1
+    from public.user_roles
+    where user_id = _user_id
+  );
+$;
+
+revoke execute on function public.has_app_access(uuid) from public, anon;
+grant execute on function public.has_app_access(uuid) to authenticated;
+
 revoke execute on function public.has_role(uuid, public.app_role) from public, anon;
 revoke execute on function public.can_manage(uuid) from public, anon;
 revoke execute on function public.current_roles() from public, anon;
@@ -184,7 +201,7 @@ with check ((select public.has_role((select auth.uid()), 'administrador'::public
 -- Cadastros: todos os usuários autenticados podem consultar;
 -- somente RH/administrador alteram; somente administrador exclui.
 create policy departments_select on public.departments
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy departments_insert on public.departments
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy departments_update on public.departments
@@ -196,7 +213,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy positions_select on public.positions
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy positions_insert on public.positions
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy positions_update on public.positions
@@ -208,7 +225,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy work_schedules_select on public.work_schedules
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy work_schedules_insert on public.work_schedules
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy work_schedules_update on public.work_schedules
@@ -220,7 +237,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy holidays_select on public.holidays
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy holidays_insert on public.holidays
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy holidays_update on public.holidays
@@ -232,7 +249,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy occurrence_types_select on public.occurrence_types
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy occurrence_types_insert on public.occurrence_types
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy occurrence_types_update on public.occurrence_types
@@ -245,7 +262,7 @@ using ((select public.has_role((select auth.uid()), 'administrador'::public.app_
 
 -- Funcionários e dados operacionais.
 create policy employees_select on public.employees
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy employees_insert on public.employees
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy employees_update on public.employees
@@ -257,7 +274,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy time_periods_select on public.time_periods
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy time_periods_insert on public.time_periods
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy time_periods_update on public.time_periods
@@ -269,7 +286,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy time_records_select on public.time_records
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy time_records_insert on public.time_records
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy time_records_update on public.time_records
@@ -281,7 +298,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy time_adjustments_select on public.time_adjustments
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy time_adjustments_insert on public.time_adjustments
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy time_adjustments_update on public.time_adjustments
@@ -293,7 +310,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy overtime_records_select on public.overtime_records
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy overtime_records_insert on public.overtime_records
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy overtime_records_update on public.overtime_records
@@ -305,7 +322,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy bank_hours_select on public.bank_hours
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy bank_hours_insert on public.bank_hours
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy bank_hours_update on public.bank_hours
@@ -317,7 +334,7 @@ for delete to authenticated
 using ((select public.has_role((select auth.uid()), 'administrador'::public.app_role)));
 
 create policy occurrences_select on public.occurrences
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy occurrences_insert on public.occurrences
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy occurrences_update on public.occurrences
@@ -381,7 +398,7 @@ using ((select public.has_role((select auth.uid()), 'administrador'::public.app_
 
 -- Configurações: leitura para autenticados; alteração para RH/administrador.
 create policy app_settings_select on public.app_settings
-for select to authenticated using (true);
+for select to authenticated using ((select public.has_app_access((select auth.uid()))));
 create policy app_settings_insert on public.app_settings
 for insert to authenticated with check ((select public.can_manage((select auth.uid()))));
 create policy app_settings_update on public.app_settings
