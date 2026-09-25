@@ -118,7 +118,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         d.employees++;
         deptMap.set(name, d);
       });
-      launches.filter((x: any) => overtimeTypes.includes(x.type)).forEach((x: any) => {
+      currentOvertime.forEach((x: any) => {
         const employee = employees.find((e: any) => e.id === x.employee_id);
         const name = employee?.departments?.name || "Sem departamento";
         if (deptMap.has(name)) deptMap.get(name)!.minutes += x.minutes || 0;
