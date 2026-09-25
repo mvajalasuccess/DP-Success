@@ -12,14 +12,14 @@ export const Route=createRootRouteWithContext<{queryClient:QueryClient}>()({head
 
 function RootShell({children}:{children:ReactNode}){return <html lang="pt-BR"><head><HeadContent/></head><body>{children}<Scripts/></body></html>}
 
-function RootComponent(){const{queryClient}=Route.useRouteContext();const navigate=useNavigate();const location=useLocation();const[checkingAuth,setCheckingAuth]=useState(true);const[session,setSession]=useState<any>(null);
- useEffect(()=>{let mounted=true;let timeout:ReturnType<typeof setTimeout>|undefined;
+function RootComponent(){const{queryClient}=Route.useRouteContext();const navigate=useNavigate();const location=useLocation();const isLoginRoute = location.pathname === "/login"; const[checkingAuth,setCheckingAuth]=useState(!isLoginRoute);const[session,setSession]=useState<any>(null);
+ useEffect(()=>{if(isLoginRoute)return;let mounted=true;let timeout:ReturnType<typeof setTimeout>|undefined;
   const finish=(nextSession:any)=>{if(!mounted)return;setSession(nextSession);setCheckingAuth(false);if(timeout)clearTimeout(timeout)};
   const {data:listener}=supabase.auth.onAuthStateChange((_event,nextSession)=>finish(nextSession));
   timeout=setTimeout(()=>finish(null),4000);
   void supabase.auth.getSession().then(({data})=>finish(data.session)).catch(()=>finish(null));
   return()=>{mounted=false;if(timeout)clearTimeout(timeout);listener.subscription.unsubscribe()};
- },[]);
- useEffect(()=>{if(checkingAuth)return;if(!session&&location.pathname!=="/login")void navigate({to:"/login",replace:true});else if(session&&location.pathname==="/login")void navigate({to:"/",replace:true})},[checkingAuth,session,location.pathname,navigate]);
- if(checkingAuth)return <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">Verificando acesso...</div>;
+ },[isLoginRoute]);
+ useEffect(()=>{if(isLoginRoute||checkingAuth)return;if(!session)void navigate({to:"/login",replace:true})},[isLoginRoute,checkingAuth,session,navigate]);
+ if(isLoginRoute)return <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">Verificando acesso...</div>;
  return <QueryClientProvider client={queryClient}><Outlet/></QueryClientProvider>}
