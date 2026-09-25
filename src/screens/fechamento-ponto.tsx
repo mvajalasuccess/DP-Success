@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarDays, CheckCircle2, LockKeyhole, Plus } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, LockKeyhole, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +29,7 @@ export function PointClosing() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -69,6 +70,26 @@ export function PointClosing() {
     setSaving(false);
   }
 
+
+  async function deleteCompetence(id: string) {
+    setSaving(true);
+    setError("");
+
+    const { error } = await supabase
+      .from("time_periods")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      setError("Não foi possível excluir esta competência: " + error.message);
+    } else {
+      setConfirmDelete(null);
+      await load();
+    }
+
+    setSaving(false);
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background px-6 py-4">
@@ -91,7 +112,18 @@ export function PointClosing() {
             <Card key={p.id} className="p-5"><div className="flex flex-col gap-5 lg:flex-row lg:items-center">
               <div className="flex-1"><h2 className="font-display font-bold">{periodName(p)}</h2><p className="text-xs text-muted-foreground">{formatDate(start)} → {formatDate(end)}</p></div>
               <div className="flex items-center gap-3"><span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${p.status === "fechado" ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-700"}`}>{p.status === "fechado" ? <LockKeyhole className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}{p.status}</span>
-              {p.status !== "fechado" && <button disabled={saving} onClick={() => void closeCompetence(p.id)} className="rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50">Fechar competência</button>}</div>
+              {p.status !== "fechado" && <button disabled={saving} onClick={() => void closeCompetence(p.id)} className="rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50">Fechar competência</button>}
+              {confirmDelete !== p.id ? (
+                <button disabled={saving} onClick={() => setConfirmDelete(p.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50">
+                  <Trash2 className="h-3.5 w-3.5" /> Excluir fechamento
+                </button>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-2">
+                  <span className="text-xs text-destructive">Excluir esta competência?</span>
+                  <button disabled={saving} onClick={() => void deleteCompetence(p.id)} className="rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground disabled:opacity-50">Excluir</button>
+                  <button disabled={saving} onClick={() => setConfirmDelete(null)} className="rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50">Cancelar</button>
+                </div>
+              )}</div>
             </div></Card>
           ); })}
         </div>
