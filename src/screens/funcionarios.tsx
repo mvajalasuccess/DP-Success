@@ -16,6 +16,7 @@ export function Employees() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   async function loadEmployees() {
     setLoading(true);
@@ -153,22 +154,31 @@ export function Employees() {
   }
 
   async function deactivateEmployee(employee: any) {
-    const date = window.prompt("Data de desligamento:", new Date().toISOString().slice(0, 10));
+    const date = window.prompt("Data de desligamento:", employee.termination_date ?? new Date().toISOString().slice(0, 10));
     if (!date) return;
     setError("");
+    setActionLoading(employee.id);
     const result = await supabase.from("employees").update({ status: "inativo", termination_date: date }).eq("id", employee.id);
+    setActionLoading(null);
     if (result.error) setError(result.error.message);
     else await loadEmployees();
   }
 
-  const filtered = employees.filter((e) => e.full_name.toLowerCase().includes(search.toLowerCase()));
-  const money = (v: number | undefined) => v == null ? "—" : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const mins = (v: number) => {
-    const s = v < 0 ? "-" : "+";
-    const a = Math.abs(v);
-    return `${s}${String(Math.floor(a / 60)).padStart(2, "0")}:${String(a % 60).padStart(2, "0")}`;
-  };
+  async function deleteEmployee(employee: any) {
+    const confirmed = window.confirm("Excluir definitivamente o cadastro de " + employee.full_name + "?\n\nUse Desligar quando houver histórico que precise ser preservado.");
+    if (!confirmed) return;
+    setError("");
+    setActionLoading(employee.id);
+    const result = await supabase.from("employees").delete().eq("id", employee.id);
+    setActionLoading(null);
+    if (result.error) {
+      setError('Não foi possível excluir. Se houver histórico, use "Desligar". Detalhe: ' + result.error.message);
+      return;
+    }
+    await loadEmployees();
+  }
 
+  const filtered = employees.filter((e) => e.full_name.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background px-6 py-4">
@@ -190,7 +200,7 @@ export function Employees() {
           {[
             ["Funcionários ativos", String(employees.filter((e) => e.status === "ativo").length), UserRound],
             ["Funcionários cadastrados", String(employees.length), BriefcaseBusiness],
-            ["Banco inicial lançado", employees.length ? `${Math.round(employees.filter(() => false).length / employees.length * 100)}%` : "0%", WalletCards],
+            ["Cadastros ativos", String(employees.filter((e) => e.status === "ativo").length), WalletCards],
           ].map(([label, value, Icon]) => (
             <Card key={label as string} className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold">{value}</p></div></div></Card>
           ))}
@@ -202,9 +212,26 @@ export function Employees() {
             <div className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 md:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Cargo</th><th className="px-5 py-3">Departamento</th><th className="px-5 py-3">Salário</th><th className="px-5 py-3">Admissão</th><th className="px-5 py-3">Desligamento</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Ações</th></tr></thead>
+            <table className="w-full text-left text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground"><tr>
+                <th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Cargo</th><th className="px-5 py-3">Departamento</th><th className="px-5 py-3">Admissão</th><th className="px-5 py-3">Desligamento</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Ações</th>
+              </tr></thead>
               <tbody className="divide-y">
-                {loading ? <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Carregando...</td></tr> : filtered.length === 0 ? <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">Nenhum funcionário encontrado.</td></tr> : filtered.map((e) => <tr key={e.id}><td className="px-5 py-4 font-medium">{e.full_name}</td><td className="px-5 py-4 text-muted-foreground">{e.positions?.name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{e.departments?.name ?? "—"}</td><td className="px-5 py-4">—</td><td className="px-5 py-4">—</td><td className="px-5 py-4"><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{e.status === "ativo" ? "Ativo" : "Inativo"}</span></td></tr>)}
+                {loading ? <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Carregando...</td></tr> :
+                filtered.length === 0 ? <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Nenhum funcionário encontrado.</td></tr> :
+                filtered.map((e) => <tr key={e.id}>
+                  <td className="px-5 py-4 font-medium">{e.full_name}</td>
+                  <td className="px-5 py-4 text-muted-foreground">{e.positions?.name ?? "—"}</td>
+                  <td className="px-5 py-4 text-muted-foreground">{e.departments?.name ?? "—"}</td>
+                  <td className="px-5 py-4">{e.hire_date ? new Date(e.hire_date + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</td>
+                  <td className="px-5 py-4">{e.termination_date ? new Date(e.termination_date + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</td>
+                  <td className="px-5 py-4"><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">{e.status === "ativo" ? "Ativo" : "Inativo"}</span></td>
+                  <td className="px-5 py-4"><div className="flex justify-end gap-2">
+                    <button type="button" disabled={actionLoading===e.id} onClick={()=>openEdit(e)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50"><Pencil className="h-3.5 w-3.5"/>Editar</button>
+                    {e.status==="ativo" && <button type="button" disabled={actionLoading===e.id} onClick={()=>void deactivateEmployee(e)} className="rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50">Desligar</button>}
+                    <button type="button" disabled={actionLoading===e.id} onClick={()=>void deleteEmployee(e)} className="inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/5 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5"/>Excluir</button>
+                  </div></td>
+                </tr>)}
               </tbody>
             </table>
           </div>
