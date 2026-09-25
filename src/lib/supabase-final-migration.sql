@@ -515,3 +515,9 @@ drop policy if exists work_schedules_authenticated_all on work_schedules;
 create policy work_schedules_authenticated_all on work_schedules for all to authenticated using (true) with check (true);
 drop policy if exists employees_authenticated_all on employees;
 create policy employees_authenticated_all on employees for all to authenticated using (true) with check (true);
+
+
+-- Histórico de saldo por competência: não sobrescrever o saldo inicial histórico do cadastro.
+alter table employees add column if not exists current_bank_minutes integer not null default 0;
+update employees set current_bank_minutes = coalesce(initial_bank_minutes,0) where current_bank_minutes = 0;
+create index if not exists idx_competence_balances_employee on competence_employee_balances(employee_id, competence_id);
