@@ -82,7 +82,8 @@ function Launches() {
           .eq("employee_id", employee.id)
           .order("valid_from", { ascending: false })
           .limit(1);
-        const schedule = await db.from("work_schedules").select("divisor").eq("id", employee.work_schedule_id).maybeSingle();\n        return { ...employee, salary: data?.[0]?.salary ?? 0, divisor: schedule.data?.divisor ?? 220 };
+        const schedule = await db.from("work_schedules").select("divisor").eq("id", employee.work_schedule_id).maybeSingle();
+        return { ...employee, salary: data?.[0]?.salary ?? 0, divisor: schedule.data?.divisor ?? 220 };
       }),
     );
 
@@ -137,7 +138,6 @@ function Launches() {
       rate_factor: rule.factor,
       description: description.trim() || null,
       source: "manual",
-      financial_value: Number(estimatedValue.toFixed(2)),
     };
 
     const launchRes = await db.from("point_launches").insert(payload).select("id").single();
