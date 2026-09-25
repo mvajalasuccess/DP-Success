@@ -147,18 +147,8 @@ function Launches() {
       return;
     }
 
-    const bankMinutes = direction === "DEBITO" ? -minutes : minutes;
-    const bankRes = await db.from("bank_movements").insert({
-      employee_id: employeeId,
-      competence_id: competence.id,
-      launch_id: launchRes.data.id,
-      movement_date: launchDate,
-      minutes: bankMinutes,
-      description: description.trim() || rule.label,
-    });
-    if (bankRes.error) {
-      setError("Lançamento salvo, mas houve erro ao atualizar o banco de horas: " + bankRes.error.message);
-    }
+    // O banco de horas é sincronizado pelo trigger do Supabase
+    // a partir do lançamento, evitando duplicidade de movimentações.
 
     setOpen(false);
     setDescription("");
