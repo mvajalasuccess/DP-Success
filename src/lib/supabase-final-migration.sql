@@ -714,22 +714,10 @@ for each row execute function log_competence_close();
 
 -- ============================================================
 -- HARDENING DE SEGURANÇA - ACESSO POR USUÁRIO/ROLE
--- Corrige políticas amplas (USING/WITH CHECK true) e restringe
--- os dados do DP a usuários autorizados no próprio banco.
--- ============================================================
+-- Usa a mesma tabela de papéis da migration principal (user_roles),
+-- evitando dois sistemas de autorização diferentes.
 
 create schema if not exists private;
-
-create table if not exists public.app_users (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  role text not null default 'RH'
-    check (role in ('ADMIN','RH','CONSULTA')),
-  active boolean not null default true,
-  created_at timestamptz not null default now()
-);
-
-alter table public.app_users enable row level security;
-revoke all on table public.app_users from anon, authenticated;
 
 create or replace function private.has_app_access()
 returns boolean
@@ -740,13 +728,12 @@ set search_path = ''
 as $$
   select exists (
     select 1
-    from public.app_users au
-    where au.user_id = (select auth.uid())
-      and au.active = true
+    from public.user_roles ur
+    where ur.user_id = (select auth.uid())
   );
 $$;
 
-create or replace function private.has_role(p_role text)
+create or replace function private.has_role(p_role public.app_role)
 returns boolean
 language sql
 stable
@@ -755,18 +742,17 @@ set search_path = ''
 as $$
   select exists (
     select 1
-    from public.app_users au
-    where au.user_id = (select auth.uid())
-      and au.active = true
-      and (au.role = p_role or au.role = 'ADMIN')
+    from public.user_roles ur
+    where ur.user_id = (select auth.uid())
+      and (ur.role = p_role or ur.role = 'administrador'::public.app_role)
   );
 $$;
 
 revoke all on function private.has_app_access() from public, anon;
-revoke all on function private.has_role(text) from public, anon;
+revoke all on function private.has_role(public.app_role) from public, anon;
 grant usage on schema private to authenticated;
 grant execute on function private.has_app_access() to authenticated;
-grant execute on function private.has_role(text) to authenticated;
+grant execute on function private.has_role(public.app_role) to authenticated;
 
 -- Remove políticas amplas antigas e torna este bloco reaplicável.
 drop policy if exists departments_authenticated_all on public.departments;
@@ -884,173 +870,173 @@ for select to authenticated
 using ((select private.has_app_access()));
 create policy departments_app_insert on public.departments
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy departments_app_update on public.departments
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy departments_app_delete on public.departments
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy positions_app_select on public.positions
 for select to authenticated
 using ((select private.has_app_access()));
 create policy positions_app_insert on public.positions
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy positions_app_update on public.positions
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy positions_app_delete on public.positions
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy work_schedules_app_select on public.work_schedules
 for select to authenticated
 using ((select private.has_app_access()));
 create policy work_schedules_app_insert on public.work_schedules
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy work_schedules_app_update on public.work_schedules
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy work_schedules_app_delete on public.work_schedules
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy employees_app_select on public.employees
 for select to authenticated
 using ((select private.has_app_access()));
 create policy employees_app_insert on public.employees
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy employees_app_update on public.employees
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy employees_app_delete on public.employees
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy salary_history_app_select on public.salary_history
 for select to authenticated
 using ((select private.has_app_access()));
 create policy salary_history_app_insert on public.salary_history
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy salary_history_app_update on public.salary_history
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy salary_history_app_delete on public.salary_history
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy competencies_app_select on public.competencies
 for select to authenticated
 using ((select private.has_app_access()));
 create policy competencies_app_insert on public.competencies
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy competencies_app_update on public.competencies
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy competencies_app_delete on public.competencies
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy point_launches_app_select on public.point_launches
 for select to authenticated
 using ((select private.has_app_access()));
 create policy point_launches_app_insert on public.point_launches
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy point_launches_app_update on public.point_launches
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy point_launches_app_delete on public.point_launches
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy bank_movements_app_select on public.bank_movements
 for select to authenticated
 using ((select private.has_app_access()));
 create policy bank_movements_app_insert on public.bank_movements
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy bank_movements_app_update on public.bank_movements
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy bank_movements_app_delete on public.bank_movements
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy occurrences_app_select on public.occurrences
 for select to authenticated
 using ((select private.has_app_access()));
 create policy occurrences_app_insert on public.occurrences
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy occurrences_app_update on public.occurrences
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy occurrences_app_delete on public.occurrences
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy competence_balances_app_select on public.competence_employee_balances
 for select to authenticated
 using ((select private.has_app_access()));
 create policy competence_balances_app_insert on public.competence_employee_balances
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy competence_balances_app_update on public.competence_employee_balances
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy competence_balances_app_delete on public.competence_employee_balances
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy calculation_parameters_app_select on public.calculation_parameters
 for select to authenticated
 using ((select private.has_app_access()));
 create policy calculation_parameters_app_insert on public.calculation_parameters
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy calculation_parameters_app_update on public.calculation_parameters
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy calculation_parameters_app_delete on public.calculation_parameters
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 -- Atestados: dado médico sensível, somente ADMIN/RH.
 create policy medical_certificates_app_select on public.medical_certificates
 for select to authenticated
-using ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)));
 create policy medical_certificates_app_insert on public.medical_certificates
 for insert to authenticated
-with check ((select private.has_role('RH')));
+with check ((select private.has_role('rh'::public.app_role)));
 create policy medical_certificates_app_update on public.medical_certificates
 for update to authenticated
-using ((select private.has_role('RH')))
-with check ((select private.has_role('RH')));
+using ((select private.has_role('rh'::public.app_role)))
+with check ((select private.has_role('rh'::public.app_role)));
 create policy medical_certificates_app_delete on public.medical_certificates
 for delete to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 create policy audit_logs_admin_select on public.audit_logs
 for select to authenticated
-using ((select private.has_role('ADMIN')));
+using ((select private.has_role('administrador'::public.app_role)));
 
 -- Funções SECURITY DEFINER só podem ser chamadas pela aplicação autenticada.
 revoke execute on function public.create_competence_for_date(date) from public, anon, authenticated;
@@ -1069,7 +1055,7 @@ declare
   v_end date;
   v_id uuid;
 begin
-  if not (select private.has_role('RH')) then
+  if not (select private.has_role('rh'::public.app_role)) then
     raise exception 'Usuário sem permissão para criar competência.';
   end if;
 
@@ -1111,7 +1097,7 @@ declare
   v_next_start date;
   v_next_end date;
 begin
-  if not (select private.has_role('RH')) then
+  if not (select private.has_role('rh'::public.app_role)) then
     raise exception 'Usuário sem permissão para fechar competência.';
   end if;
 
