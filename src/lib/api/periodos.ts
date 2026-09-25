@@ -1,6 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { PeriodStatus, TimePeriod } from "./db";
+import type { PeriodStatus, TableUpdate, TimePeriod } from "./db";
 
 function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
   if (result.error) throw new Error(result.error.message);
@@ -61,14 +61,28 @@ export async function setPeriodStatus(params: {
   notes?: string | null;
 }): Promise<TimePeriod> {
   const period = await ensurePeriod(params.year, params.month);
-  const patch: Record<string, unknown> = { status: params.status, notes: params.notes ?? period.notes };
+
+  const patch: TableUpdate<"time_periods"> = {
+    status: params.status,
+    notes: params.notes ?? period.notes,
+  };
+
   if (params.status === "fechado") {
-    patch.closed_by = params.userId;
-    patch.closed_at = new Date().toISOString();
+    patch["closed_by"] = params.userId;
+    patch["closed_at"] = new Date().toISOString();
   }
+
   if (params.status === "aberto" && period.status === "fechado") {
-    patch.reopened_by = params.userId;
-    patch.reopened_at = new Date().toISOString();
+    patch["reopened_by"] = params.userId;
+    patch["reopened_at"] = new Date().toISOString();
   }
-  return unwrap(await supabase.from("time_periods").update(patch).eq("id", period.id).select().single());
+
+  return unwrap(
+    await supabase
+      .from("time_periods")
+      .update(patch)
+      .eq("id", period.id)
+      .select()
+      .single(),
+  );
 }
