@@ -122,7 +122,7 @@ export function BankHours() {
     const [timeRes, overtimeRes, bankRes, occurrenceRes, settingsRes] = await Promise.all([
       supabase.from("time_records").select("period_id,negative_minutes").eq("employee_id", employeeId).in("period_id", periodIds),
       supabase.from("overtime_records").select("period_id,minutes,rate_percent,estimated_value,notes").eq("employee_id", employeeId).in("period_id", periodIds),
-      supabase.from("bank_hours").select("period_id,kind,minutes").eq("employee_id", employeeId).in("period_id", periodIds),
+      supabase.from("bank_hours").select("period_id,kind,minutes,justification").eq("employee_id", employeeId).in("period_id", periodIds),
       supabase.from("occurrences").select("period_id,quantity,unit,occurrence_type_id,occurrence_types(code,name)").eq("employee_id", employeeId).in("period_id", periodIds),
       supabase.from("app_settings").select("key,value").eq("key", "company_name").limit(1),
     ]);
@@ -153,11 +153,34 @@ export function BankHours() {
       overtime.set(item.period_id, current);
     }
 
-    const bank = new Map<string, number>();
+    // Créditos lançados no Banco de Horas também alimentam as colunas de natureza.
+    // A justificativa preserva o tipo escolhido no lançamento consolidado.
+    const bankCategories = new Map<string, { he60: number; heNoturna: number; he100: number; he100Noturna: number; noturno: number; interjornada: number }>();
+    const bankMovement = new Map<string, number>();
+
+    function classifyBankCredit(justification: string | null) {
+      const note = String(justification || "").toLowerCase();
+      if (note.includes("100% + 20%")) return "he100Noturna";
+      if (note.includes("60% + 20%")) return "heNoturna";
+      if (note.includes("interjornada")) return "interjornada";
+      if (note.includes("100%")) return "he100";
+      if (note.includes("20%")) return "noturno";
+      return "he60";
+    }
+
     for (const item of bankRes.data ?? []) {
       if (!item.period_id) continue;
-      const signed = item.kind === "debito" ? -Math.abs(Number(item.minutes || 0)) : Math.abs(Number(item.minutes || 0));
-      bank.set(item.period_id, (bank.get(item.period_id) ?? 0) + signed);
+      const minutes = Math.abs(Number(item.minutes || 0));
+
+      if (item.kind === "credito") {
+        const current = bankCategories.get(item.period_id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0 };
+        const key = classifyBankCredit((item as any).justification);
+        current[key] += minutes;
+        bankCategories.set(item.period_id, current);
+      } else {
+        const signed = item.kind === "debito" ? -minutes : minutes;
+        bankMovement.set(item.period_id, (bankMovement.get(item.period_id) ?? 0) + signed);
+      }
     }
 
     const folga = new Map<string, number>();
@@ -177,24 +200,31 @@ export function BankHours() {
       .sort((a, b) => a.reference_year - b.reference_year || a.reference_month - b.reference_month)
       .map(period => {
         const extra = overtime.get(period.id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0, salary: 0 };
+        const categorizedBank = bankCategories.get(period.id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0 };
         const delay = delays.get(period.id) ?? 0;
-        const bankMovement = bank.get(period.id) ?? 0;
+        const movement = bankMovement.get(period.id) ?? 0;
         const totalFolga = folga.get(period.id) ?? 0;
-        const overtimeMinutes = extra.he60 + extra.heNoturna + extra.he100 + extra.he100Noturna + extra.noturno;
-        const totalBalance = overtimeMinutes - delay + bankMovement - totalFolga;
+        const he60 = extra.he60 + categorizedBank.he60;
+        const heNoturna = extra.heNoturna + categorizedBank.heNoturna;
+        const he100 = extra.he100 + categorizedBank.he100;
+        const he100Noturna = extra.he100Noturna + categorizedBank.he100Noturna;
+        const noturno = extra.noturno + categorizedBank.noturno;
+        const interjornada = extra.interjornada + categorizedBank.interjornada;
+        const creditMinutes = he60 + heNoturna + he100 + he100Noturna + noturno;
+        const totalBalance = creditMinutes - delay + movement - totalFolga;
         running += totalBalance;
         return {
           period,
           label: periodLabel(period),
           range: periodRange(period).label,
           delay,
-          he60: extra.he60,
-          heNoturna: extra.heNoturna,
-          he100: extra.he100,
-          he100Noturna: extra.he100Noturna,
-          noturno: extra.noturno,
-          interjornada: extra.interjornada,
-          bankMovement,
+          he60,
+          heNoturna,
+          he100,
+          he100Noturna,
+          noturno,
+          interjornada,
+          bankMovement: movement,
           totalSalary: extra.salary,
           totalFolga,
           totalBalance,
