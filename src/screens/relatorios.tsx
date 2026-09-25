@@ -2,7 +2,7 @@ import { Link}from"@tanstack/react-router";import{ArrowLeft,Download,FileBarChar
 const reports=[["fechamento","Fechamento de ponto"],["banco","Banco de horas"],["extras","Horas extras por funcionário"],["absenteismo","Absenteísmo por departamento"],["atestados","Atestados e afastamentos"],["ocorrencias","Faltas e ocorrências"]] as const;
 export function csv(rows:any[]){if(!rows.length)return "";const keys=Object.keys(rows[0]);const esc=(v:any)=>'"'+String(v??"").replaceAll('"','""')+'"';return [keys.join(";"),...rows.map(r=>keys.map(k=>esc(r[k])).join(";"))].join("\n")}
 function download(name:string,rows:any[]){const blob=new Blob(["\ufeff"+csv(rows)],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
-function Relatorios(){
+export function Relatorios(){
  const[competence,setCompetence]=useState<any>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(""),[error,setError]=useState("");
  useEffect(()=>{void(async()=>{const{data,error}=await(supabase).from("competencies").select("id,name,start_date,end_date,status").order("end_date",{ascending:false}).limit(1);if(error)setError(error.message);setCompetence(data?.[0]??null);setLoading(false)})()},[]);
  async function exportReport(kind:string){
