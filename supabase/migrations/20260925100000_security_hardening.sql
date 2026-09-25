@@ -150,6 +150,14 @@ drop policy if exists medical_certificates_select on public.medical_certificates
 drop policy if exists medical_certificates_insert on public.medical_certificates;
 drop policy if exists medical_certificates_update on public.medical_certificates;
 drop policy if exists medical_certificates_delete on public.medical_certificates;
+drop policy if exists profiles_insert_own on public.profiles;
+drop policy if exists profiles_update_own on public.profiles;
+drop policy if exists user_roles_select on public.user_roles;
+drop policy if exists user_roles_admin_all on public.user_roles;
+drop policy if exists medical_certificates_select on public.medical_certificates;
+drop policy if exists medical_certificates_insert on public.medical_certificates;
+drop policy if exists medical_certificates_update on public.medical_certificates;
+drop policy if exists medical_certificates_delete on public.medical_certificates;
 
 -- Nunca permitir acesso pelo anon às tabelas de negócio.
 revoke all on table
