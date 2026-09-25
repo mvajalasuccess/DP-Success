@@ -1,6 +1,6 @@
 import { Link}from"@tanstack/react-router";import{ArrowLeft,TrendingUp,Users,Clock3,CalendarX2,Percent,Wallet}from"lucide-react";import{Card}from"@/components/ui/card";import{useEffect,useState}from"react";import{supabase}from"@/integrations/supabase/client";
 export function fmt(n:number){const s=n<0?"-":"+";const a=Math.abs(Math.round(n));return s+Math.floor(a/60)+"h "+String(a%60).padStart(2,"0")+"m"}
-function Kpis(){
+export function Kpis(){
  const[m,setM]=useState({employees:0,credits:0,debits:0,positive:0,negative:0,absence:0,certificates:0,absenteeism:0,overtimeValue:0}),[period,setPeriod]=useState(""),[error,setError]=useState("");
  useEffect(()=>{void(async()=>{
   const db=supabase;
