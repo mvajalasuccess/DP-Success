@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Plus, Power, Search, X } from "lucide-react";
+import { ArrowLeft, Plus, Power, Search, Pencil, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ export function Positions() {
   const [rows, setRows] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [formName, setFormName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -28,6 +29,7 @@ export function Positions() {
 
   function openNew() {
     setError("");
+    setEditingId(null);
     setFormName("");
     setOpen(true);
   }
@@ -42,9 +44,9 @@ export function Positions() {
     setSaving(true);
     setError("");
 
-    const { error } = await (supabase)
-      .from("positions")
-      .insert({ name: value, active: true });
+    const { error } = editingId
+      ? await (supabase).from("positions").update({ name: value }).eq("id", editingId)
+      : await (supabase).from("positions").insert({ name: value, active: true });
 
     if (error) {
       setError(
@@ -141,10 +143,10 @@ export function Positions() {
                       <td className="px-5 py-4 font-medium">{row.name}</td>
                       <td className="px-5 py-4">{row.active ? "Ativo" : "Inativo"}</td>
                       <td className="px-5 py-4">
-                        <button type="button" onClick={() => void toggle(row)} className="text-primary">
+                        <button type="button" onClick={() => { setError(""); setEditingId(row.id); setFormName(row.name); setOpen(true); }} className="mr-3 text-primary"><Pencil className="mr-1 inline h-4 w-4" />Editar</button><button type="button" onClick={() => void toggle(row)} className="mr-3 text-primary">
                           <Power className="mr-1 inline h-4 w-4" />
                           {row.active ? "Inativar" : "Ativar"}
-                        </button>
+                        </button><button type="button" onClick={async () => { if (!window.confirm("Excluir este cargo?")) return; const r = await (supabase).from("positions").delete().eq("id", row.id); if (r.error) setError("Não foi possível excluir. Se o cargo já estiver sendo usado, inative-o em vez de excluir."); else await load(); }} className="text-destructive"><Trash2 className="mr-1 inline h-4 w-4" />Excluir</button>
                       </td>
                     </tr>
                   ))
@@ -160,7 +162,7 @@ export function Positions() {
           <Card className="w-full max-w-md p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold">Novo cargo</h2>
+                <h2 className="text-lg font-bold">{editingId ? "Editar cargo" : "Novo cargo"}</h2>
                 <p className="mt-1 text-xs text-muted-foreground">O cadastro será salvo no banco.</p>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="text-muted-foreground">
@@ -189,7 +191,7 @@ export function Positions() {
                 Cancelar
               </button>
               <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
-                {saving ? "Salvando..." : "Salvar cargo"}
+                {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar cargo"}
               </button>
             </div>
           </Card>
