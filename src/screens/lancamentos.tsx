@@ -35,6 +35,7 @@ export function Launches() {
   const [consolidatedDate, setConsolidatedDate] = useState("");
   const [creditHours, setCreditHours] = useState("00:00");
   const [debitHours, setDebitHours] = useState("00:00");
+  const [creditType, setCreditType] = useState("HE_60");
   const [consolidatedDescription, setConsolidatedDescription] = useState("");
   const [editing, setEditing] = useState<Launch | null>(null);
   const [selectedType, setSelectedType] = useState("Hora extra 60%");
@@ -107,6 +108,7 @@ export function Launches() {
     setConsolidatedDate(competence ? periodDates(competence).end : "");
     setCreditHours("00:00");
     setDebitHours("00:00");
+    setCreditType("HE_60");
     setConsolidatedDescription("");
     setConsolidatedOpen(true);
   }
@@ -129,6 +131,7 @@ export function Launches() {
 
     const credit = parseHours(creditHours);
     const debit = parseHours(debitHours);
+    const creditTypeLabel: Record<string,string> = { HE_60: "60%", ADICIONAL_NOTURNO: "20%", HE_NOTURNA: "60% + 20%", INTERJORNADA: "Interjornada 50%" };
     if (credit <= 0 && debit <= 0) {
       setError("Informe pelo menos um valor de crédito ou débito.");
       setSaving(false); return;
@@ -144,6 +147,7 @@ export function Launches() {
 
     let balance = Number(previous?.[0]?.balance_minutes || 0);
     const description = consolidatedDescription.trim() || "Lançamento consolidado de crédito e débito";
+    const creditJustification = `Crédito ${creditTypeLabel[creditType] ?? creditType} · ${description}`;
 
     if (credit > 0) {
       const nextBalance = balance + credit;
@@ -155,7 +159,7 @@ export function Launches() {
         minutes: credit,
         previous_balance_minutes: balance,
         balance_minutes: nextBalance,
-        justification: description,
+        justification: creditJustification,
       });
       if (creditError) {
         setError(creditError.message); setSaving(false); return;
@@ -243,7 +247,7 @@ export function Launches() {
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <label className="grid gap-1 text-sm font-medium">Funcionário<select value={consolidatedEmployeeId} onChange={e => setConsolidatedEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         <label className="grid gap-1 text-sm font-medium">Data<input type="date" value={consolidatedDate} min={competence ? periodDates(competence).start : undefined} max={competence ? periodDates(competence).end : undefined} onChange={e => setConsolidatedDate(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
-        <label className="grid gap-1 text-sm font-medium">Crédito<input value={creditHours} onChange={e => setCreditHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="02:30" /></label>
+        <label className="grid gap-1 text-sm font-medium">Tipo do crédito<select value={creditType} onChange={e => setCreditType(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="HE_60">60%</option><option value="ADICIONAL_NOTURNO">20%</option><option value="HE_NOTURNA">60% + 20%</option><option value="INTERJORNADA">Interjornada 50%</option></select></label><label className="grid gap-1 text-sm font-medium">Crédito<input value={creditHours} onChange={e => setCreditHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="02:30" /></label>
         <label className="grid gap-1 text-sm font-medium">Débito<input value={debitHours} onChange={e => setDebitHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="00:30" /></label>
         <div className="rounded-lg border bg-muted/30 p-4 md:col-span-2"><p className="text-xs text-muted-foreground">Saldo deste lançamento</p><p className={"mt-1 text-2xl font-bold " + (parseHours(creditHours) - parseHours(debitHours) < 0 ? "text-destructive" : "text-primary")}>{parseHours(creditHours) - parseHours(debitHours) >= 0 ? "+" : "-"}{String(Math.floor(Math.abs(parseHours(creditHours) - parseHours(debitHours)) / 60)).padStart(2, "0")}:{String(Math.abs(parseHours(creditHours) - parseHours(debitHours)) % 60).padStart(2, "0")}</p><p className="mt-1 text-xs text-muted-foreground">Ex.: crédito 02:30 − débito 00:30 = saldo +02:00</p></div>
         <label className="grid gap-1 text-sm font-medium md:col-span-2">Observação<input value={consolidatedDescription} onChange={e => setConsolidatedDescription(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="Ex.: fechamento do dia" /></label>
