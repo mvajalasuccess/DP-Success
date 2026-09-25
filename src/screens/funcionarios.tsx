@@ -20,7 +20,7 @@ export function Employees() {
     setLoading(true);
     const { data, error } = await supabase
       .from("employees")
-      .select("id,full_name,active,initial_bank_minutes,current_bank_minutes,departments(name),positions(name),salary_history(salary,valid_from),work_schedules(name,divisor)")
+      .select("id,full_name,status,departments(name),positions(name),work_schedules(name)")
       .order("full_name");
     if (error) setError(error.message);
     else setEmployees(data ?? []);
@@ -31,7 +31,7 @@ export function Employees() {
     const [dep, pos, schedule] = await Promise.all([
       (supabase).from("departments").select("id,name").eq("active", true).order("name"),
       (supabase).from("positions").select("id,name").eq("active", true).order("name"),
-      (supabase).from("work_schedules").select("id,name,divisor").eq("active", true).order("name"),
+      (supabase).from("work_schedules").select("id,name").eq("active", true).order("name"),
     ]);
     if (dep.error || pos.error || schedule.error) {
       setError(dep.error?.message || pos.error?.message || schedule.error?.message || "Não foi possível carregar as opções do cadastro.");
@@ -74,9 +74,8 @@ export function Employees() {
         full_name: form.name.trim(),
         department_id: form.department,
         position_id: form.role,
-        admission_date: form.admission,
-        initial_bank_minutes: bankMinutes,
-        current_bank_minutes: bankMinutes,
+        hire_date: form.admission,
+        status: "ativo",
         work_schedule_id: form.work_schedule_id || null,
       })
       .select("id")
@@ -88,16 +87,20 @@ export function Employees() {
       return;
     }
 
-    const sal = await supabase.from("salary_history").insert({
-      employee_id: emp.data.id,
-      salary,
-      valid_from: form.admission,
-    });
-
-    if (sal.error) {
-      setError("O funcionário foi criado, mas o histórico salarial não pôde ser salvo: " + sal.error.message);
-      setSaving(false);
-      return;
+    if (bankMinutes !== 0) {
+      const kind = bankMinutes > 0 ? "credito" : "debito";
+      const bank = await supabase.from("bank_hours").insert({
+        employee_id: emp.data.id,
+        entry_date: form.admission,
+        kind,
+        minutes: Math.abs(bankMinutes),
+        previous_balance_minutes: 0,
+        balance_minutes: bankMinutes,
+        justification: "Saldo inicial do cadastro",
+      });
+      if (bank.error) {
+        setError("Funcionário criado, mas o saldo inicial não pôde ser lançado: " + bank.error.message);
+      }
     }
 
     setForm({ name: "", role: "", department: "", salary: "", admission: "", bank: "", work_schedule_id: "" });
@@ -133,9 +136,9 @@ export function Employees() {
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           {[
-            ["Funcionários ativos", String(employees.filter((e) => e.active).length), UserRound],
+            ["Funcionários ativos", String(employees.filter((e) => e.status === "ativo").length), UserRound],
             ["Funcionários cadastrados", String(employees.length), BriefcaseBusiness],
-            ["Banco inicial lançado", employees.length ? `${Math.round(employees.filter((e) => e.initial_bank_minutes !== 0).length / employees.length * 100)}%` : "0%", WalletCards],
+            ["Banco inicial lançado", employees.length ? `${Math.round(employees.filter(() => false).length / employees.length * 100)}%` : "0%", WalletCards],
           ].map(([label, value, Icon]) => (
             <Card key={label as string} className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold">{value}</p></div></div></Card>
           ))}
@@ -149,7 +152,7 @@ export function Employees() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Cargo</th><th className="px-5 py-3">Departamento</th><th className="px-5 py-3">Salário</th><th className="px-5 py-3">Saldo inicial</th><th className="px-5 py-3">Status</th></tr></thead>
               <tbody className="divide-y">
-                {loading ? <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">Carregando...</td></tr> : filtered.length === 0 ? <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">Nenhum funcionário encontrado.</td></tr> : filtered.map((e) => <tr key={e.id}><td className="px-5 py-4 font-medium">{e.full_name}</td><td className="px-5 py-4 text-muted-foreground">{e.positions?.name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{e.departments?.name ?? "—"}</td><td className="px-5 py-4">{money(e.salary_history?.[0]?.salary)}</td><td className={`px-5 py-4 font-semibold ${e.current_bank_minutes < 0 ? "text-destructive" : "text-primary"}`}>{mins(e.current_bank_minutes ?? e.initial_bank_minutes ?? 0)}</td><td className="px-5 py-4"><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{e.active ? "Ativo" : "Inativo"}</span></td></tr>)}
+                {loading ? <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">Carregando...</td></tr> : filtered.length === 0 ? <tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">Nenhum funcionário encontrado.</td></tr> : filtered.map((e) => <tr key={e.id}><td className="px-5 py-4 font-medium">{e.full_name}</td><td className="px-5 py-4 text-muted-foreground">{e.positions?.name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{e.departments?.name ?? "—"}</td><td className="px-5 py-4">—</td><td className="px-5 py-4">—</td><td className="px-5 py-4"><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{e.status === "ativo" ? "Ativo" : "Inativo"}</span></td></tr>)}
               </tbody>
             </table>
           </div>
@@ -167,7 +170,7 @@ export function Employees() {
             <label className="grid gap-1 text-sm font-medium">Salário<input type="number" min="0" step="0.01" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="3000,00" /></label>
             <label className="grid gap-1 text-sm font-medium">Data de admissão<input type="date" value={form.admission} onChange={(e) => setForm({ ...form, admission: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
             <label className="grid gap-1 text-sm font-medium">Saldo inicial<input value={form.bank} onChange={(e) => setForm({ ...form, bank: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="+12:35 ou -03:20" /></label>
-            <label className="grid gap-1 text-sm font-medium md:col-span-2">Jornada / escala<select value={form.work_schedule_id} onChange={(e) => setForm({ ...form, work_schedule_id: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecionar jornada</option>{schedules.map((s) => <option key={s.id} value={s.id}>{s.name} · divisor {s.divisor}</option>)}</select></label>
+            <label className="grid gap-1 text-sm font-medium md:col-span-2">Jornada / escala<select value={form.work_schedule_id} onChange={(e) => setForm({ ...form, work_schedule_id: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecionar jornada</option>{schedules.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           </div>
 
           {error && <p className="mt-4 rounded-lg bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
