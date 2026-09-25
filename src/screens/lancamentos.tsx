@@ -30,6 +30,12 @@ function labelForType(type: string) {
 
 export function Launches() {
   const [open, setOpen] = useState(false);
+  const [consolidatedOpen, setConsolidatedOpen] = useState(false);
+  const [consolidatedEmployeeId, setConsolidatedEmployeeId] = useState("");
+  const [consolidatedDate, setConsolidatedDate] = useState("");
+  const [creditHours, setCreditHours] = useState("00:00");
+  const [debitHours, setDebitHours] = useState("00:00");
+  const [consolidatedDescription, setConsolidatedDescription] = useState("");
   const [editing, setEditing] = useState<Launch | null>(null);
   const [selectedType, setSelectedType] = useState("Hora extra 60%");
   const [hours, setHours] = useState("02:30");
@@ -89,6 +95,97 @@ export function Launches() {
     setOpen(true);
   }
 
+  function parseHours(value: string) {
+    const parts = value.split(":");
+    const h = Number(parts[0] || 0);
+    const m = Number(parts[1] || 0);
+    return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+  }
+
+  function openConsolidated() {
+    setConsolidatedEmployeeId("");
+    setConsolidatedDate(competence ? periodDates(competence).end : "");
+    setCreditHours("00:00");
+    setDebitHours("00:00");
+    setConsolidatedDescription("");
+    setConsolidatedOpen(true);
+  }
+
+  async function saveConsolidated() {
+    setSaving(true); setError("");
+    if (!consolidatedEmployeeId || !competence) {
+      setError("Selecione o funcionário e a competência.");
+      setSaving(false); return;
+    }
+    const range = periodDates(competence);
+    if (consolidatedDate < range.start || consolidatedDate > range.end) {
+      setError("A data precisa estar dentro da competência.");
+      setSaving(false); return;
+    }
+    if (competence.status === "fechado") {
+      setError("A competência está fechada e não aceita alterações.");
+      setSaving(false); return;
+    }
+
+    const credit = parseHours(creditHours);
+    const debit = parseHours(debitHours);
+    if (credit <= 0 && debit <= 0) {
+      setError("Informe pelo menos um valor de crédito ou débito.");
+      setSaving(false); return;
+    }
+
+    const { data: previous } = await supabase
+      .from("bank_hours")
+      .select("balance_minutes,entry_date,created_at")
+      .eq("employee_id", consolidatedEmployeeId)
+      .order("entry_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    let balance = Number(previous?.[0]?.balance_minutes || 0);
+    const description = consolidatedDescription.trim() || "Lançamento consolidado de crédito e débito";
+
+    if (credit > 0) {
+      const nextBalance = balance + credit;
+      const { error: creditError } = await supabase.from("bank_hours").insert({
+        employee_id: consolidatedEmployeeId,
+        period_id: competence.id,
+        entry_date: consolidatedDate,
+        kind: "credito",
+        minutes: credit,
+        previous_balance_minutes: balance,
+        balance_minutes: nextBalance,
+        justification: description,
+      });
+      if (creditError) {
+        setError(creditError.message); setSaving(false); return;
+      }
+      balance = nextBalance;
+    }
+
+    if (debit > 0) {
+      const nextBalance = balance - debit;
+      const { error: debitError } = await supabase.from("bank_hours").insert({
+        employee_id: consolidatedEmployeeId,
+        period_id: competence.id,
+        entry_date: consolidatedDate,
+        kind: "debito",
+        minutes: debit,
+        previous_balance_minutes: balance,
+        balance_minutes: nextBalance,
+        justification: description,
+      });
+      if (debitError) {
+        setError(debitError.message); setSaving(false); return;
+      }
+      balance = nextBalance;
+    }
+
+    setConsolidatedOpen(false);
+    await loadData();
+    setSaving(false);
+  }
+
   async function saveLaunch() {
     setSaving(true); setError("");
     if (!employeeId || !competence || minutes <= 0) { setError("Selecione o funcionário, a competência e informe as horas."); setSaving(false); return; }
@@ -129,7 +226,10 @@ export function Launches() {
   return <div className="min-h-screen bg-background">
     <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a><span className="font-semibold">DP Success · Lançamentos</span></div></header>
     <main className="mx-auto max-w-[1500px] px-6 py-7">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Operação</p><h1 className="mt-1 text-3xl font-bold">Lançamentos</h1><p className="mt-1 text-sm text-muted-foreground">Registre créditos, débitos e adicionais vinculados à competência.</p></div><button onClick={openNew} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" /> Novo lançamento</button></div>
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Operação</p><h1 className="mt-1 text-3xl font-bold">Lançamentos</h1><p className="mt-1 text-sm text-muted-foreground">Registre créditos, débitos e adicionais vinculados à competência.</p></div><div className="flex flex-wrap gap-2">
+          <button onClick={openConsolidated} className="inline-flex items-center gap-2 rounded-lg border bg-background px-4 py-2.5 text-sm font-medium"><ArrowDownUp className="h-4 w-4" /> Lançamento consolidado</button>
+          <button onClick={openNew} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" /> Novo lançamento</button>
+        </div></div>
       {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{types.map(({ label, icon: Icon }) => <Card key={label} className="p-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div><span className="text-sm font-medium">{label}</span></div></Card>)}</div>
       <Card className="mt-6 overflow-hidden">
@@ -138,6 +238,18 @@ export function Launches() {
         <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Horas</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filtered.map(row => <tr key={row.source + row.id}><td className="px-5 py-4 font-medium">{row.employee?.full_name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{date(row.launch_date)}</td><td className="px-5 py-4">{labelForType(row.type)}</td><td className={"px-5 py-4 font-bold " + (row.direction === "DEBITO" ? "text-destructive" : "text-primary")}>{fmt(row.direction === "DEBITO" ? -row.minutes : row.minutes)}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => openEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"><Pencil className="h-3 w-3" />Editar</button><button onClick={() => void deleteLaunch(row)} className="inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive"><Trash2 className="h-3 w-3" />Excluir</button></div></td></tr>)}</tbody></table>{!loading && !filtered.length && <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento encontrado.</div>}</div>
       </Card>
     </main>
+    {consolidatedOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-2xl p-6">
+      <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">Lançamento consolidado</h2><p className="text-sm text-muted-foreground">Informe crédito e débito de uma vez. O saldo líquido será gravado automaticamente no Banco de Horas.</p></div><button onClick={() => setConsolidatedOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <label className="grid gap-1 text-sm font-medium">Funcionário<select value={consolidatedEmployeeId} onChange={e => setConsolidatedEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+        <label className="grid gap-1 text-sm font-medium">Data<input type="date" value={consolidatedDate} min={competence ? periodDates(competence).start : undefined} max={competence ? periodDates(competence).end : undefined} onChange={e => setConsolidatedDate(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
+        <label className="grid gap-1 text-sm font-medium">Crédito<input value={creditHours} onChange={e => setCreditHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="02:30" /></label>
+        <label className="grid gap-1 text-sm font-medium">Débito<input value={debitHours} onChange={e => setDebitHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="00:30" /></label>
+        <div className="rounded-lg border bg-muted/30 p-4 md:col-span-2"><p className="text-xs text-muted-foreground">Saldo deste lançamento</p><p className={"mt-1 text-2xl font-bold " + (parseHours(creditHours) - parseHours(debitHours) < 0 ? "text-destructive" : "text-primary")}>{parseHours(creditHours) - parseHours(debitHours) >= 0 ? "+" : "-"}{String(Math.floor(Math.abs(parseHours(creditHours) - parseHours(debitHours)) / 60)).padStart(2, "0")}:{String(Math.abs(parseHours(creditHours) - parseHours(debitHours)) % 60).padStart(2, "0")}</p><p className="mt-1 text-xs text-muted-foreground">Ex.: crédito 02:30 − débito 00:30 = saldo +02:00</p></div>
+        <label className="grid gap-1 text-sm font-medium md:col-span-2">Observação<input value={consolidatedDescription} onChange={e => setConsolidatedDescription(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="Ex.: fechamento do dia" /></label>
+      </div>
+      <div className="mt-5 flex justify-end gap-2"><button onClick={() => setConsolidatedOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void saveConsolidated()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar e atualizar Banco de Horas"}</button></div>
+    </Card></div>}
     {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-2xl p-6"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">{editing ? "Editar lançamento" : "Novo lançamento"}</h2><p className="text-sm text-muted-foreground">{competence ? "Competência atual" : "Cadastre uma competência primeiro."}</p></div><button onClick={() => setOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div>
       <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="grid gap-1 text-sm font-medium">Funcionário<select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Data<input type="date" value={launchDate} min={competence ? periodDates(competence).start : undefined} max={competence ? periodDates(competence).end : undefined} onChange={e => setLaunchDate(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label><label className="grid gap-1 text-sm font-medium">Tipo<select value={selectedType} onChange={e => setSelectedType(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal">{types.map(t => <option key={t.label}>{t.label}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Movimento<select value={direction} onChange={e => setDirection(e.target.value as "CREDITO" | "DEBITO")} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="CREDITO">Crédito</option><option value="DEBITO">Débito</option></select></label><label className="grid gap-1 text-sm font-medium md:col-span-2">Horas<input value={hours} onChange={e => setHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="02:30" /></label><label className="grid gap-1 text-sm font-medium md:col-span-2">Observação<input value={description} onChange={e => setDescription(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label></div>
       <div className="mt-5 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void saveLaunch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar lançamento"}</button></div></Card></div>}
