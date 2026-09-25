@@ -889,10 +889,15 @@ export type Database = {
     Functions: {
       can_manage: { Args: { _user_id: string }; Returns: boolean }
       certificate_cid: { Args: { _certificate_id: string }; Returns: string }
+      current_roles: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
       ensure_user_setup: {
         Args: { _email?: string; _full_name?: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      has_app_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
