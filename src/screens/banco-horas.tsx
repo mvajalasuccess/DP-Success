@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Employee = { id: string; full_name: string };
-type Period = { id: string; reference_year: number; reference_month: number; status: string };
+type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string; status: string };
 type BalanceRow = {
   period: Period; label: string; range: string;
   debit: number; he60: number; heNoturna: number; he100: number;
@@ -17,10 +17,12 @@ function minutesToHours(value: number) {
   const abs = Math.abs(Math.round(value));
   return sign + String(Math.floor(abs / 60)).padStart(2, "0") + ":" + String(abs % 60).padStart(2, "0");
 }
+function formatDate(value: string) {
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
+}
 function periodRange(p: Period) {
-  const end = new Date(p.reference_year, p.reference_month - 1, 20);
-  const start = new Date(p.reference_year, p.reference_month - 2, 21);
-  return start.toLocaleDateString("pt-BR") + " → " + end.toLocaleDateString("pt-BR");
+  return `${formatDate(p.start_date)} → ${formatDate(p.end_date)}`;
 }
 function periodLabel(p: Period) {
   const start = new Date(p.reference_year, p.reference_month - 2, 21);
@@ -63,7 +65,7 @@ export function BankHours() {
     setLoading(true); setError("");
 
     const { data: periodData, error: periodError } = await supabase
-      .from("time_periods").select("id,reference_year,reference_month,status")
+      .from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status")
       .order("reference_year", { ascending: false }).order("reference_month", { ascending: false });
     if (periodError) { setError(periodError.message); setLoading(false); return; }
 
