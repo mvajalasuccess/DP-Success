@@ -11,7 +11,6 @@ function signedMinutes(kind: string, minutes: number) {
 
 export function BankHours() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [period: any] = useState<any>(null);
   const [competence, setCompetence] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
