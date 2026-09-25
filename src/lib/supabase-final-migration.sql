@@ -141,13 +141,24 @@ create index if not exists idx_occurrences_employee_competence on occurrences(em
 -- ============================================================
 
 -- Compatibilidade com a tela de Funcionários
+-- Algumas bases antigas já possuem status/hire_date; em uma base nova
+-- essas colunas precisam existir antes da compatibilidade ser aplicada.
+alter table employees add column if not exists status text;
+alter table employees add column if not exists hire_date date;
 alter table employees add column if not exists active boolean;
-update employees set active = case when status::text = 'ativo' then true else false end where active is null;
+update employees
+set active = case
+  when lower(coalesce(status::text, 'ativo')) in ('ativo','active') then true
+  else false
+end
+where active is null;
 alter table employees alter column active set default true;
 alter table employees alter column active set not null;
 alter table employees add column if not exists initial_bank_minutes integer not null default 0;
 alter table employees add column if not exists admission_date date;
-update employees set admission_date = hire_date where admission_date is null and hire_date is not null;
+update employees
+set admission_date = hire_date
+where admission_date is null and hire_date is not null;
 
 -- Histórico salarial: o salário usado em um lançamento nunca depende
 -- do salário atual do funcionário.
