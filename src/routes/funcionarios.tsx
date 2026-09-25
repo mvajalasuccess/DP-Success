@@ -17,18 +17,19 @@ function Employees() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name:"", role:"", department:"", salary:"", admission:"", bank:"" });
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [form, setForm] = useState({ name:"", role:"", department:"", salary:"", admission:"", bank:"", work_schedule_id:"" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   async function loadEmployees() {
     setLoading(true);
-    const { data, error } = await supabase.from("employees").select("id,full_name,active,initial_bank_minutes,departments(name),positions(name),salary_history(salary,valid_from)").order("full_name");
+    const { data, error } = await supabase.from("employees").select("id,full_name,active,initial_bank_minutes,departments(name),positions(name),salary_history(salary,valid_from),work_schedules(name,divisor)").order("full_name");
     if (error) setError(error.message); else setEmployees(data ?? []);
     setLoading(false);
   }
-  useEffect(() => { void loadEmployees(); }, []);
+  useEffect(() => { void loadEmployees(); void (async()=>{const {data}=await (supabase as any).from("work_schedules").select("id,name,divisor").eq("active",true).order("name");setSchedules(data??[]);})(); }, []);
 
   async function createEmployee() {
     setSaving(true); setError("");
@@ -40,11 +41,11 @@ function Employees() {
     if (dep.error) { setError(dep.error.message); setSaving(false); return; }
     const pos = await supabase.from("positions").upsert({ name:form.role }, { onConflict:"name" }).select("id").single();
     if (pos.error) { setError(pos.error.message); setSaving(false); return; }
-    const emp = await supabase.from("employees").insert({ full_name:form.name, department_id:dep.data.id, position_id:pos.data.id, admission_date:form.admission, initial_bank_minutes:bankMinutes }).select("id").single();
+    const emp = await supabase.from("employees").insert({ full_name:form.name, department_id:dep.data.id, position_id:pos.data.id, admission_date:form.admission, initial_bank_minutes:bankMinutes, work_schedule_id:form.work_schedule_id || null }).select("id").single();
     if (emp.error) { setError(emp.error.message); setSaving(false); return; }
     const sal = await supabase.from("salary_history").insert({ employee_id:emp.data.id, salary, valid_from:form.admission });
     if (sal.error) { setError(sal.error.message); setSaving(false); return; }
-    setForm({name:"",role:"",department:"",salary:"",admission:"",bank:""}); setOpen(false); setSaving(false); await loadEmployees();
+    setForm({name:"",role:"",department:"",salary:"",admission:"",bank:"",work_schedule_id:""}); setOpen(false); setSaving(false); await loadEmployees();
   }
   const filtered=employees.filter(e=>e.full_name.toLowerCase().includes(search.toLowerCase()));
   const money=(v:number|undefined)=>v==null?"—":v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -59,6 +60,6 @@ function Employees() {
       <Card className="mt-6 overflow-hidden"><div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between"><div><h2 className="font-display font-bold">Lista de funcionários</h2><p className="text-xs text-muted-foreground">Dados vindos do banco</p></div><div className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 md:w-72"><Search className="h-4 w-4 text-muted-foreground"/><input value={search} onChange={e=>setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div></div>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Cargo</th><th className="px-5 py-3">Departamento</th><th className="px-5 py-3">Salário</th><th className="px-5 py-3">Saldo inicial</th><th className="px-5 py-3">Status</th></tr></thead><tbody className="divide-y">{loading?<tr><td colSpan={6} className="px-5 py-8 text-center text-muted-foreground">Carregando...</td></tr>:filtered.map(e=><tr key={e.id}><td className="px-5 py-4 font-medium">{e.full_name}</td><td className="px-5 py-4 text-muted-foreground">{e.positions?.name??"—"}</td><td className="px-5 py-4 text-muted-foreground">{e.departments?.name??"—"}</td><td className="px-5 py-4">{money(e.salary_history?.[0]?.salary)}</td><td className={`px-5 py-4 font-semibold ${e.initial_bank_minutes<0?"text-destructive":"text-primary"}`}>{mins(e.initial_bank_minutes)}</td><td className="px-5 py-4"><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{e.active?"Ativo":"Inativo"}</span></td></tr>)}</tbody></table></div></Card>
     </main>
-    {open&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-2xl p-6"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">Novo funcionário</h2><p className="text-sm text-muted-foreground">Os dados serão gravados no Supabase.</p></div><button onClick={()=>setOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div><div className="mt-5 grid gap-4 md:grid-cols-2">{([["name","Nome completo","text"],["role","Cargo","text"],["department","Departamento","text"],["salary","Salário","number"],["admission","Data de admissão","date"],["bank","Saldo inicial (ex.: +12:35)","text"]] as const).map(([key,label,type])=><label key={key} className="grid gap-1 text-sm font-medium">{label}<input type={type} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} className="rounded-lg border bg-background px-3 py-2 font-normal"/></label>)}</div>{error&&<p className="mt-4 text-sm text-destructive">{error}</p>}<div className="mt-5 flex justify-end gap-2"><button onClick={()=>setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving} onClick={()=>void createEmployee()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving?"Salvando...":"Salvar funcionário"}</button></div></Card></div>}
+    {open&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-2xl p-6"><div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">Novo funcionário</h2><p className="text-sm text-muted-foreground">Os dados serão gravados no Supabase.</p></div><button onClick={()=>setOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div><div className="mt-5 grid gap-4 md:grid-cols-2">{([["name","Nome completo","text"],["role","Cargo","text"],["department","Departamento","text"],["salary","Salário","number"],["admission","Data de admissão","date"],["bank","Saldo inicial (ex.: +12:35)","text"]] as const).map(([key,label,type])=><label key={key} className="grid gap-1 text-sm font-medium">{label}<input type={type} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})} className="rounded-lg border bg-background px-3 py-2 font-normal"/></label>)}</div>{error&&<p className="mt-4 text-sm text-destructive">{error}</p>}<label className="mt-3 grid gap-1 text-sm font-medium">Jornada / escala<select value={form.work_schedule_id} onChange={e=>setForm({...form,work_schedule_id:e.target.value})} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecionar jornada</option>{schedules.map(s=><option key={s.id} value={s.id}>{s.name} · divisor {s.divisor}</option>)}</select></label><div className="mt-5 flex justify-end gap-2"><button onClick={()=>setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving} onClick={()=>void createEmployee()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving?"Salvando...":"Salvar funcionário"}</button></div></Card></div>}
   </div>;
 }
