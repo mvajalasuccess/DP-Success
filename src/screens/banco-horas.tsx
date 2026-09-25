@@ -119,9 +119,10 @@ export function BankHours() {
 
     const periodIds = periodList.map(p => p.id);
 
-    const [timeRes, overtimeRes] = await Promise.all([
+    const [timeRes, overtimeRes, bankRes] = await Promise.all([
       supabase.from("time_records").select("period_id,negative_minutes").eq("employee_id", employeeId).in("period_id", periodIds),
       supabase.from("overtime_records").select("period_id,minutes,rate_percent,notes").eq("employee_id", employeeId).in("period_id", periodIds),
+      supabase.from("bank_hours").select("period_id,kind,minutes,justification").eq("employee_id", employeeId).in("period_id", periodIds),
     ]);
 
     if (timeRes.error) {
@@ -131,6 +132,11 @@ export function BankHours() {
     }
     if (overtimeRes.error) {
       setError(overtimeRes.error.message);
+      setLoading(false);
+      return;
+    }
+    if (bankRes.error) {
+      setError(bankRes.error.message);
       setLoading(false);
       return;
     }
@@ -146,6 +152,22 @@ export function BankHours() {
       const current = credits.get(item.period_id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0 };
       const key = classifyOvertime(item);
       current[key] += Number(item.minutes || 0);
+      credits.set(item.period_id, current);
+    }
+
+    // Créditos manuais/abertura também compõem o saldo. Débitos da tabela
+    // bank_hours não são somados aqui, pois débito = horas em atraso.
+    for (const item of bankRes.data ?? []) {
+      if (item.kind !== "credito" || !item.period_id) continue;
+      const current = credits.get(item.period_id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0 };
+      const note = String(item.justification || "").toLowerCase();
+      const key = note.includes("interjornada") ? "interjornada"
+        : note.includes("100% + 20%") ? "he100Noturna"
+        : note.includes("100%") ? "he100"
+        : note.includes("60% + 20%") || note.includes("noturna") ? "heNoturna"
+        : note.includes("20%") ? "noturno"
+        : "he60";
+      current[key] += Math.abs(Number(item.minutes || 0));
       credits.set(item.period_id, current);
     }
 
