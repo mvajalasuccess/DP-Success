@@ -52,9 +52,7 @@ function Dashboard() {
 }
 
 function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void }) {
-  const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, bank: 0, absence: 0, certificates: 0, absenteeism: employees.length > 0
-          ? Math.round((absence / (employees.length * 22 * 480)) * 1000) / 10
-          : 0, period: "Nenhuma competência" });
+  const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, bank: 0, absence: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
   const [top, setTop] = useState<Array<{ name: string; minutes: number }>>([]);
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
@@ -142,7 +140,9 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         bank,
         absence,
         certificates: (cert.data ?? []).length,
-        absenteeism: 0,
+        absenteeism: employees.length > 0
+          ? Math.round((absence / (employees.length * 22 * 480)) * 1000) / 10
+          : 0,
         period: periodLabel,
       });
       setAlerts(competence && competence.status !== "FECHADA" ? ["Competência não fechada"] : []);
