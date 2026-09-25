@@ -149,7 +149,7 @@ export function BankHours() {
       const current = overtime.get(item.period_id) ?? { he60: 0, heNoturna: 0, he100: 0, he100Noturna: 0, noturno: 0, interjornada: 0, salary: 0 };
       const key = classifyOvertime(item);
       current[key] += Number(item.minutes || 0);
-      current.salary += Number(item.estimated_value || 0);
+      if (key !== "interjornada") current.salary += Number(item.estimated_value || 0);
       overtime.set(item.period_id, current);
     }
 
