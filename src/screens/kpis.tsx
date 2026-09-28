@@ -30,6 +30,10 @@ type Metrics = {
   employees: number;
   expected: number;
   absenceMinutes: number;
+  faltasMinutes: number;
+  atestadosMinutes: number;
+  declaracoesMinutes: number;
+  abonosMinutes: number;
   worked: number;
   he60: number;
   he60Night: number;
@@ -43,7 +47,7 @@ type Metrics = {
 };
 
 const emptyMetrics: Metrics = {
-  employees: 0, expected: 0, absenceMinutes: 0, worked: 0,
+  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, atestadosMinutes: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0,
   he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0,
   interjornada: 0, turnover: 0, terminations: 0, averageHeadcount: 0,
 };
@@ -76,7 +80,6 @@ function employeeMatches(
 
 export function Kpis() {
   const [metrics, setMetrics] = useState<Metrics>(emptyMetrics);
-  const [overtimeEmployees, setOvertimeEmployees] = useState<OvertimeEmployee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -147,7 +150,6 @@ export function Kpis() {
 
       if (!targetPeriods.length) {
         setMetrics(emptyMetrics);
-        setOvertimeEmployees([]);
         setPeriodLabel(String(selectedYear));
         return;
       }
@@ -174,7 +176,6 @@ export function Kpis() {
         { data: historical, error: historicalError },
         { data: overtime, error: overtimeError },
         { data: timeRecords, error: timeError },
-        { data: _unusedBankCredits, error: bankCreditsError },
       ] = await Promise.all([
         historicalPeriodIds.length
           ? db.from("historical_kpi_data")
@@ -194,8 +195,8 @@ export function Kpis() {
           : Promise.resolve({ data: [], error: null }),
       ]);
 
-      if (historicalError || overtimeError || timeError || bankCreditsError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? bankCreditsError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || timeError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? "Não foi possível carregar os indicadores.");
         return;
       }
 
@@ -214,7 +215,6 @@ export function Kpis() {
       };
 
       const next = { ...emptyMetrics };
-      const comparison = new Map<string, OvertimeEmployee>();
       let historicalCount = 0;
       let operationalCount = 0;
 
@@ -226,23 +226,21 @@ export function Kpis() {
 
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
-        next.absenceMinutes += decimalHoursToMinutes(row.absence_quantity);
-        next.absenceMinutes += Number(row.certificate_minutes || 0);
-        next.absenceMinutes += Number(row.declaration_minutes || 0);
-        next.absenceMinutes += Number(row.allowance_minutes || 0);
-        next.absenceMinutes += Number(row.debit_minutes || 0);
+        const faltas = decimalHoursToMinutes(row.absence_quantity);
+        const atestados = Number(row.certificate_minutes || 0);
+        const declaracoes = Number(row.declaration_minutes || 0);
+        const abonos = Number(row.allowance_minutes || 0);
+        next.faltasMinutes += faltas;
+        next.atestadosMinutes += atestados;
+        next.declaracoesMinutes += declaracoes;
+        next.abonosMinutes += abonos;
+        next.absenceMinutes += faltas + atestados + declaracoes + abonos;
 
-        const current = comparison.get(key) ?? {
-          employeeId: employee?.id ?? key,
-          name: employee?.name ?? String(row.employee_name ?? "Histórico"),
-          he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0, interjornada: 0, total: 0,
-        };
-        current.he60 += Number(row.he_60_minutes || 0);
-        current.he60Night += Number(row.he_60_night_minutes || 0);
-        current.he100 += Number(row.he_100_minutes || 0);
-        current.he20 += Number(row.he_20_minutes || 0);
-        current.interjornada += Number(row.interjornada_minutes || 0);
-        comparison.set(key, current);
+        next.he60 += Number(row.he_60_minutes || 0);
+        next.he60Night += Number(row.he_60_night_minutes || 0);
+        next.he100 += Number(row.he_100_minutes || 0);
+        next.he20 += Number(row.he_20_minutes || 0);
+        next.interjornada += Number(row.interjornada_minutes || 0);
       }
 
       for (const row of timeRecords ?? []) {
@@ -250,30 +248,8 @@ export function Kpis() {
         operationalCount += 1;
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
+        next.faltasMinutes += Number(row.negative_minutes || 0);
         next.absenceMinutes += Number(row.negative_minutes || 0);
-      }
-
-      for (const row of overtime ?? []) {
-        if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
-
-        const employee = employees.find(e => e.id === row.employee_id);
-        if (!employee) continue;
-
-        const current = comparison.get(employee.id) ?? {
-          employeeId: employee.id, name: employee.name,
-          he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0, interjornada: 0, total: 0,
-        };
-
-        const minutes = Number(row.minutes || 0);
-        const type = String(row.launch_type || "").toUpperCase();
-        if (type === "INTERJORNADA_50") current.interjornada += minutes;
-        else if (type === "HE_100_NOTURNO") current.he100Night += minutes;
-        else if (type === "HE_100") current.he100 += minutes;
-        else if (type === "ADICIONAL_NOTURNO") current.he20 += minutes;
-        else if (type === "HE_60_NOTURNO") current.he60Night += minutes;
-        else current.he60 += minutes;
-
-        comparison.set(employee.id, current);
       }
 
       const terminationEmployees = allowedEmployees.filter(e =>
@@ -324,7 +300,6 @@ export function Kpis() {
 
   const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
   const totalOvertime = metrics.he60 + metrics.he60Night + metrics.he100 + metrics.he100Night + metrics.he20 + metrics.interjornada;
-  const maxComparison = Math.max(...overtimeEmployees.map(e => e.total), 1);
 
   return (
     <div className="min-h-screen bg-background">
@@ -418,8 +393,13 @@ export function Kpis() {
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.faltasMinutes)}</p></Card>
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.atestadosMinutes)}</p></Card>
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Abonos</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.abonosMinutes)}</p></Card>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
               <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas de ausência</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.absenceMinutes)}</p></Card>
               <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas trabalhadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.worked)}</p></Card>
               <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Funcionários</p><p className="mt-1 text-2xl font-bold">{metrics.employees}</p></Card>
             </div>
@@ -437,7 +417,7 @@ export function Kpis() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 02</p>
                 <h2 className="mt-1 text-2xl font-bold">Horas Extras</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Selecione os funcionários acima para comparar os tipos de horas.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Visão consolidada das horas extras do período.</p>
               </div>
               <div className="rounded-2xl border bg-card px-6 py-4 text-right shadow-sm">
                 <p className="text-xs text-muted-foreground">Total de HE + Interjornada</p>
@@ -459,25 +439,6 @@ export function Kpis() {
                 </Card>
               ))}
             </div>
-            <Card className="mt-4 overflow-hidden">
-              <div className="border-b bg-muted/40 px-5 py-3 text-sm font-semibold">Comparação por funcionário</div>
-              {overtimeEmployees.length ? overtimeEmployees.map(row => (
-                <div key={row.employeeId} className="border-b px-5 py-4 last:border-b-0">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="truncate font-medium">{row.name}</span>
-                    <span className="font-bold">{fmt(row.total)}</span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-muted-foreground md:grid-cols-6">
-                    <span>60% <b className="text-foreground">{fmt(row.he60)}</b></span>
-                    <span>60%+20% <b className="text-foreground">{fmt(row.he60Night)}</b></span>
-                    <span>100% <b className="text-foreground">{fmt(row.he100)}</b></span>
-                    <span>100%+20% <b className="text-foreground">{fmt(row.he100Night)}</b></span>
-                    <span>20% <b className="text-foreground">{fmt(row.he20)}</b></span>
-                    <span>Interj. <b className="text-foreground">{fmt(row.interjornada)}</b></span>
-                  </div>
-                </div>
-              )) : <div className="px-5 py-10 text-center text-sm text-muted-foreground">Nenhuma hora extra encontrada para os filtros selecionados.</div>}
-            </Card>
           </section>
         )}
 
