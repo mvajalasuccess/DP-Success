@@ -8,7 +8,7 @@ import { CREDIT_TYPES, balancesByEmployee, periodRangeLabel, minutesToHours, for
 const BALANCE_ITEMS: CreditType[] = ["HE_60", "HE_60_NOTURNO", "HE_100", "HE_100_NOTURNO", "ADICIONAL_NOTURNO"];
 
 export function BankHours() {
-  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string; status?: string }>>([]);\n  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [employeeId, setEmployeeId] = useState("");
   const [rows, setRows] = useState<PeriodBalance[]>([]);
   const [expanded, setExpanded] = useState("");
@@ -27,9 +27,9 @@ export function BankHours() {
 
   useEffect(() => {
     void (async () => {
-      const r = await supabase.from("employees").select("id,full_name").order("full_name");
+      const r = await supabase.from("employees").select("id,full_name,status").order("full_name");
       if (r.error) setError(r.error.message);
-      else { setEmployees(r.data ?? []); if (r.data?.[0]) setEmployeeId(r.data[0].id); }
+      else { setEmployees(r.data ?? []); const active = (r.data ?? []).find((e: any) => e.status !== "inativo"); if (active) setEmployeeId(active.id); else if (r.data?.[0]) setEmployeeId(r.data[0].id); }
     })();
   }, []);
 
@@ -51,7 +51,7 @@ export function BankHours() {
 
   useEffect(() => { void loadBankData(); }, [employeeId]);
 
-  const accumulated = rows[0]?.accumulated ?? 0;
+  const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));\n  const accumulated = rows[0]?.accumulated ?? 0;
   const firstPeriod = rows[rows.length - 1]?.period;
   const cls = (n: number) => n < 0 ? "text-destructive" : "text-primary";
 
@@ -186,11 +186,11 @@ export function BankHours() {
           </Card>
         );
       })()}
-      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-[1fr_auto_auto] md:items-end">
+      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
         <label className="grid gap-1.5 text-sm font-medium">Funcionário
           <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
             {!employees.length && <option value="">Nenhum funcionário cadastrado</option>}
-            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+            {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
           </select>
         </label>
         <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado atual</p><p className={`text-2xl font-bold ${cls(accumulated)}`}>{minutesToHours(accumulated, true)}</p></div>
