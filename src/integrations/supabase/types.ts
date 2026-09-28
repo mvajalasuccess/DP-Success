@@ -121,6 +121,7 @@ export type Database = {
           is_demo: boolean
           justification: string | null
           kind: Database["public"]["Enums"]["bank_hours_kind"]
+          launch_group_id: string | null
           minutes: number
           period_id: string | null
           previous_balance_minutes: number
@@ -136,6 +137,7 @@ export type Database = {
           is_demo?: boolean
           justification?: string | null
           kind: Database["public"]["Enums"]["bank_hours_kind"]
+          launch_group_id?: string | null
           minutes: number
           period_id?: string | null
           previous_balance_minutes?: number
@@ -151,6 +153,7 @@ export type Database = {
           is_demo?: boolean
           justification?: string | null
           kind?: Database["public"]["Enums"]["bank_hours_kind"]
+          launch_group_id?: string | null
           minutes?: number
           period_id?: string | null
           previous_balance_minutes?: number
@@ -514,6 +517,8 @@ export type Database = {
           estimated_value: number | null
           id: string
           is_demo: boolean
+          launch_group_id: string | null
+          launch_type: string
           minutes: number
           notes: string | null
           period_id: string | null
@@ -528,6 +533,8 @@ export type Database = {
           estimated_value?: number | null
           id?: string
           is_demo?: boolean
+          launch_group_id?: string | null
+          launch_type?: string
           minutes?: number
           notes?: string | null
           period_id?: string | null
@@ -542,6 +549,8 @@ export type Database = {
           estimated_value?: number | null
           id?: string
           is_demo?: boolean
+          launch_group_id?: string | null
+          launch_type?: string
           minutes?: number
           notes?: string | null
           period_id?: string | null
