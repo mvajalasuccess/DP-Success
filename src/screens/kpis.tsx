@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { periodRangeLabel, type Period } from "@/lib/dp-model";
+import { countWorkingWeekdays } from "@/lib/feriados";
 
 type Employee = {
   id: string;
@@ -239,12 +240,6 @@ export function Kpis() {
         (scheduleRows ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0)]),
       );
 
-      const dateDiffInclusive = (start: string, end: string) => {
-        const a = new Date(start + "T00:00:00");
-        const b = new Date(end + "T00:00:00");
-        return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000) + 1);
-      };
-
       const expectedFromSchedule = (employee: Employee, period: Period) => {
         const weekly = employee.workScheduleId ? (scheduleMinutes.get(employee.workScheduleId) ?? 0) : 0;
         if (!weekly) return 0;
@@ -257,7 +252,15 @@ export function Kpis() {
           : period.end_date;
 
         if (employeeEnd < employeeStart) return 0;
-        return Math.round((weekly / 7) * dateDiffInclusive(employeeStart, employeeEnd));
+
+        // A jornada cadastrada atualmente é semanal. Para o cálculo das horas
+        // previstas, consideramos a jornada padrão de segunda a sexta e
+        // retiramos automaticamente os feriados nacionais que caem em dias úteis.
+        // Ex.: 21/08/2026 a 20/09/2026 tem 20 dias úteis após 07/09,
+        // então uma jornada de 44h/semana resulta em 20 × 08:48 = 176:00.
+        const workingDays = countWorkingWeekdays(employeeStart, employeeEnd);
+        const dailyMinutes = weekly / 5;
+        return Math.round(workingDays * dailyMinutes);
       };
 
       const dailyMinutesFromSchedule = (employee: Employee) => {
