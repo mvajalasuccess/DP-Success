@@ -22,7 +22,7 @@ export function Employees() {
     setLoading(true);
     const { data, error } = await supabase
       .from("employees")
-      .select("id,full_name,status,hire_date,termination_date,department_id,position_id,work_schedule_id,departments(name),positions(name),work_schedules(name)")
+      .select("id,full_name,status,hire_date,termination_date,department_id,position_id,work_schedule_id,salary,departments(name),positions(name),work_schedules(name)")
       .order("full_name");
     if (error) setError(error.message);
     else setEmployees(data ?? []);
@@ -63,7 +63,7 @@ export function Employees() {
       name: employee.full_name ?? "",
       role: employee.position_id ?? "",
       department: employee.department_id ?? "",
-      salary: "",
+      salary: employee.salary != null ? String(employee.salary).replace(".", ",") : "",
       admission: employee.hire_date ?? "",
       termination: employee.termination_date ?? "",
       bank: "",
@@ -98,6 +98,7 @@ export function Employees() {
         termination_date: form.status === "inativo" ? form.termination || null : null,
         status: form.status,
         work_schedule_id: form.work_schedule_id || null,
+        salary: Number(form.salary.replace(",", ".")),
       }).eq("id", editingId);
       if (result.error) {
         setError(result.error.message);
@@ -131,6 +132,7 @@ export function Employees() {
       termination_date: form.status === "inativo" ? form.termination || null : null,
       status: form.status,
       work_schedule_id: form.work_schedule_id || null,
+      salary,
     }).select("id").single();
 
     if (emp.error) {
