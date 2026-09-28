@@ -203,11 +203,11 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   const joseLucianoManualBalances: Record<string, number> = {
     "2026-01-20": 10 * 60 + 13,
     "2026-02-20": 10 * 60 + 8,
-    "2026-03-08": 0,
-    "2026-03-20": -(5 * 60 + 20),
-    "2026-04-20": 46 * 60 + 38,
-    "2026-05-20": 41 * 60 + 36,
-    "2026-06-20": 32 * 60 + 17,
+    "2026-03-20": 0,
+    "2026-04-20": -(5 * 60 + 20),
+    "2026-05-20": 46 * 60 + 38,
+    "2026-06-20": 41 * 60 + 36,
+    "2026-07-20": 32 * 60 + 17,
   };
   const historicalByPeriod = new Map(historical.map(row => [row.period_id, historicalComposition(row)]));
   const ordered = [...periods].sort((a, b) => a.start_date.localeCompare(b.start_date));
