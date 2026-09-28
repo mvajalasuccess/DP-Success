@@ -692,12 +692,14 @@ export type Database = {
           closed_at: string | null
           closed_by: string | null
           created_at: string
+          end_date: string
           id: string
           notes: string | null
           reference_month: number
           reference_year: number
           reopened_at: string | null
           reopened_by: string | null
+          start_date: string
           status: Database["public"]["Enums"]["period_status"]
           updated_at: string
         }
@@ -705,12 +707,14 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           created_at?: string
+          end_date: string
           id?: string
           notes?: string | null
           reference_month: number
           reference_year: number
           reopened_at?: string | null
           reopened_by?: string | null
+          start_date: string
           status?: Database["public"]["Enums"]["period_status"]
           updated_at?: string
         }
@@ -718,12 +722,14 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           created_at?: string
+          end_date?: string
           id?: string
           notes?: string | null
           reference_month?: number
           reference_year?: number
           reopened_at?: string | null
           reopened_by?: string | null
+          start_date?: string
           status?: Database["public"]["Enums"]["period_status"]
           updated_at?: string
         }
