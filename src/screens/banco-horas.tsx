@@ -42,7 +42,8 @@ export function BankHours() {
         supabase.from("bank_hours").select("id,entry_date,minutes,adjustment_direction,justification,period_id").eq("employee_id", employeeId).eq("kind", "ajuste").order("entry_date", { ascending: false }),
       ]);
       if (adjustmentRows.error) throw new Error(adjustmentRows.error.message);
-      setRows(balanceRows.reverse());
+      const orderedRows = balanceRows.reverse();
+      setRows(orderedRows);
       setAdjustments(adjustmentRows.data ?? []);
     } catch (e) { setError((e as Error).message); }
     setLoading(false);
@@ -56,7 +57,8 @@ export function BankHours() {
   function openAdjustmentNew() {
     setEditingAdjustment(null);
     setAdjustmentDirection("credito");
-    setAdjustmentDate(new Date().toISOString().slice(0, 10));
+    const targetPeriod = rows.find(r => r.period.status === "aberto") ?? rows[0];
+    setAdjustmentDate(targetPeriod?.period.end_date ?? new Date().toISOString().slice(0, 10));
     setAdjustmentHours("");
     setAdjustmentReason("Saldo inicial");
     setAdjustmentJustification("");
@@ -102,6 +104,10 @@ export function BankHours() {
     setError("");
     try {
       const period = rows.find(r => adjustmentDate >= r.period.start_date && adjustmentDate <= r.period.end_date)?.period;
+      if (!period) {
+        setError("A data do ajuste precisa estar dentro de uma competência existente.");
+        return;
+      }
       const payload = {
         employee_id: employeeId,
         period_id: period?.id ?? null,
