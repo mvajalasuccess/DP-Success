@@ -52,7 +52,8 @@ export function Kpis() {
   const [selectedMonth, setSelectedMonth] = useState("todos");
   const [selectedDepartment, setSelectedDepartment] = useState("todos");
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [employeeOptions, setEmployeeOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [employeeOptions, setEmployeeOptions] = useState<Array<{ id: string; name: string; registration: string; department: string }>>([]);
+  const [employeeFilterOpen, setEmployeeFilterOpen] = useState(false);
   const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
   const [period, setPeriod] = useState("");
   const [source, setSource] = useState("");
@@ -78,7 +79,7 @@ export function Kpis() {
       const years = [...new Set(list.map(p => p.reference_year))].sort((a, b) => b - a);
       if (years.length) setSelectedYear(years[0]);
       if (list[0]) setSelectedPeriodId(list[0].id);
-      const employeeList = (employees ?? []).map((e: any) => ({ id: e.id, name: e.full_name }));
+      const employeeList = (employees ?? []).map((e: any) => ({ id: e.id, name: e.full_name, registration: e.registration ?? "", department: String(e.departments?.name ?? "").trim() }));
       setEmployeeOptions(employeeList);
       setDepartmentOptions([...new Set((employees ?? []).map((e: any) => String(e.departments?.name ?? "").trim()).filter(Boolean))].sort());
       setSelectedEmployees([]);
@@ -120,8 +121,15 @@ export function Kpis() {
       }
 
       const historicalRows = (historical ?? []).filter((row: any) => {
-        const employeeOk = selectedEmployees.length === 0 || (row.employee_id && selectedEmployees.includes(row.employee_id));
-        const departmentOk = selectedDepartment === "todos" || String(row.department_name ?? "").trim() === selectedDepartment;
+        const matchedEmployee = employeeOptions.find((e) =>
+          (row.employee_id && e.id === row.employee_id) ||
+          (row.registration && e.registration && String(row.registration).trim() === String(e.registration).trim()) ||
+          String(row.employee_name ?? "").trim().toLowerCase() === e.name.trim().toLowerCase()
+        );
+        const employeeOk = selectedEmployees.length === 0 || (!!matchedEmployee && selectedEmployees.includes(matchedEmployee.id));
+        const departmentOk = selectedDepartment === "todos" ||
+          String(row.department_name ?? "").trim() === selectedDepartment ||
+          (!!matchedEmployee && matchedEmployee.department === selectedDepartment);
         return employeeOk && departmentOk;
       });
       const historicalPeriodIds = new Set((historical ?? []).map((row: any) => row.period_id));
@@ -211,13 +219,13 @@ export function Kpis() {
 
       next.employees = employeeIds.size;
       if (!employeeIds.size) {
-        next.employees = viewMode === "mensal" ? 0 : historicalRows.length ? new Set(historicalRows.map((r: any) => r.employee_id ?? r.registration ?? r.employee_name)).size : 0;
+        next.employees = historicalRows.length ? new Set(historicalRows.map((r: any) => r.registration ?? r.employee_id ?? r.employee_name)).size : 0;
       }
       next.balance = next.he60 + next.he60Night + next.he100 + next.he20 - next.debit;
       setSource(hasHistorical && hasOperational ? "Histórico da BASE + lançamentos atuais do DP-Success" : hasHistorical ? "Histórico consolidado da aba BASE do Power BI" : "Lançamentos atuais do DP-Success");
       setM(next);
     })();
-  }, [selectedPeriodId, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, periods]);
+  }, [selectedPeriodId, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, periods, employeeOptions]);
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b px-6 py-4">
@@ -230,31 +238,51 @@ export function Kpis() {
       <main className="mx-auto max-w-[1500px] px-6 py-7">
         <p className="text-sm text-primary">Gestão</p>
         <h1 className="text-3xl font-bold">KPIs de RH e DP</h1>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4"><label className="grid gap-1 text-sm font-medium">Ano<select className="rounded-lg border bg-background px-3 py-2" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>{[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Mês<select className="rounded-lg border bg-background px-3 py-2" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}><option value="todos">Todos</option>{periods.filter(p => p.reference_year === selectedYear).map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Setor<select className="rounded-lg border bg-background px-3 py-2" value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}><option value="todos">Todos</option>{departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}</select></label><div className="grid gap-1 text-sm font-medium">
-              <span>Funcionários</span>
-              <div className="max-h-48 overflow-y-auto rounded-lg border bg-background p-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 font-normal hover:bg-muted">
-                  <input
-                    type="checkbox"
-                    checked={selectedEmployees.length === 0}
-                    onChange={() => setSelectedEmployees([])}
-                  />
-                  Selecionar todos
+        <Card className="mt-5 border p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold">Filtros dos indicadores</p>
+              <p className="text-xs text-muted-foreground">Combine ano, competência, setor e funcionários.</p>
+            </div>
+            <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => { setSelectedMonth("todos"); setSelectedDepartment("todos"); setSelectedEmployees([]); }}>Limpar filtros</button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
+            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ano
+              <select className="h-10 rounded-lg border bg-background px-3 text-sm font-normal outline-none focus:ring-2 focus:ring-primary/20" value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
+                {[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mês
+              <select className="h-10 rounded-lg border bg-background px-3 text-sm font-normal outline-none focus:ring-2 focus:ring-primary/20" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+                <option value="todos">Todos</option>
+                {periods.filter(p => p.reference_year === selectedYear).map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Setor
+              <select className="h-10 rounded-lg border bg-background px-3 text-sm font-normal outline-none focus:ring-2 focus:ring-primary/20" value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}>
+                <option value="todos">Todos os setores</option>
+                {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </label>
+            <div className="relative grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Funcionários
+              <button type="button" className="flex h-10 items-center justify-between rounded-lg border bg-background px-3 text-left text-sm font-normal normal-case" onClick={() => setEmployeeFilterOpen(v => !v)}>
+                <span className="truncate">{selectedEmployees.length === 0 ? "Todos os funcionários" : `${selectedEmployees.length} selecionado(s)`}</span>
+                <span className="ml-2 text-muted-foreground">⌄</span>
+              </button>
+              {employeeFilterOpen && <div className="absolute left-0 right-0 top-[4.5rem] z-30 max-h-72 overflow-y-auto rounded-lg border bg-popover p-2 text-sm shadow-lg">
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                  <input type="checkbox" checked={selectedEmployees.length === 0} onChange={() => setSelectedEmployees([])} />
+                  <span>Todos os funcionários</span>
                 </label>
-                {employeeOptions.map(e => (
-                  <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 font-normal hover:bg-muted">
-                    <input
-                      type="checkbox"
-                      checked={selectedEmployees.includes(e.id)}
-                      onChange={() => setSelectedEmployees(current => current.includes(e.id)
-                        ? current.filter(id => id !== e.id)
-                        : [...current, e.id])}
-                    />
-                    <span className="truncate">{e.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div></div><p className="mt-2 text-sm text-muted-foreground">{period || "Competência atual"}</p>
+                {employeeOptions.map(e => <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                  <input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={() => setSelectedEmployees(current => current.includes(e.id) ? current.filter(id => id !== e.id) : [...current, e.id])} />
+                  <span className="truncate">{e.name}</span>
+                </label>)}
+              </div>}
+            </div>
+          </div>
+        </Card><p className="mt-2 text-sm text-muted-foreground">{period || "Competência atual"}</p>
         {source && <p className="mt-1 text-xs text-muted-foreground">{source}</p>}
         {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
