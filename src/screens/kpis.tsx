@@ -47,7 +47,9 @@ const emptyMetrics: Metrics = {
 export function Kpis() {
   const [m, setM] = useState<Metrics>(emptyMetrics);
   const [periods, setPeriods] = useState<Period[]>([]);
+  const [viewMode, setViewMode] = useState<"mensal" | "anual">("mensal");
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [period, setPeriod] = useState("");
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
@@ -69,99 +71,132 @@ export function Kpis() {
 
       const list = (periodRows ?? []) as Period[];
       setPeriods(list);
+      const years = [...new Set(list.map(p => p.reference_year))].sort((a, b) => b - a);
+      if (years.length) setSelectedYear(years[0]);
       if (list[0]) setSelectedPeriodId(list[0].id);
       else setM({ ...emptyMetrics, employees: employees?.length ?? 0 });
     })();
   }, []);
 
   useEffect(() => {
-    if (!selectedPeriodId) return;
+    if (!periods.length) return;
     void (async () => {
       setError("");
       const db = supabase as any;
       const selected = periods.find(p => p.id === selectedPeriodId);
-      if (!selected) return;
+      const targetPeriods = viewMode === "mensal"
+        ? (selected ? [selected] : [])
+        : periods.filter(p => p.reference_year === selectedYear);
 
-      const start = selected.start_date;
-      const end = selected.end_date;
-      setPeriod(periodRangeLabel(selected));
+      if (!targetPeriods.length) {
+        setPeriod(viewMode === "anual" ? String(selectedYear) : "Nenhuma competência selecionada");
+        setM(emptyMetrics);
+        return;
+      }
+
+      setPeriod(viewMode === "anual"
+        ? `Ano ${selectedYear}`
+        : periodRangeLabel(targetPeriods[0]));
+
+      const periodIds = targetPeriods.map(p => p.id);
+      const start = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, targetPeriods[0].start_date);
+      const end = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, targetPeriods[0].end_date);
 
       const { data: historical, error: historicalError } = await db
         .from("historical_kpi_data")
-        .select("employee_id,registration,employee_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-        .eq("period_id", selected.id);
+        .select("period_id,employee_id,registration,employee_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+        .in("period_id", periodIds);
 
       if (historicalError) {
         setError(historicalError.message);
         return;
       }
 
-      if ((historical ?? []).length > 0) {
-        const next = { ...emptyMetrics, employees: historical.length };
-        for (const row of historical) {
-          next.expected += Number(row.expected_minutes || 0);
-          next.worked += Number(row.worked_minutes || 0);
-          next.absences += Number(row.absence_quantity || 0);
-          next.certificates += Number(row.certificate_minutes || 0);
-          next.declarations += Number(row.declaration_minutes || 0);
-          next.allowances += Number(row.allowance_minutes || 0);
-          next.debit += Number(row.debit_minutes || 0);
-          next.he60 += Number(row.he_60_minutes || 0);
-          next.he60Night += Number(row.he_60_night_minutes || 0);
-          next.he100 += Number(row.he_100_minutes || 0);
-          next.he20 += Number(row.he_20_minutes || 0);
-          next.interjornada += Number(row.interjornada_minutes || 0);
-        }
-        next.balance = next.he60 + next.he60Night + next.he100 + next.he20 - next.debit;
-        setSource("Histórico consolidado da aba BASE do Power BI");
-        setM(next);
-        return;
-      }
+      const historicalRows = historical ?? [];
+      const historicalPeriodIds = new Set(historicalRows.map((row: any) => row.period_id));
+      const operationalPeriods = targetPeriods.filter(p => !historicalPeriodIds.has(p.id));
+      const next = { ...emptyMetrics, employees: 0 };
+      const employeeIds = new Set<string>();
+      let hasHistorical = false;
+      let hasOperational = false;
 
-      const [overtime, bank, occurrences, certificates, timeRecords] = await Promise.all([
-        db.from("overtime_records").select("minutes,rate_percent,notes").eq("period_id", selected.id),
-        db.from("bank_hours").select("minutes,kind").eq("period_id", selected.id),
-        db.from("occurrences").select("quantity,unit").eq("period_id", selected.id),
-        db.from("medical_certificates").select("days,start_date,end_date").gte("start_date", start).lte("start_date", end),
-        db.from("time_records").select("expected_minutes,worked_minutes").eq("period_id", selected.id),
-      ]);
-
-      const operationalError = [overtime, bank, occurrences, certificates, timeRecords].find((x: any) => x.error);
-      if (operationalError) {
-        setError(operationalError.error.message);
-        return;
-      }
-
-      const next = { ...emptyMetrics, employees: employees?.length ?? 0 };
-      for (const row of timeRecords.data ?? []) {
+      for (const row of historicalRows) {
+        hasHistorical = true;
+        if (row.employee_id) employeeIds.add(row.employee_id);
+        else if (row.registration) employeeIds.add(`registration:${row.registration}`);
+        else employeeIds.add(`name:${row.employee_name}`);
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
+        next.absences += Number(row.absence_quantity || 0);
+        next.certificates += Number(row.certificate_minutes || 0);
+        next.declarations += Number(row.declaration_minutes || 0);
+        next.allowances += Number(row.allowance_minutes || 0);
+        next.debit += Number(row.debit_minutes || 0);
+        next.he60 += Number(row.he_60_minutes || 0);
+        next.he60Night += Number(row.he_60_night_minutes || 0);
+        next.he100 += Number(row.he_100_minutes || 0);
+        next.he20 += Number(row.he_20_minutes || 0);
+        next.interjornada += Number(row.interjornada_minutes || 0);
       }
-      for (const row of overtime.data ?? []) {
-        const minutes = Number(row.minutes || 0);
-        const rate = Number(row.rate_percent || 0);
-        const notes = String(row.notes || "").toLowerCase();
-        if (rate === 50) next.interjornada += minutes;
-        else if (rate === 100) next.he100 += minutes;
-        else if (rate === 20) next.he20 += minutes;
-        else if (notes.includes("60% + 20%") || notes.includes("noturn")) next.he60Night += minutes;
-        else next.he60 += minutes;
+
+      if (operationalPeriods.length) {
+        const ids = operationalPeriods.map(p => p.id);
+        const [overtime, bank, occurrences, certificates, timeRecords] = await Promise.all([
+          db.from("overtime_records").select("employee_id,minutes,rate_percent,notes").in("period_id", ids),
+          db.from("bank_hours").select("employee_id,minutes,kind").in("period_id", ids),
+          db.from("occurrences").select("employee_id,quantity,unit").in("period_id", ids),
+          db.from("medical_certificates").select("employee_id,days,start_date,end_date").gte("start_date", start).lte("start_date", end),
+          db.from("time_records").select("employee_id,expected_minutes,worked_minutes").in("period_id", ids),
+        ]);
+
+        const operationalError = [overtime, bank, occurrences, certificates, timeRecords].find((x: any) => x.error);
+        if (operationalError) {
+          setError(operationalError.error.message);
+          return;
+        }
+
+        hasOperational = [overtime.data, bank.data, occurrences.data, certificates.data, timeRecords.data].some((rows: any[]) => rows.length > 0);
+
+        for (const row of timeRecords.data ?? []) {
+          if (row.employee_id) employeeIds.add(row.employee_id);
+          next.expected += Number(row.expected_minutes || 0);
+          next.worked += Number(row.worked_minutes || 0);
+        }
+        for (const row of overtime.data ?? []) {
+          if (row.employee_id) employeeIds.add(row.employee_id);
+          const minutes = Number(row.minutes || 0);
+          const rate = Number(row.rate_percent || 0);
+          const notes = String(row.notes || "").toLowerCase();
+          if (rate === 50) next.interjornada += minutes;
+          else if (rate === 100) next.he100 += minutes;
+          else if (rate === 20) next.he20 += minutes;
+          else if (notes.includes("60% + 20%") || notes.includes("noturn")) next.he60Night += minutes;
+          else next.he60 += minutes;
+        }
+        for (const row of bank.data ?? []) {
+          if (row.employee_id) employeeIds.add(row.employee_id);
+          if (row.kind === "debito") next.debit += Math.abs(Number(row.minutes || 0));
+          if (row.kind === "credito") next.he60 += Number(row.minutes || 0);
+        }
+        for (const row of occurrences.data ?? []) {
+          if (row.employee_id) employeeIds.add(row.employee_id);
+          if (String(row.unit).toLowerCase().includes("dia")) next.absences += Number(row.quantity || 0);
+        }
+        for (const row of certificates.data ?? []) {
+          if (row.employee_id) employeeIds.add(row.employee_id);
+          next.certificates += Number(row.days || 0) * 60 * 8.8;
+        }
       }
-      for (const row of bank.data ?? []) {
-        if (row.kind === "debito") next.debit += Math.abs(Number(row.minutes || 0));
-        if (row.kind === "credito") next.he60 += Number(row.minutes || 0);
-      }
-      for (const row of occurrences.data ?? []) {
-        if (String(row.unit).toLowerCase().includes("dia")) next.absences += Number(row.quantity || 0);
-      }
-      for (const row of certificates.data ?? []) {
-        next.certificates += Number(row.days || 0) * 60 * 8.8;
+
+      next.employees = employeeIds.size;
+      if (!employeeIds.size) {
+        next.employees = viewMode === "mensal" ? 0 : historicalRows.length ? new Set(historicalRows.map((r: any) => r.employee_id ?? r.registration ?? r.employee_name)).size : 0;
       }
       next.balance = next.he60 + next.he60Night + next.he100 + next.he20 - next.debit;
-      setSource("Lançamentos atuais do DP-Success");
+      setSource(hasHistorical && hasOperational ? "Histórico da BASE + lançamentos atuais do DP-Success" : hasHistorical ? "Histórico consolidado da aba BASE do Power BI" : "Lançamentos atuais do DP-Success");
       setM(next);
     })();
-  }, [selectedPeriodId, periods]);
+  }, [selectedPeriodId, selectedYear, viewMode, periods]);
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b px-6 py-4">
@@ -174,7 +209,7 @@ export function Kpis() {
       <main className="mx-auto max-w-[1500px] px-6 py-7">
         <p className="text-sm text-primary">Gestão</p>
         <h1 className="text-3xl font-bold">KPIs de RH e DP</h1>
-        <div className="mt-3 max-w-md"><label className="grid gap-1 text-sm font-medium">Competência<select className="rounded-lg border bg-background px-3 py-2" value={selectedPeriodId} onChange={e => setSelectedPeriodId(e.target.value)}>{periods.map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}</select></label></div><p className="mt-2 text-sm text-muted-foreground">{period || "Competência atual"}</p>
+        <div className="mt-4 grid max-w-2xl gap-4 md:grid-cols-2"><label className="grid gap-1 text-sm font-medium">Visão<select className="rounded-lg border bg-background px-3 py-2" value={viewMode} onChange={e => setViewMode(e.target.value as "mensal" | "anual")}><option value="mensal">Mensal</option><option value="anual">Anual</option></select></label>{viewMode === "mensal" ? <label className="grid gap-1 text-sm font-medium">Competência<select className="rounded-lg border bg-background px-3 py-2" value={selectedPeriodId} onChange={e => setSelectedPeriodId(e.target.value)}>{periods.map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}</select></label> : <label className="grid gap-1 text-sm font-medium">Ano<select className="rounded-lg border bg-background px-3 py-2" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>{[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}</select></label>}</div><p className="mt-2 text-sm text-muted-foreground">{period || "Competência atual"}</p>
         {source && <p className="mt-1 text-xs text-muted-foreground">{source}</p>}
         {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
