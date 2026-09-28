@@ -188,23 +188,30 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   const adjustments = check(adjustmentsResult) as ManualAdjustment[];
   const historicalByPeriod = new Map(historical.map(row => [row.period_id, historicalComposition(row)]));
   const ordered = [...periods].sort((a, b) => a.start_date.localeCompare(b.start_date));
-  let accumulated = 0;
+  // Ajustes anteriores à primeira competência são saldo inicial: entram no acumulado,
+  // mas nunca alteram o saldo mensal da primeira competência.
+  const firstPeriod = ordered[0];
+  const openingBalance = firstPeriod
+    ? adjustments
+        .filter(a => !a.period_id && a.entry_date < firstPeriod.start_date)
+        .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0)
+    : 0;
+  let accumulated = openingBalance;
 
-  return ordered.map((period, index) => {
+  return ordered.map((period) => {
     const historicalComp = historicalByPeriod.get(period.id);
     const comp = historicalComp ?? composeMinutes(
       launches.credits.filter(r => r.period_id === period.id || inRange(r.reference_date, period)),
       launches.debits.filter(r => r.period_id === period.id || inRange(r.entry_date, period)),
     );
 
-    // Ajustes vinculados à competência entram nela. Ajustes antigos sem period_id
-    // também são tratados como saldo inicial da PRIMEIRA competência, para que
-    // apareçam em janeiro e participem do acumulado desde o início.
+    // Ajustes vinculados à competência entram nela. Ajustes sem period_id
+    // entram apenas se a data estiver dentro da própria competência.
+    // O saldo anterior já foi tratado separadamente em openingBalance.
     const adjustment = adjustments
       .filter(a => {
         if (a.period_id === period.id) return true;
         if (a.period_id) return false;
-        if (index === 0 && a.entry_date < period.start_date) return true;
         return inRange(a.entry_date, period);
       })
       .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
