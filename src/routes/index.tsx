@@ -145,7 +145,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
           : 0,
         period: periodLabel,
       });
-      setAlerts(competence && competence.status !== "FECHADA" ? ["Competência não fechada"] : []);
+      setAlerts(competence && competence.status !== "fechado" ? ["Competência não fechada"] : []);
     })();
   }, []);
 

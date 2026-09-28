@@ -37,7 +37,7 @@ function Login() {
       }
 
       const { error: setupError } = await supabase.rpc("ensure_user_setup", {
-        _full_name: null,
+        _full_name: undefined,
         _email: email.trim(),
       });
       if (setupError) {
@@ -66,7 +66,7 @@ function Login() {
 
     if (data.session) {
       const { error: setupError } = await supabase.rpc("ensure_user_setup", {
-        _full_name: null,
+        _full_name: undefined,
         _email: email.trim(),
       });
       if (setupError) {
