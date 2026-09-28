@@ -242,7 +242,11 @@ export function Kpis() {
         next.atestadosMinutes += atestados;
         next.declaracoesMinutes += declaracoes;
         next.abonosMinutes += abonos;
-        next.absenceMinutes += faltas + atestados + declaracoes + abonos;
+        // No histórico, o absenteísmo considera somente:
+        // faltas (1 dia = 08:48) + débitos + abonos.
+        // Atestados e declarações continuam nos cards, mas não entram na fórmula.
+        const debitos = Number(row.debit_minutes || 0);
+        next.absenceMinutes += faltas + debitos + abonos;
 
         next.he60 += Number(row.he_60_minutes || 0);
         next.he60Night += Number(row.he_60_night_minutes || 0);
