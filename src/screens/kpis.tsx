@@ -327,14 +327,14 @@ export function Kpis() {
         }
       }
 
-      const recordedExpectedEmployees = new Set<string>();
+      const recordedExpectedPeriods = new Set<string>();
       for (const row of timeRecords ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
         operationalCount += 1;
         const expected = Number(row.expected_minutes || 0);
         next.expected += expected;
         next.worked += Number(row.worked_minutes || 0);
-        if (expected > 0) recordedExpectedEmployees.add(row.employee_id);
+        if (expected > 0) recordedExpectedPeriods.add(`${row.employee_id}:${row.period_id}`);
       }
 
       // Nas competências manuais, não é necessário informar horas previstas em cada lançamento.
@@ -342,7 +342,7 @@ export function Kpis() {
       // automaticamente a partir da jornada cadastrada no funcionário.
       for (const period of targetPeriods.filter(p => p.end_date > HISTORICAL_CUTOFF)) {
         for (const employee of allowedEmployees) {
-          if (recordedExpectedEmployees.has(employee.id)) continue;
+          if (recordedExpectedPeriods.has(`${employee.id}:${period.id}`)) continue;
           next.expected += expectedFromSchedule(employee, period);
         }
       }
