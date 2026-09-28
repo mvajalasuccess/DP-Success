@@ -87,6 +87,7 @@ export function Kpis() {
   const [periodLabel, setPeriodLabel] = useState("");
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
+  const [activeSection, setActiveSection] = useState<"absenteismo" | "horas-extras" | "turnover">("absenteismo");
 
   useEffect(() => {
     void (async () => {
@@ -284,6 +285,12 @@ export function Kpis() {
       }
 
       const comparisonRows = [...comparison.values()].filter(item => item.total > 0).sort((a, b) => b.total - a.total);
+      next.he60 = comparisonRows.reduce((sum, row) => sum + row.he60, 0);
+      next.he60Night = comparisonRows.reduce((sum, row) => sum + row.he60Night, 0);
+      next.he100 = comparisonRows.reduce((sum, row) => sum + row.he100, 0);
+      next.he100Night = comparisonRows.reduce((sum, row) => sum + row.he100Night, 0);
+      next.he20 = comparisonRows.reduce((sum, row) => sum + row.he20, 0);
+      next.interjornada = comparisonRows.reduce((sum, row) => sum + row.interjornada, 0);
       setOvertimeEmployees(comparisonRows);
 
       setMetrics(next);
@@ -318,17 +325,23 @@ export function Kpis() {
         </div>
 
         <Card className="mt-6 border shadow-sm">
-          <div className="border-b px-5 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-semibold">Filtros</p>
-                <p className="text-xs text-muted-foreground">Combine os filtros para atualizar todas as seções.</p>
-              </div>
-              <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => { setSelectedMonth("todos"); setSelectedDepartment("todos"); setSelectedEmployees([]); }}>
-                Limpar filtros
+          <div className="flex items-center gap-1 border-b px-3 pt-3">
+            {[
+              ["absenteismo", "Absenteísmo"],
+              ["horas-extras", "Hr Extra"],
+              ["turnover", "Turnover"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveSection(key as typeof activeSection)}
+                className={`border-b-2 px-5 py-3 text-sm font-medium transition ${activeSection === key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                {label}
               </button>
-            </div>
+            ))}
           </div>
+
           <div className="grid gap-4 p-5 md:grid-cols-3 lg:grid-cols-4">
             <label className="grid gap-1.5 text-sm font-medium">Ano
               <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
@@ -373,76 +386,109 @@ export function Kpis() {
 
         {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
 
-        <section className="mt-8">
-          <div className="mb-4 flex items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
-              <h2 className="mt-1 text-2xl font-bold">Absenteísmo</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Horas de ausência ÷ horas previstas × 100.</p>
-            </div>
-            <div className="rounded-2xl border bg-card px-5 py-3 text-right shadow-sm">
-              <p className="text-xs text-muted-foreground">Índice de absenteísmo</p>
-              <p className="text-3xl font-bold">{pct(absenteeismRate)}</p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
-            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Horas de ausência</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.absenceMinutes)}</p></Card>
-            <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Horas trabalhadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.worked)}</p></Card>
-            <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Funcionários no recorte</p><p className="mt-1 text-2xl font-bold">{metrics.employees}</p></Card>
-          </div>
-        </section>
-
-        <section className="mt-10">
-          <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 02</p>
-            <div className="flex flex-wrap items-end justify-between gap-3">
+        {activeSection === "absenteismo" && (
+          <section className="mt-6">
+            <div className="mb-5 flex items-end justify-between gap-4">
               <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
+                <h2 className="mt-1 text-2xl font-bold">Absenteísmo</h2>
+              </div>
+              <div className="rounded-2xl border bg-card px-6 py-4 text-right shadow-sm">
+                <p className="text-xs text-muted-foreground">Absenteísmo</p>
+                <p className="mt-1 text-3xl font-bold">{pct(absenteeismRate)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{periodLabel}</p>
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas de ausência</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.absenceMinutes)}</p></Card>
+              <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas trabalhadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.worked)}</p></Card>
+              <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Funcionários</p><p className="mt-1 text-2xl font-bold">{metrics.employees}</p></Card>
+            </div>
+            <Card className="mt-4 p-5">
+              <p className="text-sm font-semibold">Cálculo do indicador</p>
+              <p className="mt-2 text-sm text-muted-foreground">Horas de ausência ÷ horas previstas × 100</p>
+              <p className="mt-3 text-lg font-semibold">{fmt(metrics.absenceMinutes)} ÷ {fmt(metrics.expected)} × 100 = {pct(absenteeismRate)}</p>
+            </Card>
+          </section>
+        )}
+
+        {activeSection === "horas-extras" && (
+          <section className="mt-6">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 02</p>
                 <h2 className="mt-1 text-2xl font-bold">Horas Extras</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Comparação entre os funcionários selecionados. Interjornada é exibida, mas não compõe o saldo.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Selecione os funcionários acima para comparar os tipos de horas.</p>
               </div>
-              <div className="rounded-2xl border bg-card px-5 py-3 text-right shadow-sm">
-                <p className="text-xs text-muted-foreground">Total de horas extras</p>
-                <p className="text-2xl font-bold">{fmt(totalOvertime)}</p>
+              <div className="rounded-2xl border bg-card px-6 py-4 text-right shadow-sm">
+                <p className="text-xs text-muted-foreground">Total de HE + Interjornada</p>
+                <p className="mt-1 text-3xl font-bold">{fmt(totalOvertime)}</p>
               </div>
             </div>
-          </div>
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+              {[
+                ["HE 60%", metrics.he60],
+                ["HE 60% + 20%", metrics.he60Night],
+                ["HE 100%", metrics.he100],
+                ["HE 100% + 20%", metrics.he100Night],
+                ["HE 20%", metrics.he20],
+                ["Interjornada", metrics.interjornada],
+              ].map(([label, value]) => (
+                <Card key={String(label)} className="p-5">
+                  <p className="text-sm text-muted-foreground">{label}</p>
+                  <p className="mt-2 text-2xl font-bold">{fmt(Number(value))}</p>
+                </Card>
+              ))}
+            </div>
+            <Card className="mt-4 overflow-hidden">
+              <div className="border-b bg-muted/40 px-5 py-3 text-sm font-semibold">Comparação por funcionário</div>
+              {overtimeEmployees.length ? overtimeEmployees.map(row => (
+                <div key={row.employeeId} className="border-b px-5 py-4 last:border-b-0">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="truncate font-medium">{row.name}</span>
+                    <span className="font-bold">{fmt(row.total)}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-muted-foreground md:grid-cols-6">
+                    <span>60% <b className="text-foreground">{fmt(row.he60)}</b></span>
+                    <span>60%+20% <b className="text-foreground">{fmt(row.he60Night)}</b></span>
+                    <span>100% <b className="text-foreground">{fmt(row.he100)}</b></span>
+                    <span>100%+20% <b className="text-foreground">{fmt(row.he100Night)}</b></span>
+                    <span>20% <b className="text-foreground">{fmt(row.he20)}</b></span>
+                    <span>Interj. <b className="text-foreground">{fmt(row.interjornada)}</b></span>
+                  </div>
+                </div>
+              )) : <div className="px-5 py-10 text-center text-sm text-muted-foreground">Nenhuma hora extra encontrada para os filtros selecionados.</div>}
+            </Card>
+          </section>
+        )}
 
-          <Card className="overflow-hidden">
-            <div className="grid grid-cols-[minmax(180px,1fr)_repeat(6,minmax(80px,0.6fr))_minmax(90px,0.7fr)] border-b bg-muted/40 px-4 py-3 text-xs font-semibold text-muted-foreground">
-              <span>Funcionário</span><span>60%</span><span>60%+20%</span><span>100%</span><span>100%+20%</span><span>20%</span><span>Interj.</span><span>Total</span>
-            </div>
-            {overtimeEmployees.length ? overtimeEmployees.map(row => (
-              <div key={row.employeeId} className="grid grid-cols-[minmax(180px,1fr)_repeat(6,minmax(80px,0.6fr))_minmax(90px,0.7fr)] items-center gap-0 border-b px-4 py-3 text-sm last:border-b-0">
-                <div className="min-w-0 pr-3"><p className="truncate font-medium">{row.name}</p><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (row.total / maxComparison) * 100)}%` }} /></div></div>
-                <span>{fmt(row.he60)}</span><span>{fmt(row.he60Night)}</span><span>{fmt(row.he100)}</span><span>{fmt(row.he100Night)}</span><span>{fmt(row.he20)}</span><span>{fmt(row.interjornada)}</span><span className="font-semibold">{fmt(row.total)}</span>
+        {activeSection === "turnover" && (
+          <section className="mt-6">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 03</p>
+                <h2 className="mt-1 text-2xl font-bold">Turnover</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Calculado automaticamente pelas datas de desligamento cadastradas.</p>
               </div>
-            )) : (
-              <div className="px-5 py-10 text-center text-sm text-muted-foreground">Nenhuma hora extra encontrada para os filtros selecionados.</div>
-            )}
-          </Card>
-        </section>
-
-        <section className="mt-10 pb-10">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 03</p>
-              <h2 className="mt-1 text-2xl font-bold">Turnover</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Calculado automaticamente pelos desligamentos cadastrados e pela média de funcionários no período.</p>
+              <div className="rounded-2xl border bg-card px-6 py-4 text-right shadow-sm">
+                <p className="text-xs text-muted-foreground">Turnover</p>
+                <p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{periodLabel}</p>
+              </div>
             </div>
-            <div className="rounded-2xl border bg-card px-5 py-3 text-right shadow-sm">
-              <p className="text-xs text-muted-foreground">Turnover</p>
-              <p className="text-3xl font-bold">{pct(metrics.turnover)}</p>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Funcionários desligados</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
+              <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários</p><p className="mt-1 text-3xl font-bold">{metrics.averageHeadcount.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</p></Card>
+              <Card className="p-6"><Percent className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Índice de Turnover</p><p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p></Card>
             </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="p-5"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Desligamentos no período</p><p className="mt-1 text-2xl font-bold">{metrics.terminations}</p></Card>
-            <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Média de funcionários</p><p className="mt-1 text-2xl font-bold">{metrics.averageHeadcount.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</p></Card>
-            <Card className="p-5"><Percent className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Fórmula</p><p className="mt-1 text-sm font-semibold">Desligamentos ÷ média de funcionários × 100</p></Card>
-          </div>
-        </section>
+            <Card className="mt-4 p-5">
+              <p className="text-sm font-semibold">Cálculo do indicador</p>
+              <p className="mt-2 text-sm text-muted-foreground">Desligamentos no período ÷ média de funcionários no período × 100</p>
+            </Card>
+          </section>
+        )}
       </main>
     </div>
   );
-}
+
