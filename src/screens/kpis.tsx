@@ -2,6 +2,7 @@ import { ArrowLeft, TrendingUp, Users, Clock3, CalendarX2, Percent, Wallet, Brie
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { periodRangeLabel, type Period } from "@/lib/dp-model";
 
 function fmt(n: number) {
   const sign = n < 0 ? "-" : "";
@@ -45,6 +46,8 @@ const emptyMetrics: Metrics = {
 
 export function Kpis() {
   const [m, setM] = useState<Metrics>(emptyMetrics);
+  const [periods, setPeriods] = useState<Period[]>([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState("");
   const [period, setPeriod] = useState("");
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
@@ -52,36 +55,41 @@ export function Kpis() {
   useEffect(() => {
     void (async () => {
       const db = supabase as any;
-
-      const [{ data: latestPeriod, error: periodError }, { data: employees, error: employeesError }] =
-        await Promise.all([
-          db.from("time_periods")
-            .select("id,reference_year,reference_month,start_date,end_date")
-            .order("end_date", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          db.from("employees").select("id").eq("status", "ativo"),
-        ]);
+      const [{ data: periodRows, error: periodError }, { data: employees, error: employeesError }] = await Promise.all([
+        db.from("time_periods")
+          .select("id,reference_year,reference_month,start_date,end_date,status")
+          .order("start_date", { ascending: false }),
+        db.from("employees").select("id").eq("status", "ativo"),
+      ]);
 
       if (periodError || employeesError) {
         setError(periodError?.message ?? employeesError?.message ?? "Não foi possível carregar os KPIs.");
         return;
       }
 
-      if (!latestPeriod) {
-        setPeriod("Nenhuma competência cadastrada");
-        setM({ ...emptyMetrics, employees: employees?.length ?? 0 });
-        return;
-      }
+      const list = (periodRows ?? []) as Period[];
+      setPeriods(list);
+      if (list[0]) setSelectedPeriodId(list[0].id);
+      else setM({ ...emptyMetrics, employees: employees?.length ?? 0 });
+    })();
+  }, []);
 
-      const start = latestPeriod.start_date;
-      const end = latestPeriod.end_date;
-      setPeriod(`${start.split("-").reverse().join("/")} → ${end.split("-").reverse().join("/")}`);
+  useEffect(() => {
+    if (!selectedPeriodId) return;
+    void (async () => {
+      setError("");
+      const db = supabase as any;
+      const selected = periods.find(p => p.id === selectedPeriodId);
+      if (!selected) return;
+
+      const start = selected.start_date;
+      const end = selected.end_date;
+      setPeriod(periodRangeLabel(selected));
 
       const { data: historical, error: historicalError } = await db
         .from("historical_kpi_data")
         .select("employee_id,registration,employee_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-        .eq("period_id", latestPeriod.id);
+        .eq("period_id", selected.id);
 
       if (historicalError) {
         setError(historicalError.message);
@@ -89,10 +97,8 @@ export function Kpis() {
       }
 
       if ((historical ?? []).length > 0) {
-        const rows = historical ?? [];
-        const next = { ...emptyMetrics, employees: rows.length };
-
-        for (const row of rows) {
+        const next = { ...emptyMetrics, employees: historical.length };
+        for (const row of historical) {
           next.expected += Number(row.expected_minutes || 0);
           next.worked += Number(row.worked_minutes || 0);
           next.absences += Number(row.absence_quantity || 0);
@@ -106,7 +112,6 @@ export function Kpis() {
           next.he20 += Number(row.he_20_minutes || 0);
           next.interjornada += Number(row.interjornada_minutes || 0);
         }
-
         next.balance = next.he60 + next.he60Night + next.he100 + next.he20 - next.debit;
         setSource("Histórico consolidado da aba BASE do Power BI");
         setM(next);
@@ -114,11 +119,11 @@ export function Kpis() {
       }
 
       const [overtime, bank, occurrences, certificates, timeRecords] = await Promise.all([
-        db.from("overtime_records").select("minutes,rate_percent,notes").eq("period_id", latestPeriod.id),
-        db.from("bank_hours").select("minutes,kind").eq("period_id", latestPeriod.id),
-        db.from("occurrences").select("quantity,unit").eq("period_id", latestPeriod.id),
+        db.from("overtime_records").select("minutes,rate_percent,notes").eq("period_id", selected.id),
+        db.from("bank_hours").select("minutes,kind").eq("period_id", selected.id),
+        db.from("occurrences").select("quantity,unit").eq("period_id", selected.id),
         db.from("medical_certificates").select("days,start_date,end_date").gte("start_date", start).lte("start_date", end),
-        db.from("time_records").select("expected_minutes,worked_minutes").eq("period_id", latestPeriod.id),
+        db.from("time_records").select("expected_minutes,worked_minutes").eq("period_id", selected.id),
       ]);
 
       const operationalError = [overtime, bank, occurrences, certificates, timeRecords].find((x: any) => x.error);
@@ -128,43 +133,35 @@ export function Kpis() {
       }
 
       const next = { ...emptyMetrics, employees: employees?.length ?? 0 };
-
       for (const row of timeRecords.data ?? []) {
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
       }
-
       for (const row of overtime.data ?? []) {
         const minutes = Number(row.minutes || 0);
         const rate = Number(row.rate_percent || 0);
         const notes = String(row.notes || "").toLowerCase();
         if (rate === 50) next.interjornada += minutes;
-        else if (rate === 100 && notes.includes("noturn")) next.he100 += minutes;
         else if (rate === 100) next.he100 += minutes;
         else if (rate === 20) next.he20 += minutes;
         else if (notes.includes("60% + 20%") || notes.includes("noturn")) next.he60Night += minutes;
         else next.he60 += minutes;
       }
-
       for (const row of bank.data ?? []) {
         if (row.kind === "debito") next.debit += Math.abs(Number(row.minutes || 0));
         if (row.kind === "credito") next.he60 += Number(row.minutes || 0);
       }
-
       for (const row of occurrences.data ?? []) {
         if (String(row.unit).toLowerCase().includes("dia")) next.absences += Number(row.quantity || 0);
       }
-
       for (const row of certificates.data ?? []) {
         next.certificates += Number(row.days || 0) * 60 * 8.8;
       }
-
       next.balance = next.he60 + next.he60Night + next.he100 + next.he20 - next.debit;
       setSource("Lançamentos atuais do DP-Success");
       setM(next);
     })();
-  }, []);
-
+  }, [selectedPeriodId, periods]);
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b px-6 py-4">
@@ -177,7 +174,7 @@ export function Kpis() {
       <main className="mx-auto max-w-[1500px] px-6 py-7">
         <p className="text-sm text-primary">Gestão</p>
         <h1 className="text-3xl font-bold">KPIs de RH e DP</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{period || "Competência atual"}</p>
+        <div className="mt-3 max-w-md"><label className="grid gap-1 text-sm font-medium">Competência<select className="rounded-lg border bg-background px-3 py-2" value={selectedPeriodId} onChange={e => setSelectedPeriodId(e.target.value)}>{periods.map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}</select></label></div><p className="mt-2 text-sm text-muted-foreground">{period || "Competência atual"}</p>
         {source && <p className="mt-1 text-xs text-muted-foreground">{source}</p>}
         {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
