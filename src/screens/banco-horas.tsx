@@ -193,7 +193,7 @@ export function BankHours() {
                     </div>
                   </div>
                 )}
-              {r.adjustment !== 0 && open && adjustments.filter(a => a.period_id === r.period.id).map(a => {
+              {r.adjustment !== 0 && open && adjustments.filter(a => a.period_id === r.period.id || (!a.period_id && (a.entry_date >= r.period.start_date && a.entry_date <= r.period.end_date || (r.period.status === "aberto" && a.entry_date > r.period.end_date)))).map(a => {
                 const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes)) : Math.abs(Number(a.minutes));
                 return (
                   <div key={a.id} className="border-t px-5 py-3 text-sm">
