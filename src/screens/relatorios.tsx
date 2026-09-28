@@ -6,7 +6,7 @@ export function Relatorios(){
  const[competence,setCompetence]=useState<any>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(""),[error,setError]=useState("");
  useEffect(()=>{void(async()=>{const{data,error}=await(supabase).from("competencies").select("id,name,start_date,end_date,status").order("end_date",{ascending:false}).limit(1);if(error)setError(error.message);setCompetence(data?.[0]??null);setLoading(false)})()},[]);
  async function exportReport(kind:string){
-  setBusy(kind);setError("");const db=supabase;let rows:any[]=[];
+  setBusy(kind);setError("");const db=supabase as any;let rows:any[]=[];
   try{
    if(kind==="fechamento"){const{data,error}=await db.from("competencies").select("name,start_date,end_date,status,closed_at").order("start_date",{ascending:false}).limit(24);if(error)throw error;rows=data??[]}
    if(kind==="banco"){const{data,error}=await db.from("competence_employee_balances").select("competence_id,employee_id,opening_minutes,credit_minutes,debit_minutes,closing_minutes,estimated_value");if(error)throw error;rows=data??[]}
