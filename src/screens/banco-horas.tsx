@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, History, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronUp, History, Plus, X, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,9 @@ export function BankHours() {
   const [adjustmentReason, setAdjustmentReason] = useState("Saldo inicial");
   const [adjustmentJustification, setAdjustmentJustification] = useState("");
   const [savingAdjustment, setSavingAdjustment] = useState(false);
+  const [adjustments, setAdjustments] = useState<any[]>([]);
+  const [editingAdjustment, setEditingAdjustment] = useState<any | null>(null);
+  const [confirmAdjustmentDelete, setConfirmAdjustmentDelete] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -30,50 +33,108 @@ export function BankHours() {
     })();
   }, []);
 
-  useEffect(() => {
+  async function loadBankData() {
     if (!employeeId) return;
-    void (async () => {
-      setLoading(true); setError("");
-      try {
-        setRows((await balancesByEmployee(employeeId)).reverse());
-      } catch (e) { setError((e as Error).message); }
-      setLoading(false);
-    })();
-  }, [employeeId]);
+    setLoading(true); setError("");
+    try {
+      const [balanceRows, adjustmentRows] = await Promise.all([
+        balancesByEmployee(employeeId),
+        supabase.from("bank_hours").select("id,entry_date,minutes,adjustment_direction,justification,period_id").eq("employee_id", employeeId).eq("kind", "ajuste").order("entry_date", { ascending: false }),
+      ]);
+      if (adjustmentRows.error) throw new Error(adjustmentRows.error.message);
+      setRows(balanceRows.reverse());
+      setAdjustments(adjustmentRows.data ?? []);
+    } catch (e) { setError((e as Error).message); }
+    setLoading(false);
+  }
+
+  useEffect(() => { void loadBankData(); }, [employeeId]);
 
   const accumulated = rows[0]?.accumulated ?? 0;
   const cls = (n: number) => n < 0 ? "text-destructive" : "text-primary";
 
+  function openAdjustmentNew() {
+    setEditingAdjustment(null);
+    setAdjustmentDirection("credito");
+    setAdjustmentDate(new Date().toISOString().slice(0, 10));
+    setAdjustmentHours("");
+    setAdjustmentReason("Saldo inicial");
+    setAdjustmentJustification("");
+    setAdjustmentOpen(true);
+  }
+
+  function openAdjustmentEdit(a: any) {
+    setEditingAdjustment(a);
+    setAdjustmentDirection(a.adjustment_direction === "debito" ? "debito" : "credito");
+    setAdjustmentDate(a.entry_date ?? new Date().toISOString().slice(0, 10));
+    setAdjustmentHours(minutesToHours(Math.abs(Number(a.minutes || 0))));
+    const full = String(a.justification ?? "");
+    const parts = full.split(": ");
+    setAdjustmentReason(parts.shift() || "Correção de saldo");
+    setAdjustmentJustification(parts.join(": "));
+    setAdjustmentOpen(true);
+  }
+
+  function parseSignedHours(value: string) {
+    const match = value.trim().match(/^([+-])?(\d+):(\d{2})$/);
+    if (!match) return null;
+    const sign = match[1] === "-" ? -1 : 1;
+    const hours = Number(match[2]);
+    const minutes = Number(match[3]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes >= 60) return null;
+    return sign * (hours * 60 + minutes);
+  }
+
   async function saveAdjustment() {
     if (!employeeId || !adjustmentHours) return;
-    const parts = adjustmentHours.split(":");
-    const parsedMinutes = Number(parts[0] || 0) * 60 + Number(parts[1] || 0);
-    if (!Number.isFinite(parsedMinutes) || parsedMinutes <= 0) {
-      setError("Informe um tempo válido no formato HH:MM.");
+    const parsed = parseSignedHours(adjustmentHours);
+    if (parsed === null || parsed === 0) {
+      setError("Informe um tempo válido no formato HH:MM, podendo usar -HH:MM.");
       return;
     }
     if (!adjustmentJustification.trim()) {
       setError("Informe o motivo do ajuste.");
       return;
     }
+    const direction = parsed < 0 ? "debito" : adjustmentDirection;
+    const minutes = Math.abs(parsed);
     setSavingAdjustment(true);
     setError("");
     try {
       const period = rows.find(r => adjustmentDate >= r.period.start_date && adjustmentDate <= r.period.end_date)?.period;
-      const { error: insertError } = await supabase.from("bank_hours").insert({
+      const payload = {
         employee_id: employeeId,
         period_id: period?.id ?? null,
         entry_date: adjustmentDate,
         kind: "ajuste",
-        minutes: parsedMinutes,
-        adjustment_direction: adjustmentDirection,
+        minutes,
+        adjustment_direction: direction,
         justification: adjustmentReason + ": " + adjustmentJustification.trim(),
-      } as any);
-      if (insertError) throw new Error(insertError.message);
+      };
+      const result = editingAdjustment
+        ? await supabase.from("bank_hours").update(payload).eq("id", editingAdjustment.id)
+        : await supabase.from("bank_hours").insert(payload);
+      if (result.error) throw new Error(result.error.message);
       setAdjustmentOpen(false);
+      setEditingAdjustment(null);
       setAdjustmentHours("");
       setAdjustmentJustification("");
-      setRows((await balancesByEmployee(employeeId)).reverse());
+      await loadBankData();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingAdjustment(false);
+    }
+  }
+
+  async function deleteAdjustment(id: string) {
+    setSavingAdjustment(true);
+    setError("");
+    try {
+      const result = await supabase.from("bank_hours").delete().eq("id", id);
+      if (result.error) throw new Error(result.error.message);
+      setConfirmAdjustmentDelete(null);
+      await loadBankData();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -91,7 +152,7 @@ export function BankHours() {
           </select>
         </label>
         <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado atual</p><p className={`text-2xl font-bold ${cls(accumulated)}`}>{minutesToHours(accumulated, true)}</p></div>
-        <button type="button" onClick={() => setAdjustmentOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Lançar crédito / débito</button>
+        <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Lançar crédito / débito</button>
       </Card>
 
       <div className="mt-6 space-y-3">
@@ -126,6 +187,33 @@ export function BankHours() {
                     </div>
                   </div>
                 )}
+              {r.adjustment !== 0 && open && adjustments.filter(a => a.period_id === r.period.id).map(a => {
+                const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes)) : Math.abs(Number(a.minutes));
+                return (
+                  <div key={a.id} className="border-t px-5 py-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <span className="font-medium">Ajuste</span>
+                        <span className={`ml-2 font-semibold ${cls(value)}`}>{minutesToHours(value, true)}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{a.justification ?? ""}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        {confirmAdjustmentDelete === a.id ? (
+                          <>
+                            <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingAdjustment} onClick={() => void deleteAdjustment(a.id)}>Confirmar exclusão</button>
+                            <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setConfirmAdjustmentDelete(null)}>Cancelar</button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className="rounded-md border px-2 py-1 text-xs inline-flex items-center gap-1" onClick={() => openAdjustmentEdit(a)}><Pencil className="h-3 w-3" /> Editar</button>
+                            <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive inline-flex items-center gap-1" onClick={() => setConfirmAdjustmentDelete(a.id)}><Trash2 className="h-3 w-3" /> Excluir</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
               </Card>
             );
           })}
