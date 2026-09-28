@@ -30,7 +30,7 @@ export type ManualAdjustment = {
   id: string;
   entry_date: string;
   minutes: number;
-  direction: "credito" | "debito";
+  adjustment_direction: "credito" | "debito";
   justification: string | null;
   period_id: string | null;
 };
@@ -190,7 +190,7 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   const ordered = [...periods].sort((a, b) => a.start_date.localeCompare(b.start_date));
   let accumulated = adjustments
     .filter(a => a.entry_date < (ordered[0]?.start_date ?? "9999-12-31"))
-    .reduce((sum, a) => sum + (a.direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
+    .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
 
   return ordered.map(period => {
     const historicalComp = historicalByPeriod.get(period.id);
