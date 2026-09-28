@@ -106,9 +106,29 @@ export function ImportacaoHistorico() {
       for (const employee of employees ?? []) {
         const registration = String(employee.registration ?? "").trim();
         const name = String(employee.full_name ?? "").trim().toLowerCase();
-        if (registration) employeeByRegistration.set(registration, employee);
+        if (registration && name) employeeByRegistration.set(registration + "|" + name, employee);
         if (name) employeeByName.set(name, employee);
       }
+
+      const { data: departments, error: departmentsError } = await db
+        .from("departments")
+        .select("id,name");
+      if (departmentsError) throw new Error(departmentsError.message);
+
+      const { data: positions, error: positionsError } = await db
+        .from("positions")
+        .select("id,name,department_id");
+      if (positionsError) throw new Error(positionsError.message);
+
+      const departmentByName = new Map<string, any>(
+        (departments ?? []).map((item: any) => [String(item.name ?? "").trim().toLowerCase(), item]),
+      );
+      const positionByKey = new Map<string, any>(
+        (positions ?? []).map((item: any) => [
+          String(item.name ?? "").trim().toLowerCase() + "|" + String(item.department_id ?? ""),
+          item,
+        ]),
+      );
 
       const { data: batch, error: batchError } = await db
         .from("historical_import_batches")
@@ -166,8 +186,54 @@ export function ImportacaoHistorico() {
           periodIds.set(periodKey, periodId);
         }
 
-        let employee = registration ? employeeByRegistration.get(registration) : undefined;
-        if (!employee) employee = employeeByName.get(employeeName.toLowerCase());
+        let departmentId: string | null = null;
+        const departmentName = String(row["Setor"] ?? "").trim();
+        if (departmentName) {
+          const departmentKey = departmentName.toLowerCase();
+          let department = departmentByName.get(departmentKey);
+          if (!department) {
+            const { data: createdDepartment, error: departmentCreateError } = await db
+              .from("departments")
+              .insert({
+                name: departmentName,
+                active: true,
+                is_demo: false,
+              })
+              .select("id,name")
+              .single();
+            if (departmentCreateError) throw new Error(`Não foi possível criar o setor ${departmentName}: ${departmentCreateError.message}`);
+            department = createdDepartment;
+            departmentByName.set(departmentKey, department);
+          }
+          departmentId = department.id;
+        }
+
+        let positionId: string | null = null;
+        const positionName = String(row["Cargo"] ?? "").trim();
+        if (positionName) {
+          const positionKey = positionName.toLowerCase() + "|" + String(departmentId ?? "");
+          let position = positionByKey.get(positionKey);
+          if (!position) {
+            const { data: createdPosition, error: positionCreateError } = await db
+              .from("positions")
+              .insert({
+                name: positionName,
+                department_id: departmentId,
+                active: true,
+                is_demo: false,
+              })
+              .select("id,name,department_id")
+              .single();
+            if (positionCreateError) throw new Error(`Não foi possível criar o cargo ${positionName}: ${positionCreateError.message}`);
+            position = createdPosition;
+            positionByKey.set(positionKey, position);
+          }
+          positionId = position.id;
+        }
+
+        const employeeNameKey = employeeName.toLowerCase();
+        let employee = employeeByRegistration.get((registration || "") + "|" + employeeNameKey);
+        if (!employee) employee = employeeByName.get(employeeNameKey);
 
         if (!employee) {
           const { data: createdEmployee, error: employeeCreateError } = await db
@@ -175,6 +241,8 @@ export function ImportacaoHistorico() {
             .insert({
               registration: registration || null,
               full_name: employeeName,
+              department_id: departmentId,
+              position_id: positionId,
               status: "inativo",
               notes: "Cadastro criado automaticamente a partir do histórico da BASE do Power BI. Dados cadastrais atuais devem ser completados pelo RH.",
             })
@@ -183,8 +251,17 @@ export function ImportacaoHistorico() {
           if (employeeCreateError) throw new Error(`Não foi possível criar o cadastro de ${employeeName}: ${employeeCreateError.message}`);
           employee = createdEmployee;
           createdEmployees += 1;
-          if (registration) employeeByRegistration.set(registration, employee);
-          employeeByName.set(employeeName.toLowerCase(), employee);
+          employeeByRegistration.set((registration || "") + "|" + employeeNameKey, employee);
+          employeeByName.set(employeeNameKey, employee);
+        } else if (departmentId || positionId) {
+          const { error: employeeUpdateError } = await db
+            .from("employees")
+            .update({
+              department_id: departmentId,
+              position_id: positionId,
+            })
+            .eq("id", employee.id);
+          if (employeeUpdateError) throw new Error(`Não foi possível completar o cadastro de ${employeeName}: ${employeeUpdateError.message}`);
         }
 
         output.push({
@@ -288,7 +365,7 @@ export function ImportacaoHistorico() {
 
           {error && <div className="mt-4 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
           {message && <div className="mt-4 flex gap-2 rounded-lg border p-3 text-sm"><CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />{message}</div>}
-          {result && <div className="mt-4 rounded-lg border p-4 text-sm"><b>{result.imported}</b> registros importados/atualizados. <span className="text-muted-foreground">{result.createdEmployees} cadastro(s) de funcionário criado(s) automaticamente. Os cadastros históricos ficam inativos até o RH completar e ativar quando necessário.</span></div>}
+          {result && <div className="mt-4 rounded-lg border p-4 text-sm"><b>{result.imported}</b> registros importados/atualizados. <span className="text-muted-foreground">{result.createdEmployees} cadastro(s) de funcionário criado(s)/completado(s) automaticamente. Setores e cargos da BASE também foram vinculados aos cadastros.</span></div>}
         </Card>
       </main>
     </div>
