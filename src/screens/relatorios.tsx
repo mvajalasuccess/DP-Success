@@ -1,6 +1,6 @@
 import { Link}from"@tanstack/react-router";import{ArrowLeft,Download,FileBarChart}from"lucide-react";import{Card}from"@/components/ui/card";import{useEffect,useState}from"react";import{supabase}from"@/integrations/supabase/client";
 const reports=[["fechamento","Fechamento de ponto"],["banco","Banco de horas"],["extras","Horas extras por funcionário"],["absenteismo","Absenteísmo por departamento"],["atestados","Atestados e afastamentos"],["ocorrencias","Faltas e ocorrências"]] as const;
-export function csv(rows:any[]){if(!rows.length)return "";const keys=Object.keys(rows[0]);const esc=(v:any)=>'"'+String(v??"").replaceAll('"','""')+'"';return [keys.join(";"),...rows.map(r=>keys.map(k=>esc(r[k])).join(";"))].join("\n")}
+export function csv(rows:any[]){if(!rows.length)return "";const keys=Object.keys(rows[0]);const esc=(v:any)=>{let s=String(v??"");if(/^[=+\-@]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'};return [keys.join(";"),...rows.map(r=>keys.map(k=>esc(r[k])).join(";"))].join("\n")}
 function download(name:string,rows:any[]){const blob=new Blob(["\ufeff"+csv(rows)],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
 export function Relatorios(){
  const[competence,setCompetence]=useState<any>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(""),[error,setError]=useState("");
