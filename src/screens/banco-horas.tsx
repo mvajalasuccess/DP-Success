@@ -8,7 +8,8 @@ import { CREDIT_TYPES, balancesByEmployee, periodRangeLabel, minutesToHours, for
 const BALANCE_ITEMS: CreditType[] = ["HE_60", "HE_60_NOTURNO", "HE_100", "HE_100_NOTURNO", "ADICIONAL_NOTURNO"];
 
 export function BankHours() {
-  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string; status?: string }>>([]);\n  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
+  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string; status?: string }>>([]);
+  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [employeeId, setEmployeeId] = useState("");
   const [rows, setRows] = useState<PeriodBalance[]>([]);
   const [expanded, setExpanded] = useState("");
@@ -51,7 +52,8 @@ export function BankHours() {
 
   useEffect(() => { void loadBankData(); }, [employeeId]);
 
-  const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));\n  const accumulated = rows[0]?.accumulated ?? 0;
+  const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));
+  const accumulated = rows[0]?.accumulated ?? 0;
   const firstPeriod = rows[rows.length - 1]?.period;
   const cls = (n: number) => n < 0 ? "text-destructive" : "text-primary";
 
