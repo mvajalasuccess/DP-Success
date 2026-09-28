@@ -101,7 +101,7 @@ export function PointClosing() {
       reference_month: end.getMonth() + 1,
       start_date: startDate,
       end_date: endDate,
-      status: "aberto",
+      status: "aberto" as const,
     };
 
     const { error } = await supabase.from("time_periods").insert(payload);

@@ -197,12 +197,12 @@ export function Employees() {
         {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {[
+          {([
             ["Funcionários ativos", String(employees.filter((e) => e.status === "ativo").length), UserRound],
             ["Funcionários cadastrados", String(employees.length), BriefcaseBusiness],
             ["Cadastros ativos", String(employees.filter((e) => e.status === "ativo").length), WalletCards],
-          ].map(([label, value, Icon]) => (
-            <Card key={label as string} className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold">{value}</p></div></div></Card>
+          ] as [string, string, typeof UserRound][]).map(([label, value, Icon]) => (
+            <Card key={label} className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><div><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-bold">{value}</p></div></div></Card>
           ))}
         </div>
 

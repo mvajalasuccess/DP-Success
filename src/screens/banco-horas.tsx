@@ -84,7 +84,7 @@ export function BankHours() {
     if (bankRes.error) { setError(bankRes.error.message); setLoading(false); return; }
 
     const debits = new Map<string, number>();
-    for (const r of timeRes.data ?? []) debits.set(r.period_id, (debits.get(r.period_id) ?? 0) + Number(r.negative_minutes || 0));
+    for (const r of timeRes.data ?? []) { if (!r.period_id) continue; debits.set(r.period_id, (debits.get(r.period_id) ?? 0) + Number(r.negative_minutes || 0)); }
 
     const credits = new Map<string, ReturnType<typeof emptyCredit>>();
     for (const r of overtimeRes.data ?? []) {
