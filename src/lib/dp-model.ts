@@ -174,7 +174,7 @@ function historicalComposition(row: HistoricalBalanceRow): Composition {
 }
 
 export async function balancesByEmployee(employeeId: string): Promise<PeriodBalance[]> {
-  const [periods, launches, historical, adjustmentsResult, employeeResult] = await Promise.all([
+  const [periods, launches, historical, adjustmentsResult, paymentsResult, employeeResult] = await Promise.all([
     fetchPeriods(),
     fetchLaunches({ employeeId }),
     fetchHistoricalBalances(employeeId),
@@ -184,9 +184,16 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
       .eq("employee_id", employeeId)
       .eq("kind", "ajuste")
       .order("entry_date", { ascending: true }),
+    supabase
+      .from("bank_hours")
+      .select("id,entry_date,minutes,period_id,justification")
+      .eq("employee_id", employeeId)
+      .eq("kind", "pagamento_he")
+      .order("entry_date", { ascending: true }),
     supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle(),
   ]);
   const adjustments = check(adjustmentsResult) as ManualAdjustment[];
+  const payments = check(paymentsResult) as Array<{ id: string; entry_date: string; minutes: number; period_id: string | null; justification: string | null }>;
   const employeeName = String(employeeResult.data?.full_name ?? "").trim().toUpperCase();
   const isDyan = employeeName === "DYAN" || employeeName.startsWith("DYAN ");
   const isRichard = employeeName.includes("RICHARD");
@@ -242,7 +249,12 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
         .filter(a => !a.period_id && a.entry_date < firstPeriod.start_date)
         .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0)
     : 0;
-  let accumulated = openingBalance;
+  const openingPayments = firstPeriod
+    ? payments
+        .filter(p => p.entry_date < firstPeriod.start_date)
+        .reduce((sum, p) => sum + Math.abs(Number(p.minutes) || 0), 0)
+    : 0;
+  let accumulated = openingBalance - openingPayments;
 
   return ordered.map((period) => {
     const historicalComp = historicalByPeriod.get(period.id);
@@ -262,6 +274,10 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
       })
       .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
 
+    const paymentMinutes = payments
+      .filter(p => p.period_id === period.id || (!p.period_id && inRange(p.entry_date, period)))
+      .reduce((sum, p) => sum + Math.abs(Number(p.minutes) || 0), 0);
+
     const calculatedBalance = balanceOf(comp) + adjustment;
     const monthBalance = isRichard && Object.prototype.hasOwnProperty.call(richardManualBalances, period.end_date)
       ? richardManualBalances[period.end_date]
@@ -278,12 +294,12 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
             : isOrmindo && Object.prototype.hasOwnProperty.call(ormindoManualBalances, period.end_date)
               ? ormindoManualBalances[period.end_date]
               : calculatedBalance;
-    accumulated += monthBalance;
-    return { period, composition: comp, monthBalance, accumulated, adjustment };
+    accumulated += monthBalance - paymentMinutes;
+    return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes };
   });
 }
 
-export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number; adjustment: number };
+export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number; adjustment: number; paymentMinutes: number };
 
 /** Saldo por competência (ordem cronológica), com acumulado. Cada lançamento cai em uma única competência pelo intervalo de datas. */
 export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits: DebitRow[]): PeriodBalance[] {
