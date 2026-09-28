@@ -193,6 +193,12 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   const richardManualBalances: Record<string, number> = {
     "2026-01-20": 16 * 60 + 23,
   };
+  const isYves = employeeName.includes("YVES");
+  const yvesManualBalances: Record<string, number> = {
+    "2026-02-20": -(3 * 60 + 3),
+    "2026-03-20": 40 * 60,
+    "2026-04-20": 10 * 60 + 9,
+  };
   const dyanManualBalances: Record<string, number> = {
     "2026-01-20": 17 * 60 + 31,
     "2026-02-20": 12 * 60 + 28,
@@ -259,7 +265,9 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
     const calculatedBalance = balanceOf(comp) + adjustment;
     const monthBalance = isRichard && Object.prototype.hasOwnProperty.call(richardManualBalances, period.end_date)
       ? richardManualBalances[period.end_date]
-      : isDyan && Object.prototype.hasOwnProperty.call(dyanManualBalances, period.end_date)
+      : isYves && Object.prototype.hasOwnProperty.call(yvesManualBalances, period.end_date)
+        ? yvesManualBalances[period.end_date]
+        : isDyan && Object.prototype.hasOwnProperty.call(dyanManualBalances, period.end_date)
         ? dyanManualBalances[period.end_date]
         : isJoseLuciano && Object.prototype.hasOwnProperty.call(joseLucianoManualBalances, period.end_date)
         ? joseLucianoManualBalances[period.end_date]
