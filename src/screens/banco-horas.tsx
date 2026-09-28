@@ -25,6 +25,12 @@ export function BankHours() {
   const [adjustments, setAdjustments] = useState<any[]>([]);
   const [editingAdjustment, setEditingAdjustment] = useState<any | null>(null);
   const [confirmAdjustmentDelete, setConfirmAdjustmentDelete] = useState<string | null>(null);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentHours, setPaymentHours] = useState("");
+  const [paymentJustification, setPaymentJustification] = useState("");
+  const [savingPayment, setSavingPayment] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -38,14 +44,17 @@ export function BankHours() {
     if (!employeeId) return;
     setLoading(true); setError("");
     try {
-      const [balanceRows, adjustmentRows] = await Promise.all([
+      const [balanceRows, adjustmentRows, paymentRows] = await Promise.all([
         balancesByEmployee(employeeId),
         supabase.from("bank_hours").select("id,entry_date,minutes,adjustment_direction,justification,period_id").eq("employee_id", employeeId).eq("kind", "ajuste").order("entry_date", { ascending: false }),
+        supabase.from("bank_hours").select("id,entry_date,minutes,justification,period_id").eq("employee_id", employeeId).eq("kind", "pagamento_he").order("entry_date", { ascending: false }),
       ]);
       if (adjustmentRows.error) throw new Error(adjustmentRows.error.message);
+      if (paymentRows.error) throw new Error(paymentRows.error.message);
       const orderedRows = [...balanceRows].reverse();
       setRows(orderedRows);
       setAdjustments(adjustmentRows.data ?? []);
+      setPayments(paymentRows.data ?? []);
     } catch (e) { setError((e as Error).message); }
     setLoading(false);
   }
@@ -66,6 +75,51 @@ export function BankHours() {
     setAdjustmentReason("Saldo inicial");
     setAdjustmentJustification("");
     setAdjustmentOpen(true);
+  }
+
+  function openPaymentNew() {
+    const targetPeriod = rows.find(r => r.period.status === "aberto") ?? rows[0];
+    setPaymentDate(targetPeriod?.period.end_date ?? new Date().toISOString().slice(0, 10));
+    setPaymentHours("");
+    setPaymentJustification("");
+    setError("");
+    setPaymentOpen(true);
+  }
+
+  async function savePayment() {
+    if (!employeeId || !paymentHours) return;
+    const parsed = parseSignedHours(paymentHours);
+    if (parsed === null || parsed <= 0) {
+      setError("Informe as horas pagas no formato HH:MM, sem sinal negativo.");
+      return;
+    }
+    setSavingPayment(true);
+    setError("");
+    try {
+      const target = rows.find(r => paymentDate >= r.period.start_date && paymentDate <= r.period.end_date)?.period;
+      if (!target) {
+        setError("A data do pagamento precisa estar dentro de uma competência existente.");
+        return;
+      }
+      const result = await supabase.from("bank_hours").insert({
+        employee_id: employeeId,
+        entry_date: paymentDate,
+        period_id: target.id,
+        kind: "pagamento_he",
+        minutes: Math.abs(parsed),
+        adjustment_direction: "debito",
+        justification: paymentJustification.trim() || "Pagamento de horas extras",
+      });
+      if (result.error) throw new Error(result.error.message);
+      setPaymentOpen(false);
+      setPaymentHours("");
+      setPaymentJustification("");
+      await loadBankData();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingPayment(false);
+    }
   }
 
   function openAdjustmentEdit(a: any) {
@@ -208,7 +262,10 @@ export function BankHours() {
           </select>
         </label>
         <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado atual</p><p className={`text-2xl font-bold ${cls(accumulated)}`}>{minutesToHours(accumulated, true)}</p></div>
-        <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Lançar crédito / débito</button>
+        <div className="flex gap-2">
+          <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Ajuste</button>
+          <button type="button" onClick={openPaymentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Registrar pagamento de HE</button>
+        </div>
       </Card>
 
       <div className="mt-6 space-y-3">
@@ -227,7 +284,7 @@ export function BankHours() {
                     <div className="text-right"><p className="text-xs text-muted-foreground">Saldo do mês</p><p className={`text-xl font-bold ${cls(r.monthBalance)}`}>{minutesToHours(r.monthBalance, true)}</p></div>
                     <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado</p><p className={`font-semibold ${cls(r.accumulated)}`}>{minutesToHours(r.accumulated, true)}</p></div>
                     <div className="text-right"><p className="text-xs text-muted-foreground">Débito / atrasos</p><p className="font-semibold text-destructive">{minutesToHours(-r.composition.debit)}</p></div>
-                    {r.adjustment !== 0 && <div className="text-right"><p className="text-xs text-muted-foreground">Ajuste</p><p className={`font-semibold ${cls(r.adjustment)}`}>{minutesToHours(r.adjustment, true)}</p></div>}
+
                     {open ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                   </div>
                 </button>
@@ -243,37 +300,25 @@ export function BankHours() {
                     </div>
                   </div>
                 )}
-              {r.adjustment !== 0 && open && adjustments.filter(a => a.period_id === r.period.id || (!a.period_id && (a.entry_date >= r.period.start_date && a.entry_date <= r.period.end_date || false))).map(a => {
-                const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes)) : Math.abs(Number(a.minutes));
-                return (
-                  <div key={a.id} className="border-t px-5 py-3 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <span className="font-medium">Ajuste</span>
-                        <span className={`ml-2 font-semibold ${cls(value)}`}>{minutesToHours(value, true)}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">{a.justification ?? ""}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        {confirmAdjustmentDelete === a.id ? (
-                          <>
-                            <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingAdjustment} onClick={() => void deleteAdjustment(a.id)}>Confirmar exclusão</button>
-                            <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setConfirmAdjustmentDelete(null)}>Cancelar</button>
-                          </>
-                        ) : (
-                          <>
-                            <button type="button" className="rounded-md border px-2 py-1 text-xs inline-flex items-center gap-1" onClick={() => openAdjustmentEdit(a)}><Pencil className="h-3 w-3" /> Editar</button>
-                            <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive inline-flex items-center gap-1" onClick={() => setConfirmAdjustmentDelete(a.id)}><Trash2 className="h-3 w-3" /> Excluir</button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
               </Card>
             );
           })}
       </div>
+
+      {paymentOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-lg p-6 shadow-xl">
+            <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">Registrar pagamento de HE</h2><p className="mt-1 text-sm text-muted-foreground">O pagamento não altera o saldo da competência original; apenas reduz o saldo disponível acumulado.</p></div><button type="button" onClick={() => setPaymentOpen(false)}><X className="h-5 w-5" /></button></div>
+            <div className="mt-5 grid gap-4">
+              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">{employees.find(e => e.id === employeeId)?.full_name ?? "—"}</div>
+              <label className="grid gap-1.5 text-sm font-medium">Data do pagamento<input type="date" className={inputCls} value={paymentDate} onChange={e => setPaymentDate(e.target.value)} /></label>
+              <label className="grid gap-1.5 text-sm font-medium">Horas pagas<input type="text" inputMode="numeric" placeholder="Ex.: 20:00" className={inputCls} value={paymentHours} onChange={e => setPaymentHours(e.target.value)} /></label>
+              <label className="grid gap-1.5 text-sm font-medium">Observação<textarea className={inputCls} rows={3} placeholder="Ex.: pagamento das horas extras da competência de julho." value={paymentJustification} onChange={e => setPaymentJustification(e.target.value)} /></label>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setPaymentOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={savingPayment} onClick={() => void savePayment()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{savingPayment ? "Salvando..." : "Registrar pagamento"}</button></div>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {adjustmentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
