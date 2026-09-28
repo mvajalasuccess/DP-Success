@@ -40,7 +40,7 @@ function addDays(date: Date, days: number) {
 
 /**
  * Retorna o nome do feriado nacional para a data informada.
- * Inclui feriados nacionais fixos e Sexta-feira Santa.
+ * Inclui feriados nacionais, estaduais de São Paulo e municipais da cidade de São Paulo.
  */
 export function brazilNationalHoliday(date: string): string | null {
   const [yearText] = date.slice(0, 10).split("-");
@@ -49,8 +49,11 @@ export function brazilNationalHoliday(date: string): string | null {
 
   const fixed: Record<string, string> = {
     `${year}-01-01`: "Confraternização Universal",
+    `${year}-01-25`: "Aniversário da Cidade de São Paulo",
     `${year}-04-21`: "Tiradentes",
     `${year}-05-01`: "Dia Mundial do Trabalho",
+    `${year}-06-04`: "Corpus Christi",
+    `${year}-07-09`: "Data Magna do Estado de São Paulo",
     `${year}-09-07`: "Independência do Brasil",
     `${year}-10-12`: "Nossa Senhora Aparecida",
     `${year}-11-02`: "Finados",
