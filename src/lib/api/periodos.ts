@@ -29,6 +29,8 @@ export const periodQuery = (year: number, month: number) =>
         .select("*")
         .eq("reference_year", year)
         .eq("reference_month", month)
+        .order("end_date", { ascending: false })
+        .limit(1)
         .maybeSingle();
       if (error) throw new Error(error.message);
       return data;
@@ -46,8 +48,16 @@ export async function ensurePeriod(year: number, month: number): Promise<TimePer
   if (existing.error) throw new Error(existing.error.message);
   if (existing.data) return existing.data;
 
-  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
-  const endDate = new Date(year, month, 0).toISOString().slice(0, 10);
+  const end = new Date(year, month - 1, 20);
+  const start = new Date(year, month - 2, 21);
+  const toDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const startDate = toDate(start);
+  const endDate = toDate(end);
   return unwrap(
     await supabase
       .from("time_periods")
