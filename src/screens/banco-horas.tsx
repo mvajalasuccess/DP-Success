@@ -171,7 +171,14 @@ export function BankHours() {
                   return <div key={a.id} className="flex items-center gap-2 text-sm">
                     <span>{formatDateBR(a.entry_date)} · {minutesToHours(value, true)}</span>
                     <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => openAdjustmentEdit(a)}><Pencil className="inline h-3 w-3" /> Editar</button>
-                    <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" onClick={() => setConfirmAdjustmentDelete(a.id)}>Excluir</button>
+                    {confirmAdjustmentDelete === a.id ? (
+                      <>
+                        <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingAdjustment} onClick={() => void deleteAdjustment(a.id)}>Confirmar exclusão</button>
+                        <button type="button" className="rounded-md border px-2 py-1 text-xs" disabled={savingAdjustment} onClick={() => setConfirmAdjustmentDelete(null)}>Cancelar</button>
+                      </>
+                    ) : (
+                      <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" onClick={() => setConfirmAdjustmentDelete(a.id)}>Excluir</button>
+                    )}
                   </div>;
                 })}
               </div>
