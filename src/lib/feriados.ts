@@ -1,9 +1,6 @@
 /**
- * Feriados nacionais do Brasil usados no cálculo das horas previstas.
- *
- * A função recebe uma data ISO (YYYY-MM-DD) e retorna o feriado nacional,
- * quando existir. Feriados estaduais/municipais e dias facultativos não são
- * descontados automaticamente porque dependem da localidade da empresa.
+ * Feriados considerados no cálculo das horas previstas para a operação em São Paulo.
+ * Inclui feriados nacionais, estadual de São Paulo e municipais da cidade de São Paulo.
  */
 
 function easterSunday(year: number): Date {
@@ -52,7 +49,6 @@ export function brazilNationalHoliday(date: string): string | null {
     `${year}-01-25`: "Aniversário da Cidade de São Paulo",
     `${year}-04-21`: "Tiradentes",
     `${year}-05-01`: "Dia Mundial do Trabalho",
-    `${year}-06-04`: "Corpus Christi",
     `${year}-07-09`: "Data Magna do Estado de São Paulo",
     `${year}-09-07`: "Independência do Brasil",
     `${year}-10-12`: "Nossa Senhora Aparecida",
@@ -62,10 +58,15 @@ export function brazilNationalHoliday(date: string): string | null {
     `${year}-12-25`: "Natal",
   };
 
-  if (fixed[date.slice(0, 10)]) return fixed[date.slice(0, 10)];
+  const dateKey = date.slice(0, 10);
+  if (fixed[dateKey]) return fixed[dateKey];
 
-  const goodFriday = iso(addDays(easterSunday(year), -2));
-  if (date.slice(0, 10) === goodFriday) return "Paixão de Cristo";
+  const easter = easterSunday(year);
+  const goodFriday = iso(addDays(easter, -2));
+  if (dateKey === goodFriday) return "Paixão de Cristo";
+
+  const corpusChristi = iso(addDays(easter, 60));
+  if (dateKey === corpusChristi) return "Corpus Christi";
 
   return null;
 }
