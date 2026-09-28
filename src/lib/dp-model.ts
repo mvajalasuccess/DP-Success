@@ -196,7 +196,7 @@ export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits
     const comp = composeMinutes(credits.filter(r => inRange(r.reference_date, p)), debits.filter(r => inRange(r.entry_date, p)));
     const monthBalance = balanceOf(comp);
     acc += monthBalance;
-    return { period: p, composition: comp, monthBalance, accumulated: acc };
+    return { period: p, composition: comp, monthBalance, accumulated: acc, adjustment: 0 };
   });
 }
 
