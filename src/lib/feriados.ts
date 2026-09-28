@@ -45,17 +45,17 @@ export function brazilNationalHoliday(date: string): string | null {
   if (!Number.isFinite(year)) return null;
 
   const fixed: Record<string, string> = {
-    `${year}-01-01`: "Confraternização Universal",
-    `${year}-01-25`: "Aniversário da Cidade de São Paulo",
-    `${year}-04-21`: "Tiradentes",
-    `${year}-05-01`: "Dia Mundial do Trabalho",
-    `${year}-07-09`: "Data Magna do Estado de São Paulo",
-    `${year}-09-07`: "Independência do Brasil",
-    `${year}-10-12`: "Nossa Senhora Aparecida",
-    `${year}-11-02`: "Finados",
-    `${year}-11-15`: "Proclamação da República",
-    `${year}-11-20`: "Dia Nacional de Zumbi e da Consciência Negra",
-    `${year}-12-25`: "Natal",
+    [`${year}-01-01`]: "Confraternização Universal",
+    [`${year}-01-25`]: "Aniversário da Cidade de São Paulo",
+    [`${year}-04-21`]: "Tiradentes",
+    [`${year}-05-01`]: "Dia Mundial do Trabalho",
+    [`${year}-07-09`]: "Data Magna do Estado de São Paulo",
+    [`${year}-09-07`]: "Independência do Brasil",
+    [`${year}-10-12`]: "Nossa Senhora Aparecida",
+    [`${year}-11-02`]: "Finados",
+    [`${year}-11-15`]: "Proclamação da República",
+    [`${year}-11-20`]: "Dia Nacional de Zumbi e da Consciência Negra",
+    [`${year}-12-25`]: "Natal",
   };
 
   const dateKey = date.slice(0, 10);
