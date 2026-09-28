@@ -243,7 +243,7 @@ export function ImportacaoHistorico() {
               full_name: employeeName,
               department_id: departmentId,
               position_id: positionId,
-              status: "inativo",
+              status: "ativo",
               notes: "Cadastro criado automaticamente a partir do histórico da BASE do Power BI. Dados cadastrais atuais devem ser completados pelo RH.",
             })
             .select("id,registration,full_name")
@@ -254,12 +254,22 @@ export function ImportacaoHistorico() {
           employeeByRegistration.set((registration || "") + "|" + employeeNameKey, employee);
           employeeByName.set(employeeNameKey, employee);
         } else if (departmentId || positionId) {
+          const updatePayload: Record<string, unknown> = {
+            department_id: departmentId,
+            position_id: positionId,
+          };
+
+          // Cadastros criados automaticamente pela importação anterior
+          // devem permanecer ativos até que o RH informe manualmente
+          // a situação real e, se necessário, a data de desligamento.
+          if (String(employee.notes ?? "").includes("Cadastro criado automaticamente a partir do histórico da BASE")) {
+            updatePayload.status = "ativo";
+            updatePayload.termination_date = null;
+          }
+
           const { error: employeeUpdateError } = await db
             .from("employees")
-            .update({
-              department_id: departmentId,
-              position_id: positionId,
-            })
+            .update(updatePayload)
             .eq("id", employee.id);
           if (employeeUpdateError) throw new Error(`Não foi possível completar o cadastro de ${employeeName}: ${employeeUpdateError.message}`);
         }
@@ -303,7 +313,7 @@ export function ImportacaoHistorico() {
       if (batchUpdateError) throw new Error(batchUpdateError.message);
 
       setResult({ imported: output.length, unmatched, createdEmployees });
-      setMessage(`Histórico importado com sucesso. ${createdEmployees} cadastro(s) de funcionário foram criados automaticamente como inativos para preservar o histórico.`);
+      setMessage(`Histórico importado com sucesso. ${createdEmployees} cadastro(s) de funcionário foram criados automaticamente como ativos para preservar o histórico. O RH pode editar a situação e a data de demissão de cada funcionário.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha na importação.");
     } finally {
