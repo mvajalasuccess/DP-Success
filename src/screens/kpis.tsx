@@ -440,8 +440,8 @@ export function Kpis() {
             </div>
             <Card className="mt-4 p-5">
               <p className="text-sm font-semibold">Cálculo do indicador</p>
-              <p className="mt-2 text-sm text-muted-foreground">Horas de ausência ÷ horas previstas × 100</p>
-              <p className="mt-3 text-lg font-semibold">{fmt(metrics.absenceMinutes)} ÷ {fmt(metrics.expected)} × 100 = {pct(absenteeismRate)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">(Faltas + Débitos + Abonos) ÷ horas previstas × 100</p>
+              <p className="mt-3 text-lg font-semibold">({fmt(metrics.faltasMinutes)} + {fmt(metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)} + {fmt(metrics.abonosMinutes)}) ÷ {fmt(metrics.expected)} × 100 = {pct(absenteeismRate)}</p>
             </Card>
           </section>
         )}
