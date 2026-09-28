@@ -17,7 +17,8 @@ export function Launches() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [periodId, setPeriodId] = useState("");
-  const [employeeFilter, setEmployeeFilter] = useState("");\n  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [credits, setCredits] = useState<CreditRow[]>([]);
   const [debits, setDebits] = useState<DebitRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +32,8 @@ export function Launches() {
   const [debitHours, setDebitHours] = useState("00:00");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const period = periods.find(p => p.id === periodId) ?? null;\n  const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));
+  const period = periods.find(p => p.id === periodId) ?? null;
+  const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));
 
   async function loadBase() {
     try {
@@ -42,7 +44,8 @@ export function Launches() {
       if (emps.error) throw new Error(emps.error.message);
       setEmployees(emps.data ?? []);
       setPeriods(ps);
-      if (!periodId && ps[0]) setPeriodId(ps[0].id);\n      if (!employeeFilter) { const first = (emps.data ?? []).find((e: any) => e.status !== "inativo"); if (first) setEmployeeFilter(first.id); }
+      if (!periodId && ps[0]) setPeriodId(ps[0].id);
+      if (!employeeFilter) { const first = (emps.data ?? []).find((e: any) => e.status !== "inativo"); if (first) setEmployeeFilter(first.id); }
       if (!ps.length) setLoading(false);
     } catch (e) { setError((e as Error).message); setLoading(false); }
   }
