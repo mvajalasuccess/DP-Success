@@ -268,10 +268,7 @@ export function BankHours() {
         </div>
       </Card>
 
-      <Card className="mt-6 border-dashed p-5">
-        <div><h2 className="font-bold">Movimentações separadas</h2><p className="text-sm text-muted-foreground">Ajustes e correções continuam contabilizados no saldo, mas ficam fora dos cards das competências.</p></div>
-        {adjustments.length ? <div className="mt-4 space-y-2">{adjustments.map(a => { const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes || 0)) : Math.abs(Number(a.minutes || 0)); return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"><div><span className="font-medium">{formatDateBR(a.entry_date)}</span><span className={`ml-3 font-semibold ${cls(value)}`}>{minutesToHours(value, true)}</span><span className="ml-3 text-muted-foreground">{a.justification ?? "Ajuste"}</span></div><div className="flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => openAdjustmentEdit(a)}><Pencil className="inline h-3 w-3" /> Editar</button>{confirmAdjustmentDelete === a.id ? <><button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingAdjustment} onClick={() => void deleteAdjustment(a.id)}>Confirmar exclusão</button><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setConfirmAdjustmentDelete(null)}>Cancelar</button></> : <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" onClick={() => setConfirmAdjustmentDelete(a.id)}><Trash2 className="inline h-3 w-3" /> Excluir</button>}</div></div>; })}</div> : <p className="mt-4 text-sm text-muted-foreground">Nenhum ajuste registrado.</p>}
-      </Card>
+
 
       <div className="mt-6 space-y-3">
         {loading ? <Card className="p-8 text-center text-muted-foreground">Carregando saldos...</Card>
@@ -309,6 +306,12 @@ export function BankHours() {
             );
           })}
       </div>
+
+      <Card className="mt-6 border-dashed p-5">
+        <div><h2 className="font-bold">Movimentações separadas</h2><p className="text-sm text-muted-foreground">Ajustes e correções continuam contabilizados no saldo, mas ficam fora dos cards das competências.</p></div>
+        {adjustments.length ? <div className="mt-4 space-y-2">{adjustments.map(a => { const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes || 0)) : Math.abs(Number(a.minutes || 0)); return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"><div><span className="font-medium">{formatDateBR(a.entry_date)}</span><span className={`ml-3 font-semibold ${cls(value)}`}>{minutesToHours(value, true)}</span><span className="ml-3 text-muted-foreground">{a.justification ?? "Ajuste"}</span></div><div className="flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => openAdjustmentEdit(a)}><Pencil className="inline h-3 w-3" /> Editar</button>{confirmAdjustmentDelete === a.id ? <><button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingAdjustment} onClick={() => void deleteAdjustment(a.id)}>Confirmar exclusão</button><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setConfirmAdjustmentDelete(null)}>Cancelar</button></> : <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" onClick={() => setConfirmAdjustmentDelete(a.id)}><Trash2 className="inline h-3 w-3" /> Excluir</button>}</div></div>; })}</div> : <p className="mt-4 text-sm text-muted-foreground">Nenhum ajuste registrado.</p>}
+        {payments.length ? <div className="mt-6 space-y-2"><p className="text-sm font-semibold">Pagamentos de HE</p>{payments.map(p => <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"><div><span className="font-medium">{formatDateBR(p.entry_date)}</span><span className="ml-3 font-semibold text-destructive">-{minutesToHours(Number(p.minutes || 0))}</span><span className="ml-3 text-muted-foreground">{p.justification ?? "Pagamento de horas extras"}</span></div></div>)}</div> : <p className="mt-4 text-sm text-muted-foreground">Nenhum pagamento de HE registrado.</p>}
+      </Card>
 
       {paymentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
