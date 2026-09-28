@@ -42,7 +42,7 @@ export function BankHours() {
         supabase.from("bank_hours").select("id,entry_date,minutes,adjustment_direction,justification,period_id").eq("employee_id", employeeId).eq("kind", "ajuste").order("entry_date", { ascending: false }),
       ]);
       if (adjustmentRows.error) throw new Error(adjustmentRows.error.message);
-      const orderedRows = balanceRows.reverse();
+      const orderedRows = [...balanceRows].reverse();
       setRows(orderedRows);
       setAdjustments(adjustmentRows.data ?? []);
     } catch (e) { setError((e as Error).message); }
@@ -52,6 +52,7 @@ export function BankHours() {
   useEffect(() => { void loadBankData(); }, [employeeId]);
 
   const accumulated = rows[0]?.accumulated ?? 0;
+  const firstPeriod = rows[rows.length - 1]?.period;
   const cls = (n: number) => n < 0 ? "text-destructive" : "text-primary";
 
   function openAdjustmentNew() {
@@ -104,7 +105,6 @@ export function BankHours() {
     setError("");
     try {
       const period = rows.find(r => adjustmentDate >= r.period.start_date && adjustmentDate <= r.period.end_date)?.period;
-      const firstPeriod = rows[0]?.period;
       const isPriorBalance = Boolean(firstPeriod && adjustmentDate < firstPeriod.start_date);
       if (!period && !isPriorBalance) {
         setError("A data do ajuste precisa estar dentro de uma competência existente ou ser anterior à primeira competência para representar saldo anterior.");
@@ -153,7 +153,7 @@ export function BankHours() {
   return (
     <ScreenShell section="Operação" title="Banco de Horas" name="Banco de Horas" subtitle="Saldo por funcionário e competência." error={error}>
       {(() => {
-        const firstStart = rows[0]?.period.start_date;
+        const firstStart = firstPeriod?.start_date;
         const prior = adjustments.filter(a => !a.period_id && firstStart && a.entry_date < firstStart);
         if (!prior.length) return null;
         const total = prior.reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes || 0)) : Math.abs(Number(a.minutes || 0))), 0);
@@ -222,7 +222,7 @@ export function BankHours() {
                     </div>
                   </div>
                 )}
-              {r.adjustment !== 0 && open && adjustments.filter(a => a.period_id === r.period.id || (!a.period_id && (a.entry_date >= r.period.start_date && a.entry_date <= r.period.end_date || (r === rows[0] && a.entry_date < r.period.start_date)))).map(a => {
+              {r.adjustment !== 0 && open && adjustments.filter(a => a.period_id === r.period.id || (!a.period_id && (a.entry_date >= r.period.start_date && a.entry_date <= r.period.end_date || false))).map(a => {
                 const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes)) : Math.abs(Number(a.minutes));
                 return (
                   <div key={a.id} className="border-t px-5 py-3 text-sm">
