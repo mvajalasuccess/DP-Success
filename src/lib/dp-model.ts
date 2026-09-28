@@ -209,6 +209,7 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   };
   const isOrmindo = employeeName.includes("ORMINDO");
   const ormindoManualBalances: Record<string, number> = {
+    "2026-01-20": 13 * 60 + 33,
     "2026-03-20": 36 * 60 + 40,
   };
 const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.includes("JOSÉ LUCIANO");
