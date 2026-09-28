@@ -61,7 +61,7 @@ export function ImportacaoHistorico() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ imported: number; unmatched: number } | null>(null);
+  const [result, setResult] = useState<{ imported: number; unmatched: number; createdEmployees: number } | null>(null);
 
   async function readFile(file: File) {
     setError("");
@@ -101,9 +101,14 @@ export function ImportacaoHistorico() {
         .select("id,registration,full_name");
       if (employeesError) throw new Error(employeesError.message);
 
-      const employeeByRegistration = new Map(
-        (employees ?? []).map((e: any) => [String(e.registration ?? "").trim(), e]),
-      );
+      const employeeByRegistration = new Map<string, any>();
+      const employeeByName = new Map<string, any>();
+      for (const employee of employees ?? []) {
+        const registration = String(employee.registration ?? "").trim();
+        const name = String(employee.full_name ?? "").trim().toLowerCase();
+        if (registration) employeeByRegistration.set(registration, employee);
+        if (name) employeeByName.set(name, employee);
+      }
 
       const { data: batch, error: batchError } = await db
         .from("historical_import_batches")
@@ -114,6 +119,7 @@ export function ImportacaoHistorico() {
 
       const periodIds = new Map<string, string>();
       let unmatched = 0;
+      let createdEmployees = 0;
 
       const output: any[] = [];
       for (const row of rows) {
@@ -160,8 +166,26 @@ export function ImportacaoHistorico() {
           periodIds.set(periodKey, periodId);
         }
 
-        const employee = employeeByRegistration.get(registration);
-        if (!employee) unmatched += 1;
+        let employee = registration ? employeeByRegistration.get(registration) : undefined;
+        if (!employee) employee = employeeByName.get(employeeName.toLowerCase());
+
+        if (!employee) {
+          const { data: createdEmployee, error: employeeCreateError } = await db
+            .from("employees")
+            .insert({
+              registration: registration || null,
+              full_name: employeeName,
+              status: "inativo",
+              notes: "Cadastro criado automaticamente a partir do histórico da BASE do Power BI. Dados cadastrais atuais devem ser completados pelo RH.",
+            })
+            .select("id,registration,full_name")
+            .single();
+          if (employeeCreateError) throw new Error(`Não foi possível criar o cadastro de ${employeeName}: ${employeeCreateError.message}`);
+          employee = createdEmployee;
+          createdEmployees += 1;
+          if (registration) employeeByRegistration.set(registration, employee);
+          employeeByName.set(employeeName.toLowerCase(), employee);
+        }
 
         output.push({
           period_id: periodId,
@@ -201,8 +225,8 @@ export function ImportacaoHistorico() {
         .eq("id", batch.id);
       if (batchUpdateError) throw new Error(batchUpdateError.message);
 
-      setResult({ imported: output.length, unmatched });
-      setMessage("Histórico importado com sucesso. Os dados da BASE foram preservados como histórico consolidado.");
+      setResult({ imported: output.length, unmatched, createdEmployees });
+      setMessage(`Histórico importado com sucesso. ${createdEmployees} cadastro(s) de funcionário foram criados automaticamente como inativos para preservar o histórico.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha na importação.");
     } finally {
@@ -231,7 +255,7 @@ export function ImportacaoHistorico() {
               <div className="rounded-xl bg-primary/10 p-3 text-primary"><FileSpreadsheet className="h-5 w-5" /></div>
               <div>
                 <p className="font-semibold">Arquivo Excel</p>
-                <p className="text-xs text-muted-foreground">O sistema procura exclusivamente a aba BASE.</p>
+                <p className="text-xs text-muted-foreground">O sistema procura exclusivamente a aba BASE e cria automaticamente os funcionários históricos que ainda não estiverem cadastrados.</p>
               </div>
             </div>
             <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => e.target.files?.[0] && void readFile(e.target.files[0])} />
@@ -264,7 +288,7 @@ export function ImportacaoHistorico() {
 
           {error && <div className="mt-4 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
           {message && <div className="mt-4 flex gap-2 rounded-lg border p-3 text-sm"><CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />{message}</div>}
-          {result && <div className="mt-4 rounded-lg border p-4 text-sm"><b>{result.imported}</b> registros importados/atualizados. <span className="text-muted-foreground">{result.unmatched} registros não encontraram matrícula correspondente no cadastro atual; o histórico foi preservado mesmo assim.</span></div>}
+          {result && <div className="mt-4 rounded-lg border p-4 text-sm"><b>{result.imported}</b> registros importados/atualizados. <span className="text-muted-foreground">{result.createdEmployees} cadastro(s) de funcionário criado(s) automaticamente. Os cadastros históricos ficam inativos até o RH completar e ativar quando necessário.</span></div>}
         </Card>
       </main>
     </div>
