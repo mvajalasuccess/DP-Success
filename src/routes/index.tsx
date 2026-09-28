@@ -41,7 +41,7 @@ const closingNav: Array<[string, ScreenKey]> = [
 
 const mainNav: Array<[string, ScreenKey]> = [
   ["Funcionários", "funcionarios"], ["Banco de Horas", "banco-horas"],
-  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Parâmetros", "parametros"],
+  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"],
 ];
 
 function fmt(minutes: number) {
