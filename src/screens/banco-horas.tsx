@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, History } from "lucide-react";
+import { ChevronDown, ChevronUp, History, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,13 @@ export function BankHours() {
   const [expanded, setExpanded] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false);
+  const [adjustmentDirection, setAdjustmentDirection] = useState<"credito" | "debito">("credito");
+  const [adjustmentDate, setAdjustmentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [adjustmentHours, setAdjustmentHours] = useState("");
+  const [adjustmentReason, setAdjustmentReason] = useState("Saldo inicial");
+  const [adjustmentJustification, setAdjustmentJustification] = useState("");
+  const [savingAdjustment, setSavingAdjustment] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -37,9 +44,46 @@ export function BankHours() {
   const accumulated = rows[0]?.accumulated ?? 0;
   const cls = (n: number) => n < 0 ? "text-destructive" : "text-primary";
 
+  async function saveAdjustment() {
+    if (!employeeId || !adjustmentHours) return;
+    const parts = adjustmentHours.split(":");
+    const parsedMinutes = Number(parts[0] || 0) * 60 + Number(parts[1] || 0);
+    if (!Number.isFinite(parsedMinutes) || parsedMinutes <= 0) {
+      setError("Informe um tempo válido no formato HH:MM.");
+      return;
+    }
+    if (!adjustmentJustification.trim()) {
+      setError("Informe o motivo do ajuste.");
+      return;
+    }
+    setSavingAdjustment(true);
+    setError("");
+    try {
+      const period = rows.find(r => adjustmentDate >= r.period.start_date && adjustmentDate <= r.period.end_date)?.period;
+      const { error: insertError } = await supabase.from("bank_hours").insert({
+        employee_id: employeeId,
+        period_id: period?.id ?? null,
+        entry_date: adjustmentDate,
+        kind: "ajuste",
+        minutes: parsedMinutes,
+        adjustment_direction: adjustmentDirection,
+        justification: adjustmentReason + ": " + adjustmentJustification.trim(),
+      } as any);
+      if (insertError) throw new Error(insertError.message);
+      setAdjustmentOpen(false);
+      setAdjustmentHours("");
+      setAdjustmentJustification("");
+      setRows((await balancesByEmployee(employeeId)).reverse());
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingAdjustment(false);
+    }
+  }
+
   return (
     <ScreenShell section="Operação" title="Banco de Horas" name="Banco de Horas" subtitle="Saldo por funcionário e competência." error={error}>
-      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-end">
+      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-[1fr_auto_auto] md:items-end">
         <label className="grid gap-1.5 text-sm font-medium">Funcionário
           <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
             {!employees.length && <option value="">Nenhum funcionário cadastrado</option>}
@@ -47,6 +91,7 @@ export function BankHours() {
           </select>
         </label>
         <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado atual</p><p className={`text-2xl font-bold ${cls(accumulated)}`}>{minutesToHours(accumulated, true)}</p></div>
+        <button type="button" onClick={() => setAdjustmentOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Lançar crédito / débito</button>
       </Card>
 
       <div className="mt-6 space-y-3">
@@ -65,6 +110,7 @@ export function BankHours() {
                     <div className="text-right"><p className="text-xs text-muted-foreground">Saldo do mês</p><p className={`text-xl font-bold ${cls(r.monthBalance)}`}>{minutesToHours(r.monthBalance, true)}</p></div>
                     <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado</p><p className={`font-semibold ${cls(r.accumulated)}`}>{minutesToHours(r.accumulated, true)}</p></div>
                     <div className="text-right"><p className="text-xs text-muted-foreground">Débito / atrasos</p><p className="font-semibold text-destructive">{minutesToHours(-r.composition.debit)}</p></div>
+                    {r.adjustment !== 0 && <div className="text-right"><p className="text-xs text-muted-foreground">Ajuste</p><p className={`font-semibold ${cls(r.adjustment)}`}>{minutesToHours(r.adjustment, true)}</p></div>}
                     {open ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
                   </div>
                 </button>
@@ -84,6 +130,29 @@ export function BankHours() {
             );
           })}
       </div>
+
+      {adjustmentOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-lg p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div><h2 className="text-xl font-bold">Lançar ajuste no Banco de Horas</h2><p className="mt-1 text-sm text-muted-foreground">Saldo anterior, pagamento/zeragem ou correção.</p></div>
+              <button type="button" onClick={() => setAdjustmentOpen(false)}><X className="h-5 w-5" /></button>
+            </div>
+            <div className="mt-5 grid gap-4">
+              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">{employees.find(e => e.id === employeeId)?.full_name ?? "—"}</div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-sm font-medium">Tipo<select className={inputCls} value={adjustmentDirection} onChange={e => setAdjustmentDirection(e.target.value as "credito" | "debito")}><option value="credito">Crédito</option><option value="debito">Débito</option></select></label>
+                <label className="grid gap-1.5 text-sm font-medium">Data<input type="date" className={inputCls} value={adjustmentDate} onChange={e => setAdjustmentDate(e.target.value)} /></label>
+              </div>
+              <label className="grid gap-1.5 text-sm font-medium">Horas<input type="text" inputMode="numeric" placeholder="Ex.: 12:30" className={inputCls} value={adjustmentHours} onChange={e => setAdjustmentHours(e.target.value)} /></label>
+              <label className="grid gap-1.5 text-sm font-medium">Motivo<select className={inputCls} value={adjustmentReason} onChange={e => setAdjustmentReason(e.target.value)}><option>Saldo inicial</option><option>Pagamento de horas</option><option>Correção de saldo</option><option>Outros</option></select></label>
+              <label className="grid gap-1.5 text-sm font-medium">Justificativa<textarea className={inputCls} rows={3} placeholder="Ex.: saldo trazido de período anterior / horas pagas no holerite." value={adjustmentJustification} onChange={e => setAdjustmentJustification(e.target.value)} /></label>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setAdjustmentOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={savingAdjustment} onClick={() => void saveAdjustment()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{savingAdjustment ? "Salvando..." : "Salvar ajuste"}</button></div>
+            </div>
+          </Card>
+        </div>
+      )}
+
     </ScreenShell>
   );
 }
