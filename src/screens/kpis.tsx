@@ -162,20 +162,40 @@ export function Kpis() {
       const allowedEmployees = employees.filter(e => employeeMatches(e, [], selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
       const allowedIds = new Set(allowedEmployees.map(e => e.id));
 
-      const [{ data: historical, error: historicalError }, { data: overtime, error: overtimeError }, { data: timeRecords, error: timeError }] = await Promise.all([
-        db.from("historical_kpi_data")
-          .select("period_id,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-          .in("period_id", periodIds),
-        db.from("overtime_records")
-          .select("employee_id,period_id,minutes,rate_percent,notes")
-          .in("period_id", periodIds),
-        db.from("time_records")
-          .select("employee_id,period_id,expected_minutes,worked_minutes")
-          .in("period_id", periodIds),
+      // A BASE histórica foi importada somente até a competência de julho/2026
+      // (21/06/2026 a 20/07/2026). A partir de agosto, o KPI usa exclusivamente
+      // os lançamentos atuais do DP-Success. Isso evita somar a mesma competência
+      // duas vezes.
+      const HISTORICAL_CUTOFF = "2026-07-20";
+      const historicalPeriodIds = targetPeriods.filter(p => p.end_date <= HISTORICAL_CUTOFF).map(p => p.id);
+      const currentPeriodIds = targetPeriods.filter(p => p.end_date > HISTORICAL_CUTOFF).map(p => p.id);
+
+      const [
+        { data: historical, error: historicalError },
+        { data: overtime, error: overtimeError },
+        { data: timeRecords, error: timeError },
+        { data: _unusedBankCredits, error: bankCreditsError },
+      ] = await Promise.all([
+        historicalPeriodIds.length
+          ? db.from("historical_kpi_data")
+              .select("period_id,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+              .in("period_id", historicalPeriodIds)
+          : Promise.resolve({ data: [], error: null }),
+        Promise.resolve({ data: [], error: null }),
+        currentPeriodIds.length
+          ? db.from("time_records")
+              .select("employee_id,period_id,expected_minutes,worked_minutes,negative_minutes")
+              .in("period_id", currentPeriodIds)
+          : Promise.resolve({ data: [], error: null }),
+        currentPeriodIds.length
+          ? db.from("overtime_records")
+              .select("employee_id,period_id,minutes,launch_type,rate_percent,notes")
+              .in("period_id", currentPeriodIds)
+          : Promise.resolve({ data: [], error: null }),
       ]);
 
-      if (historicalError || overtimeError || timeError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || timeError || bankCreditsError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? bankCreditsError?.message ?? "Não foi possível carregar os indicadores.");
         return;
       }
 
@@ -230,6 +250,7 @@ export function Kpis() {
         operationalCount += 1;
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
+        next.absenceMinutes += Number(row.negative_minutes || 0);
       }
 
       for (const row of overtime ?? []) {
@@ -244,14 +265,12 @@ export function Kpis() {
         };
 
         const minutes = Number(row.minutes || 0);
-        const rate = Number(row.rate_percent || 0);
-        const notes = String(row.notes || "").toLowerCase();
-
-        if (rate === 50) current.interjornada += minutes;
-        else if (rate === 100 && notes.includes("noturn")) current.he100Night += minutes;
-        else if (rate === 100) current.he100 += minutes;
-        else if (rate === 20) current.he20 += minutes;
-        else if (notes.includes("60% + 20%") || notes.includes("noturn")) current.he60Night += minutes;
+        const type = String(row.launch_type || "").toUpperCase();
+        if (type === "INTERJORNADA_50") current.interjornada += minutes;
+        else if (type === "HE_100_NOTURNO") current.he100Night += minutes;
+        else if (type === "HE_100") current.he100 += minutes;
+        else if (type === "ADICIONAL_NOTURNO") current.he20 += minutes;
+        else if (type === "HE_60_NOTURNO") current.he60Night += minutes;
         else current.he60 += minutes;
 
         comparison.set(employee.id, current);
