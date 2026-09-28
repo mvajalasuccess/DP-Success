@@ -199,8 +199,14 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
       launches.debits.filter(r => r.period_id === period.id || inRange(r.entry_date, period)),
     );
     const adjustment = adjustments
-      .filter(a => a.entry_date >= period.start_date && a.entry_date <= period.end_date)
-      .reduce((sum, a) => sum + (a.direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
+      .filter(a => {
+        if (a.period_id === period.id) return true;
+        if (a.period_id) return false;
+        if (a.entry_date >= period.start_date && a.entry_date <= period.end_date) return true;
+        const openPeriod = ordered.find(p => p.status === "aberto");
+        return openPeriod?.id === period.id && a.entry_date > period.end_date;
+      })
+      .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
     const monthBalance = balanceOf(comp) + adjustment;
     accumulated += monthBalance;
     return { period, composition: comp, monthBalance, accumulated, adjustment };
