@@ -50,7 +50,7 @@ export function Launches() {
     if (!period) return;
     setLoading(true); setError("");
     try {
-      const r = await fetchLaunches({ start: period.start_date, end: period.end_date, employeeId: employeeFilter || undefined });
+      const r = await fetchLaunches(employeeFilter ? { start: period.start_date, end: period.end_date, employeeId: employeeFilter } : { start: period.start_date, end: period.end_date });
       setCredits(r.credits); setDebits(r.debits);
     } catch (e) { setError((e as Error).message); }
     setLoading(false);
