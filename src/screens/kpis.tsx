@@ -110,7 +110,7 @@ export function Kpis() {
 
       const { data: historical, error: historicalError } = await db
         .from("historical_kpi_data")
-        .select("period_id,employee_id,registration,employee_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+        .select("period_id,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
         .in("period_id", periodIds)
         .order("employee_name");
 
@@ -230,7 +230,31 @@ export function Kpis() {
       <main className="mx-auto max-w-[1500px] px-6 py-7">
         <p className="text-sm text-primary">Gestão</p>
         <h1 className="text-3xl font-bold">KPIs de RH e DP</h1>
-        <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4"><label className="grid gap-1 text-sm font-medium">Ano<select className="rounded-lg border bg-background px-3 py-2" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>{[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Mês<select className="rounded-lg border bg-background px-3 py-2" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}><option value="todos">Todos</option>{periods.filter(p => p.reference_year === selectedYear).map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Setor<select className="rounded-lg border bg-background px-3 py-2" value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}><option value="todos">Todos</option>{departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Funcionários<select multiple className="min-h-[42px] rounded-lg border bg-background px-3 py-2" value={selectedEmployees} onChange={e => setSelectedEmployees(Array.from(e.target.selectedOptions, o => o.value))}>{employeeOptions.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></label></div><p className="mt-2 text-sm text-muted-foreground">{period || "Competência atual"}</p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4"><label className="grid gap-1 text-sm font-medium">Ano<select className="rounded-lg border bg-background px-3 py-2" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}>{[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Mês<select className="rounded-lg border bg-background px-3 py-2" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}><option value="todos">Todos</option>{periods.filter(p => p.reference_year === selectedYear).map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}</select></label><label className="grid gap-1 text-sm font-medium">Setor<select className="rounded-lg border bg-background px-3 py-2" value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}><option value="todos">Todos</option>{departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}</select></label><div className="grid gap-1 text-sm font-medium">
+              <span>Funcionários</span>
+              <div className="max-h-48 overflow-y-auto rounded-lg border bg-background p-2">
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 font-normal hover:bg-muted">
+                  <input
+                    type="checkbox"
+                    checked={selectedEmployees.length === 0}
+                    onChange={() => setSelectedEmployees([])}
+                  />
+                  Selecionar todos
+                </label>
+                {employeeOptions.map(e => (
+                  <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 font-normal hover:bg-muted">
+                    <input
+                      type="checkbox"
+                      checked={selectedEmployees.includes(e.id)}
+                      onChange={() => setSelectedEmployees(current => current.includes(e.id)
+                        ? current.filter(id => id !== e.id)
+                        : [...current, e.id])}
+                    />
+                    <span className="truncate">{e.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div></div><p className="mt-2 text-sm text-muted-foreground">{period || "Competência atual"}</p>
         {source && <p className="mt-1 text-xs text-muted-foreground">{source}</p>}
         {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
