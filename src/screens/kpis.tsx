@@ -1,316 +1,447 @@
-import { ArrowLeft, TrendingUp, Users, Clock3, CalendarX2, Percent, Wallet, BriefcaseBusiness, Moon, Sun } from "lucide-react";
+import { ArrowLeft, TrendingDown, TrendingUp, Users, Clock3, CalendarX2, Percent, UserMinus, Moon, Sun } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { periodRangeLabel, type Period } from "@/lib/dp-model";
 
-function fmt(n: number) {
-  const sign = n < 0 ? "-" : "";
-  const a = Math.abs(Math.round(n));
-  return sign + Math.floor(a / 60) + "h " + String(a % 60).padStart(2, "0") + "m";
-}
+type Employee = {
+  id: string;
+  name: string;
+  registration: string;
+  department: string;
+  hireDate: string | null;
+  terminationDate: string | null;
+  status: string;
+};
+
+type OvertimeEmployee = {
+  employeeId: string;
+  name: string;
+  he60: number;
+  he60Night: number;
+  he100: number;
+  he100Night: number;
+  he20: number;
+  interjornada: number;
+  total: number;
+};
 
 type Metrics = {
   employees: number;
   expected: number;
+  absenceMinutes: number;
   worked: number;
-  absences: number;
-  certificates: number;
-  declarations: number;
-  allowances: number;
-  debit: number;
   he60: number;
   he60Night: number;
   he100: number;
+  he100Night: number;
   he20: number;
   interjornada: number;
-  balance: number;
+  turnover: number;
+  terminations: number;
+  averageHeadcount: number;
 };
 
 const emptyMetrics: Metrics = {
-  employees: 0,
-  expected: 0,
-  worked: 0,
-  absences: 0,
-  certificates: 0,
-  declarations: 0,
-  allowances: 0,
-  debit: 0,
-  he60: 0,
-  he60Night: 0,
-  he100: 0,
-  he20: 0,
-  interjornada: 0,
-  balance: 0,
+  employees: 0, expected: 0, absenceMinutes: 0, worked: 0,
+  he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0,
+  interjornada: 0, turnover: 0, terminations: 0, averageHeadcount: 0,
 };
 
+function fmt(minutes: number) {
+  const sign = minutes < 0 ? "-" : "";
+  const value = Math.abs(Math.round(minutes));
+  return sign + Math.floor(value / 60) + "h " + String(value % 60).padStart(2, "0") + "m";
+}
+
+function pct(value: number) {
+  return value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
+}
+
+function decimalHoursToMinutes(value: unknown) {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n * 60) : 0;
+}
+
+function employeeMatches(
+  employee: Employee | undefined,
+  selectedEmployees: string[],
+  selectedDepartment: string,
+) {
+  if (!employee) return false;
+  if (selectedEmployees.length && !selectedEmployees.includes(employee.id)) return false;
+  if (selectedDepartment !== "todos" && employee.department !== selectedDepartment) return false;
+  return true;
+}
+
 export function Kpis() {
-  const [m, setM] = useState<Metrics>(emptyMetrics);
+  const [metrics, setMetrics] = useState<Metrics>(emptyMetrics);
+  const [overtimeEmployees, setOvertimeEmployees] = useState<OvertimeEmployee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
-  const [selectedPeriodId, setSelectedPeriodId] = useState("");
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState("todos");
   const [selectedDepartment, setSelectedDepartment] = useState("todos");
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [employeeOptions, setEmployeeOptions] = useState<Array<{ id: string; name: string; registration: string; department: string }>>([]);
   const [employeeFilterOpen, setEmployeeFilterOpen] = useState(false);
-  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
-  const [period, setPeriod] = useState("");
+  const [periodLabel, setPeriodLabel] = useState("");
   const [source, setSource] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
     void (async () => {
       const db = supabase as any;
-      const [{ data: periodRows, error: periodError }, { data: employees, error: employeesError }] = await Promise.all([
-        db.from("time_periods")
-          .select("id,reference_year,reference_month,start_date,end_date,status")
-          .order("start_date", { ascending: false }),
-        db.from("employees").select("id,full_name,department_id,departments(name)").order("full_name"),
+      const [{ data: periodRows, error: periodError }, { data: employeeRows, error: employeeError }] = await Promise.all([
+        db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
+        db.from("employees").select("id,full_name,registration,department_id,hire_date,termination_date,status,departments(name)").order("full_name"),
       ]);
 
-      if (periodError || employeesError) {
-        setError(periodError?.message ?? employeesError?.message ?? "Não foi possível carregar os KPIs.");
+      if (periodError || employeeError) {
+        setError(periodError?.message ?? employeeError?.message ?? "Não foi possível carregar os KPIs.");
         return;
       }
 
-      const list = (periodRows ?? []) as Period[];
-      setPeriods(list);
-      const years = [...new Set(list.map(p => p.reference_year))].sort((a, b) => b - a);
+      const parsedEmployees: Employee[] = (employeeRows ?? []).map((e: any) => ({
+        id: e.id,
+        name: e.full_name,
+        registration: String(e.registration ?? "").trim(),
+        department: String(e.departments?.name ?? "").trim(),
+        hireDate: e.hire_date ?? null,
+        terminationDate: e.termination_date ?? null,
+        status: e.status ?? "ativo",
+      }));
+
+      const parsedPeriods = (periodRows ?? []) as Period[];
+      setEmployees(parsedEmployees);
+      setPeriods(parsedPeriods);
+
+      const years = [...new Set(parsedPeriods.map(p => p.reference_year))].sort((a, b) => b - a);
       if (years.length) setSelectedYear(years[0]);
-      if (list[0]) setSelectedPeriodId(list[0].id);
-      const employeeList = (employees ?? []).map((e: any) => ({ id: e.id, name: e.full_name, registration: e.registration ?? "", department: String(e.departments?.name ?? "").trim() }));
-      setEmployeeOptions(employeeList);
-      setDepartmentOptions([...new Set((employees ?? []).map((e: any) => String(e.departments?.name ?? "").trim()).filter(Boolean))].sort());
-      setSelectedEmployees([]);
-      if (!list.length) setM({ ...emptyMetrics, employees: employeeList.length });
     })();
   }, []);
 
+  const departmentOptions = useMemo(
+    () => [...new Set(employees.map(e => e.department).filter(Boolean))].sort(),
+    [employees],
+  );
+
+  const employeeOptions = useMemo(
+    () => employees.filter(e => selectedDepartment === "todos" || e.department === selectedDepartment),
+    [employees, selectedDepartment],
+  );
+
+  useEffect(() => {
+    setSelectedEmployees(current => current.filter(id => employeeOptions.some(e => e.id === id)));
+  }, [employeeOptions]);
+
   useEffect(() => {
     if (!periods.length) return;
+
     void (async () => {
       setError("");
       const db = supabase as any;
-      const selected = periods.find(p => p.id === selectedPeriodId);
+
       const targetPeriods = selectedMonth === "todos"
         ? periods.filter(p => p.reference_year === selectedYear)
-        : periods.filter(p => p.reference_year === selectedYear && p.id === selectedMonth);
+        : periods.filter(p => p.id === selectedMonth);
 
       if (!targetPeriods.length) {
-        setPeriod(viewMode === "anual" ? String(selectedYear) : "Nenhuma competência selecionada");
-        setM(emptyMetrics);
+        setMetrics(emptyMetrics);
+        setOvertimeEmployees([]);
+        setPeriodLabel(String(selectedYear));
         return;
       }
-
-      setPeriod(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(targetPeriods[0]));
 
       const periodIds = targetPeriods.map(p => p.id);
-      const start = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, targetPeriods[0].start_date);
-      const end = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, targetPeriods[0].end_date);
+      const rangeStart = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, targetPeriods[0].start_date);
+      const rangeEnd = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, targetPeriods[0].end_date);
 
-      const { data: historical, error: historicalError } = await db
-        .from("historical_kpi_data")
-        .select("period_id,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-        .in("period_id", periodIds)
-        .order("employee_name");
+      setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(targetPeriods[0]));
 
-      if (historicalError) {
-        setError(historicalError.message);
+      const selectedEmployeeSet = new Set(selectedEmployees);
+      const allowedEmployees = employees.filter(e => employeeMatches(e, undefined, selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
+      const allowedIds = new Set(allowedEmployees.map(e => e.id));
+
+      const [{ data: historical, error: historicalError }, { data: overtime, error: overtimeError }, { data: timeRecords, error: timeError }] = await Promise.all([
+        db.from("historical_kpi_data")
+          .select("period_id,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+          .in("period_id", periodIds),
+        db.from("overtime_records")
+          .select("employee_id,period_id,minutes,rate_percent,notes")
+          .in("period_id", periodIds),
+        db.from("time_records")
+          .select("employee_id,period_id,expected_minutes,worked_minutes")
+          .in("period_id", periodIds),
+      ]);
+
+      if (historicalError || overtimeError || timeError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? "Não foi possível carregar os indicadores.");
         return;
       }
 
-      const historicalRows = (historical ?? []).filter((row: any) => {
-        const matchedEmployee = employeeOptions.find((e) =>
+      const resolveEmployee = (row: any): Employee | undefined =>
+        employees.find(e =>
           (row.employee_id && e.id === row.employee_id) ||
-          (row.registration && e.registration && String(row.registration).trim() === String(e.registration).trim()) ||
-          String(row.employee_name ?? "").trim().toLowerCase() === e.name.trim().toLowerCase()
+          (row.registration && e.registration && String(row.registration).trim() === e.registration) ||
+          (row.employee_name && e.name.trim().toLowerCase() === String(row.employee_name).trim().toLowerCase())
         );
-        const employeeOk = selectedEmployees.length === 0 || (!!matchedEmployee && selectedEmployees.includes(matchedEmployee.id));
-        const departmentOk = selectedDepartment === "todos" ||
-          String(row.department_name ?? "").trim() === selectedDepartment ||
-          (!!matchedEmployee && matchedEmployee.department === selectedDepartment);
-        return employeeOk && departmentOk;
-      });
-      const historicalPeriodIds = new Set((historical ?? []).map((row: any) => row.period_id));
-      const operationalPeriods = targetPeriods.filter(p => !historicalPeriodIds.has(p.id));
-      const next = { ...emptyMetrics, employees: 0 };
-      const employeeIds = new Set<string>();
-      let hasHistorical = false;
-      let hasOperational = false;
 
-      for (const row of historicalRows) {
-        hasHistorical = true;
-        if (row.employee_id) employeeIds.add(row.employee_id);
-        else if (row.registration) employeeIds.add(`registration:${row.registration}`);
-        else employeeIds.add(`name:${row.employee_name}`);
+      const isAllowedRow = (row: any) => {
+        const employee = resolveEmployee(row);
+        if (employee) return allowedIds.has(employee.id);
+        if (selectedEmployees.length) return false;
+        return selectedDepartment === "todos" || String(row.department_name ?? "").trim() === selectedDepartment;
+      };
+
+      const next = { ...emptyMetrics };
+      const comparison = new Map<string, OvertimeEmployee>();
+      let historicalCount = 0;
+      let operationalCount = 0;
+
+      for (const row of historical ?? []) {
+        if (!isAllowedRow(row)) continue;
+        const employee = resolveEmployee(row);
+        const key = employee?.id ?? `historical:${row.registration ?? row.employee_name}`;
+        if (employee) historicalCount += 1;
+
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
-        next.absences += Number(row.absence_quantity || 0);
-        next.certificates += Number(row.certificate_minutes || 0);
-        next.declarations += Number(row.declaration_minutes || 0);
-        next.allowances += Number(row.allowance_minutes || 0);
-        next.debit += Number(row.debit_minutes || 0);
-        next.he60 += Number(row.he_60_minutes || 0);
-        next.he60Night += Number(row.he_60_night_minutes || 0);
-        next.he100 += Number(row.he_100_minutes || 0);
-        next.he20 += Number(row.he_20_minutes || 0);
-        next.interjornada += Number(row.interjornada_minutes || 0);
+        next.absenceMinutes += decimalHoursToMinutes(row.absence_quantity);
+        next.absenceMinutes += Number(row.certificate_minutes || 0);
+        next.absenceMinutes += Number(row.declaration_minutes || 0);
+        next.absenceMinutes += Number(row.allowance_minutes || 0);
+        next.absenceMinutes += Number(row.debit_minutes || 0);
+
+        const current = comparison.get(key) ?? {
+          employeeId: employee?.id ?? key,
+          name: employee?.name ?? String(row.employee_name ?? "Histórico"),
+          he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0, interjornada: 0, total: 0,
+        };
+        current.he60 += Number(row.he_60_minutes || 0);
+        current.he60Night += Number(row.he_60_night_minutes || 0);
+        current.he100 += Number(row.he_100_minutes || 0);
+        current.he20 += Number(row.he_20_minutes || 0);
+        current.interjornada += Number(row.interjornada_minutes || 0);
+        comparison.set(key, current);
       }
 
-      if (operationalPeriods.length) {
-        const ids = operationalPeriods.map(p => p.id);
-        const [overtime, bank, occurrences, certificates, timeRecords] = await Promise.all([
-          db.from("overtime_records").select("employee_id,minutes,rate_percent,notes").in("period_id", ids),
-          db.from("bank_hours").select("employee_id,minutes,kind").in("period_id", ids),
-          db.from("occurrences").select("employee_id,quantity,unit").in("period_id", ids),
-          db.from("medical_certificates").select("employee_id,days,start_date,end_date").gte("start_date", start).lte("start_date", end),
-          db.from("time_records").select("employee_id,expected_minutes,worked_minutes").in("period_id", ids),
-        ]);
-
-        const operationalError = [overtime, bank, occurrences, certificates, timeRecords].find((x: any) => x.error);
-        if (operationalError) {
-          setError(operationalError.error.message);
-          return;
-        }
-
-        hasOperational = [overtime.data, bank.data, occurrences.data, certificates.data, timeRecords.data].some((rows: any[]) => rows.length > 0);
-
-        const employeeAllowed = (id: string | null) => selectedEmployees.length === 0 || (!!id && selectedEmployees.includes(id));
-        const employeeDepartment = new Map<string, string>();
-        for (const e of employees ?? []) employeeDepartment.set(e.id, String(e.departments?.name ?? "").trim());
-        const departmentAllowed = (id: string | null) => selectedDepartment === "todos" || (!!id && employeeDepartment.get(id) === selectedDepartment);
-
-        for (const row of timeRecords.data ?? []) {
-          if (!employeeAllowed(row.employee_id) || !departmentAllowed(row.employee_id)) continue;
-          if (row.employee_id) employeeIds.add(row.employee_id);
-          next.expected += Number(row.expected_minutes || 0);
-          next.worked += Number(row.worked_minutes || 0);
-        }
-        for (const row of overtime.data ?? []) {
-          if (!employeeAllowed(row.employee_id) || !departmentAllowed(row.employee_id)) continue;
-          if (row.employee_id) employeeIds.add(row.employee_id);
-          const minutes = Number(row.minutes || 0);
-          const rate = Number(row.rate_percent || 0);
-          const notes = String(row.notes || "").toLowerCase();
-          if (rate === 50) next.interjornada += minutes;
-          else if (rate === 100) next.he100 += minutes;
-          else if (rate === 20) next.he20 += minutes;
-          else if (notes.includes("60% + 20%") || notes.includes("noturn")) next.he60Night += minutes;
-          else next.he60 += minutes;
-        }
-        for (const row of bank.data ?? []) {
-          if (!employeeAllowed(row.employee_id) || !departmentAllowed(row.employee_id)) continue;
-          if (row.employee_id) employeeIds.add(row.employee_id);
-          if (row.kind === "debito") next.debit += Math.abs(Number(row.minutes || 0));
-          if (row.kind === "credito") next.he60 += Number(row.minutes || 0);
-        }
-        for (const row of occurrences.data ?? []) {
-          if (!employeeAllowed(row.employee_id) || !departmentAllowed(row.employee_id)) continue;
-          if (row.employee_id) employeeIds.add(row.employee_id);
-          if (String(row.unit).toLowerCase().includes("dia")) next.absences += Number(row.quantity || 0);
-        }
-        for (const row of certificates.data ?? []) {
-          if (!employeeAllowed(row.employee_id) || !departmentAllowed(row.employee_id)) continue;
-          if (row.employee_id) employeeIds.add(row.employee_id);
-          next.certificates += Number(row.days || 0) * 60 * 8.8;
-        }
+      for (const row of timeRecords ?? []) {
+        if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        operationalCount += 1;
+        next.expected += Number(row.expected_minutes || 0);
+        next.worked += Number(row.worked_minutes || 0);
       }
 
-      next.employees = employeeIds.size;
-      if (!employeeIds.size) {
-        next.employees = historicalRows.length ? new Set(historicalRows.map((r: any) => r.registration ?? r.employee_id ?? r.employee_name)).size : 0;
+      for (const row of overtime ?? []) {
+        if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+
+        const employee = employees.find(e => e.id === row.employee_id);
+        if (!employee) continue;
+
+        const current = comparison.get(employee.id) ?? {
+          employeeId: employee.id, name: employee.name,
+          he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0, interjornada: 0, total: 0,
+        };
+
+        const minutes = Number(row.minutes || 0);
+        const rate = Number(row.rate_percent || 0);
+        const notes = String(row.notes || "").toLowerCase();
+
+        if (rate === 50) current.interjornada += minutes;
+        else if (rate === 100 && notes.includes("noturn")) current.he100Night += minutes;
+        else if (rate === 100) current.he100 += minutes;
+        else if (rate === 20) current.he20 += minutes;
+        else if (notes.includes("60% + 20%") || notes.includes("noturn")) current.he60Night += minutes;
+        else current.he60 += minutes;
+
+        comparison.set(employee.id, current);
       }
-      next.balance = next.he60 + next.he60Night + next.he100 + next.he20 - next.debit;
-      setSource(hasHistorical && hasOperational ? "Histórico da BASE + lançamentos atuais do DP-Success" : hasHistorical ? "Histórico consolidado da aba BASE do Power BI" : "Lançamentos atuais do DP-Success");
-      setM(next);
+
+      const terminationEmployees = allowedEmployees.filter(e =>
+        e.terminationDate &&
+        e.terminationDate >= rangeStart &&
+        e.terminationDate <= rangeEnd
+      );
+
+      const headcountAt = (date: string) =>
+        allowedEmployees.filter(e =>
+          (!e.hireDate || e.hireDate <= date) &&
+          (!e.terminationDate || e.terminationDate > date)
+        ).length;
+
+      const headcounts = targetPeriods.map(p => headcountAt(p.end_date));
+      const averageHeadcount = headcounts.length
+        ? headcounts.reduce((sum, value) => sum + value, 0) / headcounts.length
+        : 0;
+
+      next.employees = allowedEmployees.filter(e => !e.terminationDate || e.terminationDate > rangeEnd).length;
+      next.terminations = terminationEmployees.length;
+      next.averageHeadcount = averageHeadcount;
+      next.turnover = averageHeadcount > 0 ? (terminationEmployees.length / averageHeadcount) * 100 : 0;
+
+      for (const item of comparison.values()) {
+        item.total = item.he60 + item.he60Night + item.he100 + item.he100Night + item.he20 + item.interjornada;
+      }
+
+      const comparisonRows = [...comparison.values()].filter(item => item.total > 0).sort((a, b) => b.total - a.total);
+      setOvertimeEmployees(comparisonRows);
+
+      setMetrics(next);
+      setSource(
+        historicalCount && operationalCount
+          ? "Histórico da BASE + lançamentos atuais do DP-Success"
+          : historicalCount
+            ? "Histórico consolidado da aba BASE do Power BI"
+            : "Lançamentos atuais do DP-Success"
+      );
     })();
-  }, [selectedPeriodId, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, periods, employeeOptions]);
+  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees]);
+
+  const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
+  const totalOvertime = metrics.he60 + metrics.he60Night + metrics.he100 + metrics.he100Night + metrics.he20 + metrics.interjornada;
+  const maxComparison = Math.max(...overtimeEmployees.map(e => e.total), 1);
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b px-6 py-4">
-        <div className="mx-auto flex max-w-[1500px] justify-between">
-          <a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="inline h-4 w-4 mr-1" />Voltar</a>
+      <header className="border-b bg-background/95 px-6 py-4">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between">
+          <a href="/" className="text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="mr-1 inline h-4 w-4" />Voltar</a>
           <b>DP Success · KPIs</b>
         </div>
       </header>
 
       <main className="mx-auto max-w-[1500px] px-6 py-7">
-        <p className="text-sm text-primary">Gestão</p>
-        <h1 className="text-3xl font-bold">KPIs de RH e DP</h1>
-        <Card className="mt-5 border p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold">Filtros dos indicadores</p>
-              <p className="text-xs text-muted-foreground">Combine ano, competência, setor e funcionários.</p>
+        <div>
+          <p className="text-sm font-medium text-primary">Gestão</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight">KPIs de RH e DP</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{periodLabel || "Selecione os filtros para analisar os indicadores."}</p>
+        </div>
+
+        <Card className="mt-6 border shadow-sm">
+          <div className="border-b px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-semibold">Filtros</p>
+                <p className="text-xs text-muted-foreground">Combine os filtros para atualizar todas as seções.</p>
+              </div>
+              <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => { setSelectedMonth("todos"); setSelectedDepartment("todos"); setSelectedEmployees([]); }}>
+                Limpar filtros
+              </button>
             </div>
-            <button type="button" className="text-xs font-medium text-primary hover:underline" onClick={() => { setSelectedMonth("todos"); setSelectedDepartment("todos"); setSelectedEmployees([]); }}>Limpar filtros</button>
           </div>
-          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
-            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ano
-              <select className="h-10 rounded-lg border bg-background px-3 text-sm font-normal outline-none focus:ring-2 focus:ring-primary/20" value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
+          <div className="grid gap-4 p-5 md:grid-cols-3 lg:grid-cols-4">
+            <label className="grid gap-1.5 text-sm font-medium">Ano
+              <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
                 {[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}
               </select>
             </label>
-            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mês
-              <select className="h-10 rounded-lg border bg-background px-3 text-sm font-normal outline-none focus:ring-2 focus:ring-primary/20" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+            <label className="grid gap-1.5 text-sm font-medium">Mês
+              <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
                 <option value="todos">Todos</option>
                 {periods.filter(p => p.reference_year === selectedYear).map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}
               </select>
             </label>
-            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Setor
-              <select className="h-10 rounded-lg border bg-background px-3 text-sm font-normal outline-none focus:ring-2 focus:ring-primary/20" value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}>
+            <label className="grid gap-1.5 text-sm font-medium">Setor
+              <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}>
                 <option value="todos">Todos os setores</option>
                 {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </label>
-            <div className="relative grid gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="relative grid gap-1.5 text-sm font-medium">
               Funcionários
-              <button type="button" className="flex h-10 items-center justify-between rounded-lg border bg-background px-3 text-left text-sm font-normal normal-case" onClick={() => setEmployeeFilterOpen(v => !v)}>
+              <button type="button" className="flex h-10 items-center justify-between rounded-lg border bg-background px-3 text-left font-normal" onClick={() => setEmployeeFilterOpen(v => !v)}>
                 <span className="truncate">{selectedEmployees.length === 0 ? "Todos os funcionários" : `${selectedEmployees.length} selecionado(s)`}</span>
                 <span className="ml-2 text-muted-foreground">⌄</span>
               </button>
-              {employeeFilterOpen && <div className="absolute left-0 right-0 top-[4.5rem] z-30 max-h-72 overflow-y-auto rounded-lg border bg-popover p-2 text-sm shadow-lg">
-                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
-                  <input type="checkbox" checked={selectedEmployees.length === 0} onChange={() => setSelectedEmployees([])} />
-                  <span>Todos os funcionários</span>
-                </label>
-                {employeeOptions.map(e => <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
-                  <input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={() => setSelectedEmployees(current => current.includes(e.id) ? current.filter(id => id !== e.id) : [...current, e.id])} />
-                  <span className="truncate">{e.name}</span>
-                </label>)}
-              </div>}
+              {employeeFilterOpen && (
+                <div className="absolute left-0 right-0 top-[4.5rem] z-30 max-h-72 overflow-y-auto rounded-lg border bg-popover p-2 text-sm shadow-xl">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                    <input type="checkbox" checked={selectedEmployees.length === 0} onChange={() => setSelectedEmployees([])} />
+                    <span>Todos os funcionários</span>
+                  </label>
+                  {employeeOptions.map(e => (
+                    <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
+                      <input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={() => setSelectedEmployees(current => current.includes(e.id) ? current.filter(id => id !== e.id) : [...current, e.id])} />
+                      <span className="truncate">{e.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </Card><p className="mt-2 text-sm text-muted-foreground">{period || "Competência atual"}</p>
-        {source && <p className="mt-1 text-xs text-muted-foreground">{source}</p>}
-        {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Funcionários na competência</p><p className="text-2xl font-bold">{m.employees}</p></Card>
-          <Card className="p-5"><BriefcaseBusiness className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="text-2xl font-bold">{fmt(m.expected)}</p></Card>
-          <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas trabalhadas</p><p className="text-2xl font-bold">{fmt(m.worked)}</p></Card>
-          <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="text-2xl font-bold">{m.absences}</p></Card>
-
-          <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="text-2xl font-bold">{fmt(m.certificates)}</p></Card>
-          <Card className="p-5"><Percent className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declaração de horas</p><p className="text-2xl font-bold">{fmt(m.declarations)}</p></Card>
-          <Card className="p-5"><Wallet className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Abonos</p><p className="text-2xl font-bold">{fmt(m.allowances)}</p></Card>
-          <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Débito</p><p className="text-2xl font-bold">{fmt(-m.debit)}</p></Card>
-
-          <Card className="p-5"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">HE 60%</p><p className="text-2xl font-bold">{fmt(m.he60)}</p></Card>
-          <Card className="p-5"><Moon className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">HE 60% + 20%</p><p className="text-2xl font-bold">{fmt(m.he60Night)}</p></Card>
-          <Card className="p-5"><Sun className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">HE 100%</p><p className="text-2xl font-bold">{fmt(m.he100)}</p></Card>
-          <Card className="p-5"><Moon className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">HE 20%</p><p className="text-2xl font-bold">{fmt(m.he20)}</p></Card>
-
-          <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Interjornada</p><p className="text-2xl font-bold">{fmt(m.interjornada)}</p><p className="text-xs text-muted-foreground">Fora do saldo</p></Card>
-          <Card className="p-5"><Wallet className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Saldo da competência</p><p className="text-2xl font-bold">{fmt(m.balance)}</p><p className="text-xs text-muted-foreground">Créditos − débito; interjornada não entra</p></Card>
-        </div>
-
-        <Card className="mt-6 p-6">
-          <p className="text-sm text-muted-foreground">
-            Os 18 campos da aba BASE são preservados no histórico consolidado por funcionário e competência. A partir das competências manuais, os KPIs usam os registros operacionais do DP-Success.
-          </p>
         </Card>
+
+        {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
+
+        <section className="mt-8">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
+              <h2 className="mt-1 text-2xl font-bold">Absenteísmo</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Horas de ausência ÷ horas previstas × 100.</p>
+            </div>
+            <div className="rounded-2xl border bg-card px-5 py-3 text-right shadow-sm">
+              <p className="text-xs text-muted-foreground">Índice de absenteísmo</p>
+              <p className="text-3xl font-bold">{pct(absenteeismRate)}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
+            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Horas de ausência</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.absenceMinutes)}</p></Card>
+            <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Horas trabalhadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.worked)}</p></Card>
+            <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Funcionários no recorte</p><p className="mt-1 text-2xl font-bold">{metrics.employees}</p></Card>
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 02</p>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="mt-1 text-2xl font-bold">Horas Extras</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Comparação entre os funcionários selecionados. Interjornada é exibida, mas não compõe o saldo.</p>
+              </div>
+              <div className="rounded-2xl border bg-card px-5 py-3 text-right shadow-sm">
+                <p className="text-xs text-muted-foreground">Total de horas extras</p>
+                <p className="text-2xl font-bold">{fmt(totalOvertime)}</p>
+              </div>
+            </div>
+          </div>
+
+          <Card className="overflow-hidden">
+            <div className="grid grid-cols-[minmax(180px,1fr)_repeat(6,minmax(80px,0.6fr))_minmax(90px,0.7fr)] border-b bg-muted/40 px-4 py-3 text-xs font-semibold text-muted-foreground">
+              <span>Funcionário</span><span>60%</span><span>60%+20%</span><span>100%</span><span>100%+20%</span><span>20%</span><span>Interj.</span><span>Total</span>
+            </div>
+            {overtimeEmployees.length ? overtimeEmployees.map(row => (
+              <div key={row.employeeId} className="grid grid-cols-[minmax(180px,1fr)_repeat(6,minmax(80px,0.6fr))_minmax(90px,0.7fr)] items-center gap-0 border-b px-4 py-3 text-sm last:border-b-0">
+                <div className="min-w-0 pr-3"><p className="truncate font-medium">{row.name}</p><div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (row.total / maxComparison) * 100)}%` }} /></div></div>
+                <span>{fmt(row.he60)}</span><span>{fmt(row.he60Night)}</span><span>{fmt(row.he100)}</span><span>{fmt(row.he100Night)}</span><span>{fmt(row.he20)}</span><span>{fmt(row.interjornada)}</span><span className="font-semibold">{fmt(row.total)}</span>
+              </div>
+            )) : (
+              <div className="px-5 py-10 text-center text-sm text-muted-foreground">Nenhuma hora extra encontrada para os filtros selecionados.</div>
+            )}
+          </Card>
+        </section>
+
+        <section className="mt-10 pb-10">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 03</p>
+              <h2 className="mt-1 text-2xl font-bold">Turnover</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Calculado automaticamente pelos desligamentos cadastrados e pela média de funcionários no período.</p>
+            </div>
+            <div className="rounded-2xl border bg-card px-5 py-3 text-right shadow-sm">
+              <p className="text-xs text-muted-foreground">Turnover</p>
+              <p className="text-3xl font-bold">{pct(metrics.turnover)}</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="p-5"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Desligamentos no período</p><p className="mt-1 text-2xl font-bold">{metrics.terminations}</p></Card>
+            <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Média de funcionários</p><p className="mt-1 text-2xl font-bold">{metrics.averageHeadcount.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</p></Card>
+            <Card className="p-5"><Percent className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Fórmula</p><p className="mt-1 text-sm font-semibold">Desligamentos ÷ média de funcionários × 100</p></Card>
+          </div>
+        </section>
       </main>
     </div>
   );
