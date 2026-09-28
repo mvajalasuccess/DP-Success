@@ -259,14 +259,8 @@ export function ImportacaoHistorico() {
             position_id: positionId,
           };
 
-          // Cadastros criados automaticamente pela importação anterior
-          // devem permanecer ativos até que o RH informe manualmente
-          // a situação real e, se necessário, a data de desligamento.
-          if (String(employee.notes ?? "").includes("Cadastro criado automaticamente a partir do histórico da BASE")) {
-            updatePayload.status = "ativo";
-            updatePayload.termination_date = null;
-          }
-
+          // A importação histórica não altera situação nem data de desligamento.
+          // Essas informações são decisões cadastrais do RH e alimentam o Turnover.
           const { error: employeeUpdateError } = await db
             .from("employees")
             .update(updatePayload)
@@ -313,7 +307,7 @@ export function ImportacaoHistorico() {
       if (batchUpdateError) throw new Error(batchUpdateError.message);
 
       setResult({ imported: output.length, unmatched, createdEmployees });
-      setMessage(`Histórico importado com sucesso. ${createdEmployees} cadastro(s) de funcionário foram criados automaticamente como ativos para preservar o histórico. O RH pode editar a situação e a data de demissão de cada funcionário.`);
+      setMessage(`Histórico importado com sucesso. ${createdEmployees} cadastro(s) de funcionário foram criados automaticamente como ativos para preservar o histórico. O RH pode editar a situação e a data de demissão de cada funcionário. A importação não altera essas informações.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha na importação.");
     } finally {
