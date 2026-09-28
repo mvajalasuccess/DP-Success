@@ -12,7 +12,7 @@ export function Employees() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "" });
+  const [form, setForm] = useState({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -52,7 +52,7 @@ export function Employees() {
   function openNew() {
     setError("");
     setEditingId(null);
-    setForm({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "" });
+    setForm({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo" });
     setOpen(true);
   }
 
@@ -67,6 +67,7 @@ export function Employees() {
       admission: employee.hire_date ?? "",
       termination: employee.termination_date ?? "",
       bank: "",
+      status: employee.status ?? "ativo",
       work_schedule_id: employee.work_schedule_id ?? "",
     });
     setOpen(true);
@@ -75,6 +76,10 @@ export function Employees() {
   async function saveEmployee() {
     if (!form.name.trim() || !form.role || !form.department || !form.admission) {
       setError("Preencha nome, cargo, departamento e data de admissão.");
+      return;
+    }
+    if (form.status === "inativo" && !form.termination) {
+      setError("Informe a data de desligamento para um funcionário inativo.");
       return;
     }
     if (form.termination && form.termination < form.admission) {
@@ -90,8 +95,8 @@ export function Employees() {
         department_id: form.department,
         position_id: form.role,
         hire_date: form.admission,
-        termination_date: form.termination || null,
-        status: form.termination ? "inativo" : "ativo",
+        termination_date: form.status === "inativo" ? form.termination || null : null,
+        status: form.status,
         work_schedule_id: form.work_schedule_id || null,
       }).eq("id", editingId);
       if (result.error) {
@@ -123,8 +128,8 @@ export function Employees() {
       department_id: form.department,
       position_id: form.role,
       hire_date: form.admission,
-      termination_date: form.termination || null,
-      status: form.termination ? "inativo" : "ativo",
+      termination_date: form.status === "inativo" ? form.termination || null : null,
+      status: form.status,
       work_schedule_id: form.work_schedule_id || null,
     }).select("id").single();
 
@@ -147,7 +152,7 @@ export function Employees() {
       if (bank.error) setError("Funcionário criado, mas o saldo inicial não pôde ser lançado: " + bank.error.message);
     }
 
-    setForm({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "" });
+    setForm({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo" });
     setOpen(false);
     setSaving(false);
     await loadEmployees();
@@ -248,7 +253,8 @@ export function Employees() {
             <label className="grid gap-1 text-sm font-medium">Departamento<select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione o departamento</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
             <label className="grid gap-1 text-sm font-medium">Salário<input type="number" min="0" step="0.01" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="3000,00" /></label>
             <label className="grid gap-1 text-sm font-medium">Data de admissão<input type="date" value={form.admission} onChange={(e) => setForm({ ...form, admission: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
-            <label className="grid gap-1 text-sm font-medium">Data de desligamento<input type="date" value={form.termination} onChange={(e) => setForm({ ...form, termination: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
+            <label className="grid gap-1 text-sm font-medium">Situação<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value, termination: e.target.value === "ativo" ? "" : form.termination })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>
+            <label className="grid gap-1 text-sm font-medium">Data de desligamento<input type="date" value={form.termination} onChange={(e) => setForm({ ...form, termination: e.target.value })} disabled={form.status !== "inativo"} className="rounded-lg border bg-background px-3 py-2 font-normal disabled:bg-muted disabled:text-muted-foreground" /></label>
             {!editingId && <label className="grid gap-1 text-sm font-medium">Saldo inicial<input value={form.bank} onChange={(e) => setForm({ ...form, bank: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="+12:35 ou -03:20" /></label>}
             <label className="grid gap-1 text-sm font-medium md:col-span-2">Jornada / escala<select value={form.work_schedule_id} onChange={(e) => setForm({ ...form, work_schedule_id: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecionar jornada</option>{schedules.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           </div>
