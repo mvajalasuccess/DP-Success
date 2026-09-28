@@ -188,25 +188,27 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   const adjustments = check(adjustmentsResult) as ManualAdjustment[];
   const historicalByPeriod = new Map(historical.map(row => [row.period_id, historicalComposition(row)]));
   const ordered = [...periods].sort((a, b) => a.start_date.localeCompare(b.start_date));
-  let accumulated = adjustments
-    .filter(a => a.entry_date < (ordered[0]?.start_date ?? "9999-12-31"))
-    .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
+  let accumulated = 0;
 
-  return ordered.map(period => {
+  return ordered.map((period, index) => {
     const historicalComp = historicalByPeriod.get(period.id);
     const comp = historicalComp ?? composeMinutes(
       launches.credits.filter(r => r.period_id === period.id || inRange(r.reference_date, period)),
       launches.debits.filter(r => r.period_id === period.id || inRange(r.entry_date, period)),
     );
+
+    // Ajustes vinculados à competência entram nela. Ajustes antigos sem period_id
+    // também são tratados como saldo inicial da PRIMEIRA competência, para que
+    // apareçam em janeiro e participem do acumulado desde o início.
     const adjustment = adjustments
       .filter(a => {
         if (a.period_id === period.id) return true;
         if (a.period_id) return false;
-        if (a.entry_date >= period.start_date && a.entry_date <= period.end_date) return true;
-        const openPeriod = ordered.find(p => p.status === "aberto");
-        return openPeriod?.id === period.id && a.entry_date > period.end_date;
+        if (index === 0 && a.entry_date < period.start_date) return true;
+        return inRange(a.entry_date, period);
       })
       .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
+
     const monthBalance = balanceOf(comp) + adjustment;
     accumulated += monthBalance;
     return { period, composition: comp, monthBalance, accumulated, adjustment };
