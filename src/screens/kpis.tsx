@@ -12,6 +12,7 @@ type Employee = {
   hireDate: string | null;
   terminationDate: string | null;
   status: string;
+  workScheduleId: string | null;
 };
 
 type OvertimeEmployee = {
@@ -98,7 +99,7 @@ export function Kpis() {
       const db = supabase as any;
       const [{ data: periodRows, error: periodError }, { data: employeeRows, error: employeeError }] = await Promise.all([
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
-        db.from("employees").select("id,full_name,registration,department_id,hire_date,termination_date,status,departments(name)").order("full_name"),
+        db.from("employees").select("id,full_name,registration,department_id,hire_date,termination_date,status,work_schedule_id,departments(name)").order("full_name"),
       ]);
 
       if (periodError || employeeError) {
@@ -114,6 +115,7 @@ export function Kpis() {
         hireDate: e.hire_date ?? null,
         terminationDate: e.termination_date ?? null,
         status: e.status ?? "ativo",
+        workScheduleId: e.work_schedule_id ?? null,
       }));
 
       const parsedPeriods = (periodRows ?? []) as Period[];
@@ -180,6 +182,7 @@ export function Kpis() {
         { data: timeRecords, error: timeError },
         { data: currentOccurrences, error: occurrenceError },
         { data: currentDebits, error: debitError },
+        { data: scheduleRows, error: scheduleError },
       ] = await Promise.all([
         historicalPeriodIds.length
           ? db.from("historical_kpi_data")
@@ -207,10 +210,11 @@ export function Kpis() {
               .eq("kind", "debito")
               .in("period_id", currentPeriodIds)
           : Promise.resolve({ data: [], error: null }),
+        db.from("work_schedules").select("id,weekly_minutes").eq("active", true),
       ]);
 
-      if (historicalError || overtimeError || timeError || occurrenceError || debitError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || timeError || occurrenceError || debitError || scheduleError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
         return;
       }
 
@@ -231,6 +235,35 @@ export function Kpis() {
       const next = { ...emptyMetrics };
       let historicalCount = 0;
       let operationalCount = 0;
+      const scheduleMinutes = new Map<string, number>(
+        (scheduleRows ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0)]),
+      );
+
+      const dateDiffInclusive = (start: string, end: string) => {
+        const a = new Date(start + "T00:00:00");
+        const b = new Date(end + "T00:00:00");
+        return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000) + 1);
+      };
+
+      const expectedFromSchedule = (employee: Employee, period: Period) => {
+        const weekly = employee.workScheduleId ? (scheduleMinutes.get(employee.workScheduleId) ?? 0) : 0;
+        if (!weekly) return 0;
+
+        const employeeStart = employee.hireDate && employee.hireDate > period.start_date
+          ? employee.hireDate
+          : period.start_date;
+        const employeeEnd = employee.terminationDate && employee.terminationDate < period.end_date
+          ? employee.terminationDate
+          : period.end_date;
+
+        if (employeeEnd < employeeStart) return 0;
+        return Math.round((weekly / 7) * dateDiffInclusive(employeeStart, employeeEnd));
+      };
+
+      const dailyMinutesFromSchedule = (employee: Employee) => {
+        const weekly = employee.workScheduleId ? (scheduleMinutes.get(employee.workScheduleId) ?? 0) : 0;
+        return weekly ? weekly / 5 : 8.8 * 60;
+      };
       const comparison = new Map<string, OvertimeEmployee>();
 
       const addOvertime = (row: any, employee: Employee | undefined, minutes: number, launchType: string) => {
@@ -294,11 +327,24 @@ export function Kpis() {
         }
       }
 
+      const recordedExpectedEmployees = new Set<string>();
       for (const row of timeRecords ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
         operationalCount += 1;
-        next.expected += Number(row.expected_minutes || 0);
+        const expected = Number(row.expected_minutes || 0);
+        next.expected += expected;
         next.worked += Number(row.worked_minutes || 0);
+        if (expected > 0) recordedExpectedEmployees.add(row.employee_id);
+      }
+
+      // Nas competências manuais, não é necessário informar horas previstas em cada lançamento.
+      // Quando não houver registro de ponto com expected_minutes, o KPI calcula o previsto
+      // automaticamente a partir da jornada cadastrada no funcionário.
+      for (const period of targetPeriods.filter(p => p.end_date > HISTORICAL_CUTOFF)) {
+        for (const employee of allowedEmployees) {
+          if (recordedExpectedEmployees.has(employee.id)) continue;
+          next.expected += expectedFromSchedule(employee, period);
+        }
       }
 
       for (const row of overtime ?? []) {
@@ -319,8 +365,10 @@ export function Kpis() {
         const code = String(row.occurrence_types?.code ?? "").toLowerCase();
         const quantity = Number(row.quantity || 0);
         const unit = String(row.unit ?? "dias");
+        const employee = employees.find(e => e.id === row.employee_id);
+        const dailyMinutes = employee ? dailyMinutesFromSchedule(employee) : 8.8 * 60;
         const minutes = unit.toLowerCase().startsWith("dia")
-          ? Math.round(quantity * 8.8 * 60)
+          ? Math.round(quantity * dailyMinutes)
           : unit.toLowerCase().startsWith("hor")
             ? Math.round(quantity * 60)
             : Math.round(quantity);
