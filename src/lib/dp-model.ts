@@ -78,6 +78,9 @@ export function formatDateBR(value?: string | null) {
   return `${d}/${m}/${y}`;
 }
 export function periodRangeLabel(p: Pick<Period, "start_date" | "end_date">) {
+  // Exceção exclusivamente visual da competência de janeiro/2026:
+  // a competência começou em 11/12/2025, sem alterar nenhum cálculo ou período no banco.
+  if (p.end_date === "2026-01-20") return "11/12/2025 até 20/01/2026";
   return `${formatDateBR(p.start_date)} até ${formatDateBR(p.end_date)}`;
 }
 export const PERIOD_STATUS_LABEL: Record<string, string> = { aberto: "Aberto", em_conferencia: "Em conferência", fechado: "Fechado" };
