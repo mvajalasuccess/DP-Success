@@ -26,16 +26,6 @@ function decimalHoursToMinutes(value: unknown) {
   return Math.round(numberValue(value) * 60);
 }
 
-/** Débito e horas extras da BASE usam o formato HH.MM (ex.: 8.31 = 8h31). */
-function hhmmValueToMinutes(value: unknown) {
-  const n = numberValue(value);
-  const sign = n < 0 ? -1 : 1;
-  const absolute = Math.abs(n);
-  const hours = Math.floor(absolute);
-  const minutes = Math.round((absolute - hours) * 100);
-  return sign * (hours * 60 + minutes);
-}
-
 function monthFromCell(value: unknown) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.getMonth() + 1;
   if (typeof value === "number") {
@@ -295,12 +285,12 @@ export function ImportacaoHistorico() {
           certificate_minutes: decimalHoursToMinutes(row["Atestados"]),
           declaration_minutes: decimalHoursToMinutes(row["Declaração de Horas"]),
           allowance_minutes: decimalHoursToMinutes(row["Abonos"]),
-          debit_minutes: hhmmValueToMinutes(row["Débito"]),
-          he_60_minutes: hhmmValueToMinutes(row["HE 60%"]),
-          he_60_night_minutes: hhmmValueToMinutes(row["HE 60%20%"]),
-          he_100_minutes: hhmmValueToMinutes(row["HE 100%"]),
-          he_20_minutes: hhmmValueToMinutes(row["HE 20%"]),
-          interjornada_minutes: hhmmValueToMinutes(row["INTERJORNADA"]),
+          debit_minutes: decimalHoursToMinutes(row["Débito"]),
+          he_60_minutes: decimalHoursToMinutes(row["HE 60%"]),
+          he_60_night_minutes: decimalHoursToMinutes(row["HE 60%20%"]),
+          he_100_minutes: decimalHoursToMinutes(row["HE 100%"]),
+          he_20_minutes: decimalHoursToMinutes(row["HE 20%"]),
+          interjornada_minutes: decimalHoursToMinutes(row["INTERJORNADA"]),
           import_batch_id: batch.id,
         });
       }
@@ -368,7 +358,7 @@ export function ImportacaoHistorico() {
               <div className="mt-5 flex flex-col gap-3 rounded-xl border p-4 text-sm md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-semibold">Competência histórica</p>
-                  <p className="text-xs text-muted-foreground">Janeiro/2026 será gravado como 21/12/2025 até 20/01/2026. A BASE será importada somente até julho/2026. Janeiro corresponde a 21/12/2025 → 20/01/2026. Horas previstas/trabalhadas e afastamentos são decimais; débito e horas extras da BASE usam HH.MM (ex.: 8.31 = 8h31).</p>
+                  <p className="text-xs text-muted-foreground">Janeiro/2026 será gravado como 21/12/2025 até 20/01/2026. A BASE será importada somente até julho/2026. Janeiro corresponde a 21/12/2025 → 20/01/2026. Os valores de horas da BASE são horas decimais (ex.: 0,93 = 0h55m48s), e o sistema converte esses valores para minutos.</p>
                 </div>
                 <button type="button" disabled={loading} onClick={() => void importData()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
                   {loading ? "Importando..." : "Importar BASE"}
