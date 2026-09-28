@@ -176,6 +176,8 @@ export function Kpis() {
         { data: historical, error: historicalError },
         { data: overtime, error: overtimeError },
         { data: timeRecords, error: timeError },
+        { data: currentOccurrences, error: occurrenceError },
+        { data: currentDebits, error: debitError },
       ] = await Promise.all([
         historicalPeriodIds.length
           ? db.from("historical_kpi_data")
@@ -185,18 +187,24 @@ export function Kpis() {
         Promise.resolve({ data: [], error: null }),
         currentPeriodIds.length
           ? db.from("time_records")
-              .select("employee_id,period_id,expected_minutes,worked_minutes,negative_minutes")
+              .select("employee_id,period_id,expected_minutes,worked_minutes")
               .in("period_id", currentPeriodIds)
           : Promise.resolve({ data: [], error: null }),
         currentPeriodIds.length
-          ? db.from("overtime_records")
-              .select("employee_id,period_id,minutes,launch_type,rate_percent,notes")
+          ? db.from("occurrences")
+              .select("employee_id,period_id,quantity,unit,occurrence_types(code)")
+              .in("period_id", currentPeriodIds)
+          : Promise.resolve({ data: [], error: null }),
+        currentPeriodIds.length
+          ? db.from("bank_hours")
+              .select("employee_id,period_id,minutes")
+              .eq("kind", "debito")
               .in("period_id", currentPeriodIds)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
-      if (historicalError || overtimeError || timeError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || timeError || occurrenceError || debitError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? "Não foi possível carregar os indicadores.");
         return;
       }
 
@@ -248,8 +256,35 @@ export function Kpis() {
         operationalCount += 1;
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
-        next.faltasMinutes += Number(row.negative_minutes || 0);
-        next.absenceMinutes += Number(row.negative_minutes || 0);
+
+      }
+
+      // Regra de absenteísmo:
+      // horas perdidas = horas de falta + horas de débito + horas de abono.
+      // Uma falta de 1 dia corresponde a 08:48 (528 minutos).
+      for (const row of currentOccurrences ?? []) {
+        if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        const code = String(row.occurrence_types?.code ?? "").toLowerCase();
+        const quantity = Number(row.quantity || 0);
+        const unit = String(row.unit ?? "dias");
+        const minutes = unit.toLowerCase().startsWith("dia")
+          ? Math.round(quantity * 8.8 * 60)
+          : unit.toLowerCase().startsWith("hor")
+            ? Math.round(quantity * 60)
+            : Math.round(quantity);
+        if (code === "falta") {
+          next.faltasMinutes += minutes;
+          next.absenceMinutes += minutes;
+        } else if (code === "abono") {
+          next.abonosMinutes += minutes;
+          next.absenceMinutes += minutes;
+        }
+      }
+
+      for (const row of currentDebits ?? []) {
+        if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        const minutes = Math.abs(Number(row.minutes || 0));
+        next.absenceMinutes += minutes;
       }
 
       const terminationEmployees = allowedEmployees.filter(e =>
