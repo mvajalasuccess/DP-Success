@@ -174,7 +174,7 @@ function historicalComposition(row: HistoricalBalanceRow): Composition {
 }
 
 export async function balancesByEmployee(employeeId: string): Promise<PeriodBalance[]> {
-  const [periods, launches, historical, adjustmentsResult] = await Promise.all([
+  const [periods, launches, historical, adjustmentsResult, employeeResult] = await Promise.all([
     fetchPeriods(),
     fetchLaunches({ employeeId }),
     fetchHistoricalBalances(employeeId),
@@ -184,8 +184,21 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
       .eq("employee_id", employeeId)
       .eq("kind", "ajuste")
       .order("entry_date", { ascending: true }),
+    supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle(),
   ]);
   const adjustments = check(adjustmentsResult) as ManualAdjustment[];
+  const employeeName = String(employeeResult.data?.full_name ?? "").trim().toUpperCase();
+  const isDyan = employeeName === "DYAN" || employeeName.startsWith("DYAN ");
+  const dyanManualBalances: Record<string, number> = {
+    "2026-01-20": 17 * 60 + 31,
+    "2026-02-20": 12 * 60 + 28,
+    "2026-03-08": 20 * 60 + 10,
+    "2026-03-20": 33 * 60 + 30,
+    "2026-04-20": -(1 * 60 + 7),
+    "2026-05-20": 18 * 60 + 17,
+    "2026-06-20": 41 * 60 + 19,
+    "2026-07-20": -(14 * 60 + 58),
+  };
   const historicalByPeriod = new Map(historical.map(row => [row.period_id, historicalComposition(row)]));
   const ordered = [...periods].sort((a, b) => a.start_date.localeCompare(b.start_date));
   // Ajustes anteriores à primeira competência são saldo inicial: entram no acumulado,
@@ -216,7 +229,10 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
       })
       .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
 
-    const monthBalance = balanceOf(comp) + adjustment;
+    const calculatedBalance = balanceOf(comp) + adjustment;
+    const monthBalance = isDyan && Object.prototype.hasOwnProperty.call(dyanManualBalances, period.end_date)
+      ? dyanManualBalances[period.end_date]
+      : calculatedBalance;
     accumulated += monthBalance;
     return { period, composition: comp, monthBalance, accumulated, adjustment };
   });
