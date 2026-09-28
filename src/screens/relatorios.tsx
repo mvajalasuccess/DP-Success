@@ -4,7 +4,7 @@ export function csv(rows:any[]){if(!rows.length)return "";const keys=Object.keys
 function download(name:string,rows:any[]){const blob=new Blob(["\ufeff"+csv(rows)],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
 export function Relatorios(){
  const[competence,setCompetence]=useState<any>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(""),[error,setError]=useState("");
- useEffect(()=>{void(async()=>{const{data,error}=await(supabase).from("competencies").select("id,name,start_date,end_date,status").order("end_date",{ascending:false}).limit(1);if(error)setError(error.message);setCompetence(data?.[0]??null);setLoading(false)})()},[]);
+ useEffect(()=>{void(async()=>{const{data,error}=await(supabase as any).from("competencies").select("id,name,start_date,end_date,status").order("end_date",{ascending:false}).limit(1);if(error)setError(error.message);setCompetence(data?.[0]??null);setLoading(false)})()},[]);
  async function exportReport(kind:string){
   setBusy(kind);setError("");const db=supabase as any;let rows:any[]=[];
   try{
