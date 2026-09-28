@@ -90,6 +90,8 @@ export function Kpis() {
   const [periodLabel, setPeriodLabel] = useState("");
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<"absenteismo" | "horas-extras" | "turnover">("absenteismo");
+  const [overtimeEmployees, setOvertimeEmployees] = useState<OvertimeEmployee[]>([]);
+  const [source, setSource] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -184,7 +186,11 @@ export function Kpis() {
               .select("period_id,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
               .in("period_id", historicalPeriodIds)
           : Promise.resolve({ data: [], error: null }),
-        Promise.resolve({ data: [], error: null }),
+        currentPeriodIds.length
+          ? db.from("overtime_records")
+              .select("employee_id,period_id,minutes,launch_type")
+              .in("period_id", currentPeriodIds)
+          : Promise.resolve({ data: [], error: null }),
         currentPeriodIds.length
           ? db.from("time_records")
               .select("employee_id,period_id,expected_minutes,worked_minutes")
@@ -225,6 +231,31 @@ export function Kpis() {
       const next = { ...emptyMetrics };
       let historicalCount = 0;
       let operationalCount = 0;
+      const comparison = new Map<string, OvertimeEmployee>();
+
+      const addOvertime = (row: any, employee: Employee | undefined, minutes: number, launchType: string) => {
+        if (!employee || !allowedIds.has(employee.id)) return;
+        const key = employee.id;
+        const item = comparison.get(key) ?? {
+          employeeId: employee.id,
+          name: employee.name,
+          he60: 0,
+          he60Night: 0,
+          he100: 0,
+          he100Night: 0,
+          he20: 0,
+          interjornada: 0,
+          total: 0,
+        };
+        const type = String(launchType ?? "").toUpperCase();
+        if (type === "HE_60") item.he60 += minutes;
+        else if (type === "HE_60_NOTURNO") item.he60Night += minutes;
+        else if (type === "HE_100") item.he100 += minutes;
+        else if (type === "HE_100_NOTURNO") item.he100Night += minutes;
+        else if (type === "ADICIONAL_NOTURNO") item.he20 += minutes;
+        else if (type === "INTERJORNADA_50") item.interjornada += minutes;
+        comparison.set(key, item);
+      };
 
       for (const row of historical ?? []) {
         if (!isAllowedRow(row)) continue;
@@ -253,6 +284,14 @@ export function Kpis() {
         next.he100 += Number(row.he_100_minutes || 0);
         next.he20 += Number(row.he_20_minutes || 0);
         next.interjornada += Number(row.interjornada_minutes || 0);
+
+        if (employee) {
+          addOvertime(row, employee, Number(row.he_60_minutes || 0), "HE_60");
+          addOvertime(row, employee, Number(row.he_60_night_minutes || 0), "HE_60_NOTURNO");
+          addOvertime(row, employee, Number(row.he_100_minutes || 0), "HE_100");
+          addOvertime(row, employee, Number(row.he_20_minutes || 0), "ADICIONAL_NOTURNO");
+          addOvertime(row, employee, Number(row.interjornada_minutes || 0), "INTERJORNADA_50");
+        }
       }
 
       for (const row of timeRecords ?? []) {
@@ -260,7 +299,16 @@ export function Kpis() {
         operationalCount += 1;
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
+      }
 
+      for (const row of overtime ?? []) {
+        if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        addOvertime(
+          row,
+          employees.find(e => e.id === row.employee_id),
+          Math.abs(Number(row.minutes || 0)),
+          String(row.launch_type ?? ""),
+        );
       }
 
       // Regra de absenteísmo:
