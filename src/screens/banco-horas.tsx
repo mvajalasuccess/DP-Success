@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { ScreenShell, inputCls } from "@/components/screen-shell";
-import { CREDIT_TYPES, balancesByEmployee, periodRangeLabel, minutesToHours, PERIOD_STATUS_LABEL, type PeriodBalance, type CreditType } from "@/lib/dp-model";
+import { CREDIT_TYPES, balancesByEmployee, periodRangeLabel, minutesToHours, formatDateBR, PERIOD_STATUS_LABEL, type PeriodBalance, type CreditType } from "@/lib/dp-model";
 
 const BALANCE_ITEMS: CreditType[] = ["HE_60", "HE_60_NOTURNO", "HE_100", "HE_100_NOTURNO", "ADICIONAL_NOTURNO"];
 
