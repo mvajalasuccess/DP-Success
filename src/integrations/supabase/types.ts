@@ -112,6 +112,8 @@ export type Database = {
       }
       bank_hours: {
         Row: {
+          adjustment_direction: string | null
+          adjustment_reason: string | null
           balance_minutes: number
           created_at: string
           created_by: string | null
@@ -128,6 +130,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          adjustment_direction?: string | null
+          adjustment_reason?: string | null
           balance_minutes?: number
           created_at?: string
           created_by?: string | null
@@ -144,6 +148,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          adjustment_direction?: string | null
+          adjustment_reason?: string | null
           balance_minutes?: number
           created_at?: string
           created_by?: string | null
@@ -222,6 +228,7 @@ export type Database = {
           phone: string | null
           position_id: string | null
           registration: string | null
+          salary: number | null
           status: Database["public"]["Enums"]["employee_status"]
           termination_date: string | null
           updated_at: string
@@ -242,6 +249,7 @@ export type Database = {
           phone?: string | null
           position_id?: string | null
           registration?: string | null
+          salary?: number | null
           status?: Database["public"]["Enums"]["employee_status"]
           termination_date?: string | null
           updated_at?: string
@@ -262,6 +270,7 @@ export type Database = {
           phone?: string | null
           position_id?: string | null
           registration?: string | null
+          salary?: number | null
           status?: Database["public"]["Enums"]["employee_status"]
           termination_date?: string | null
           updated_at?: string
@@ -294,6 +303,148 @@ export type Database = {
             columns: ["work_schedule_id"]
             isOneToOne: false
             referencedRelation: "work_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      historical_import_batches: {
+        Row: {
+          created_at: string
+          file_name: string
+          id: string
+          imported_by: string | null
+          row_count: number
+          source_sheet: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          id?: string
+          imported_by?: string | null
+          row_count?: number
+          source_sheet?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          id?: string
+          imported_by?: string | null
+          row_count?: number
+          source_sheet?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      historical_kpi_data: {
+        Row: {
+          absence_quantity: number
+          allowance_minutes: number
+          certificate_minutes: number
+          created_at: string
+          debit_minutes: number
+          declaration_minutes: number
+          department_name: string | null
+          employee_id: string | null
+          employee_name: string
+          expected_minutes: number
+          he_100_minutes: number
+          he_20_minutes: number
+          he_60_minutes: number
+          he_60_night_minutes: number
+          id: string
+          import_batch_id: string | null
+          interjornada_minutes: number
+          period_end: string
+          period_id: string | null
+          period_start: string
+          position_name: string | null
+          reference_month: number
+          reference_year: number
+          registration: string | null
+          source: string
+          updated_at: string
+          worked_minutes: number
+        }
+        Insert: {
+          absence_quantity?: number
+          allowance_minutes?: number
+          certificate_minutes?: number
+          created_at?: string
+          debit_minutes?: number
+          declaration_minutes?: number
+          department_name?: string | null
+          employee_id?: string | null
+          employee_name: string
+          expected_minutes?: number
+          he_100_minutes?: number
+          he_20_minutes?: number
+          he_60_minutes?: number
+          he_60_night_minutes?: number
+          id?: string
+          import_batch_id?: string | null
+          interjornada_minutes?: number
+          period_end: string
+          period_id?: string | null
+          period_start: string
+          position_name?: string | null
+          reference_month: number
+          reference_year: number
+          registration?: string | null
+          source?: string
+          updated_at?: string
+          worked_minutes?: number
+        }
+        Update: {
+          absence_quantity?: number
+          allowance_minutes?: number
+          certificate_minutes?: number
+          created_at?: string
+          debit_minutes?: number
+          declaration_minutes?: number
+          department_name?: string | null
+          employee_id?: string | null
+          employee_name?: string
+          expected_minutes?: number
+          he_100_minutes?: number
+          he_20_minutes?: number
+          he_60_minutes?: number
+          he_60_night_minutes?: number
+          id?: string
+          import_batch_id?: string | null
+          interjornada_minutes?: number
+          period_end?: string
+          period_id?: string | null
+          period_start?: string
+          position_name?: string | null
+          reference_month?: number
+          reference_year?: number
+          registration?: string | null
+          source?: string
+          updated_at?: string
+          worked_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historical_kpi_data_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historical_kpi_data_import_batch_fk"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "historical_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "historical_kpi_data_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "time_periods"
             referencedColumns: ["id"]
           },
         ]
