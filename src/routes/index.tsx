@@ -16,16 +16,17 @@ import { Comparativos } from "@/screens/comparativos";
 import { Kpis } from "@/screens/kpis";
 import { Relatorios } from "@/screens/relatorios";
 import { Parametros } from "@/screens/parametros";
+import { ImportacaoHistorico } from "@/screens/importacao-historico";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
-type ScreenKey = "dashboard" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros";
+type ScreenKey = "dashboard" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "importacao-historico";
 
 const screenComponents: Record<string, ComponentType> = {
   funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
-  relatorios: Relatorios, parametros: Parametros,
+  relatorios: Relatorios, parametros: Parametros, "importacao-historico": ImportacaoHistorico,
 };
 
 const companyNav: Array<[string, ScreenKey]> = [
@@ -41,7 +42,7 @@ const closingNav: Array<[string, ScreenKey]> = [
 
 const mainNav: Array<[string, ScreenKey]> = [
   ["Funcionários", "funcionarios"], ["Banco de Horas", "banco-horas"],
-  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"],
+  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"], ["Importar histórico", "importacao-historico"],
 ];
 
 function fmt(minutes: number) {
