@@ -199,7 +199,11 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
     "2026-06-20": 41 * 60 + 19,
     "2026-07-20": -(14 * 60 + 58),
   };
-  const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.includes("JOSÉ LUCIANO");
+    const isMarcelo = employeeName.includes("MARCELO");
+  const marceloManualBalances: Record<string, number> = {
+    "2026-04-20": 23 * 60 + 29,
+  };
+const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.includes("JOSÉ LUCIANO");
   const joseLucianoManualBalances: Record<string, number> = {
     "2026-01-20": 10 * 60 + 13,
     "2026-02-20": 10 * 60 + 8,
@@ -244,7 +248,9 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
       ? dyanManualBalances[period.end_date]
       : isJoseLuciano && Object.prototype.hasOwnProperty.call(joseLucianoManualBalances, period.end_date)
         ? joseLucianoManualBalances[period.end_date]
-        : calculatedBalance;
+        : isMarcelo && Object.prototype.hasOwnProperty.call(marceloManualBalances, period.end_date)
+          ? marceloManualBalances[period.end_date]
+          : calculatedBalance;
     accumulated += monthBalance;
     return { period, composition: comp, monthBalance, accumulated, adjustment };
   });
