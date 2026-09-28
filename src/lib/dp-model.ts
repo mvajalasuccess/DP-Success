@@ -26,6 +26,14 @@ export type CreditRow = { id: string; employee_id: string; reference_date: strin
 export type DebitRow = { id: string; employee_id: string; entry_date: string; minutes: number; launch_group_id: string | null; period_id: string | null; justification: string | null };
 
 export type Composition = Record<CreditType, number> & { debit: number };
+export type ManualAdjustment = {
+  id: string;
+  entry_date: string;
+  minutes: number;
+  direction: "credito" | "debito";
+  justification: string | null;
+  period_id: string | null;
+};
 
 export function emptyComposition(): Composition {
   return { HE_60: 0, HE_60_NOTURNO: 0, HE_100: 0, HE_100_NOTURNO: 0, ADICIONAL_NOTURNO: 0, INTERJORNADA_50: 0, debit: 0 };
@@ -145,27 +153,40 @@ function historicalComposition(row: HistoricalBalanceRow): Composition {
 }
 
 export async function balancesByEmployee(employeeId: string): Promise<PeriodBalance[]> {
-  const [periods, launches, historical] = await Promise.all([
+  const [periods, launches, historical, adjustmentsResult] = await Promise.all([
     fetchPeriods(),
     fetchLaunches({ employeeId }),
     fetchHistoricalBalances(employeeId),
+    supabase
+      .from("bank_hours")
+      .select("id,entry_date,minutes,adjustment_direction,justification,period_id")
+      .eq("employee_id", employeeId)
+      .eq("kind", "ajuste")
+      .order("entry_date", { ascending: true }),
   ]);
+  const adjustments = check(adjustmentsResult) as ManualAdjustment[];
   const historicalByPeriod = new Map(historical.map(row => [row.period_id, historicalComposition(row)]));
   const ordered = [...periods].sort((a, b) => a.start_date.localeCompare(b.start_date));
-  let accumulated = 0;
+  let accumulated = adjustments
+    .filter(a => a.entry_date < (ordered[0]?.start_date ?? "9999-12-31"))
+    .reduce((sum, a) => sum + (a.direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
+
   return ordered.map(period => {
     const historicalComp = historicalByPeriod.get(period.id);
     const comp = historicalComp ?? composeMinutes(
       launches.credits.filter(r => r.period_id === period.id || inRange(r.reference_date, period)),
       launches.debits.filter(r => r.period_id === period.id || inRange(r.entry_date, period)),
     );
-    const monthBalance = balanceOf(comp);
+    const adjustment = adjustments
+      .filter(a => a.entry_date >= period.start_date && a.entry_date <= period.end_date)
+      .reduce((sum, a) => sum + (a.direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
+    const monthBalance = balanceOf(comp) + adjustment;
     accumulated += monthBalance;
-    return { period, composition: comp, monthBalance, accumulated };
+    return { period, composition: comp, monthBalance, accumulated, adjustment };
   });
 }
 
-export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number };
+export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number; adjustment: number };
 
 /** Saldo por competência (ordem cronológica), com acumulado. Cada lançamento cai em uma única competência pelo intervalo de datas. */
 export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits: DebitRow[]): PeriodBalance[] {
