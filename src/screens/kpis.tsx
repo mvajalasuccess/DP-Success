@@ -226,7 +226,7 @@ export function Kpis() {
 
         next.expected += Number(row.expected_minutes || 0);
         next.worked += Number(row.worked_minutes || 0);
-        const faltas = decimalHoursToMinutes(row.absence_quantity);
+        const faltas = Math.round(Number(row.absence_quantity || 0) * 8.8 * 60);
         const atestados = Number(row.certificate_minutes || 0);
         const declaracoes = Number(row.declaration_minutes || 0);
         const abonos = Number(row.allowance_minutes || 0);
