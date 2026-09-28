@@ -208,40 +208,7 @@ export function BankHours() {
 
   return (
     <ScreenShell section="Operação" title="Banco de Horas" name="Banco de Horas" subtitle="Saldo por funcionário e competência." error={error}>
-      {(() => {
-        const firstStart = firstPeriod?.start_date;
-        const prior = adjustments.filter(a => !a.period_id && firstStart && a.entry_date < firstStart);
-        if (!prior.length) return null;
-        const total = prior.reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes || 0)) : Math.abs(Number(a.minutes || 0))), 0);
-        return (
-          <Card className="mt-6 border-dashed p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Saldo anterior à primeira competência</p>
-                <p className={`text-xl font-bold ${cls(total)}`}>{minutesToHours(total, true)}</p>
-                <p className="text-xs text-muted-foreground">Valores anteriores a {formatDateBR(firstStart)}</p>
-              </div>
-              <div className="grid gap-2">
-                {prior.map(a => {
-                  const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes)) : Math.abs(Number(a.minutes));
-                  return <div key={a.id} className="flex items-center gap-2 text-sm">
-                    <span>{formatDateBR(a.entry_date)} · {minutesToHours(value, true)}</span>
-                    <button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => openAdjustmentEdit(a)}><Pencil className="inline h-3 w-3" /> Editar</button>
-                    {confirmAdjustmentDelete === a.id ? (
-                      <>
-                        <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingAdjustment} onClick={() => void deleteAdjustment(a.id)}>Confirmar exclusão</button>
-                        <button type="button" className="rounded-md border px-2 py-1 text-xs" disabled={savingAdjustment} onClick={() => setConfirmAdjustmentDelete(null)}>Cancelar</button>
-                      </>
-                    ) : (
-                      <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" onClick={() => setConfirmAdjustmentDelete(a.id)}>Excluir</button>
-                    )}
-                  </div>;
-                })}
-              </div>
-            </div>
-          </Card>
-        );
-      })()}
+
       <Card className="mt-6 grid gap-4 p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
         <label className="grid gap-1.5 text-sm font-medium">Status
           <select className={inputCls} value={statusFilter} onChange={e => {
