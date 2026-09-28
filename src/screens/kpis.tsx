@@ -3,18 +3,18 @@ export function fmt(n:number){const s=n<0?"-":"+";const a=Math.abs(Math.round(n)
 export function Kpis(){
  const[m,setM]=useState({employees:0,credits:0,debits:0,positive:0,negative:0,absence:0,certificates:0,absenteeism:0,overtimeValue:0}),[period,setPeriod]=useState(""),[error,setError]=useState("");
  useEffect(()=>{void(async()=>{
-  const db=supabase;
+  const db=supabase as any;
   const {data:comp,error:ce}=await db.from("competencies").select("id,name,start_date,end_date").order("end_date",{ascending:false}).limit(1).maybeSingle();
   if(ce){setError(ce.message);return}
   if(comp)setPeriod(comp.name);
   const [e,m,o,a,params]=await Promise.all([
-   db.from("employees").select("id,current_bank_minutes,initial_bank_minutes,work_schedule_id").eq("active",true),
+   db.from("employees").select("id,current_bank_minutes,initial_bank_minutes,work_schedule_id").eq("status","ativo"),
    db.from("bank_movements").select("minutes").eq("competence_id",comp?.id??"00000000-0000-0000-0000-000000000000"),
    db.from("occurrences").select("minutes,type,occurrence_date").gte("occurrence_date",comp?.start_date??"1900-01-01").lte("occurrence_date",comp?.end_date??"1900-01-01"),
    db.from("medical_certificates").select("id").gte("start_date",comp?.start_date??"1900-01-01").lte("start_date",comp?.end_date??"1900-01-01"),
    db.from("calculation_parameters").select("code,rate_factor").in("code",["ABS_FALTA","ABS_ATRASO","ABS_SAIDA_ANTECIPADA","ABS_ATESTADO"])
   ]);
-  const err=[e,m,o,a,params].find(x=>x.error);if(err){setError(err.error.message);return}
+  const err=[e,m,o,a,params].find(x=>x.error);if(err){setError((err.error as any)?.message??"Erro");return}
   const employees=e.data??[],mov=m.data??[],occ=o.data??[],p=new Map<string,number>((params.data??[]).map((x:any)=>[x.code,Number(x.rate_factor)]));
   const credits=mov.filter((x:any)=>x.minutes>0).reduce((s:number,x:any)=>s+x.minutes,0);
   const debits=mov.filter((x:any)=>x.minutes<0).reduce((s:number,x:any)=>s+Math.abs(x.minutes),0);

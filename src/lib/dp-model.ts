@@ -14,7 +14,7 @@ export const calculationRules: Record<LaunchType, { label: string; rateFactor: n
 };
 
 export function hoursToMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
+  const [hours = 0, minutes = 0] = value.split(":").map(Number);
   return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0);
 }
 

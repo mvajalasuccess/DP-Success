@@ -36,10 +36,7 @@ function Login() {
         return;
       }
 
-      const { error: setupError } = await supabase.rpc("ensure_user_setup", {
-        _full_name: null,
-        _email: email.trim(),
-      });
+      const { error: setupError } = await supabase.rpc("ensure_user_setup", { _email: email.trim() });
       if (setupError) {
         setError(setupError.message);
         setSaving(false);
@@ -65,10 +62,7 @@ function Login() {
     setSaving(false);
 
     if (data.session) {
-      const { error: setupError } = await supabase.rpc("ensure_user_setup", {
-        _full_name: null,
-        _email: email.trim(),
-      });
+      const { error: setupError } = await supabase.rpc("ensure_user_setup", { _email: email.trim() });
       if (setupError) {
         setError(setupError.message);
         return;

@@ -156,6 +156,7 @@ export function Launches() {
 
     for (const line of validLines) {
       const rule = calculationRules[line.type] ?? calculationRules["Hora extra 60%"];
+      if (!rule) continue;
       const result = await supabase.from("overtime_records").insert({
         employee_id: employeeId, period_id: competence.id, reference_date: launchDate, minutes: line.minutes,
         rate_percent: rule.code === "DOMINGO_FERIADO" ? 100 : rule.code === "INTERJORNADA" ? 50 : rule.code === "ADICIONAL_NOTURNO" ? 20 : 60,

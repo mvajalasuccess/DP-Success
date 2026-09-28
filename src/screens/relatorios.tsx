@@ -1,12 +1,12 @@
 import { Link}from"@tanstack/react-router";import{ArrowLeft,Download,FileBarChart}from"lucide-react";import{Card}from"@/components/ui/card";import{useEffect,useState}from"react";import{supabase}from"@/integrations/supabase/client";
 const reports=[["fechamento","Fechamento de ponto"],["banco","Banco de horas"],["extras","Horas extras por funcionário"],["absenteismo","Absenteísmo por departamento"],["atestados","Atestados e afastamentos"],["ocorrencias","Faltas e ocorrências"]] as const;
-export function csv(rows:any[]){if(!rows.length)return "";const keys=Object.keys(rows[0]);const esc=(v:any)=>'"'+String(v??"").replaceAll('"','""')+'"';return [keys.join(";"),...rows.map(r=>keys.map(k=>esc(r[k])).join(";"))].join("\n")}
+export function csv(rows:any[]){if(!rows.length)return "";const keys=Object.keys(rows[0]);const esc=(v:any)=>{let s=String(v??"");if(/^[=+\-@]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'};return [keys.join(";"),...rows.map(r=>keys.map(k=>esc(r[k])).join(";"))].join("\n")}
 function download(name:string,rows:any[]){const blob=new Blob(["\ufeff"+csv(rows)],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
 export function Relatorios(){
  const[competence,setCompetence]=useState<any>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(""),[error,setError]=useState("");
- useEffect(()=>{void(async()=>{const{data,error}=await(supabase).from("competencies").select("id,name,start_date,end_date,status").order("end_date",{ascending:false}).limit(1);if(error)setError(error.message);setCompetence(data?.[0]??null);setLoading(false)})()},[]);
+ useEffect(()=>{void(async()=>{const{data,error}=await(supabase as any).from("competencies").select("id,name,start_date,end_date,status").order("end_date",{ascending:false}).limit(1);if(error)setError(error.message);setCompetence(data?.[0]??null);setLoading(false)})()},[]);
  async function exportReport(kind:string){
-  setBusy(kind);setError("");const db=supabase;let rows:any[]=[];
+  setBusy(kind);setError("");const db=supabase as any;let rows:any[]=[];
   try{
    if(kind==="fechamento"){const{data,error}=await db.from("competencies").select("name,start_date,end_date,status,closed_at").order("start_date",{ascending:false}).limit(24);if(error)throw error;rows=data??[]}
    if(kind==="banco"){const{data,error}=await db.from("competence_employee_balances").select("competence_id,employee_id,opening_minutes,credit_minutes,debit_minutes,closing_minutes,estimated_value");if(error)throw error;rows=data??[]}

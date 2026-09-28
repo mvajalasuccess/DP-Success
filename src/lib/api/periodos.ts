@@ -46,10 +46,12 @@ export async function ensurePeriod(year: number, month: number): Promise<TimePer
   if (existing.error) throw new Error(existing.error.message);
   if (existing.data) return existing.data;
 
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
+  const endDate = new Date(year, month, 0).toISOString().slice(0, 10);
   return unwrap(
     await supabase
       .from("time_periods")
-      .insert({ reference_year: year, reference_month: month, status: "aberto" })
+      .insert({ reference_year: year, reference_month: month, start_date: startDate, end_date: endDate, status: "aberto" })
       .select()
       .single(),
   );
