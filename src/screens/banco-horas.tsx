@@ -261,11 +261,16 @@ export function BankHours() {
             {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
           </select>
         </label>
-        <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado atual</p><p className={`text-2xl font-bold ${cls(accumulated)}`}>{minutesToHours(accumulated, true)}</p></div>
+        <div className="text-right"><p className="text-xs text-muted-foreground">Saldo disponível atual</p><p className={`text-2xl font-bold ${cls(accumulated)}`}>{minutesToHours(accumulated, true)}</p></div>
         <div className="flex gap-2">
           <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Ajuste</button>
           <button type="button" onClick={openPaymentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Registrar pagamento de HE</button>
         </div>
+      </Card>
+
+      <Card className="mt-6 border-dashed p-5">
+        <div><h2 className="font-bold">Movimentações separadas</h2><p className="text-sm text-muted-foreground">Ajustes e correções continuam contabilizados no saldo, mas ficam fora dos cards das competências.</p></div>
+        {adjustments.length ? <div className="mt-4 space-y-2">{adjustments.map(a => { const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes || 0)) : Math.abs(Number(a.minutes || 0)); return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"><div><span className="font-medium">{formatDateBR(a.entry_date)}</span><span className={`ml-3 font-semibold ${cls(value)}`}>{minutesToHours(value, true)}</span><span className="ml-3 text-muted-foreground">{a.justification ?? "Ajuste"}</span></div><div className="flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => openAdjustmentEdit(a)}><Pencil className="inline h-3 w-3" /> Editar</button>{confirmAdjustmentDelete === a.id ? <><button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingAdjustment} onClick={() => void deleteAdjustment(a.id)}>Confirmar exclusão</button><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setConfirmAdjustmentDelete(null)}>Cancelar</button></> : <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" onClick={() => setConfirmAdjustmentDelete(a.id)}><Trash2 className="inline h-3 w-3" /> Excluir</button>}</div></div>; })}</div> : <p className="mt-4 text-sm text-muted-foreground">Nenhum ajuste registrado.</p>}
       </Card>
 
       <div className="mt-6 space-y-3">
@@ -282,7 +287,7 @@ export function BankHours() {
                   </div>
                   <div className="flex items-center gap-6">
                     <div className="text-right"><p className="text-xs text-muted-foreground">Saldo do mês</p><p className={`text-xl font-bold ${cls(r.monthBalance)}`}>{minutesToHours(r.monthBalance, true)}</p></div>
-                    <div className="text-right"><p className="text-xs text-muted-foreground">Saldo acumulado</p><p className={`font-semibold ${cls(r.accumulated)}`}>{minutesToHours(r.accumulated, true)}</p></div>
+                    <div className="text-right"><p className="text-xs text-muted-foreground">Saldo disponível</p><p className={`font-semibold ${cls(r.accumulated)}`}>{minutesToHours(r.accumulated, true)}</p></div>
                     <div className="text-right"><p className="text-xs text-muted-foreground">Débito / atrasos</p><p className="font-semibold text-destructive">{minutesToHours(-r.composition.debit)}</p></div>
 
                     {open ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
