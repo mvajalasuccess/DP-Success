@@ -63,7 +63,7 @@ export function Employees() {
       name: employee.full_name ?? "",
       role: employee.position_id ?? "",
       department: employee.department_id ?? "",
-      salary: employee.salary != null ? String(employee.salary).replace(".", ",") : "",
+      salary: employee.salary != null ? String(employee.salary) : "",
       admission: employee.hire_date ?? "",
       termination: employee.termination_date ?? "",
       bank: "",
