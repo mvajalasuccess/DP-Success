@@ -9,7 +9,7 @@ import {
   formatDateBR, composeMinutes, creditTotal, balanceOf,
 } from "@/lib/dp-model";
 
-type Employee = { id: string; full_name: string };
+type Employee = { id: string; full_name: string; status?: string };
 type Group = { key: string; employee_id: string; date: string; credits: CreditRow[]; debits: DebitRow[] };
 type Line = { type: CreditType; hours: string };
 
@@ -17,7 +17,7 @@ export function Launches() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [periodId, setPeriodId] = useState("");
-  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");\n  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [credits, setCredits] = useState<CreditRow[]>([]);
   const [debits, setDebits] = useState<DebitRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,18 +31,18 @@ export function Launches() {
   const [debitHours, setDebitHours] = useState("00:00");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const period = periods.find(p => p.id === periodId) ?? null;
+  const period = periods.find(p => p.id === periodId) ?? null;\n  const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));
 
   async function loadBase() {
     try {
       const [emps, ps] = await Promise.all([
-        supabase.from("employees").select("id,full_name").order("full_name"),
+        supabase.from("employees").select("id,full_name,status").order("full_name"),
         fetchPeriods(),
       ]);
       if (emps.error) throw new Error(emps.error.message);
       setEmployees(emps.data ?? []);
       setPeriods(ps);
-      if (!periodId && ps[0]) setPeriodId(ps[0].id);
+      if (!periodId && ps[0]) setPeriodId(ps[0].id);\n      if (!employeeFilter) { const first = (emps.data ?? []).find((e: any) => e.status !== "inativo"); if (first) setEmployeeFilter(first.id); }
       if (!ps.length) setLoading(false);
     } catch (e) { setError((e as Error).message); setLoading(false); }
   }
@@ -139,7 +139,7 @@ export function Launches() {
     <ScreenShell section="Operação" title="Lançamentos" name="Lançamentos" subtitle="Créditos e débitos do banco de horas por funcionário e data."
       error={open ? "" : error}
       actions={<button className={btnPrimary} disabled={!periods.length} onClick={openNew}><Plus className="h-4 w-4" /> Novo lançamento</button>}>
-      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-2">
+      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-3">
         <label className="grid gap-1.5 text-sm font-medium">Competência
           <select className={inputCls} value={periodId} onChange={e => setPeriodId(e.target.value)}>
             {!periods.length && <option value="">Nenhuma competência cadastrada</option>}
@@ -149,7 +149,7 @@ export function Launches() {
         <label className="grid gap-1.5 text-sm font-medium">Funcionário
           <select className={inputCls} value={employeeFilter} onChange={e => setEmployeeFilter(e.target.value)}>
             <option value="">Todos</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+            {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
           </select>
         </label>
       </Card>
