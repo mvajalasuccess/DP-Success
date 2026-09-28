@@ -2,10 +2,12 @@ import { useRef, useState } from "react";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDateBR } from "@/lib/dp-model";
 import * as XLSX from "xlsx";
 
 type Row = Record<string, unknown>;
+
+const MAX_HISTORICAL_YEAR = 2026;
+const MAX_HISTORICAL_MONTH = 7;
 
 const REQUIRED = [
   "Ano", "Mês", "Matrícula", "Funcionário", "Setor", "Cargo",
@@ -120,6 +122,9 @@ export function ImportacaoHistorico() {
         const registration = String(row["Matrícula"] ?? "").trim();
         const employeeName = String(row["Funcionário"] ?? "").trim();
         if (!year || month < 1 || month > 12 || !employeeName) continue;
+        if (year > MAX_HISTORICAL_YEAR || (year === MAX_HISTORICAL_YEAR && month > MAX_HISTORICAL_MONTH)) {
+          throw new Error("A BASE histórica deve ser importada somente até a competência de julho/2026. Agosto e setembro serão lançados manualmente no DP-Success.");
+        }
 
         const { start, end } = competenceRange(year, month);
         const periodKey = `${start}|${end}`;
@@ -229,7 +234,7 @@ export function ImportacaoHistorico() {
                 <p className="text-xs text-muted-foreground">O sistema procura exclusivamente a aba BASE.</p>
               </div>
             </div>
-            <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => e.target.files?.[0] && void readFile(e.target.files[0])} />
+            <input ref={inputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => e.target.files?.[0] && void readFile(e.target.files[0])} />
             <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted">
               <Upload className="h-4 w-4" /> Selecionar arquivo
             </button>
@@ -248,7 +253,7 @@ export function ImportacaoHistorico() {
               <div className="mt-5 flex flex-col gap-3 rounded-xl border p-4 text-sm md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-semibold">Competência histórica</p>
-                  <p className="text-xs text-muted-foreground">Janeiro/2026 será gravado como 21/12/2025 até 20/01/2026. As horas da BASE são tratadas como horas decimais e convertidas para minutos.</p>
+                  <p className="text-xs text-muted-foreground">Janeiro/2026 será gravado como 21/12/2025 até 20/01/2026. A BASE será importada somente até julho/2026. Janeiro corresponde a 21/12/2025 → 20/01/2026. As horas são decimais e serão convertidas para minutos.</p>
                 </div>
                 <button type="button" disabled={loading} onClick={() => void importData()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
                   {loading ? "Importando..." : "Importar BASE"}
