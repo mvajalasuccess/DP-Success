@@ -189,9 +189,21 @@ export function BankHours() {
         );
       })()}
       <Card className="mt-6 grid gap-4 p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+        <label className="grid gap-1.5 text-sm font-medium">Status
+          <select className={inputCls} value={statusFilter} onChange={e => {
+            const next = e.target.value as "ativo" | "inativo" | "todos";
+            setStatusFilter(next);
+            const first = employees.find(x => next === "todos" || (next === "ativo" ? x.status !== "inativo" : x.status === "inativo"));
+            setEmployeeId(first?.id ?? "");
+          }}>
+            <option value="ativo">Ativos</option>
+            <option value="inativo">Inativos</option>
+            <option value="todos">Todos</option>
+          </select>
+        </label>
         <label className="grid gap-1.5 text-sm font-medium">Funcionário
           <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
-            {!employees.length && <option value="">Nenhum funcionário cadastrado</option>}
+            {!visibleEmployees.length && <option value="">Nenhum funcionário neste filtro</option>}
             {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
           </select>
         </label>
