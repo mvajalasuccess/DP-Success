@@ -1,244 +1,240 @@
-import { ArrowLeft, Plus, Search, Clock3, Moon, CalendarDays, ArrowDownUp, Pencil, Trash2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { ScreenShell, Modal, inputCls, btnPrimary, btnOutline, btnDanger } from "@/components/screen-shell";
+import {
+  CREDIT_TYPES, CREDIT_TYPE_KEYS, type CreditType, type Period, type CreditRow, type DebitRow,
+  fetchPeriods, fetchLaunches, periodForDate, periodRangeLabel, hoursToMinutes, minutesToHours,
+  formatDateBR, composeMinutes, creditTotal, balanceOf,
+} from "@/lib/dp-model";
 
-const calculationRules: Record<string, { code: string; label: string }> = {
-  "Hora extra 60%": { code: "HE_60", label: "HE 60%" },
-  "Hora extra noturna": { code: "HE_NOTURNA", label: "HE noturna (60% + 20%)" },
-  "Adicional noturno 20%": { code: "ADICIONAL_NOTURNO", label: "Adicional noturno" },
-  "Domingo / feriado 100%": { code: "DOMINGO_FERIADO", label: "Domingo / feriado" },
-  "Interjornada 50%": { code: "INTERJORNADA", label: "Interjornada" },
-  "Domingo / feriado 100% + 20%": { code: "DOMINGO_FERIADO_NOTURNO", label: "HE 100% + 20% noturno" },
-  "Crédito / débito": { code: "CREDITO", label: "Crédito / débito" },
-};
-const types = [
-  { label: "Hora extra 60%", icon: Clock3 }, { label: "Hora extra noturna", icon: Moon },
-  { label: "Adicional noturno 20%", icon: Moon }, { label: "Domingo / feriado 100%", icon: CalendarDays },
-  { label: "Interjornada 50%", icon: ArrowDownUp }, { label: "Crédito / débito", icon: ArrowDownUp },
-];
 type Employee = { id: string; full_name: string };
-type Launch = { id: string; source: "overtime" | "bank"; employee_id: string; launch_date: string; type: string; direction: "CREDITO" | "DEBITO"; minutes: number; description: string | null; employee?: { full_name?: string } | null };
-
-function periodDates(period: any) {
-  const end = new Date(period.reference_year, period.reference_month - 1, 20);
-  const start = new Date(period.reference_year, period.reference_month - 2, 21);
-  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
-}
-function labelForType(type: string) {
-  return Object.values(calculationRules).find(r => r.code === type)?.label ?? type;
-}
-function keyForType(type: string) {
-  return Object.entries(calculationRules).find(([, rule]) => rule.code === type)?.[0] ?? "Hora extra 60%";
-}
+type Group = { key: string; employee_id: string; date: string; credits: CreditRow[]; debits: DebitRow[] };
+type Line = { type: CreditType; hours: string };
 
 export function Launches() {
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Launch | null>(null);
-  const [creditLines, setCreditLines] = useState([{ type: "Hora extra 60%", hours: "02:30" }]);
-  const [debitHours, setDebitHours] = useState("00:00");
-  const [employeeId, setEmployeeId] = useState("");
-  const [launchDate, setLaunchDate] = useState("");
-  const [search, setSearch] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [launches, setLaunches] = useState<Launch[]>([]);
-  const [competence, setCompetence] = useState<any>(null);
+  const [periods, setPeriods] = useState<Period[]>([]);
+  const [periodId, setPeriodId] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [credits, setCredits] = useState<CreditRow[]>([]);
+  const [debits, setDebits] = useState<DebitRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Group | null>(null);
+  const [employeeId, setEmployeeId] = useState("");
+  const [date, setDate] = useState("");
+  const [lines, setLines] = useState<Line[]>([{ type: "HE_60", hours: "00:00" }]);
+  const [debitHours, setDebitHours] = useState("00:00");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
+  const period = periods.find(p => p.id === periodId) ?? null;
 
-  async function loadData() {
+  async function loadBase() {
+    try {
+      const [emps, ps] = await Promise.all([
+        supabase.from("employees").select("id,full_name").order("full_name"),
+        fetchPeriods(),
+      ]);
+      if (emps.error) throw new Error(emps.error.message);
+      setEmployees(emps.data ?? []);
+      setPeriods(ps);
+      if (!periodId && ps[0]) setPeriodId(ps[0].id);
+      if (!ps.length) setLoading(false);
+    } catch (e) { setError((e as Error).message); setLoading(false); }
+  }
+  async function loadLaunches() {
+    if (!period) return;
     setLoading(true); setError("");
-    const [empRes, periodRes] = await Promise.all([
-      supabase.from("employees").select("id,full_name").eq("status", "ativo").order("full_name"),
-      supabase.from("time_periods").select("id,reference_year,reference_month,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
-    ]);
-    if (empRes.error) { setError(empRes.error.message); setLoading(false); return; }
-    if (periodRes.error) { setError(periodRes.error.message); setLoading(false); return; }
-    const period = periodRes.data?.[0] ?? null;
-    setEmployees(empRes.data ?? []); setCompetence(period);
-    if (!period) { setLaunches([]); setLoading(false); return; }
-
-    const [otRes, bankRes] = await Promise.all([
-      supabase.from("overtime_records").select("id,employee_id,reference_date,minutes,rate_percent,notes").eq("period_id", period.id).order("reference_date", { ascending: false }),
-      supabase.from("bank_hours").select("id,employee_id,entry_date,kind,minutes,justification").eq("period_id", period.id).order("entry_date", { ascending: false }),
-    ]);
-    if (otRes.error) { setError(otRes.error.message); setLoading(false); return; }
-    if (bankRes.error) { setError(bankRes.error.message); setLoading(false); return; }
-    const names = new Map((empRes.data ?? []).map((e: any) => [e.id, e.full_name]));
-    const overtime = (otRes.data ?? []).map((r: any): Launch => ({
-      id: r.id, source: "overtime", employee_id: r.employee_id, launch_date: r.reference_date,
-      type: r.rate_percent === 100 ? (String(r.notes || "").includes("noturna") ? "HE_100_NOTURNA" : "DOMINGO_FERIADO")
-        : r.rate_percent === 50 ? "INTERJORNADA" : r.rate_percent === 20 ? "ADICIONAL_NOTURNO"
-        : String(r.notes || "").includes("60% + 20%") || String(r.notes || "").includes("noturna") ? "HE_NOTURNA" : "HE_60",
-      direction: "CREDITO", minutes: Number(r.minutes || 0), description: r.notes, employee: { full_name: names.get(r.employee_id) }
-    }));
-    const bank = (bankRes.data ?? []).map((r: any): Launch => ({
-      id: r.id, source: "bank", employee_id: r.employee_id, launch_date: r.entry_date,
-      type: String(r.justification || "").includes("Débito") ? "DEBITO" : "CREDITO",
-      direction: r.kind === "debito" ? "DEBITO" : "CREDITO", minutes: Number(r.minutes || 0), description: r.justification, employee: { full_name: names.get(r.employee_id) }
-    }));
-    setLaunches([...overtime, ...bank].sort((a, b) => b.launch_date.localeCompare(a.launch_date)));
-    if (!launchDate) setLaunchDate(periodDates(period).end);
+    try {
+      const r = await fetchLaunches({ start: period.start_date, end: period.end_date, employeeId: employeeFilter || undefined });
+      setCredits(r.credits); setDebits(r.debits);
+    } catch (e) { setError((e as Error).message); }
     setLoading(false);
   }
+  useEffect(() => { void loadBase(); }, []);
+  useEffect(() => { void loadLaunches(); }, [periodId, employeeFilter]);
 
-  useEffect(() => { void loadData(); }, []);
+  const groups = useMemo(() => {
+    const map = new Map<string, Group>();
+    const add = (key: string, employee_id: string, d: string) => {
+      let g = map.get(key);
+      if (!g) { g = { key, employee_id, date: d, credits: [], debits: [] }; map.set(key, g); }
+      return g;
+    };
+    credits.forEach(c => add(c.launch_group_id ?? c.id, c.employee_id, c.reference_date).credits.push(c));
+    debits.forEach(d => add(d.launch_group_id ?? d.id, d.employee_id, d.entry_date).debits.push(d));
+    return [...map.values()].sort((a, b) => b.date.localeCompare(a.date));
+  }, [credits, debits]);
+  const names = new Map(employees.map(e => [e.id, e.full_name]));
 
   function openNew() {
-    setEditing(null);
-    setEmployeeId("");
-    setDebitHours("00:00");
-    setCreditLines([{ type: "Hora extra 60%", hours: "02:30" }]);
-    if (competence) setLaunchDate(periodDates(competence).end);
-    setOpen(true);
+    setEditing(null); setEmployeeId(employeeFilter); setDate(period?.end_date ?? "");
+    setLines([{ type: "HE_60", hours: "00:00" }]); setDebitHours("00:00"); setError(""); setOpen(true);
+  }
+  function openEdit(g: Group) {
+    setEditing(g); setEmployeeId(g.employee_id); setDate(g.date);
+    const ls = g.credits.map(c => ({ type: c.launch_type, hours: minutesToHours(c.minutes) }));
+    setLines(ls.length ? ls : [{ type: "HE_60", hours: "00:00" }]);
+    setDebitHours(minutesToHours(g.debits.reduce((s, d) => s + Math.abs(d.minutes), 0)));
+    setError(""); setOpen(true);
   }
 
-  function openEdit(row: Launch) {
-    setEditing(row);
-    setEmployeeId(row.employee_id);
-    const rowHours = String(Math.floor(row.minutes / 60)).padStart(2, "0") + ":" + String(row.minutes % 60).padStart(2, "0");
-    setDebitHours(row.direction === "DEBITO" ? rowHours : "00:00");
-    setCreditLines(row.direction === "CREDITO" ? [{ type: keyForType(row.type), hours: rowHours }] : [{ type: "Hora extra 60%", hours: "00:00" }]);
-    setLaunchDate(row.launch_date);
-    setOpen(true);
+  const preview = composeMinutes(lines.map(l => ({ launch_type: l.type, minutes: hoursToMinutes(l.hours) })), [{ minutes: hoursToMinutes(debitHours) }]);
+
+  async function removeGroup(g: Group) {
+    const cIds = g.credits.map(c => c.id), dIds = g.debits.map(d => d.id);
+    if (cIds.length) { const r = await supabase.from("overtime_records").delete().in("id", cIds); if (r.error) throw new Error(r.error.message); }
+    if (dIds.length) { const r = await supabase.from("bank_hours").delete().in("id", dIds); if (r.error) throw new Error(r.error.message); }
   }
+  function isClosed(d: string) { return periodForDate(periods, d)?.status === "fechado"; }
 
-  function parseHours(value: string) {
-    const parts = value.split(":");
-    const h = Number(parts[0] || 0);
-    const m = Number(parts[1] || 0);
-    return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-  }
+  async function save() {
+    setError("");
+    if (!employeeId || !date) return setError("Selecione o funcionário e a data.");
+    const target = periodForDate(periods, date);
+    if (!target) return setError("Não existe competência cadastrada que contenha esta data. Crie o fechamento em Fechamento de Ponto.");
+    if (target.status === "fechado") return setError("A competência desta data está fechada. Reabra-a para alterar lançamentos.");
+    if (editing && isClosed(editing.date)) return setError("O lançamento original pertence a uma competência fechada.");
+    const valid = lines.map(l => ({ type: l.type, minutes: hoursToMinutes(l.hours) })).filter(l => l.minutes > 0);
+    const debit = hoursToMinutes(debitHours);
+    if (!valid.length && debit <= 0) return setError("Informe ao menos um crédito ou débito.");
 
-  const creditOptions = ["Adicional noturno 20%", "Hora extra noturna", "Domingo / feriado 100%", "Interjornada 50%"];
-
-  function addCreditLine() {
-    setCreditLines(lines => [...lines, { type: "Adicional noturno 20%", hours: "00:00" }]);
-  }
-
-  function removeCreditLine(index: number) {
-    if (creditLines.length === 1) return;
-    setCreditLines(lines => lines.filter((_, i) => i !== index));
-  }
-
-
-  async function saveLaunch() {
-    setSaving(true); setError("");
-    if (!employeeId || !competence) {
-      setError("Selecione o funcionário e a competência.");
-      setSaving(false); return;
-    }
-    const range = periodDates(competence);
-    if (launchDate < range.start || launchDate > range.end) {
-      setError("A data precisa estar dentro da competência.");
-      setSaving(false); return;
-    }
-    if (competence.status === "fechado") {
-      setError("A competência está fechada e não aceita alterações.");
-      setSaving(false); return;
-    }
-
-    const debitMinutes = parseHours(debitHours);
-    const validLines = creditLines.map(line => ({ type: line.type, minutes: parseHours(line.hours) })).filter(line => line.minutes > 0);
-    if (!validLines.length && debitMinutes <= 0) {
-      setError("Informe pelo menos um crédito ou débito.");
-      setSaving(false); return;
-    }
-
-    if (editing) {
-      const del = editing.source === "overtime"
-        ? await supabase.from("overtime_records").delete().eq("id", editing.id)
-        : await supabase.from("bank_hours").delete().eq("id", editing.id);
-      if (del.error) { setError(del.error.message); setSaving(false); return; }
-    }
-
-    for (const line of validLines) {
-      const rule = calculationRules[line.type] ?? calculationRules["Hora extra 60%"];
-      if (!rule) continue;
-      const result = await supabase.from("overtime_records").insert({
-        employee_id: employeeId, period_id: competence.id, reference_date: launchDate, minutes: line.minutes,
-        rate_percent: rule.code === "DOMINGO_FERIADO" ? 100 : rule.code === "INTERJORNADA" ? 50 : rule.code === "ADICIONAL_NOTURNO" ? 20 : 60,
-        notes: rule.label,
-      });
-      if (result.error) { setError(result.error.message); setSaving(false); return; }
-    }
-
-    if (debitMinutes > 0) {
-      const result = await supabase.from("bank_hours").insert({
-        employee_id: employeeId, period_id: competence.id, entry_date: launchDate, kind: "debito", minutes: debitMinutes,
-        previous_balance_minutes: 0, balance_minutes: -debitMinutes, justification: "Débito do lançamento",
-      });
-      if (result.error) { setError(result.error.message); setSaving(false); return; }
-    }
-
-    setOpen(false);
-    await loadData();
+    setSaving(true);
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const groupId = editing?.key ?? crypto.randomUUID();
+      if (editing) await removeGroup(editing);
+      if (valid.length) {
+        const r = await supabase.from("overtime_records").insert(valid.map(l => ({
+          employee_id: employeeId, reference_date: date, period_id: target.id, minutes: l.minutes,
+          launch_type: l.type, rate_percent: CREDIT_TYPES[l.type].ratePercent, launch_group_id: groupId, notes: CREDIT_TYPES[l.type].label,
+        })));
+        if (r.error) throw new Error(r.error.message);
+      }
+      if (debit > 0) {
+        const r = await supabase.from("bank_hours").insert({
+          employee_id: employeeId, entry_date: date, period_id: target.id, kind: "debito", minutes: debit,
+          previous_balance_minutes: 0, balance_minutes: 0, justification: "Débito / atraso", launch_group_id: groupId, created_by: auth.user?.id ?? null,
+        });
+        if (r.error) throw new Error(r.error.message);
+      }
+      setOpen(false);
+      await loadLaunches();
+    } catch (e) { setError((e as Error).message); }
     setSaving(false);
   }
 
-  async function deleteLaunch(row: Launch) {
-    if (!window.confirm("Excluir este lançamento?")) return;
-    const result = row.source === "overtime" ? await supabase.from("overtime_records").delete().eq("id", row.id) : await supabase.from("bank_hours").delete().eq("id", row.id);
-    if (result.error) setError(result.error.message); else await loadData();
+  async function doDelete(g: Group) {
+    if (isClosed(g.date)) { setError("Não é possível excluir lançamentos de competência fechada."); return; }
+    setSaving(true);
+    try { await removeGroup(g); setConfirmDelete(null); await loadLaunches(); } catch (e) { setError((e as Error).message); }
+    setSaving(false);
   }
 
-  const filtered = useMemo(() => launches.filter(l => (l.employee?.full_name ?? "").toLowerCase().includes(search.toLowerCase())), [launches, search]);
-  const totalMinutes = launches.reduce((sum, item) => {
-    if (item.type === "INTERJORNADA") return sum;
-    return sum + (item.direction === "DEBITO" ? -item.minutes : item.minutes);
-  }, 0);
-  const interjornadaMinutes = launches.reduce((sum, item) => sum + (item.type === "INTERJORNADA" ? item.minutes : 0), 0);
-  const fmt = (v: number) => { const sign = v < 0 ? "-" : "+"; const a = Math.abs(v); return sign + String(Math.floor(a / 60)).padStart(2, "0") + ":" + String(a % 60).padStart(2, "0"); };
-  const date = (v: string) => new Date(v + "T12:00:00").toLocaleDateString("pt-BR");
-
-  return <div className="min-h-screen bg-background">
-    <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a><span className="font-semibold">DP Success · Lançamentos</span></div></header>
-    <main className="mx-auto max-w-[1500px] px-6 py-7">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Operação</p><h1 className="mt-1 text-3xl font-bold">Lançamentos</h1><p className="mt-1 text-sm text-muted-foreground">Registre créditos, débitos e adicionais vinculados à competência.</p></div><div className="flex flex-wrap gap-2">
-          <button onClick={openNew} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" /> Novo lançamento</button>
-        </div></div>
-      {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{types.map(({ label, icon: Icon }) => <Card key={label} className="p-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div><span className="text-sm font-medium">{label}</span></div></Card>)}</div>
-      <Card className="mt-6 overflow-hidden">
-        <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between"><div><h2 className="font-display font-bold">Lançamentos da competência</h2><p className="text-xs text-muted-foreground">{competence ? (() => { const d = periodDates(competence); return date(d.start) + " → " + date(d.end); })() : "Nenhuma competência cadastrada"}</p></div><div className="flex items-center gap-2 rounded-lg border px-3 py-2 md:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={e => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div></div>
-        <div className="grid grid-cols-2 border-b text-center text-sm md:grid-cols-3"><div className="p-3"><p className="text-xs text-muted-foreground">Lançamentos</p><p className="font-bold">{loading ? "…" : filtered.length}</p></div><div className="border-l p-3"><p className="text-xs text-muted-foreground">Saldo dos lançamentos</p><p className={totalMinutes < 0 ? "font-bold text-destructive" : "font-bold text-primary"}>{fmt(totalMinutes)}</p></div><div className="border-l p-3"><p className="text-xs text-muted-foreground">Interjornada · histórico</p><p className="font-bold text-muted-foreground">{fmt(interjornadaMinutes)}</p></div></div>
-        <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Horas</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filtered.map(row => <tr key={row.source + row.id}><td className="px-5 py-4 font-medium">{row.employee?.full_name ?? "—"}</td><td className="px-5 py-4 text-muted-foreground">{date(row.launch_date)}</td><td className="px-5 py-4">{labelForType(row.type)}</td><td className={"px-5 py-4 font-bold " + (row.direction === "DEBITO" ? "text-destructive" : "text-primary")}>{fmt(row.direction === "DEBITO" ? -row.minutes : row.minutes)}</td><td className="px-5 py-4"><div className="flex justify-end gap-2"><button onClick={() => openEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"><Pencil className="h-3 w-3" />Editar</button><button onClick={() => void deleteLaunch(row)} className="inline-flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive"><Trash2 className="h-3 w-3" />Excluir</button></div></td></tr>)}</tbody></table>{!loading && !filtered.length && <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lançamento encontrado.</div>}</div>
+  return (
+    <ScreenShell section="Operação" title="Lançamentos" name="Lançamentos" subtitle="Créditos e débitos do banco de horas por funcionário e data."
+      error={open ? "" : error}
+      actions={<button className={btnPrimary} disabled={!periods.length} onClick={openNew}><Plus className="h-4 w-4" /> Novo lançamento</button>}>
+      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-2">
+        <label className="grid gap-1.5 text-sm font-medium">Competência
+          <select className={inputCls} value={periodId} onChange={e => setPeriodId(e.target.value)}>
+            {!periods.length && <option value="">Nenhuma competência cadastrada</option>}
+            {periods.map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)} · {p.status === "fechado" ? "Fechado" : "Aberto"}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-1.5 text-sm font-medium">Funcionário
+          <select className={inputCls} value={employeeFilter} onChange={e => setEmployeeFilter(e.target.value)}>
+            <option value="">Todos</option>
+            {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+          </select>
+        </label>
       </Card>
-    </main>
-    {open && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"><Card className="w-full max-w-2xl p-6">
-      <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">{editing ? "Editar lançamento" : "Novo lançamento"}</h2><p className="text-xs text-muted-foreground">{competence ? "Competência atual" : "Cadastre uma competência primeiro."}</p></div><button onClick={() => setOpen(false)} className="text-sm text-muted-foreground">Fechar</button></div>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <label className="grid gap-1 text-sm font-medium">Funcionário<select value={employeeId} onChange={e => setEmployeeId(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione...</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
-        <label className="grid gap-1 text-sm font-medium">Data<input type="date" value={launchDate} min={competence ? periodDates(competence).start : undefined} max={competence ? periodDates(competence).end : undefined} onChange={e => setLaunchDate(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
-        <div className="rounded-lg border p-3 md:col-span-2">
-          <div className="flex items-center justify-between"><div><p className="text-sm font-semibold">1. Crédito</p><p className="text-xs text-muted-foreground">Começa sempre em 60%. Use + somente se precisar adicionar outro tipo de crédito.</p></div><button type="button" onClick={addCreditLine} className="inline-flex h-8 w-8 items-center justify-center rounded-full border text-primary hover:bg-primary/10" title="Adicionar tipo"><Plus className="h-4 w-4" /></button></div>
-          <div className="mt-3 grid gap-2">
-            {creditLines.map((line,index) => <div key={index} className="grid min-w-0 grid-cols-[minmax(0,1fr)_120px_32px] items-end gap-3">
-              <label className="grid min-w-0 gap-1 text-xs font-medium">{index === 0 ? "Tipo principal" : "Tipo adicional"}<select value={line.type} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,type:e.target.value} : item))} className="w-full min-w-0 rounded-lg border bg-background px-2 py-2 text-sm font-normal">
-                <option value="Hora extra 60%">60%</option>{creditOptions.map(option => <option key={option} value={option}>{option === "Hora extra noturna" ? "60% + 20%" : option === "Adicional noturno 20%" ? "20%" : option === "Domingo / feriado 100%" ? "100%" : "Interjornada 50%"}</option>)}
-              </select></label>
-              <label className="grid min-w-0 gap-1 text-xs font-medium">Horas<input value={line.hours} onChange={e => setCreditLines(lines => lines.map((item,i) => i === index ? {...item,hours:e.target.value} : item))} className="w-full min-w-0 rounded-lg border bg-background px-2 py-2 text-sm font-normal" placeholder="00:00" /></label>
-              <button type="button" disabled={creditLines.length === 1} onClick={() => removeCreditLine(index)} className="mb-0.5 h-9 w-8 rounded-md border text-muted-foreground disabled:opacity-30">×</button>
-            </div>)}
-          </div>
-          <div className="mt-4 flex items-center justify-between border-t pt-3 text-sm">
-            <span className="text-muted-foreground">Total de crédito no saldo</span>
-            <strong>{(() => { const minutes = creditLines.reduce((s,l) => s + (l.type === "Interjornada 50%" ? 0 : parseHours(l.hours)), 0); return String(Math.floor(minutes / 60)).padStart(2,"0") + ":" + String(minutes % 60).padStart(2,"0"); })()}</strong>
-          </div>
-          {creditLines.some(l => l.type === "Interjornada 50%") && <div className="mt-2 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-xs">
-            <span className="text-muted-foreground">Interjornada · somente histórico</span>
-            <strong>{(() => { const minutes = creditLines.reduce((s,l) => s + (l.type === "Interjornada 50%" ? parseHours(l.hours) : 0), 0); return String(Math.floor(minutes / 60)).padStart(2,"0") + ":" + String(minutes % 60).padStart(2,"0"); })()}</strong>
-          </div>}
-        </div>
-        <div className="rounded-lg border p-3 md:col-span-2">
-          <div><p className="text-sm font-semibold">2. Débito</p><p className="text-xs text-muted-foreground">Informe as horas que serão descontadas do saldo.</p></div>
-          <label className="mt-4 grid gap-1 text-xs font-medium">Horas do débito<input value={debitHours} onChange={e => setDebitHours(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm font-normal" placeholder="00:00" /></label>
-        </div>
-      </div>
-      <div className="mt-4 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button disabled={saving || !competence} onClick={() => void saveLaunch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : "Salvar lançamento"}</button></div>
-    </Card></div>}
 
-  </div>;
+      <div className="mt-6 space-y-3">
+        {loading ? <Card className="p-8 text-center text-muted-foreground">Carregando lançamentos...</Card>
+          : !periods.length ? <Card className="p-8 text-center text-muted-foreground">Cadastre uma competência em Fechamento de Ponto antes de lançar.</Card>
+          : !groups.length ? <Card className="p-8 text-center text-muted-foreground">Nenhum lançamento nesta competência.</Card>
+          : groups.map(g => {
+            const comp = composeMinutes(g.credits, g.debits);
+            const closed = isClosed(g.date);
+            return (
+              <Card key={g.key} className="p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                  <div className="flex-1">
+                    <p className="font-semibold">{names.get(g.employee_id) ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground">{formatDateBR(g.date)}</p>
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      {g.credits.map(c => <span key={c.id} className="rounded-full bg-primary/10 px-2 py-1 text-primary">{CREDIT_TYPES[c.launch_type]?.label ?? c.launch_type}: {minutesToHours(c.minutes)}{!CREDIT_TYPES[c.launch_type]?.affectsBalance && " (não entra no saldo)"}</span>)}
+                      {comp.debit > 0 && <span className="rounded-full bg-destructive/10 px-2 py-1 text-destructive">Débito: {minutesToHours(comp.debit)}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="text-xs text-muted-foreground">Crédito {minutesToHours(creditTotal(comp))} · Débito {minutesToHours(comp.debit)}</p>
+                    <p className={`text-lg font-bold ${balanceOf(comp) < 0 ? "text-destructive" : "text-primary"}`}>Saldo {minutesToHours(balanceOf(comp), true)}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className={btnOutline} disabled={closed || saving} onClick={() => openEdit(g)}><Pencil className="h-3.5 w-3.5" /> Editar</button>
+                    {confirmDelete === g.key ? (
+                      <>
+                        <button className={btnDanger} disabled={saving} onClick={() => void doDelete(g)}>Confirmar exclusão</button>
+                        <button className={btnOutline} onClick={() => setConfirmDelete(null)}>Cancelar</button>
+                      </>
+                    ) : <button className={btnDanger} disabled={closed || saving} onClick={() => setConfirmDelete(g.key)}><Trash2 className="h-3.5 w-3.5" /> Excluir</button>}
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+      </div>
+
+      {open && (
+        <Modal title={editing ? "Editar lançamento" : "Novo lançamento"} onClose={() => setOpen(false)}
+          footer={<><button className={btnOutline} onClick={() => setOpen(false)}>Cancelar</button><button className={btnPrimary} disabled={saving} onClick={() => void save()}>{saving ? "Salvando..." : "Salvar"}</button></>}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-sm font-medium">Funcionário
+              <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
+                <option value="">Selecione</option>
+                {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">Data
+              <input type="date" className={inputCls} value={date} onChange={e => setDate(e.target.value)} />
+            </label>
+          </div>
+          {date && <p className="mt-2 text-xs text-muted-foreground">{periodForDate(periods, date) ? `Competência: ${periodRangeLabel(periodForDate(periods, date)!)}` : "Nenhuma competência contém esta data."}</p>}
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between"><p className="text-sm font-semibold">1. Crédito</p>
+              <button type="button" className={btnOutline} onClick={() => setLines(ls => [...ls, { type: "ADICIONAL_NOTURNO", hours: "00:00" }])}><Plus className="h-3.5 w-3.5" /> Adicionar tipo</button></div>
+            <div className="mt-2 space-y-2">
+              {lines.map((l, i) => (
+                <div key={i} className="grid grid-cols-[1fr_120px_36px] gap-2">
+                  <select className={inputCls} value={l.type} onChange={e => setLines(ls => ls.map((x, j) => j === i ? { ...x, type: e.target.value as CreditType } : x))}>
+                    {CREDIT_TYPE_KEYS.map(k => <option key={k} value={k}>{CREDIT_TYPES[k].label}{CREDIT_TYPES[k].affectsBalance ? "" : " (informativo)"}</option>)}
+                  </select>
+                  <input className={inputCls} placeholder="HH:MM" value={l.hours} onChange={e => setLines(ls => ls.map((x, j) => j === i ? { ...x, hours: e.target.value } : x))} />
+                  <button type="button" disabled={i === 0} className="text-muted-foreground disabled:opacity-30" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}><X className="h-4 w-4" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-5">
+            <p className="text-sm font-semibold">2. Débito</p>
+            <input className={`${inputCls} mt-2 max-w-[160px]`} placeholder="HH:MM" value={debitHours} onChange={e => setDebitHours(e.target.value)} />
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+            <div><p className="text-xs text-muted-foreground">Crédito total</p><p className="font-bold">{minutesToHours(creditTotal(preview))}</p></div>
+            <div><p className="text-xs text-muted-foreground">Débito</p><p className="font-bold">{minutesToHours(preview.debit)}</p></div>
+            <div><p className="text-xs text-muted-foreground">Saldo</p><p className="font-bold">{minutesToHours(balanceOf(preview), true)}</p></div>
+          </div>
+          {preview.INTERJORNADA_50 > 0 && <p className="mt-2 text-xs text-muted-foreground">Interjornada ({minutesToHours(preview.INTERJORNADA_50)}) será registrada, mas não altera o saldo.</p>}
+          {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+        </Modal>
+      )}
+    </ScreenShell>
+  );
 }
