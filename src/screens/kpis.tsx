@@ -1,4 +1,4 @@
-import { ArrowLeft, TrendingDown, TrendingUp, Users, Clock3, CalendarX2, Percent, UserMinus, Moon, Sun } from "lucide-react";
+import { ArrowLeft, Users, Clock3, CalendarX2, Percent, UserMinus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,7 +85,6 @@ export function Kpis() {
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [employeeFilterOpen, setEmployeeFilterOpen] = useState(false);
   const [periodLabel, setPeriodLabel] = useState("");
-  const [source, setSource] = useState("");
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState<"absenteismo" | "horas-extras" | "turnover">("absenteismo");
 
@@ -160,7 +159,7 @@ export function Kpis() {
       setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(targetPeriods[0]));
 
       const selectedEmployeeSet = new Set(selectedEmployees);
-      const allowedEmployees = employees.filter(e => employeeMatches(e, undefined, selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
+      const allowedEmployees = employees.filter(e => employeeMatches(e, [], selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
       const allowedIds = new Set(allowedEmployees.map(e => e.id));
 
       const [{ data: historical, error: historicalError }, { data: overtime, error: overtimeError }, { data: timeRecords, error: timeError }] = await Promise.all([
