@@ -299,7 +299,14 @@ export function Kpis() {
         const key = employee?.id ?? `historical:${row.registration ?? row.employee_name}`;
         if (employee) historicalCount += 1;
 
-        next.expected += Number(row.expected_minutes || 0);
+        const historicalPeriod = periods.find(p => p.id === row.period_id);
+        const hireYear = employee?.hireDate ? Number(employee.hireDate.slice(0, 4)) : null;
+        const is2026Hire = hireYear === 2026;
+        const admissionAfterPeriodStart = Boolean(employee?.hireDate && historicalPeriod && employee.hireDate > historicalPeriod.start_date);
+        const expectedMinutes = employee && historicalPeriod && is2026Hire && admissionAfterPeriodStart
+          ? expectedFromSchedule(employee, historicalPeriod)
+          : Number(row.expected_minutes || 0);
+        next.expected += expectedMinutes;
         next.worked += Number(row.worked_minutes || 0);
         const faltas = Math.round(Number(row.absence_quantity || 0) * 8.8 * 60);
         const atestados = Number(row.certificate_minutes || 0);
