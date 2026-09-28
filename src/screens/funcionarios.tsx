@@ -10,6 +10,7 @@ export function Employees() {
   const [positions, setPositions] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("ativo");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo" });
@@ -185,7 +186,11 @@ export function Employees() {
     await loadEmployees();
   }
 
-  const filtered = employees.filter((e) => e.full_name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = employees.filter((e) => {
+    const matchesSearch = e.full_name.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "todos" || e.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background px-6 py-4">
@@ -216,7 +221,7 @@ export function Employees() {
         <Card className="mt-6 overflow-hidden">
           <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
             <div><h2 className="font-display font-bold">Lista de funcionários</h2><p className="text-xs text-muted-foreground">Dados vindos do banco</p></div>
-            <div className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 md:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div>
+            <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><div className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 sm:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "todos" | "ativo" | "inativo")} className="rounded-lg border bg-background px-3 py-2 text-sm outline-none"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select></div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
