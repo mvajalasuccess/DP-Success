@@ -250,24 +250,6 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
 
   return (
     <div className="min-h-screen bg-background">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r bg-sidebar lg:block">
-        <div className="flex h-20 items-center gap-3 border-b px-5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></div>
-          <div><div className="font-display text-lg font-bold">DP Success</div><div className="text-[10px] uppercase tracking-widest text-muted-foreground">RH · DP · Gestão</div></div>
-        </div>
-        <nav className="space-y-1 p-3 text-sm">
-          <button type="button" onClick={() => onNavigate("dashboard")} className="block w-full rounded-lg bg-sidebar-primary px-3 py-2.5 text-left text-sidebar-primary-foreground">Dashboard</button>
-          {mainNav.slice(0, 1).map(([label, key]) => <button key={key} type="button" onClick={() => onNavigate(key)} className="block w-full rounded-lg px-3 py-2.5 text-left text-sidebar-foreground/75 hover:bg-sidebar-accent">{label}</button>)}
-          <div className="pt-2">
-            <button type="button" onClick={() => setCompanyOpen(!companyOpen)} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sidebar-foreground/80 hover:bg-sidebar-accent"><span className="flex items-center gap-2"><Building2 className="h-4 w-4" />Empresas</span><ChevronDown className={`h-4 w-4 transition-transform ${companyOpen ? "rotate-180" : ""}`} /></button>
-            {companyOpen && <div className="ml-3 mt-1 space-y-1 border-l pl-3">{companyNav.map(([label, key]) => <button key={key} type="button" onClick={() => onNavigate(key)} className="block w-full rounded-lg px-3 py-2 text-left text-xs text-sidebar-foreground/70 hover:bg-sidebar-accent">{label}</button>)}</div>}
-          </div>
-          <div className="my-2 border-t border-sidebar-border" />
-          {mainNav.slice(1).map(([label, key]) => <button key={key} type="button" onClick={() => onNavigate(key)} className="block w-full rounded-lg px-3 py-2.5 text-left text-sidebar-foreground/75 hover:bg-sidebar-accent">{label}</button>)}
-        </nav>
-      </aside>
-
-      <main className="lg:pl-64">
         <header className="flex h-16 items-center justify-between border-b bg-background/90 px-6">
           <span className="text-xs text-muted-foreground">RH / Visão geral</span>
           <div className="flex items-center gap-2 rounded-xl border bg-card px-2 py-1.5">
@@ -288,7 +270,6 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
             <Card className="p-5"><h2 className="font-display font-bold">Próximas ações</h2><div className="mt-4 grid gap-2"><button type="button" onClick={() => onNavigate("fechamento-ponto")} className="rounded-lg border p-3 text-left text-sm hover:bg-muted">Conferir fechamento de ponto</button><button type="button" onClick={() => onNavigate("lancamentos")} className="rounded-lg border p-3 text-left text-sm hover:bg-muted">Registrar lançamento</button><button type="button" onClick={() => onNavigate("kpis")} className="rounded-lg border p-3 text-left text-sm hover:bg-muted">Analisar KPIs</button><button type="button" onClick={() => onNavigate("relatorios")} className="rounded-lg border p-3 text-left text-sm hover:bg-muted">Gerar relatório</button></div></Card>
           </div>
         </div>
-      </main>
     </div>
   );
 }
