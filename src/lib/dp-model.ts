@@ -106,6 +106,65 @@ export async function fetchLaunches(filter: { employeeId?: string; start?: strin
   return { credits: check(c) as CreditRow[], debits: check(d) as DebitRow[] };
 }
 
+export type HistoricalBalanceRow = {
+  period_id: string;
+  employee_id: string | null;
+  employee_name: string;
+  expected_minutes: number | null;
+  worked_minutes: number | null;
+  absence_quantity: number | null;
+  certificate_minutes: number | null;
+  declaration_minutes: number | null;
+  allowance_minutes: number | null;
+  debit_minutes: number | null;
+  he_60_minutes: number | null;
+  he_60_night_minutes: number | null;
+  he_100_minutes: number | null;
+  he_20_minutes: number | null;
+  interjornada_minutes: number | null;
+};
+
+export async function fetchHistoricalBalances(employeeId: string) {
+  const r = await supabase
+    .from("historical_kpi_data")
+    .select("period_id,employee_id,employee_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+    .eq("employee_id", employeeId);
+  return check(r) as HistoricalBalanceRow[];
+}
+
+function historicalComposition(row: HistoricalBalanceRow): Composition {
+  return {
+    HE_60: Number(row.he_60_minutes || 0),
+    HE_60_NOTURNO: Number(row.he_60_night_minutes || 0),
+    HE_100: Number(row.he_100_minutes || 0),
+    HE_100_NOTURNO: 0,
+    ADICIONAL_NOTURNO: Number(row.he_20_minutes || 0),
+    INTERJORNADA_50: Number(row.interjornada_minutes || 0),
+    debit: Number(row.debit_minutes || 0),
+  };
+}
+
+export async function balancesByEmployee(employeeId: string): Promise<PeriodBalance[]> {
+  const [periods, launches, historical] = await Promise.all([
+    fetchPeriods(),
+    fetchLaunches({ employeeId }),
+    fetchHistoricalBalances(employeeId),
+  ]);
+  const historicalByPeriod = new Map(historical.map(row => [row.period_id, historicalComposition(row)]));
+  const ordered = [...periods].sort((a, b) => a.start_date.localeCompare(b.start_date));
+  let accumulated = 0;
+  return ordered.map(period => {
+    const historicalComp = historicalByPeriod.get(period.id);
+    const comp = historicalComp ?? composeMinutes(
+      launches.credits.filter(r => r.period_id === period.id || inRange(r.reference_date, period)),
+      launches.debits.filter(r => r.period_id === period.id || inRange(r.entry_date, period)),
+    );
+    const monthBalance = balanceOf(comp);
+    accumulated += monthBalance;
+    return { period, composition: comp, monthBalance, accumulated };
+  });
+}
+
 export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number };
 
 /** Saldo por competência (ordem cronológica), com acumulado. Cada lançamento cai em uma única competência pelo intervalo de datas. */
