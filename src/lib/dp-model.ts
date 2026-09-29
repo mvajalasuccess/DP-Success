@@ -206,6 +206,10 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   const payments = check(paymentsResult) as Array<{ id: string; entry_date: string; minutes: number; period_id: string | null; justification: string | null }>;
   const employeeName = String(employeeResult.data?.full_name ?? "").trim().toUpperCase();
   const isDyan = employeeName === "DYAN" || employeeName.startsWith("DYAN ");
+  const isGlecio = employeeName.includes("GLECIO JOSE DE CARVALHO JUNIOR") || employeeName.includes("GLÉCIO JOSÉ DE CARVALHO JUNIOR");
+  const glecioManualBalances: Record<string, number> = {
+    "2026-07-20": 38 * 60 + 56,
+  };
   const isFelipeHilmann = employeeName.includes("FELIPE HILMANN");
   const felipeHilmannManualBalances: Record<string, number> = {
     "2026-07-20": 25 * 60 + 6,
@@ -327,7 +331,9 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
     const calculatedBalance = employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20"
       ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.HE_20 - comp.debit + adjustment
       : balanceOf(comp) + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
-    const monthBalance = isFelipeHilmann && Object.prototype.hasOwnProperty.call(felipeHilmannManualBalances, period.end_date)
+    const monthBalance = isGlecio && Object.prototype.hasOwnProperty.call(glecioManualBalances, period.end_date)
+      ? glecioManualBalances[period.end_date] ?? calculatedBalance
+      : isFelipeHilmann && Object.prototype.hasOwnProperty.call(felipeHilmannManualBalances, period.end_date)
       ? felipeHilmannManualBalances[period.end_date] ?? calculatedBalance
       : isRichard && Object.prototype.hasOwnProperty.call(richardManualBalances, period.end_date)
       ? richardManualBalances[period.end_date] ?? calculatedBalance
