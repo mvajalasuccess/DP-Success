@@ -46,14 +46,15 @@ type Metrics = {
   he20: number;
   interjornada: number;
   turnover: number;
+  admissions: number;
   terminations: number;
-  averageHeadcount: number;
+  activeHeadcount: number;
 };
 
 const emptyMetrics: Metrics = {
   employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, faltasDays: 0, atestadosMinutes: 0, atestadosDays: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0,
   he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0,
-  interjornada: 0, turnover: 0, terminations: 0, averageHeadcount: 0,
+  interjornada: 0, turnover: 0, admissions: 0, terminations: 0, activeHeadcount: 0,
 };
 
 function fmt(minutes: number) {
@@ -449,27 +450,33 @@ export function Kpis() {
         next.absenceMinutes += minutes;
       }
 
+      const admissionEmployees = allowedEmployees.filter(e =>
+        e.hireDate &&
+        e.hireDate >= rangeStart &&
+        e.hireDate <= rangeEnd
+      );
       const terminationEmployees = allowedEmployees.filter(e =>
         e.terminationDate &&
         e.terminationDate >= rangeStart &&
         e.terminationDate <= rangeEnd
       );
 
-      const headcountAt = (date: string) =>
-        allowedEmployees.filter(e =>
-          (!e.hireDate || e.hireDate <= date) &&
-          (!e.terminationDate || e.terminationDate > date)
-        ).length;
+      // Turnover conforme fórmula adotada no sistema:
+      // [(Admissões + Desligamentos) ÷ 2] ÷ total de colaboradores ativos × 100.
+      // O quadro ativo é o número de colaboradores que estavam ativos no fim
+      // do período analisado, respeitando os filtros de setor/funcionários.
+      const activeHeadcount = allowedEmployees.filter(e =>
+        (!e.hireDate || e.hireDate <= rangeEnd) &&
+        (!e.terminationDate || e.terminationDate > rangeEnd)
+      ).length;
 
-      const headcounts = targetPeriods.map(p => headcountAt(p.end_date));
-      const averageHeadcount = headcounts.length
-        ? headcounts.reduce((sum, value) => sum + value, 0) / headcounts.length
-        : 0;
-
-      next.employees = allowedEmployees.filter(e => !e.terminationDate || e.terminationDate > rangeEnd).length;
+      next.employees = activeHeadcount;
+      next.admissions = admissionEmployees.length;
       next.terminations = terminationEmployees.length;
-      next.averageHeadcount = averageHeadcount;
-      next.turnover = averageHeadcount > 0 ? (terminationEmployees.length / averageHeadcount) * 100 : 0;
+      next.activeHeadcount = activeHeadcount;
+      next.turnover = activeHeadcount > 0
+        ? (((admissionEmployees.length + terminationEmployees.length) / 2) / activeHeadcount) * 100
+        : 0;
 
       for (const item of comparison.values()) {
         item.total = item.he60 + item.he60Night + item.he100 + item.he100Night + item.he20 + item.interjornada;
@@ -660,7 +667,7 @@ export function Kpis() {
             </div>
             <Card className="mt-4 p-5">
               <p className="text-sm font-semibold">Cálculo do indicador</p>
-              <p className="mt-2 text-sm text-muted-foreground">Desligamentos no período ÷ média de funcionários no período × 100</p>
+              <p className="mt-2 text-sm text-muted-foreground">[(Admissões + Desligamentos) ÷ 2] ÷ colaboradores ativos × 100</p>
             </Card>
           </section>
         )}
