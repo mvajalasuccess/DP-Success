@@ -369,22 +369,31 @@ export function Kpis() {
       }
 
       const recordedExpectedPeriods = new Set<string>();
+      const currentExpectedByKey = new Map<string, number>();
+      const currentWorkedByKey = new Map<string, number>();
+      const currentLostByKey = new Map<string, number>();
+
       for (const row of timeRecords ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
         operationalCount += 1;
+        const key = String(row.employee_id) + ":" + String(row.period_id);
         const expected = Number(row.expected_minutes || 0);
+        const worked = Number(row.worked_minutes || 0);
         next.expected += expected;
-        next.worked += Number(row.worked_minutes || 0);
-        if (expected > 0) recordedExpectedPeriods.add(`${row.employee_id}:${row.period_id}`);
+        currentExpectedByKey.set(key, (currentExpectedByKey.get(key) ?? 0) + expected);
+        currentWorkedByKey.set(key, (currentWorkedByKey.get(key) ?? 0) + worked);
+        if (expected > 0) recordedExpectedPeriods.add(key);
       }
-
-      // Nas competências manuais, não é necessário informar horas previstas em cada lançamento.
+      // Nas competências manuais, não é necessário informar horas previstas em cada lançamento.      // Nas competências manuais, não é necessário informar horas previstas em cada lançamento.
       // Quando não houver registro de ponto com expected_minutes, o KPI calcula o previsto
       // automaticamente a partir da jornada cadastrada no funcionário.
       for (const period of targetPeriods.filter(p => p.end_date > HISTORICAL_CUTOFF)) {
         for (const employee of allowedEmployees) {
           if (recordedExpectedPeriods.has(`${employee.id}:${period.id}`)) continue;
-          next.expected += expectedFromSchedule(employee, period);
+          const expected = expectedFromSchedule(employee, period);
+          const key = String(employee.id) + ":" + String(period.id);
+          next.expected += expected;
+          currentExpectedByKey.set(key, (currentExpectedByKey.get(key) ?? 0) + expected);
         }
       }
 
@@ -411,10 +420,12 @@ export function Kpis() {
         const isDayBased = unit.startsWith("dia");
         const minutes = isDayBased ? Math.round(quantity * dailyMinutes) : unit.startsWith("hor") ? Math.round(quantity * 60) : Math.round(quantity);
         const faltaCodes = new Set(["falta", "folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"]);
+        const key = String(row.employee_id) + ":" + String(row.period_id);
         if (faltaCodes.has(code)) {
           next.faltasDays += quantity;
           next.faltasMinutes += minutes;
           next.absenceMinutes += minutes;
+          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
         } else if (code === "atestado") {
           // Atestados atuais têm como fonte oficial medical_certificates.
           // Evita duplicar o mesmo atestado se houver uma ocorrência legada.
@@ -439,16 +450,48 @@ export function Kpis() {
         const minutes = Math.round(selectedDays * dailyMinutes);
         next.atestadosDays += selectedDays;
         next.atestadosMinutes += minutes;
-        // Atestados são exibidos separadamente e NÃO entram no absenteísmo.
+        // Atestados não entram no absenteísmo, mas reduzem as horas trabalhadas.
+        for (const period of targetPeriods.filter(p =>
+          p.end_date > HISTORICAL_CUTOFF &&
+          row.start_date <= p.end_date &&
+          row.end_date >= p.start_date
+        )) {
+          const overlapStart = row.start_date > period.start_date ? row.start_date : period.start_date;
+          const overlapEnd = row.end_date < period.end_date ? row.end_date : period.end_date;
+          const overlapDays = Math.max(0, Math.floor(
+            (new Date(overlapEnd + "T00:00:00").getTime() - new Date(overlapStart + "T00:00:00").getTime()) / 86400000
+          ) + 1);
+          const periodMinutes = Math.min(selectedDays, overlapDays) * dailyMinutes;
+          const key = String(row.employee_id) + ":" + String(period.id);
+          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + Math.round(periodMinutes));
+        }
       }
 
       for (const row of currentDebits ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
         const minutes = Math.abs(Number(row.minutes || 0));
         next.absenceMinutes += minutes;
+        const key = String(row.employee_id) + ":" + String(row.period_id);
+        currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
       }
 
-      const admissionEmployees = allowedEmployees.filter(e =>
+      // Nas competências atuais, quando não existe time_records para o funcionário,
+      // as horas trabalhadas seguem a mesma regra do fechamento: previstas - perdidas.
+      // Quando existe time_records, preservamos as horas trabalhadas informadas no ponto.
+      let currentWorked = 0;
+      for (const [key, expected] of currentExpectedByKey) {
+        if (currentWorkedByKey.has(key)) {
+          currentWorked += currentWorkedByKey.get(key) ?? 0;
+        } else {
+          const lost = currentLostByKey.get(key) ?? 0;
+          currentWorked += Math.max(0, expected - lost);
+        }
+      }
+
+      const historicalWorked = next.worked;
+      next.worked = historicalWorked + currentWorked;
+
+      const admissionEmployees = allowedEmployees.filter(e =>      const admissionEmployees = allowedEmployees.filter(e =>
         e.hireDate &&
         e.hireDate >= rangeStart &&
         e.hireDate <= rangeEnd
