@@ -70,11 +70,11 @@ export function ImportacaoHistorico() {
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-      const sheet = workbook.Sheets.BASE;
+      const sheet = workbook.Sheets["BASE"];
       if (!sheet) throw new Error('A planilha precisa ter uma aba chamada "BASE".');
       const data = XLSX.utils.sheet_to_json<Row>(sheet, { defval: 0, raw: true });
       if (!data.length) throw new Error("A aba BASE está vazia.");
-      const foundHeaders = Object.keys(data[0]);
+      const foundHeaders = Object.keys(data[0] ?? {});
       const missing = REQUIRED.filter(h => !foundHeaders.includes(h));
       if (missing.length) throw new Error(`A aba BASE não possui: ${missing.join(", ")}`);
       setRows(data);

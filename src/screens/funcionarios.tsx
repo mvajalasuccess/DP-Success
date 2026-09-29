@@ -97,7 +97,7 @@ export function Employees() {
         position_id: form.role,
         hire_date: form.admission,
         termination_date: form.status === "inativo" ? form.termination || null : null,
-        status: form.status,
+        status: form.status as "ativo" | "inativo",
         work_schedule_id: form.work_schedule_id || null,
         salary: Number(form.salary.replace(",", ".")),
       }).eq("id", editingId);
@@ -131,7 +131,7 @@ export function Employees() {
       position_id: form.role,
       hire_date: form.admission,
       termination_date: form.status === "inativo" ? form.termination || null : null,
-      status: form.status,
+      status: form.status as "ativo" | "inativo",
       work_schedule_id: form.work_schedule_id || null,
       salary,
     }).select("id").single();

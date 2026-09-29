@@ -130,7 +130,7 @@ export function Kpis() {
       setPeriods(parsedPeriods);
 
       const years = [...new Set(parsedPeriods.map(p => p.reference_year))].sort((a, b) => b - a);
-      if (years.length) setSelectedYear(years[0]);
+      if (years.length && years[0] !== undefined) setSelectedYear(years[0]);
     })();
   }, []);
 
@@ -166,10 +166,11 @@ export function Kpis() {
       }
 
       const periodIds = targetPeriods.map(p => p.id);
-      const rangeStart = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, targetPeriods[0].start_date);
-      const rangeEnd = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, targetPeriods[0].end_date);
+      const firstTarget = targetPeriods[0]!;
+      const rangeStart = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, firstTarget.start_date);
+      const rangeEnd = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, firstTarget.end_date);
 
-      setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(targetPeriods[0]));
+      setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(firstTarget));
 
       const selectedEmployeeSet = new Set(selectedEmployees);
       const allowedEmployees = employees.filter(e => employeeMatches(e, [], selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
