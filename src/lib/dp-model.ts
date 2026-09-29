@@ -317,11 +317,11 @@ export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits
 export async function fetchIndicators(start: string, end: string) {
   const [launches, occ, certs, allLaunches] = await Promise.all([
     fetchLaunches({ start, end }),
-    supabase.from("occurrences").select("employee_id,occurrence_date,quantity,unit,occurrence_types(code)").gte("occurrence_date", start).lte("occurrence_date", end),
+    supabase.from("occurrences").select("employee_id,occurrence_date,end_date,quantity,unit,occurrence_types(code)").lte("occurrence_date", end).or(`end_date.is.null,end_date.gte.${start}`),
     supabase.from("medical_certificates").select("employee_id,start_date,end_date,days").lte("start_date", end).gte("end_date", start),
     fetchLaunches({ end }),
   ]);
-  const occRows = check(occ) as Array<{ employee_id: string; quantity: number | null; unit: string; occurrence_types: { code: string } | null }>;
+  const occRows = check(occ) as Array<{ employee_id: string; occurrence_date: string; end_date: string | null; quantity: number | null; unit: string; occurrence_types: { code: string } | null }>;
   const certRows = check(certs) as Array<{ employee_id: string; days: number }>;
   const map = new Map<string, { overtime: number; composition: Composition; late: number; absence: number; certificates: number; certificateDays: number; accumulated: number }>();
   const get = (id: string) => {
@@ -343,7 +343,7 @@ export async function fetchIndicators(start: string, end: string) {
     const code = o.occurrence_types?.code ?? "";
     const min = occurrenceMinutes(o.quantity, o.unit);
     if (code === "atraso" || code === "saida_antecipada") get(o.employee_id).late += min;
-    if (code === "falta") get(o.employee_id).absence += min;
+    if (["falta", "folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code)) get(o.employee_id).absence += min;
   }
   for (const c of certRows) { const v = get(c.employee_id); v.certificates += 1; v.certificateDays += Number(c.days || 0); }
   return map;
