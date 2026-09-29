@@ -248,6 +248,13 @@ export function Kpis() {
         );
 
       const isAllowedRow = (row: any) => {
+        // Quando "Todos os funcionários" e "Todos os setores" estão selecionados,
+        // o histórico deve considerar todos os funcionários que existem na BASE
+        // de cada competência, mesmo que hoje não estejam no cadastro ativo.
+        // Isso é necessário para que o absenteísmo de janeiro em diante não
+        // desapareça por alterações cadastrais posteriores.
+        if (!selectedEmployees.length && selectedDepartment === "todos") return true;
+
         const employee = resolveEmployee(row);
         if (employee) return allowedIds.has(employee.id);
         if (selectedEmployees.length) return false;
