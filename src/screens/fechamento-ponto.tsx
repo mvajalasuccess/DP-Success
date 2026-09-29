@@ -250,10 +250,12 @@ export function PointClosing() {
       }
 
       // Abono = atestados + declarações de horas.
-      // Horas trabalhadas = horas previstas - faltas - abonos.
+      // Horas perdidas = faltas + abonos + débitos.
+      // Horas trabalhadas = horas previstas - horas perdidas.
       const allowanceTotal = certificateMinutes + declarationMinutes;
       const absenceMinutes = Math.round(faltasDays * 528);
-      const worked = Math.max(0, expected - absenceMinutes - allowanceTotal);
+      const lostMinutes = absenceMinutes + allowanceTotal + debitMinutes;
+      const worked = Math.max(0, expected - lostMinutes);
 
       return {
         id: id + "::manual",
