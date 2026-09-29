@@ -279,7 +279,7 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
       .reduce((sum, p) => sum + Math.abs(Number(p.minutes) || 0), 0);
 
     const calculatedBalance = balanceOf(comp) + adjustment;
-    const monthBalance = isRichard && Object.prototype.hasOwnProperty.call(richardManualBalances, period.end_date)
+    const monthBalance = (isRichard && Object.prototype.hasOwnProperty.call(richardManualBalances, period.end_date)
       ? richardManualBalances[period.end_date]
       : isYves && Object.prototype.hasOwnProperty.call(yvesManualBalances, period.end_date)
         ? yvesManualBalances[period.end_date]
@@ -293,7 +293,7 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
             ? miguelManualBalances[period.end_date]
             : isOrmindo && Object.prototype.hasOwnProperty.call(ormindoManualBalances, period.end_date)
               ? ormindoManualBalances[period.end_date]
-              : calculatedBalance;
+              : calculatedBalance) ?? calculatedBalance;
     accumulated += monthBalance - paymentMinutes;
     return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes };
   });

@@ -170,7 +170,7 @@ export function BankHours() {
         employee_id: employeeId,
         period_id: period?.id ?? null,
         entry_date: adjustmentDate,
-        kind: "ajuste",
+        kind: "ajuste" as const,
         minutes,
         adjustment_direction: direction,
         justification: adjustmentReason + ": " + adjustmentJustification.trim(),

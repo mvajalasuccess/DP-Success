@@ -111,7 +111,7 @@ export function Comparativos() {
         else if (type.includes("20")) t.he20 += minutes;
         else t.he60 += minutes;
       }
-      for (const row of debits.data ?? []) if (next[row.employee_id]) next[row.employee_id].debitos += Math.abs(Number(row.minutes) || 0);
+      for (const row of debits.data ?? []) { const t = next[row.employee_id]; if (t) t.debitos += Math.abs(Number(row.minutes) || 0); }
       for (const row of absences.data ?? []) {
         const t = next[row.employee_id];
         if (!t) continue;
