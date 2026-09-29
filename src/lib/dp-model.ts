@@ -258,10 +258,22 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
 
   return ordered.map((period) => {
     const historicalComp = historicalByPeriod.get(period.id);
-    const comp = historicalComp ?? composeMinutes(
+    let comp = historicalComp ?? composeMinutes(
       launches.credits.filter(r => r.period_id === period.id || inRange(r.reference_date, period)),
       launches.debits.filter(r => r.period_id === period.id || inRange(r.entry_date, period)),
     );
+
+    // Ajuste manual solicitado para Felipe Hilmann na competência de julho/2026.
+    // Mantém os demais dados da competência e corrige somente a composição informada.
+    if (employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20") {
+      comp = {
+        ...comp,
+        HE_60: 19 * 60 + 26,
+        HE_60_NOTURNO: 1 * 60 + 31,
+        HE_100: 15 * 60 + 33,
+        debit: 11 * 60 + 24,
+      };
+    }
 
     // Ajustes vinculados à competência entram nela. Ajustes sem period_id
     // entram apenas se a data estiver dentro da própria competência.
