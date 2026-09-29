@@ -179,7 +179,8 @@ export function PointClosing() {
         ? employee.termination_date
         : p.end_date;
       if (effectiveStart > effectiveEnd) return 0;
-      return countWorkingWeekdays(effectiveStart, effectiveEnd) * 528;
+      const workingDays = countWorkingWeekdays(effectiveStart, effectiveEnd);
+      return workingDays * 528;
     };
 
     const expectedByEmployee = new Map<string, number>();
@@ -207,7 +208,7 @@ export function PointClosing() {
         const quantity = Number(row.quantity || 0);
         const unit = String(row.unit ?? "dias").toLowerCase();
         const minutes = unit.startsWith("dia")
-          ? Math.round(quantity * dailyMinutes(employee))
+          ? Math.round(quantity * 528)
           : unit.startsWith("hor")
             ? Math.round(quantity * 60)
             : Math.round(quantity);
