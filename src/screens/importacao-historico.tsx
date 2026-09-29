@@ -53,6 +53,10 @@ function competenceRange(year: number, month: number) {
   return { start: iso(start), end: iso(end) };
 }
 
+function employeeKey(year: number, month: number, name: string) {
+  return `${year}-${month}-${name.trim().toLowerCase()}`;
+}
+
 export function ImportacaoHistorico() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -194,11 +198,7 @@ export function ImportacaoHistorico() {
           if (!department) {
             const { data: createdDepartment, error: departmentCreateError } = await db
               .from("departments")
-              .insert({
-                name: departmentName,
-                active: true,
-                is_demo: false,
-              })
+              .insert({ name: departmentName, active: true, is_demo: false })
               .select("id,name")
               .single();
             if (departmentCreateError) throw new Error(`Não foi possível criar o setor ${departmentName}: ${departmentCreateError.message}`);
@@ -216,12 +216,7 @@ export function ImportacaoHistorico() {
           if (!position) {
             const { data: createdPosition, error: positionCreateError } = await db
               .from("positions")
-              .insert({
-                name: positionName,
-                department_id: departmentId,
-                active: true,
-                is_demo: false,
-              })
+              .insert({ name: positionName, department_id: departmentId, active: true, is_demo: false })
               .select("id,name,department_id")
               .single();
             if (positionCreateError) throw new Error(`Não foi possível criar o cargo ${positionName}: ${positionCreateError.message}`);
@@ -295,10 +290,61 @@ export function ImportacaoHistorico() {
         });
       }
 
-      const { error: upsertError } = await db
-        .from("historical_kpi_data")
-        .upsert(output, { onConflict: "reference_year,reference_month,registration,employee_name" });
-      if (upsertError) throw new Error(upsertError.message);
+      // Atualiza o histórico existente por competência + funcionário, sem apagar
+      // outras competências nem registros lançados manualmente no sistema.
+      // A matrícula pode ter sido corrigida na nova BASE, então ela não é usada
+      // como chave de reconciliação.
+      const existingByKey = new Map<string, any>();
+      const years = [...new Set(output.map(row => row.reference_year))];
+      const months = [...new Set(output.map(row => row.reference_month))];
+
+      for (const year of years) {
+        const selectedMonths = months.filter(month => output.some(row => row.reference_year === year && row.reference_month === month));
+        for (const month of selectedMonths) {
+          const { data: existingRows, error: existingError } = await db
+            .from("historical_kpi_data")
+            .select("id,reference_year,reference_month,employee_name,registration,import_batch_id")
+            .eq("reference_year", year)
+            .eq("reference_month", month);
+          if (existingError) throw new Error(existingError.message);
+
+          for (const existing of existingRows ?? []) {
+            const key = employeeKey(existing.reference_year, existing.reference_month, String(existing.employee_name ?? ""));
+            existingByKey.set(key, existing);
+          }
+        }
+      }
+
+      const toUpdate: any[] = [];
+      const toInsert: any[] = [];
+
+      for (const row of output) {
+        const key = employeeKey(row.reference_year, row.reference_month, row.employee_name);
+        const existing = existingByKey.get(key);
+        if (existing?.id) {
+          toUpdate.push({ ...row, id: existing.id });
+        } else {
+          toInsert.push(row);
+        }
+      }
+
+      if (toUpdate.length) {
+        for (const row of toUpdate) {
+          const { id, ...payload } = row;
+          const { error: updateError } = await db
+            .from("historical_kpi_data")
+            .update(payload)
+            .eq("id", id);
+          if (updateError) throw new Error(updateError.message);
+        }
+      }
+
+      if (toInsert.length) {
+        const { error: insertError } = await db
+          .from("historical_kpi_data")
+          .insert(toInsert);
+        if (insertError) throw new Error(insertError.message);
+      }
 
       const { error: batchUpdateError } = await db
         .from("historical_import_batches")
@@ -307,7 +353,7 @@ export function ImportacaoHistorico() {
       if (batchUpdateError) throw new Error(batchUpdateError.message);
 
       setResult({ imported: output.length, unmatched, createdEmployees });
-      setMessage(`Histórico importado com sucesso. ${createdEmployees} cadastro(s) de funcionário foram criados automaticamente como ativos para preservar o histórico. O RH pode editar a situação e a data de demissão de cada funcionário. A importação não altera essas informações.`);
+      setMessage(`Histórico importado com segurança. ${createdEmployees} cadastro(s) de funcionário foram criados automaticamente como ativos para preservar o histórico. Os registros históricos existentes foram atualizados pela competência + funcionário, permitindo corrigir matrículas sem apagar outras competências ou lançamentos atuais. A importação não altera situação nem data de desligamento dos funcionários.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha na importação.");
     } finally {
