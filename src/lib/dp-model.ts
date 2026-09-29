@@ -136,28 +136,14 @@ export type HistoricalBalanceRow = {
 };
 
 export async function fetchHistoricalBalances(employeeId: string) {
-  // O histórico importado precisa continuar vinculado ao cadastro atual mesmo
-  // quando o employee_id mudou. A BASE também guarda matrícula/nome, então
-  // usamos a matrícula como chave de reconciliação e employee_id como principal.
-  const employeeResult = await supabase
-    .from("employees")
-    .select("id,registration,full_name")
-    .eq("id", employeeId)
-    .maybeSingle();
-  if (employeeResult.error) throw new Error(employeeResult.error.message);
-
-  const registration = String(employeeResult.data?.registration ?? "").trim();
-  let query = supabase
+  // O histórico importado deve ser vinculado ao cadastro pelo employee_id.
+  // A matrícula não pode ser usada como fallback porque pode existir duplicidade
+  // histórica (ex.: Felipe Santos Barros e Lorran Ferreira Barros possuem a mesma
+  // matrícula 18). Usar matrícula aqui faria o Banco de Horas misturar os dois.
+  const r = await supabase
     .from("historical_kpi_data")
-    .select("period_id,employee_id,registration,employee_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes");
-
-  if (registration) {
-    query = query.or(`employee_id.eq.${employeeId},registration.eq.${registration}`);
-  } else {
-    query = query.eq("employee_id", employeeId);
-  }
-
-  const r = await query;
+    .select("period_id,employee_id,registration,employee_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+    .eq("employee_id", employeeId);
   return check(r) as HistoricalBalanceRow[];
 }
 
