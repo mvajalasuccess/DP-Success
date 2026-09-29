@@ -33,7 +33,10 @@ export function Atestados() {
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<"atestado" | "declaracao">("atestado");
   const [declarationForm, setDeclarationForm] = useState({ employee_id: "", occurrence_date: "", quantity: "", reason: "Acompanhante", notes: "" });
-  const [editingDeclaration, setEditingDeclaration] = useState<Declaration | null>(null);\n\n  const referenceDate = mode === "declaracao" ? declarationForm.occurrence_date : form.start_date;\n  const employeesForDate = employees.filter(e => !referenceDate || ( (!e.hire_date || e.hire_date <= referenceDate) && (!e.termination_date || e.termination_date >= referenceDate) ));
+  const [editingDeclaration, setEditingDeclaration] = useState<Declaration | null>(null);
+
+  const referenceDate = mode === "declaracao" ? declarationForm.occurrence_date : form.start_date;
+  const employeesForDate = employees.filter(e => !referenceDate || ( (!e.hire_date || e.hire_date <= referenceDate) && (!e.termination_date || e.termination_date >= referenceDate) ));
 
   async function load() {
     setError("");
