@@ -174,10 +174,14 @@ function historicalComposition(row: HistoricalBalanceRow): Composition {
 }
 
 export async function balancesByEmployee(employeeId: string): Promise<PeriodBalance[]> {
-  const [periods, launches, historical, adjustmentsResult, paymentsResult, employeeResult] = await Promise.all([
+  const [periods, launches, historical, overridesResult, adjustmentsResult, paymentsResult, employeeResult] = await Promise.all([
     fetchPeriods(),
     fetchLaunches({ employeeId }),
     fetchHistoricalBalances(employeeId),
+    (supabase as any)
+      .from("point_closing_overrides")
+      .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+      .eq("employee_id", employeeId),
     supabase
       .from("bank_hours")
       .select("id,entry_date,minutes,adjustment_direction,justification,period_id")
@@ -192,6 +196,23 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
       .order("entry_date", { ascending: true }),
     supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle(),
   ]);
+  const overrides = check(overridesResult) as Array<{
+    period_id: string;
+    employee_id: string;
+    expected_minutes: number;
+    worked_minutes: number;
+    absence_quantity: number;
+    certificate_minutes: number;
+    declaration_minutes: number;
+    allowance_minutes: number;
+    debit_minutes: number;
+    he_60_minutes: number;
+    he_60_night_minutes: number;
+    he_100_minutes: number;
+    he_20_minutes: number;
+    interjornada_minutes: number;
+  }>;
+  const overridesByPeriod = new Map(overrides.map(row => [row.period_id, row]));
   const adjustments = check(adjustmentsResult) as ManualAdjustment[];
   const payments = check(paymentsResult) as Array<{ id: string; entry_date: string; minutes: number; period_id: string | null; justification: string | null }>;
   const employeeName = String(employeeResult.data?.full_name ?? "").trim().toUpperCase();
@@ -262,14 +283,27 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
 
   return ordered.map((period) => {
     const historicalComp = historicalByPeriod.get(period.id);
+    const override = overridesByPeriod.get(period.id);
     let comp = historicalComp ?? composeMinutes(
       launches.credits.filter(r => r.period_id === period.id || inRange(r.reference_date, period)),
       launches.debits.filter(r => r.period_id === period.id || inRange(r.entry_date, period)),
     );
 
+    if (override) {
+      comp = {
+        ...comp,
+        HE_60: Number(override.he_60_minutes || 0),
+        HE_60_NOTURNO: Number(override.he_60_night_minutes || 0),
+        HE_100: Number(override.he_100_minutes || 0),
+        HE_20: Number(override.he_20_minutes || 0),
+        INTERJORNADA_50: Number(override.interjornada_minutes || 0),
+        debit: Number(override.debit_minutes || 0),
+      };
+    }
+
     // Ajuste manual solicitado para Felipe Hilmann na competência de julho/2026.
     // Mantém os demais dados da competência e corrige somente a composição informada.
-    if (employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20") {
+    if (!override && employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20") {
       comp = {
         ...comp,
         HE_60: 19 * 60 + 26,
