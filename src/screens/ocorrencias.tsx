@@ -107,7 +107,6 @@ export function Ocorrencias() {
   }
 
   function startEdit(row: Occ) {
-    const code = row.occurrence_types?.code ?? "";
     setEditing(row);
     setForm({
       employee_id: row.employee_id,
@@ -115,8 +114,6 @@ export function Ocorrencias() {
       occurrence_date: row.occurrence_date,
       end_date: row.end_date ?? "",
       quantity: row.quantity == null ? "" : String(row.quantity),
-      cid: "",
-      declaration_reason: reason,
       justification: row.justification ?? "",
       notes: row.notes ?? "",
     });
@@ -130,8 +127,6 @@ export function Ocorrencias() {
       occurrence_type_id: id,
       quantity: "",
       end_date: "",
-      cid: "",
-      declaration_reason: "",
       justification: "",
     });
   }

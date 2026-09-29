@@ -491,7 +491,7 @@ export function Kpis() {
       const historicalWorked = next.worked;
       next.worked = historicalWorked + currentWorked;
 
-      const admissionEmployees = allowedEmployees.filter(e =>      const admissionEmployees = allowedEmployees.filter(e =>
+      const admissionEmployees = allowedEmployees.filter(e =>
         e.hireDate &&
         e.hireDate >= rangeStart &&
         e.hireDate <= rangeEnd
