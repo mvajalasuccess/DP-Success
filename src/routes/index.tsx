@@ -156,7 +156,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       const db = supabase;
       const [emps, comp, overtimeRows, occ, cert, timeRows, bankRows] = await Promise.all([
         db.from("employees").select("id,full_name,department_id,departments(name)").eq("status", "ativo"),
-        db.from("time_periods").select("id,reference_year,reference_month,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
+        db.from("time_periods").select("id,reference_year,reference_month,status,start_date,end_date").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
         db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
         db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_date,end_date,period_id,occurrence_types(code)").order("occurrence_date", { ascending: false }),
         db.from("medical_certificates").select("id,employee_id,start_date,end_date,days"),

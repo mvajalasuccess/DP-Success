@@ -63,4 +63,5 @@ export const BANK_KIND_LABELS: Record<BankHoursKind, string> = {
   debito: "Débito",
   compensacao: "Compensação",
   ajuste: "Ajuste manual",
+  pagamento_he: "Pagamento de HE",
 };
