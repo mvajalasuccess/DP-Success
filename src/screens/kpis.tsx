@@ -194,9 +194,16 @@ export function Kpis() {
         { data: scheduleRows, error: scheduleError },
       ] = await Promise.all([
         historicalPeriodIds.length
-          ? db.from("historical_kpi_data")
-              .select("period_id,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-              .in("period_id", historicalPeriodIds)
+          ? (() => {
+              const query = db.from("historical_kpi_data")
+                .select("period_id,reference_year,reference_month,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+                .eq("reference_year", selectedYear);
+              if (selectedMonth !== "todos") {
+                const selectedPeriod = targetPeriods[0];
+                return query.eq("reference_month", selectedPeriod.reference_month);
+              }
+              return query;
+            })()
           : Promise.resolve({ data: [], error: null }),
         currentPeriodIds.length
           ? db.from("overtime_records")
@@ -423,7 +430,7 @@ export function Kpis() {
         const minutes = Math.round(selectedDays * dailyMinutes);
         next.atestadosDays += selectedDays;
         next.atestadosMinutes += minutes;
-        next.absenceMinutes += minutes;
+        // Atestados são exibidos separadamente e NÃO entram no absenteísmo.
       }
 
       for (const row of currentDebits ?? []) {
@@ -456,29 +463,54 @@ export function Kpis() {
       // existentes naquela linha da BASE é a fonte correta do quadro daquele mês.
       const historicalHeadcountSets = new Map<string, Set<string>>();
 
+      // Para o histórico, a fonte do quadro é a própria BASE importada.
+      // A contagem deve ser feita por competência (Ano/Mês) e nunca pelo
+      // cadastro atual de funcionários. Assim, desligamentos posteriores,
+      // mudanças de matrícula ou alterações cadastrais não removem pessoas
+      // que realmente estavam na BASE daquela competência.
       const historicalRowsForHeadcount = (historical ?? []).filter((row: any) => {
-        const period = periods.find(p => p.id === row.period_id);
-        return period?.end_date && period.end_date <= HISTORICAL_CUTOFF;
+        const month = Number(row.reference_month);
+        const year = Number(row.reference_year);
+        return year === selectedYear && month >= 1 && month <= 7;
       });
 
       const historicalHeadcountByPeriod = new Map<string, number>();
       for (const row of historicalRowsForHeadcount) {
-        // A contagem histórica deve vir diretamente da BASE. Não cruzar com
-        // o cadastro atual, porque funcionários desligados posteriormente
-        // continuam fazendo parte do quadro daquela competência.
-        const key = String(row.period_id);
-        const employeeKey = String(
-          row.registration ??
-          row.employee_id ??
-          String(row.employee_name ?? "").trim().toLowerCase()
-        ).trim();
+        const period = periods.find(p =>
+          Number(p.reference_year) === Number(row.reference_year) &&
+          Number(p.reference_month) === Number(row.reference_month)
+        );
+        if (!period) continue;
+
+        let employeeKey = String(row.registration ?? "").trim();
+        if (!employeeKey) {
+          employeeKey = String(row.employee_id ?? "").trim();
+        }
+        if (!employeeKey) {
+          employeeKey = String(row.employee_name ?? "").trim().toLowerCase();
+        }
         if (!employeeKey) continue;
+
+        // Os filtros de funcionário/setor também precisam respeitar os dados
+        // históricos da BASE, sem excluir alguém só porque o cadastro atual
+        // mudou.
+        if (selectedEmployees.length) {
+          const employee = resolveEmployee(row);
+          if (!employee || !selectedEmployeeSet.has(employee.id)) continue;
+        }
+        if (selectedDepartment !== "todos" &&
+            String(row.department_name ?? "").trim() !== selectedDepartment) {
+          continue;
+        }
+
+        const key = `${row.reference_year}-${row.reference_month}`;
         const set = historicalHeadcountSets.get(key) ?? new Set<string>();
         set.add(employeeKey);
         historicalHeadcountSets.set(key, set);
       }
-      for (const [periodId, set] of historicalHeadcountSets) {
-        historicalHeadcountByPeriod.set(periodId, set.size);
+
+      for (const [key, set] of historicalHeadcountSets) {
+        historicalHeadcountByPeriod.set(key, set.size);
       }
 
       const isHistoricalOnly = targetPeriods.length > 0 && targetPeriods.every(
@@ -490,7 +522,10 @@ export function Kpis() {
       ).length;
 
       const activeHeadcount = isHistoricalOnly
-        ? targetPeriods.reduce((sum, period) => sum + (historicalHeadcountByPeriod.get(period.id) ?? 0), 0) / targetPeriods.length
+        ? targetPeriods.reduce((sum, period) => {
+            const key = `${period.reference_year}-${period.reference_month}`;
+            return sum + (historicalHeadcountByPeriod.get(key) ?? 0);
+          }, 0) / targetPeriods.length
         : currentActiveHeadcount;
 
       next.employees = activeHeadcount;
