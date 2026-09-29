@@ -57,7 +57,16 @@ export function Ocorrencias() {
 
   const selectedType = visibleTypes.find(t => t.id === form.occurrence_type_id);
   const selectedCode = selectedType?.code ?? "";
-  const isFalta = ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(selectedCode);\n\n  const employeesForDate = useMemo(() => {\n    const referenceDate = form.occurrence_date;\n    if (!referenceDate) return employees;\n    return employees.filter(e =>\n      (!e.hire_date || e.hire_date <= referenceDate) &&\n      (!e.termination_date || e.termination_date >= referenceDate)\n    );\n  }, [employees, form.occurrence_date]);
+  const isFalta = ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(selectedCode);
+
+  const employeesForDate = useMemo(() => {
+    const referenceDate = form.occurrence_date;
+    if (!referenceDate) return employees;
+    return employees.filter(e =>
+      (!e.hire_date || e.hire_date <= referenceDate) &&
+      (!e.termination_date || e.termination_date >= referenceDate)
+    );
+  }, [employees, form.occurrence_date]);
 
   async function load() {
     setError("");
