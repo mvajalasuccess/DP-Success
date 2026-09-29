@@ -737,6 +737,84 @@ export type Database = {
           },
         ]
       }
+      point_closing_overrides: {
+        Row: {
+          absence_quantity: number
+          allowance_minutes: number
+          certificate_minutes: number
+          created_at: string
+          debit_minutes: number
+          declaration_minutes: number
+          employee_id: string
+          expected_minutes: number
+          he_100_minutes: number
+          he_20_minutes: number
+          he_60_minutes: number
+          he_60_night_minutes: number
+          id: string
+          interjornada_minutes: number
+          justification: string | null
+          period_id: string
+          updated_at: string
+          worked_minutes: number
+        }
+        Insert: {
+          absence_quantity?: number
+          allowance_minutes?: number
+          certificate_minutes?: number
+          created_at?: string
+          debit_minutes?: number
+          declaration_minutes?: number
+          employee_id: string
+          expected_minutes?: number
+          he_100_minutes?: number
+          he_20_minutes?: number
+          he_60_minutes?: number
+          he_60_night_minutes?: number
+          id?: string
+          interjornada_minutes?: number
+          justification?: string | null
+          period_id: string
+          updated_at?: string
+          worked_minutes?: number
+        }
+        Update: {
+          absence_quantity?: number
+          allowance_minutes?: number
+          certificate_minutes?: number
+          created_at?: string
+          debit_minutes?: number
+          declaration_minutes?: number
+          employee_id?: string
+          expected_minutes?: number
+          he_100_minutes?: number
+          he_20_minutes?: number
+          he_60_minutes?: number
+          he_60_night_minutes?: number
+          id?: string
+          interjornada_minutes?: number
+          justification?: string | null
+          period_id?: string
+          updated_at?: string
+          worked_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_closing_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_closing_overrides_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "time_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           active: boolean
