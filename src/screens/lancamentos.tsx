@@ -237,7 +237,7 @@ export function Launches() {
               {lines.map((l, i) => (
                 <div key={i} className="grid grid-cols-[1fr_120px_36px] gap-2">
                   <select className={inputCls} value={l.type} onChange={e => setLines(ls => ls.map((x, j) => j === i ? { ...x, type: e.target.value as CreditType } : x))}>
-                    {CREDIT_TYPE_KEYS.map(k => <option key={k} value={k}>{CREDIT_TYPES[k].label}{CREDIT_TYPES[k].affectsBalance ? "" : " (informativo)"}</option>)}
+                    {CREDIT_TYPE_KEYS.map(k => <option key={k} value={k}>{CREDIT_TYPES[k].label}</option>)}
                   </select>
                   <input className={inputCls} placeholder="HH:MM" value={l.hours} onChange={e => setLines(ls => ls.map((x, j) => j === i ? { ...x, hours: e.target.value } : x))} />
                   <button type="button" disabled={i === 0} className="text-muted-foreground disabled:opacity-30" onClick={() => setLines(ls => ls.filter((_, j) => j !== i))}><X className="h-4 w-4" /></button>
