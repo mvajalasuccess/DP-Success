@@ -195,6 +195,7 @@ export function Kpis() {
         { data: currentDebits, error: debitError },
         { data: currentCertificates, error: certificateError },
         { data: scheduleRows, error: scheduleError },
+        { data: overrideRows, error: overrideError },
       ] = await Promise.all([
         historicalPeriodIds.length
           ? (() => {
@@ -236,10 +237,13 @@ export function Kpis() {
               .gte("end_date", rangeStart)
           : Promise.resolve({ data: [], error: null }),
         db.from("work_schedules").select("id,weekly_minutes").eq("active", true),
+        db.from("point_closing_overrides")
+          .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+          .in("period_id", periodIds),
       ]);
 
-      if (historicalError || overtimeError || timeError || occurrenceError || debitError || certificateError || scheduleError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || timeError || occurrenceError || debitError || certificateError || scheduleError || overrideError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? overrideError?.message ?? "Não foi possível carregar os indicadores.");
         return;
       }
 
@@ -293,6 +297,13 @@ export function Kpis() {
         const weekly = employee.workScheduleId ? (scheduleMinutes.get(employee.workScheduleId) ?? 0) : 0;
         return weekly ? weekly / 5 : 8.8 * 60;
       };
+      const overrides = (overrideRows ?? []) as any[];
+      const overrideByKey = new Map<string, any>(
+        overrides.map((row: any) => [String(row.period_id) + ":" + String(row.employee_id), row]),
+      );
+      const hasOverride = (employeeId: string | null | undefined, periodId: string | null | undefined) =>
+        Boolean(employeeId && periodId && overrideByKey.has(String(periodId) + ":" + String(employeeId)));
+
       const comparison = new Map<string, OvertimeEmployee>();
 
       const addOvertime = (row: any, employee: Employee | undefined, minutes: number, launchType: string) => {
@@ -322,22 +333,24 @@ export function Kpis() {
       for (const row of historical ?? []) {
         if (!isAllowedRow(row)) continue;
         const employee = resolveEmployee(row);
+        const override = employee ? overrideByKey.get(String(row.period_id) + ":" + String(employee.id)) : undefined;
+        const sourceRow = override ? { ...row, ...override } : row;
         const key = employee?.id ?? `historical:${row.registration ?? row.employee_name}`;
         if (employee) historicalCount += 1;
 
         // Histórico da BASE: usar exatamente os valores importados.
         // Não recalcular horas previstas por jornada/admissão/desligamento aqui,
         // pois Jan-Jul já foi validado contra o Power BI e deve permanecer fechado.
-        const expectedMinutes = Number(row.expected_minutes || 0);
+        const expectedMinutes = Number(sourceRow.expected_minutes || 0);
         next.expected += expectedMinutes;
-        next.worked += Number(row.worked_minutes || 0);
+        next.worked += Number(sourceRow.worked_minutes || 0);
         const dailyMinutes = 528;
-        const faltaDays = Number(row.absence_quantity || 0);
+        const faltaDays = Number(sourceRow.absence_quantity || 0);
         const faltas = Math.round(faltaDays * dailyMinutes);
-        const atestados = Number(row.certificate_minutes || 0);
+        const atestados = Number(sourceRow.certificate_minutes || 0);
         const atestadoDays = dailyMinutes > 0 ? atestados / dailyMinutes : 0;
-        const declaracoes = Number(row.declaration_minutes || 0);
-        const abonos = Number(row.allowance_minutes || 0);
+        const declaracoes = Number(sourceRow.declaration_minutes || 0);
+        const abonos = Number(sourceRow.allowance_minutes || 0);
         next.faltasDays += faltaDays;
         next.faltasMinutes += faltas;
         next.atestadosDays += atestadoDays;
@@ -346,21 +359,21 @@ export function Kpis() {
         next.abonosMinutes += abonos;
         // Absenteísmo: considerar somente faltas + abonos + débitos.
         // Atestados e declarações NÃO entram no cálculo do indicador.
-        const debitos = Number(row.debit_minutes || 0);
+        const debitos = Number(sourceRow.debit_minutes || 0);
         next.absenceMinutes += faltas + debitos + abonos;
 
-        next.he60 += Number(row.he_60_minutes || 0);
-        next.he60Night += Number(row.he_60_night_minutes || 0);
-        next.he100 += Number(row.he_100_minutes || 0);
-        next.he20 += Number(row.he_20_minutes || 0);
-        next.interjornada += Number(row.interjornada_minutes || 0);
+        next.he60 += Number(sourceRow.he_60_minutes || 0);
+        next.he60Night += Number(sourceRow.he_60_night_minutes || 0);
+        next.he100 += Number(sourceRow.he_100_minutes || 0);
+        next.he20 += Number(sourceRow.he_20_minutes || 0);
+        next.interjornada += Number(sourceRow.interjornada_minutes || 0);
 
         if (employee) {
-          addOvertime(row, employee, Number(row.he_60_minutes || 0), "HE_60");
-          addOvertime(row, employee, Number(row.he_60_night_minutes || 0), "HE_60_NOTURNO");
-          addOvertime(row, employee, Number(row.he_100_minutes || 0), "HE_100");
-          addOvertime(row, employee, Number(row.he_20_minutes || 0), "ADICIONAL_NOTURNO");
-          addOvertime(row, employee, Number(row.interjornada_minutes || 0), "INTERJORNADA_50");
+          addOvertime(row, employee, Number(sourceRow.he_60_minutes || 0), "HE_60");
+          addOvertime(row, employee, Number(sourceRow.he_60_night_minutes || 0), "HE_60_NOTURNO");
+          addOvertime(row, employee, Number(sourceRow.he_100_minutes || 0), "HE_100");
+          addOvertime(row, employee, Number(sourceRow.he_20_minutes || 0), "ADICIONAL_NOTURNO");
+          addOvertime(row, employee, Number(sourceRow.interjornada_minutes || 0), "INTERJORNADA_50");
         }
       }
 
@@ -371,6 +384,7 @@ export function Kpis() {
 
       for (const row of timeRecords ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        if (hasOverride(row.employee_id, row.period_id)) continue;
         operationalCount += 1;
         const key = String(row.employee_id) + ":" + String(row.period_id);
         const expected = Number(row.expected_minutes || 0);
@@ -385,7 +399,7 @@ export function Kpis() {
       // automaticamente a partir da jornada cadastrada no funcionário.
       for (const period of targetPeriods.filter(p => p.end_date > HISTORICAL_CUTOFF)) {
         for (const employee of allowedEmployees) {
-          if (recordedExpectedPeriods.has(`${employee.id}:${period.id}`)) continue;
+          if (recordedExpectedPeriods.has(`${employee.id}:${period.id}`) || hasOverride(employee.id, period.id)) continue;
           const expected = expectedFromSchedule(employee, period);
           const key = String(employee.id) + ":" + String(period.id);
           next.expected += expected;
@@ -395,6 +409,7 @@ export function Kpis() {
 
       for (const row of overtime ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        if (hasOverride(row.employee_id, row.period_id)) continue;
         addOvertime(
           row,
           employees.find(e => e.id === row.employee_id),
@@ -408,6 +423,7 @@ export function Kpis() {
       // Uma falta de 1 dia corresponde a 08:48 (528 minutos).
       for (const row of currentOccurrences ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        if (hasOverride(row.employee_id, row.period_id)) continue;
         const code = String(row.occurrence_types?.code ?? "").toLowerCase();
         const quantity = Number(row.quantity || 0);
         const unit = String(row.unit ?? "dias").toLowerCase();
@@ -436,6 +452,10 @@ export function Kpis() {
 
       for (const row of currentCertificates ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        if (currentPeriodIds.some(id => hasOverride(row.employee_id, id))) {
+          const overlappingOverride = currentPeriodIds.find(id => hasOverride(row.employee_id, id));
+          if (overlappingOverride) continue;
+        }
         const employee = employees.find(e => e.id === row.employee_id);
         if (!employee) continue;
         const selectedDays = Math.max(0, Math.min(
@@ -465,10 +485,51 @@ export function Kpis() {
 
       for (const row of currentDebits ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        if (hasOverride(row.employee_id, row.period_id)) continue;
         const minutes = Math.abs(Number(row.minutes || 0));
         next.absenceMinutes += minutes;
         const key = String(row.employee_id) + ":" + String(row.period_id);
         currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
+      }
+
+      // Ajustes oficiais do fechamento substituem todos os lançamentos da mesma
+      // competência para o funcionário. Assim o KPI nunca soma a fonte original
+      // junto com a correção manual.
+      for (const override of overrides) {
+        const period = targetPeriods.find(p => p.id === override.period_id);
+        if (!period || period.end_date <= HISTORICAL_CUTOFF) continue;
+        const employee = employees.find(e => e.id === override.employee_id);
+        if (!employee || !allowedIds.has(employee.id)) continue;
+
+        const expected = Number(override.expected_minutes || 0);
+        const worked = Number(override.worked_minutes || 0);
+        const faltaDays = Number(override.absence_quantity || 0);
+        const faltas = Math.round(faltaDays * 528);
+        const atestados = Number(override.certificate_minutes || 0);
+        const declaracoes = Number(override.declaration_minutes || 0);
+        const abonos = Number(override.allowance_minutes || 0);
+        const debitos = Number(override.debit_minutes || 0);
+
+        next.expected += expected;
+        next.worked += worked;
+        next.faltasDays += faltaDays;
+        next.faltasMinutes += faltas;
+        next.atestadosMinutes += atestados;
+        next.atestadosDays += atestados / 528;
+        next.declaracoesMinutes += declaracoes;
+        next.abonosMinutes += abonos;
+        next.absenceMinutes += faltas + abonos + debitos;
+        next.he60 += Number(override.he_60_minutes || 0);
+        next.he60Night += Number(override.he_60_night_minutes || 0);
+        next.he100 += Number(override.he_100_minutes || 0);
+        next.he20 += Number(override.he_20_minutes || 0);
+        next.interjornada += Number(override.interjornada_minutes || 0);
+
+        addOvertime(override, employee, Number(override.he_60_minutes || 0), "HE_60");
+        addOvertime(override, employee, Number(override.he_60_night_minutes || 0), "HE_60_NOTURNO");
+        addOvertime(override, employee, Number(override.he_100_minutes || 0), "HE_100");
+        addOvertime(override, employee, Number(override.he_20_minutes || 0), "ADICIONAL_NOTURNO");
+        addOvertime(override, employee, Number(override.interjornada_minutes || 0), "INTERJORNADA_50");
       }
 
       // Nas competências atuais, quando não existe time_records para o funcionário,
