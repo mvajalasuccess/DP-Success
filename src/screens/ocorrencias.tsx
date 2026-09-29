@@ -26,7 +26,6 @@ const ALLOWED_CODES = new Set([
   "folga_descontada",
   "falta_justificada",
   "falta_injustificada",
-  "atestado",
   "declaracao_horas",
 ]);
 
@@ -79,7 +78,7 @@ export function Ocorrencias() {
   const selectedType = visibleTypes.find(t => t.id === form.occurrence_type_id);
   const selectedCode = selectedType?.code ?? "";
   const isFalta = ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(selectedCode);
-  const isAtestado = selectedCode === "atestado";
+  const isAtestado = false;
   const isDeclaration = selectedCode === "declaracao_horas";
 
   async function load() {
@@ -131,7 +130,7 @@ export function Ocorrencias() {
       occurrence_date: row.occurrence_date,
       end_date: row.end_date ?? "",
       quantity: code === "declaracao_horas" ? decimalHoursToText(row.quantity) : row.quantity == null ? "" : String(row.quantity),
-      cid: row.cid ?? "",
+      cid: "",
       declaration_reason: reason,
       justification: row.justification ?? "",
       notes: row.notes ?? "",
@@ -160,18 +159,13 @@ export function Ocorrencias() {
       return;
     }
 
-    if ((isFalta || isAtestado) && Number(form.quantity) <= 0) {
+    if (isFalta && Number(form.quantity) <= 0) {
       setError("Informe a quantidade de dias.");
       return;
     }
 
     if (isDeclaration && hoursTextToDecimal(form.quantity) <= 0) {
       setError("Informe as horas realmente abonadas.");
-      return;
-    }
-
-    if (isAtestado && !form.cid.trim()) {
-      setError("Informe o CID do atestado.");
       return;
     }
 
@@ -195,18 +189,12 @@ export function Ocorrencias() {
       occurrence_type_id: form.occurrence_type_id,
       period_id: period?.id ?? null,
       occurrence_date: form.occurrence_date,
-      end_date: isAtestado
-        ? (() => {
-            const start = new Date(`${form.occurrence_date}T00:00:00`);
-            start.setDate(start.getDate() + Number(form.quantity) - 1);
-            return start.toISOString().slice(0, 10);
-          })()
-        : form.end_date || null,
+      end_date: form.end_date || null,
       quantity,
       unit: isDeclaration ? "horas" : "dias",
       justification: form.justification.trim() || null,
       notes,
-      ...(isAtestado ? { cid: form.cid.trim() } : {}),
+
     };
 
     const result = editing
@@ -319,7 +307,7 @@ export function Ocorrencias() {
           <Card className="w-full max-w-xl p-6">
             <h2 className="text-xl font-bold">{editing ? "Editar ocorrência" : "Nova ocorrência"}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              A quantidade será armazenada na unidade correta para o cálculo dos KPIs.
+              Faltas são registradas em dias. Declarações são registradas pelas horas realmente abonadas.
             </p>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -335,13 +323,7 @@ export function Ocorrencias() {
 
               <input type="date" value={form.occurrence_date} onChange={e => setForm({ ...form, occurrence_date: e.target.value })} className="rounded-lg border px-3 py-2" />
 
-              {isAtestado ? (
-                <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                  A data final será calculada automaticamente pelos dias informados.
-                </div>
-              ) : (
-                <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" />
-              )}
+              <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" />
 
               {isDeclaration ? (
                 <>
@@ -372,14 +354,7 @@ export function Ocorrencias() {
                 />
               )}
 
-              {isAtestado && (
-                <input
-                  placeholder="CID"
-                  value={form.cid}
-                  onChange={e => setForm({ ...form, cid: e.target.value })}
-                  className="rounded-lg border px-3 py-2"
-                />
-              )}
+              
 
               {selectedType?.requires_justification && (
                 <textarea
