@@ -42,6 +42,22 @@ export function Schedules() {
     if (error) setError(error.message); else await load();
   }
 
+  async function remove(row: any) {
+    if (!window.confirm("Excluir a jornada " + row.name + "?")) return;
+    setError("");
+    const { count, error: employeeError } = await supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("work_schedule_id", row.id);
+    if (employeeError) { setError(employeeError.message); return; }
+    if ((count ?? 0) > 0) {
+      setError("Não é possível excluir esta jornada porque existem funcionários vinculados a ela. Inative a jornada ou altere os funcionários antes de excluir.");
+      return;
+    }
+    const { error } = await supabase.from("work_schedules").delete().eq("id", row.id);
+    if (error) setError(error.message); else await load();
+  }
+
   return <div className="min-h-screen bg-background">
     <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] justify-between">
       <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a><b>DP Success · Cadastros</b>
@@ -52,7 +68,7 @@ export function Schedules() {
       </div>
       {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
       <Card className="mt-6 overflow-hidden"><table className="w-full text-left text-sm"><thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Jornada</th><th className="px-5 py-3">Carga semanal</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Ação</th></tr></thead><tbody className="divide-y">
-        {rows.length === 0 ? <tr><td colSpan={4} className="px-5 py-8 text-center text-muted-foreground">Nenhuma jornada cadastrada.</td></tr> : rows.map((row) => <tr key={row.id}><td className="px-5 py-4 font-medium">{row.name}</td><td className="px-5 py-4">{Math.floor((row.weekly_minutes || 0) / 60)}h</td><td className="px-5 py-4">{row.active === false ? "Inativa" : "Ativa"}</td><td className="px-5 py-4"><button type="button" onClick={() => { setError(""); setEditingId(row.id); setForm({ name: row.name, weekly: String((row.weekly_minutes || 0) / 60) }); setOpen(true); }} className="mr-3 text-primary"><Pencil className="mr-1 inline h-4 w-4" />Editar</button><button type="button" onClick={() => void toggle(row)} className="mr-3 text-primary"><Power className="mr-1 inline h-4 w-4" />{row.active === false ? "Ativar" : "Inativar"}</button></td></tr>)}
+        {rows.length === 0 ? <tr><td colSpan={4} className="px-5 py-8 text-center text-muted-foreground">Nenhuma jornada cadastrada.</td></tr> : rows.map((row) => <tr key={row.id}><td className="px-5 py-4 font-medium">{row.name}</td><td className="px-5 py-4">{Math.floor((row.weekly_minutes || 0) / 60)}h</td><td className="px-5 py-4">{row.active === false ? "Inativa" : "Ativa"}</td><td className="px-5 py-4"><button type="button" onClick={() => { setError(""); setEditingId(row.id); setForm({ name: row.name, weekly: String((row.weekly_minutes || 0) / 60) }); setOpen(true); }} className="mr-3 text-primary"><Pencil className="mr-1 inline h-4 w-4" />Editar</button><button type="button" onClick={() => void toggle(row)} className="mr-3 text-primary"><Power className="mr-1 inline h-4 w-4" />{row.active === false ? "Ativar" : "Inativar"}</button><button type="button" onClick={() => void remove(row)} className="text-destructive"><Trash2 className="mr-1 inline h-4 w-4" />Excluir</button></td></tr>)}
       </tbody></table></Card>
     </main>
     {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-md p-6">
