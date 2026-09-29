@@ -96,7 +96,13 @@ export function PointClosing() {
       return;
     }
 
-    if ((historical ?? []).length > 0) {
+    // A BASE histórica foi importada somente até a competência de julho/2026.
+    // A partir de agosto/2026, o fechamento deve sempre usar os dados atuais
+    // do DP-Success, mesmo que existam registros históricos antigos para a mesma
+    // competência. Isso garante que funcionários inativos que participaram da
+    // competência continuem aparecendo.
+    const HISTORICAL_CUTOFF = "2026-07-20";
+    if (p.end_date <= HISTORICAL_CUTOFF && (historical ?? []).length > 0) {
       setRowsSource("historical");
       setHistoricalRows(historical ?? []);
       setLoadingRows(false);
