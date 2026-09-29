@@ -74,8 +74,21 @@ export function Comparativos() {
       ]);
       for (const result of [historical, overtime, debits, absences, certificates]) if (result.error) throw result.error;
 
-      const inSelectedPeriods = (date: string, endDate?: string | null) =>
-        periodsSelected.some(p => (date <= p.end_date) && ((endDate ?? date) >= p.start_date));
+      const selectedRanges = periodsSelected.map(p => ({ start: p.start_date, end: p.end_date }));
+      const overlapDays = (startDate: string, endDate?: string | null) => {
+        const start = new Date(startDate + "T00:00:00");
+        const end = new Date((endDate ?? startDate) + "T00:00:00");
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+        let total = 0;
+        for (const range of selectedRanges) {
+          const rs = new Date(range.start + "T00:00:00");
+          const re = new Date(range.end + "T00:00:00");
+          const from = start > rs ? start : rs;
+          const to = end < re ? end : re;
+          if (to >= from) total += Math.floor((to.getTime() - from.getTime()) / 86400000) + 1;
+        }
+        return total;
+      };
 
       const next: Record<string, Totals> = {};
       employeeIds.forEach(id => { next[id] = { ...EMPTY }; });
@@ -99,8 +112,25 @@ export function Comparativos() {
         else t.he60 += minutes;
       }
       for (const row of debits.data ?? []) if (next[row.employee_id]) next[row.employee_id].debitos += Math.abs(Number(row.minutes) || 0);
-      for (const row of absences.data ?? []) if (next[row.employee_id] && inSelectedPeriods(row.occurrence_date, row.end_date)) next[row.employee_id].faltas += Number(row.quantity || 0);
-      for (const row of certificates.data ?? []) if (next[row.employee_id] && inSelectedPeriods(row.start_date, row.end_date)) next[row.employee_id].atestados += Number(row.days || 0);
+      for (const row of absences.data ?? []) {
+        const t = next[row.employee_id];
+        if (!t) continue;
+        const totalDays = Math.max(1, overlapDays(row.occurrence_date, row.end_date));
+        const fullDays = Math.max(1, Math.round(Number(row.quantity || 0)));
+        const selectedDays = row.end_date
+          ? Math.min(fullDays, totalDays)
+          : Number(row.quantity || 0);
+        if (selectedDays > 0) t.faltas += selectedDays;
+      }
+      for (const row of certificates.data ?? []) {
+        const t = next[row.employee_id];
+        if (!t) continue;
+        const overlap = overlapDays(row.start_date, row.end_date);
+        if (!overlap) continue;
+        const certificateDays = Number(row.days || 0);
+        const calendarDays = Math.max(1, overlapDays(row.start_date, row.end_date));
+        t.atestados += row.end_date ? Math.min(certificateDays || calendarDays, overlap) : certificateDays;
+      }
 
       setTotals(next);
     } catch (e: any) {
@@ -126,7 +156,7 @@ export function Comparativos() {
   function selectVisiblePeriods() { setSelectedPeriods(prev => [...new Set([...prev, ...visiblePeriods.map(p => p.id)])]); }
 
   const columns: [keyof Totals, string][] = [
-    ["he60", "HE 60%"], ["he60_20", "HE 60% + 20%"], ["he100", "HE 100%"], ["he20", "HE 20%"],
+    ["he60", "HE 60%"], ["he60_20", "HE 60%20"], ["he100", "HE 100%"], ["he20", "HE 20%"],
     ["interjornada", "Interjornada"], ["debitos", "Débitos"]
   ];
 
