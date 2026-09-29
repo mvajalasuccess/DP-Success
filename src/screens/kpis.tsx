@@ -332,10 +332,10 @@ export function Kpis() {
         next.atestadosMinutes += atestados;
         next.declaracoesMinutes += declaracoes;
         next.abonosMinutes += abonos;
-        // Histórico: faltas, atestados, declarações efetivamente abonadas,
-        // débitos e abonos são horas perdidas para o absenteísmo.
+        // Absenteísmo: considerar somente faltas + abonos + débitos.
+        // Atestados e declarações NÃO entram no cálculo do indicador.
         const debitos = Number(row.debit_minutes || 0);
-        next.absenceMinutes += faltas + atestados + declaracoes + debitos + abonos;
+        next.absenceMinutes += faltas + debitos + abonos;
 
         next.he60 += Number(row.he_60_minutes || 0);
         next.he60Night += Number(row.he_60_night_minutes || 0);
@@ -404,7 +404,7 @@ export function Kpis() {
           // Evita duplicar o mesmo atestado se houver uma ocorrência legada.
         } else if (code === "declaracao_horas" || code === "declaracao") {
           next.declaracoesMinutes += minutes;
-          next.absenceMinutes += minutes;
+          // Declarações são exibidas separadamente, mas NÃO entram no absenteísmo.
         } else if (code === "abono") {
           next.abonosMinutes += minutes;
           next.absenceMinutes += minutes;
@@ -591,7 +591,7 @@ export function Kpis() {
             </div>
             <Card className="mt-4 p-5">
               <p className="text-sm font-semibold">Cálculo do indicador</p>
-              <p className="mt-2 text-sm text-muted-foreground">(Faltas + Atestados + Declarações abonadas + Débitos + Abonos) ÷ horas previstas × 100</p>
+              <p className="mt-2 text-sm text-muted-foreground">(Débitos + Faltas + Abonos) ÷ horas previstas × 100</p>
               <p className="mt-3 text-lg font-semibold">({fmt(metrics.faltasMinutes)} + {fmt(metrics.atestadosMinutes)} + {fmt(metrics.declaracoesMinutes)} + {fmt(metrics.absenceMinutes - metrics.faltasMinutes - metrics.atestadosMinutes - metrics.declaracoesMinutes)}) ÷ {fmt(metrics.expected)} × 100 = {pct(absenteeismRate)}</p>
             </Card>
           </section>
