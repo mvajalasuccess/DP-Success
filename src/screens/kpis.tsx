@@ -287,7 +287,9 @@ export function Kpis() {
         // Ex.: 21/08/2026 a 20/09/2026 tem 20 dias úteis após 07/09,
         // então uma jornada de 44h/semana resulta em 20 × 08:48 = 176:00.
         const workingDays = countWorkingWeekdays(employeeStart, employeeEnd);
-        const dailyMinutes = weekly / 5;
+        // Regra oficial do fechamento: 08:48 por dia útil (528 min),
+        // independentemente da jornada cadastrada.
+        const dailyMinutes = 528;
         return Math.round(workingDays * dailyMinutes);
       };
 
@@ -333,7 +335,7 @@ export function Kpis() {
         const expectedMinutes = Number(row.expected_minutes || 0);
         next.expected += expectedMinutes;
         next.worked += Number(row.worked_minutes || 0);
-        const dailyMinutes = employee ? dailyMinutesFromSchedule(employee) : 8.8 * 60;
+        const dailyMinutes = 528;
         const faltaDays = Number(row.absence_quantity || 0);
         const faltas = Math.round(faltaDays * dailyMinutes);
         const atestados = Number(row.certificate_minutes || 0);
@@ -433,7 +435,7 @@ export function Kpis() {
           Number(row.days || 0),
           Math.floor((new Date(row.end_date + "T00:00:00").getTime() - new Date(row.start_date + "T00:00:00").getTime()) / 86400000) + 1,
         ));
-        const dailyMinutes = dailyMinutesFromSchedule(employee);
+        const dailyMinutes = 528;
         const minutes = Math.round(selectedDays * dailyMinutes);
         next.atestadosDays += selectedDays;
         next.atestadosMinutes += minutes;
