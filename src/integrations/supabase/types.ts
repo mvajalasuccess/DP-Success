@@ -581,6 +581,7 @@ export type Database = {
       occurrences: {
         Row: {
           attachment_id: string | null
+          cid: string | null
           created_at: string
           created_by: string | null
           employee_id: string
@@ -598,6 +599,7 @@ export type Database = {
         }
         Insert: {
           attachment_id?: string | null
+          cid?: string | null
           created_at?: string
           created_by?: string | null
           employee_id: string
@@ -615,6 +617,7 @@ export type Database = {
         }
         Update: {
           attachment_id?: string | null
+          cid?: string | null
           created_at?: string
           created_by?: string | null
           employee_id?: string
@@ -1074,7 +1077,12 @@ export type Database = {
     }
     Enums: {
       app_role: "administrador" | "rh" | "gestor" | "consulta"
-      bank_hours_kind: "credito" | "debito" | "compensacao" | "ajuste"
+      bank_hours_kind:
+        | "credito"
+        | "debito"
+        | "compensacao"
+        | "ajuste"
+        | "pagamento_he"
       employee_status: "ativo" | "inativo"
       period_status: "aberto" | "em_conferencia" | "fechado"
       time_record_status:
@@ -1216,7 +1224,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["administrador", "rh", "gestor", "consulta"],
-      bank_hours_kind: ["credito", "debito", "compensacao", "ajuste"],
+      bank_hours_kind: [
+        "credito",
+        "debito",
+        "compensacao",
+        "ajuste",
+        "pagamento_he",
+      ],
       employee_status: ["ativo", "inativo"],
       period_status: ["aberto", "em_conferencia", "fechado"],
       time_record_status: [
