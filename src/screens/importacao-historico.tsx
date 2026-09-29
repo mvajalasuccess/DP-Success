@@ -183,6 +183,7 @@ export function ImportacaoHistorico() {
             if (createError) throw new Error(createError.message);
             periodId = created.id;
           }
+          if (!periodId) throw new Error("Não foi possível criar a competência histórica.");
           periodIds.set(periodKey, periodId);
         }
 
