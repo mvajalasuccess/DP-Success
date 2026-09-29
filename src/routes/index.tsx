@@ -154,12 +154,14 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       }
       setUserEmail(sessionData.session.user.email || "Usuário RH");
       const db = supabase;
-      const [emps, comp, overtimeRows, occ, cert] = await Promise.all([
+      const [emps, comp, overtimeRows, occ, cert, timeRows, bankRows] = await Promise.all([
         db.from("employees").select("id,full_name,department_id,departments(name)").eq("status", "ativo"),
         db.from("time_periods").select("id,reference_year,reference_month,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
         db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
-        db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_types(code)").order("occurrence_date", { ascending: false }),
-        db.from("medical_certificates").select("id"),
+        db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_date,end_date,period_id,occurrence_types(code)").order("occurrence_date", { ascending: false }),
+        db.from("medical_certificates").select("id,employee_id,start_date,end_date,days"),
+        db.from("time_records").select("employee_id,period_id,expected_minutes,worked_minutes"),
+        db.from("bank_hours").select("employee_id,period_id,minutes,kind"),
       ]);
 
       const employees = emps.data ?? [];
@@ -172,12 +174,26 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         : overtimeData;
       const overtime = currentOvertime.reduce((sum: number, row: any) => sum + (row.minutes || 0), 0);
 
-      const absenceDays = occurrences
-        .filter((x: any) => {
-          const code = String(x.occurrence_types?.code ?? "").toLowerCase();
-          return ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code);
-        })
-        .reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
+      const periodId = competence?.id ?? null;
+      const absenceRows = occurrences.filter((x: any) => {
+        const code = String(x.occurrence_types?.code ?? "").toLowerCase();
+        return periodId && x.period_id === periodId && ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code);
+      });
+      const absenceDays = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
+      const declarationMinutes = occurrences
+        .filter((x: any) => periodId && x.period_id === periodId && String(x.occurrence_types?.code ?? "").toLowerCase() === "declaracao_horas")
+        .reduce((sum: number, x: any) => sum + Math.round(Number(x.quantity || 0) * 60), 0);
+      const certificateRows = (cert.data ?? []).filter((x: any) => {
+        if (!competence) return false;
+        return x.start_date <= competence.end_date && x.end_date >= competence.start_date;
+      });
+      const certificateDays = certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0), 0);
+      const currentTime = (timeRows.data ?? []).filter((x: any) => !periodId || x.period_id === periodId);
+      const expectedMinutes = currentTime.reduce((sum: number, x: any) => sum + Number(x.expected_minutes || 0), 0);
+      const debitMinutes = (bankRows.data ?? [])
+        .filter((x: any) => periodId && x.period_id === periodId && x.kind === "debito")
+        .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
+      const absenceMinutes = absenceDays * 8.8 * 60 + certificateDays * 8.8 * 60 + declarationMinutes + debitMinutes;
 
       const byEmployee = new Map<string, number>();
       currentOvertime.forEach((row: any) => {
@@ -204,9 +220,9 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         employees: employees.length,
         overtime,
         absenceDays,
-        certificates: (cert.data ?? []).length,
-        absenteeism: employees.length > 0
-          ? Math.round((absenceDays * 8.8 * 60 / (employees.length * 22 * 480)) * 1000) / 10
+        certificates: certificateRows.length,
+        absenteeism: expectedMinutes > 0
+          ? Math.round((absenceMinutes / expectedMinutes) * 1000) / 10
           : 0,
         period: periodLabel,
       });
