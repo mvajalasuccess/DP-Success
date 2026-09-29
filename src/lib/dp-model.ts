@@ -208,6 +208,7 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   const isDyan = employeeName === "DYAN" || employeeName.startsWith("DYAN ");
   const isGlecio = employeeName.includes("GLECIO JOSE DE CARVALHO JUNIOR") || employeeName.includes("GLÉCIO JOSÉ DE CARVALHO JUNIOR");
   const glecioManualBalances: Record<string, number> = {
+    "2026-06-20": -(3 * 60 + 48),
     "2026-07-20": 38 * 60 + 56,
   };
   const isFelipeHilmann = employeeName.includes("FELIPE HILMANN");
