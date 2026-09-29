@@ -303,8 +303,22 @@ export function Kpis() {
         const hireYear = employee?.hireDate ? Number(employee.hireDate.slice(0, 4)) : null;
         const is2026Hire = hireYear === 2026;
         const admissionAfterPeriodStart = Boolean(employee?.hireDate && historicalPeriod && employee.hireDate > historicalPeriod.start_date);
-        const expectedMinutes = employee && historicalPeriod && is2026Hire && admissionAfterPeriodStart
-          ? expectedFromSchedule(employee, historicalPeriod)
+        const terminationBeforePeriodEnd = Boolean(
+          employee?.terminationDate &&
+          historicalPeriod &&
+          employee.terminationDate < historicalPeriod.end_date
+        );
+        const scheduleWeeklyMinutes = employee?.workScheduleId
+          ? (scheduleMinutes.get(employee.workScheduleId) ?? 0)
+          : 0;
+        const shouldProrateHistoricalExpected = Boolean(
+          employee &&
+          historicalPeriod &&
+          scheduleWeeklyMinutes > 0 &&
+          ((is2026Hire && admissionAfterPeriodStart) || terminationBeforePeriodEnd)
+        );
+        const expectedMinutes = shouldProrateHistoricalExpected
+          ? expectedFromSchedule(employee!, historicalPeriod!)
           : Number(row.expected_minutes || 0);
         next.expected += expectedMinutes;
         next.worked += Number(row.worked_minutes || 0);
