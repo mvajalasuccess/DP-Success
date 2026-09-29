@@ -666,11 +666,6 @@ export function Kpis() {
               <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas trabalhadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.worked)}</p></Card>
               <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Funcionários</p><p className="mt-1 text-2xl font-bold">{metrics.employees}</p></Card>
             </div>
-            <Card className="mt-4 p-5">
-              <p className="text-sm font-semibold">Cálculo do indicador</p>
-              <p className="mt-2 text-sm text-muted-foreground">(Débitos + Faltas + Abonos) ÷ horas previstas × 100</p>
-              <p className="mt-3 text-lg font-semibold">({fmt(metrics.faltasMinutes)} + {fmt(metrics.atestadosMinutes)} + {fmt(metrics.declaracoesMinutes)} + {fmt(metrics.absenceMinutes - metrics.faltasMinutes - metrics.atestadosMinutes - metrics.declaracoesMinutes)}) ÷ {fmt(metrics.expected)} × 100 = {pct(absenteeismRate)}</p>
-            </Card>
           </section>
         )}
 
@@ -724,10 +719,6 @@ export function Kpis() {
               <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários</p><p className="mt-1 text-3xl font-bold">{metrics.activeHeadcount.toLocaleString("pt-BR")}</p></Card>
               <Card className="p-6"><Percent className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Índice de Turnover</p><p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p></Card>
             </div>
-            <Card className="mt-4 p-5">
-              <p className="text-sm font-semibold">Cálculo do indicador</p>
-              <p className="mt-2 text-sm text-muted-foreground">[(Admissões + Desligamentos) ÷ 2] ÷ colaboradores ativos × 100</p>
-            </Card>
           </section>
         )}
       </main>
