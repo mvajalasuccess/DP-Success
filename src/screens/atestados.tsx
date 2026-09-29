@@ -82,7 +82,8 @@ export function Atestados() {
 
   function startEditDeclaration(row: Declaration) {
     const parts = String(row.notes ?? "").split(" — ");
-    const reason = declarationReasons.includes(parts[0]) ? parts[0] : "Outros";
+    const firstPart = parts[0] ?? "";
+    const reason = declarationReasons.includes(firstPart) ? firstPart : "Outros";
     const totalMinutes = Math.round(Number(row.quantity || 0) * 60);
     setEditingDeclaration(row);
     setMode("declaracao");

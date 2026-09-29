@@ -13,7 +13,7 @@ export function Employees() {
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("ativo");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo" });
+  const [form, setForm] = useState<{ name: string; role: string; department: string; salary: string; admission: string; termination: string; bank: string; work_schedule_id: string; status: "ativo" | "inativo" }>({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

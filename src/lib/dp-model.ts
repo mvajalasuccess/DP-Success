@@ -280,19 +280,19 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
 
     const calculatedBalance = balanceOf(comp) + adjustment;
     const monthBalance = isRichard && Object.prototype.hasOwnProperty.call(richardManualBalances, period.end_date)
-      ? richardManualBalances[period.end_date]
+      ? richardManualBalances[period.end_date] ?? calculatedBalance
       : isYves && Object.prototype.hasOwnProperty.call(yvesManualBalances, period.end_date)
-        ? yvesManualBalances[period.end_date]
+        ? yvesManualBalances[period.end_date] ?? calculatedBalance
         : isDyan && Object.prototype.hasOwnProperty.call(dyanManualBalances, period.end_date)
-        ? dyanManualBalances[period.end_date]
+        ? dyanManualBalances[period.end_date] ?? calculatedBalance
         : isJoseLuciano && Object.prototype.hasOwnProperty.call(joseLucianoManualBalances, period.end_date)
-        ? joseLucianoManualBalances[period.end_date]
+        ? joseLucianoManualBalances[period.end_date] ?? calculatedBalance
         : isMarcelo && Object.prototype.hasOwnProperty.call(marceloManualBalances, period.end_date)
-          ? marceloManualBalances[period.end_date]
+          ? marceloManualBalances[period.end_date] ?? calculatedBalance
           : isMiguel && Object.prototype.hasOwnProperty.call(miguelManualBalances, period.end_date)
-            ? miguelManualBalances[period.end_date]
+            ? miguelManualBalances[period.end_date] ?? calculatedBalance
             : isOrmindo && Object.prototype.hasOwnProperty.call(ormindoManualBalances, period.end_date)
-              ? ormindoManualBalances[period.end_date]
+              ? ormindoManualBalances[period.end_date] ?? calculatedBalance
               : calculatedBalance;
     accumulated += monthBalance - paymentMinutes;
     return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes };

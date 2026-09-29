@@ -75,14 +75,14 @@ export function isBrazilNationalHoliday(date: string) {
 }
 
 export function isWeekday(date: string) {
-  const [year, month, day] = date.slice(0, 10).split("-").map(Number);
+  const [year = 1970, month = 1, day = 1] = date.slice(0, 10).split("-").map(Number);
   const weekday = new Date(year, month - 1, day).getDay();
   return weekday !== 0 && weekday !== 6;
 }
 
 export function countWorkingWeekdays(start: string, end: string) {
-  const [sy, sm, sd] = start.slice(0, 10).split("-").map(Number);
-  const [ey, em, ed] = end.slice(0, 10).split("-").map(Number);
+  const [sy = 1970, sm = 1, sd = 1] = start.slice(0, 10).split("-").map(Number);
+  const [ey = 1970, em = 1, ed = 1] = end.slice(0, 10).split("-").map(Number);
   const current = new Date(sy, sm - 1, sd);
   const last = new Date(ey, em - 1, ed);
   let total = 0;
