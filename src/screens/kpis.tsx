@@ -33,7 +33,9 @@ type Metrics = {
   expected: number;
   absenceMinutes: number;
   faltasMinutes: number;
+  faltasDays: number;
   atestadosMinutes: number;
+  atestadosDays: number;
   declaracoesMinutes: number;
   abonosMinutes: number;
   worked: number;
@@ -49,7 +51,7 @@ type Metrics = {
 };
 
 const emptyMetrics: Metrics = {
-  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, atestadosMinutes: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0,
+  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, faltasDays: 0, atestadosMinutes: 0, atestadosDays: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0,
   he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0,
   interjornada: 0, turnover: 0, terminations: 0, averageHeadcount: 0,
 };
@@ -62,6 +64,10 @@ function fmt(minutes: number) {
 
 function pct(value: number) {
   return value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%";
+}
+
+function daysFmt(value: number) {
+  return value.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + (Math.abs(value) === 1 ? " dia" : " dias");
 }
 
 function decimalHoursToMinutes(value: unknown) {
@@ -322,19 +328,23 @@ export function Kpis() {
           : Number(row.expected_minutes || 0);
         next.expected += expectedMinutes;
         next.worked += Number(row.worked_minutes || 0);
-        const faltas = Math.round(Number(row.absence_quantity || 0) * 8.8 * 60);
+        const dailyMinutes = employee ? dailyMinutesFromSchedule(employee) : 8.8 * 60;
+        const faltaDays = Number(row.absence_quantity || 0);
+        const faltas = Math.round(faltaDays * dailyMinutes);
         const atestados = Number(row.certificate_minutes || 0);
+        const atestadoDays = dailyMinutes > 0 ? atestados / dailyMinutes : 0;
         const declaracoes = Number(row.declaration_minutes || 0);
         const abonos = Number(row.allowance_minutes || 0);
+        next.faltasDays += faltaDays;
         next.faltasMinutes += faltas;
+        next.atestadosDays += atestadoDays;
         next.atestadosMinutes += atestados;
         next.declaracoesMinutes += declaracoes;
         next.abonosMinutes += abonos;
-        // No histórico, o absenteísmo considera somente:
-        // faltas (1 dia = 08:48) + débitos + abonos.
-        // Atestados e declarações continuam nos cards, mas não entram na fórmula.
+        // Histórico: faltas, atestados, declarações efetivamente abonadas,
+        // débitos e abonos são horas perdidas para o absenteísmo.
         const debitos = Number(row.debit_minutes || 0);
-        next.absenceMinutes += faltas + debitos + abonos;
+        next.absenceMinutes += faltas + atestados + declaracoes + debitos + abonos;
 
         next.he60 += Number(row.he_60_minutes || 0);
         next.he60Night += Number(row.he_60_night_minutes || 0);
@@ -388,16 +398,22 @@ export function Kpis() {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
         const code = String(row.occurrence_types?.code ?? "").toLowerCase();
         const quantity = Number(row.quantity || 0);
-        const unit = String(row.unit ?? "dias");
+        const unit = String(row.unit ?? "dias").toLowerCase();
         const employee = employees.find(e => e.id === row.employee_id);
         const dailyMinutes = employee ? dailyMinutesFromSchedule(employee) : 8.8 * 60;
-        const minutes = unit.toLowerCase().startsWith("dia")
-          ? Math.round(quantity * dailyMinutes)
-          : unit.toLowerCase().startsWith("hor")
-            ? Math.round(quantity * 60)
-            : Math.round(quantity);
-        if (code === "falta") {
+        const isDayBased = unit.startsWith("dia");
+        const minutes = isDayBased ? Math.round(quantity * dailyMinutes) : unit.startsWith("hor") ? Math.round(quantity * 60) : Math.round(quantity);
+        const faltaCodes = new Set(["falta", "folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"]);
+        if (faltaCodes.has(code)) {
+          next.faltasDays += quantity;
           next.faltasMinutes += minutes;
+          next.absenceMinutes += minutes;
+        } else if (code === "atestado") {
+          next.atestadosDays += quantity;
+          next.atestadosMinutes += minutes;
+          next.absenceMinutes += minutes;
+        } else if (code === "declaracao_horas" || code === "declaracao") {
+          next.declaracoesMinutes += minutes;
           next.absenceMinutes += minutes;
         } else if (code === "abono") {
           next.abonosMinutes += minutes;
@@ -552,10 +568,10 @@ export function Kpis() {
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.faltasMinutes)}</p></Card>
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.atestadosMinutes)}</p></Card>
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Abonos</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.abonosMinutes)}</p></Card>
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p></Card>
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p></Card>
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
+              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas perdidas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.absenceMinutes)}</p></Card>
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
@@ -564,8 +580,8 @@ export function Kpis() {
             </div>
             <Card className="mt-4 p-5">
               <p className="text-sm font-semibold">Cálculo do indicador</p>
-              <p className="mt-2 text-sm text-muted-foreground">(Faltas + Débitos + Abonos) ÷ horas previstas × 100</p>
-              <p className="mt-3 text-lg font-semibold">({fmt(metrics.faltasMinutes)} + {fmt(metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)} + {fmt(metrics.abonosMinutes)}) ÷ {fmt(metrics.expected)} × 100 = {pct(absenteeismRate)}</p>
+              <p className="mt-2 text-sm text-muted-foreground">(Faltas + Atestados + Declarações abonadas + Débitos + Abonos) ÷ horas previstas × 100</p>
+              <p className="mt-3 text-lg font-semibold">({fmt(metrics.faltasMinutes)} + {fmt(metrics.atestadosMinutes)} + {fmt(metrics.declaracoesMinutes)} + {fmt(metrics.absenceMinutes - metrics.faltasMinutes - metrics.atestadosMinutes - metrics.declaracoesMinutes)}) ÷ {fmt(metrics.expected)} × 100 = {pct(absenteeismRate)}</p>
             </Card>
           </section>
         )}
