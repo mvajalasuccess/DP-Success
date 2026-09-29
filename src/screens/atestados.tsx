@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
-type Employee = { id: string; full_name: string };
+type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null };
 type Certificate = {
   id: string; employee_id: string; start_date: string; end_date: string; days: number;
   certificate_type: string; cid: string | null; notes: string | null; employees?: { full_name: string } | null;
@@ -33,7 +33,7 @@ export function Atestados() {
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<"atestado" | "declaracao">("atestado");
   const [declarationForm, setDeclarationForm] = useState({ employee_id: "", occurrence_date: "", quantity: "", reason: "Acompanhante", notes: "" });
-  const [editingDeclaration, setEditingDeclaration] = useState<Declaration | null>(null);
+  const [editingDeclaration, setEditingDeclaration] = useState<Declaration | null>(null);\n\n  const referenceDate = mode === "declaracao" ? declarationForm.occurrence_date : form.start_date;\n  const employeesForDate = employees.filter(e => !referenceDate || ( (!e.hire_date || e.hire_date <= referenceDate) && (!e.termination_date || e.termination_date >= referenceDate) ));
 
   async function load() {
     setError("");
@@ -48,7 +48,7 @@ export function Atestados() {
   }
 
   async function loadEmployees() {
-    const { data } = await supabase.from("employees").select("id,full_name").eq("status", "ativo").order("full_name");
+    const { data } = await supabase.from("employees").select("id,full_name,status,hire_date,termination_date").order("full_name");
     setEmployees((data ?? []) as Employee[]);
   }
 
@@ -180,7 +180,7 @@ export function Atestados() {
     {open && mode === "atestado" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-6">
       <h2 className="text-xl font-bold">{editing ? "Editar atestado" : "Novo atestado"}</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2"><option value="">Funcionário</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>
+        <select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>
         <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="rounded-lg border px-3 py-2" />
         <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" />
         <input type="number" min="1" placeholder={`Dias (automático: ${countDays(form.start_date, form.end_date) || "—"})`} value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} className="rounded-lg border px-3 py-2" />
@@ -194,7 +194,7 @@ export function Atestados() {
       <h2 className="text-xl font-bold">{editingDeclaration ? "Editar declaração de horas" : "Nova declaração de horas"}</h2>
       <p className="mt-1 text-sm text-muted-foreground">Informe somente as horas que realmente serão abonadas.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <select value={declarationForm.employee_id} onChange={e => setDeclarationForm({ ...declarationForm, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2"><option value="">Funcionário</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>
+        <select value={declarationForm.employee_id} onChange={e => setDeclarationForm({ ...declarationForm, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>
         <input type="date" value={declarationForm.occurrence_date} onChange={e => setDeclarationForm({ ...declarationForm, occurrence_date: e.target.value })} className="rounded-lg border px-3 py-2" />
         <input type="time" value={declarationForm.quantity} onChange={e => setDeclarationForm({ ...declarationForm, quantity: e.target.value })} className="rounded-lg border px-3 py-2" />
         <select value={declarationForm.reason} onChange={e => setDeclarationForm({ ...declarationForm, reason: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2">{declarationReasons.map(reason => <option key={reason} value={reason}>{reason}</option>)}</select>
