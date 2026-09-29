@@ -482,13 +482,14 @@ export function Kpis() {
         );
         if (!period) continue;
 
-        let employeeKey = String(row.registration ?? "").trim();
-        if (!employeeKey) {
-          employeeKey = String(row.employee_id ?? "").trim();
-        }
-        if (!employeeKey) {
-          employeeKey = String(row.employee_name ?? "").trim().toLowerCase();
-        }
+        // A matrícula sozinha não é suficiente: a BASE possui casos em que
+        // duas pessoas aparecem com a mesma matrícula (ex.: 18 e 60).
+        // O quadro histórico deve contar cada funcionário da BASE.
+        const registration = String(row.registration ?? "").trim();
+        const employeeName = String(row.employee_name ?? "").trim().toLowerCase();
+        let employeeKey = registration && employeeName
+          ? `${registration}|${employeeName}`
+          : employeeName || registration || String(row.employee_id ?? "").trim();
         if (!employeeKey) continue;
 
         // Os filtros de funcionário/setor também precisam respeitar os dados
