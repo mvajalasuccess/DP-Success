@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
-type Employee = { id: string; full_name: string };
+type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null };
 type OccType = { id: string; code: string; name: string; unit: string; requires_justification: boolean; affects_balance: boolean };
 type Occ = {
   id: string;
@@ -57,7 +57,7 @@ export function Ocorrencias() {
 
   const selectedType = visibleTypes.find(t => t.id === form.occurrence_type_id);
   const selectedCode = selectedType?.code ?? "";
-  const isFalta = ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(selectedCode);
+  const isFalta = ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(selectedCode);\n\n  const employeesForDate = useMemo(() => {\n    const referenceDate = form.occurrence_date;\n    if (!referenceDate) return employees;\n    return employees.filter(e =>\n      (!e.hire_date || e.hire_date <= referenceDate) &&\n      (!e.termination_date || e.termination_date >= referenceDate)\n    );\n  }, [employees, form.occurrence_date]);
 
   async function load() {
     setError("");
@@ -72,7 +72,7 @@ export function Ocorrencias() {
 
   async function loadOptions() {
     const [e, t, p] = await Promise.all([
-      supabase.from("employees").select("id,full_name").eq("status", "ativo").order("full_name"),
+      supabase.from("employees").select("id,full_name,status,hire_date,termination_date").order("full_name"),
       supabase.from("occurrence_types").select("id,code,name,unit,requires_justification,affects_balance").eq("active", true).order("name"),
       supabase.from("time_periods").select("id,start_date,end_date").order("start_date", { ascending: false }),
     ]);
@@ -280,7 +280,7 @@ export function Ocorrencias() {
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2">
                 <option value="">Funcionário</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                {employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
               </select>
 
               <select value={form.occurrence_type_id} onChange={e => changeType(e.target.value)} className="rounded-lg border px-3 py-2 md:col-span-2">
