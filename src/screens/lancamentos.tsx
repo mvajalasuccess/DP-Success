@@ -111,8 +111,7 @@ export function Launches() {
     if (!employeeId || !date) return setError("Selecione o funcionário e a data.");
     const target = periodForDate(periods, date);
     if (!target) return setError("Não existe competência cadastrada que contenha esta data. Crie o fechamento em Fechamento de Ponto.");
-    if (target.status === "fechado") return setError("A competência desta data está fechada. Reabra-a para alterar lançamentos.");
-    if (editing && isClosed(editing.date)) return setError("O lançamento original pertence a uma competência fechada.");
+    if (target.status === "fechado" && !editing) return setError("A competência desta data está fechada. Reabra-a para criar novos lançamentos.");
     const valid = lines.map(l => ({ type: l.type, minutes: hoursToMinutes(l.hours) })).filter(l => l.minutes > 0);
     const debit = hoursToMinutes(debitHours);
     if (!valid.length && debit <= 0) return setError("Informe ao menos um crédito ou débito.");
@@ -143,7 +142,6 @@ export function Launches() {
   }
 
   async function doDelete(g: Group) {
-    if (isClosed(g.date)) { setError("Não é possível excluir lançamentos de competência fechada."); return; }
     setSaving(true);
     try { await removeGroup(g); setConfirmDelete(null); await loadLaunches(); } catch (e) { setError((e as Error).message); }
     setSaving(false);
@@ -191,13 +189,13 @@ export function Launches() {
                     <p className={`text-lg font-bold ${balanceOf(comp) < 0 ? "text-destructive" : "text-primary"}`}>Saldo {minutesToHours(balanceOf(comp), true)}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button className={btnOutline} disabled={closed || saving} onClick={() => openEdit(g)}><Pencil className="h-3.5 w-3.5" /> Editar</button>
+                    <button className={btnOutline} disabled={saving} onClick={() => openEdit(g)}><Pencil className="h-3.5 w-3.5" /> Editar</button>
                     {confirmDelete === g.key ? (
                       <>
                         <button className={btnDanger} disabled={saving} onClick={() => void doDelete(g)}>Confirmar exclusão</button>
                         <button className={btnOutline} onClick={() => setConfirmDelete(null)}>Cancelar</button>
                       </>
-                    ) : <button className={btnDanger} disabled={closed || saving} onClick={() => setConfirmDelete(g.key)}><Trash2 className="h-3.5 w-3.5" /> Excluir</button>}
+                    ) : <button className={btnDanger} disabled={saving} onClick={() => setConfirmDelete(g.key)}><Trash2 className="h-3.5 w-3.5" /> Excluir</button>}
                   </div>
                 </div>
               </Card>
