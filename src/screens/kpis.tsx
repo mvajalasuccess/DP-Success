@@ -131,7 +131,8 @@ export function Kpis() {
       setPeriods(parsedPeriods);
 
       const years = [...new Set(parsedPeriods.map(p => p.reference_year))].sort((a, b) => b - a);
-      if (years.length) setSelectedYear(years[0]);
+      const firstYear = years[0];
+      if (firstYear !== undefined) setSelectedYear(firstYear);
     })();
   }, []);
 
@@ -166,11 +167,13 @@ export function Kpis() {
         return;
       }
 
+      const firstTarget = targetPeriods[0];
+      if (!firstTarget) return;
       const periodIds = targetPeriods.map(p => p.id);
-      const rangeStart = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, targetPeriods[0].start_date);
-      const rangeEnd = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, targetPeriods[0].end_date);
+      const rangeStart = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, firstTarget.start_date);
+      const rangeEnd = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, firstTarget.end_date);
 
-      setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(targetPeriods[0]));
+      setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(firstTarget));
 
       const selectedEmployeeSet = new Set(selectedEmployees);
       const allowedEmployees = employees.filter(e => employeeMatches(e, [], selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
@@ -200,7 +203,7 @@ export function Kpis() {
                 .eq("reference_year", selectedYear);
               if (selectedMonth !== "todos") {
                 const selectedPeriod = targetPeriods[0];
-                return query.eq("reference_month", selectedPeriod.reference_month);
+                if (selectedPeriod) return query.eq("reference_month", selectedPeriod.reference_month);
               }
               return query;
             })()
@@ -491,7 +494,7 @@ export function Kpis() {
       const historicalWorked = next.worked;
       next.worked = historicalWorked + currentWorked;
 
-      const admissionEmployees = allowedEmployees.filter(e =>      const admissionEmployees = allowedEmployees.filter(e =>
+      const admissionEmployees = allowedEmployees.filter(e =>
         e.hireDate &&
         e.hireDate >= rangeStart &&
         e.hireDate <= rangeEnd
