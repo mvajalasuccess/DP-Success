@@ -97,6 +97,17 @@ export function Launches() {
     setError(""); setOpen(true);
   }
 
+  // Na tela de Lançamentos, HE 60% + 20% entra no saldo das competências
+  // atuais (ago/2026 em diante), mas não no histórico importado de jan-jul.
+  function launchCreditTotal(comp: ReturnType<typeof composeMinutes>, launchDate?: string) {
+    const includeHe60Night = Boolean(launchDate && launchDate > "2026-07-20");
+    return creditTotal(comp) + (includeHe60Night ? comp.HE_60_NOTURNO : 0);
+  }
+
+  function launchBalance(comp: ReturnType<typeof composeMinutes>, launchDate?: string) {
+    return launchCreditTotal(comp, launchDate) - comp.debit;
+  }
+
   const preview = composeMinutes(lines.map(l => ({ launch_type: l.type, minutes: hoursToMinutes(l.hours) })), [{ minutes: hoursToMinutes(debitHours) }]);
 
   async function removeGroup(g: Group) {
@@ -180,13 +191,13 @@ export function Launches() {
                     <p className="font-semibold">{names.get(g.employee_id) ?? "—"}</p>
                     <p className="text-xs text-muted-foreground">{formatDateBR(g.date)}</p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                      {g.credits.map(c => <span key={c.id} className="rounded-full bg-primary/10 px-2 py-1 text-primary">{CREDIT_TYPES[c.launch_type]?.label ?? c.launch_type}: {minutesToHours(c.minutes)}{!CREDIT_TYPES[c.launch_type]?.affectsBalance && " (não entra no saldo)"}</span>)}
+                      {g.credits.map(c => <span key={c.id} className="rounded-full bg-primary/10 px-2 py-1 text-primary">{CREDIT_TYPES[c.launch_type]?.label ?? c.launch_type}: {minutesToHours(c.minutes)}</span>)}
                       {comp.debit > 0 && <span className="rounded-full bg-destructive/10 px-2 py-1 text-destructive">Débito: {minutesToHours(comp.debit)}</span>}
                     </div>
                   </div>
                   <div className="text-right text-sm">
-                    <p className="text-xs text-muted-foreground">Crédito {minutesToHours(creditTotal(comp))} · Débito {minutesToHours(comp.debit)}</p>
-                    <p className={`text-lg font-bold ${balanceOf(comp) < 0 ? "text-destructive" : "text-primary"}`}>Saldo {minutesToHours(balanceOf(comp), true)}</p>
+                    <p className="text-xs text-muted-foreground">Crédito {minutesToHours(launchCreditTotal(comp, g.date))} · Débito {minutesToHours(comp.debit)}</p>
+                    <p className={`text-lg font-bold ${balanceOf(comp) < 0 ? "text-destructive" : "text-primary"}`}>Saldo {minutesToHours(launchBalance(comp, g.date), true)}</p>
                   </div>
                   <div className="flex gap-2">
                     <button className={btnOutline} disabled={saving} onClick={() => openEdit(g)}><Pencil className="h-3.5 w-3.5" /> Editar</button>
@@ -239,9 +250,9 @@ export function Launches() {
             <input className={`${inputCls} mt-2 max-w-[160px]`} placeholder="HH:MM" value={debitHours} onChange={e => setDebitHours(e.target.value)} />
           </div>
           <div className="mt-5 grid grid-cols-3 gap-3 rounded-lg bg-muted/50 p-3 text-sm">
-            <div><p className="text-xs text-muted-foreground">Crédito total</p><p className="font-bold">{minutesToHours(creditTotal(preview))}</p></div>
+            <div><p className="text-xs text-muted-foreground">Crédito total</p><p className="font-bold">{minutesToHours(launchCreditTotal(preview, date))}</p></div>
             <div><p className="text-xs text-muted-foreground">Débito</p><p className="font-bold">{minutesToHours(preview.debit)}</p></div>
-            <div><p className="text-xs text-muted-foreground">Saldo</p><p className="font-bold">{minutesToHours(balanceOf(preview), true)}</p></div>
+            <div><p className="text-xs text-muted-foreground">Saldo</p><p className="font-bold">{minutesToHours(launchBalance(preview, date), true)}</p></div>
           </div>
           {preview.INTERJORNADA_50 > 0 && <p className="mt-2 text-xs text-muted-foreground">Interjornada ({minutesToHours(preview.INTERJORNADA_50)}) será registrada, mas não altera o saldo.</p>}
           {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
