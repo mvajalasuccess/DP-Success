@@ -447,24 +447,48 @@ export function Kpis() {
       // [(Admissões + Desligamentos) ÷ 2] ÷ total de colaboradores ativos × 100.
       // O quadro ativo é o número de colaboradores que estavam ativos no fim
       // do período analisado, respeitando os filtros de setor/funcionários.
-      // Quadro ativo: histórico (Jan-Jul) vem da BASE; competências atuais
-      // continuam sendo calculadas pelo cadastro de funcionários.
+      // Quadro ativo:
+      // - Histórico Jan-Jul: a quantidade vem exclusivamente da BASE histórica
+      //   da própria competência. Não usamos o cadastro atual para reconstruí-la.
+      // - Competências atuais: calculamos pelo cadastro e pelas datas de admissão/desligamento.
+      //
+      // Para uma competência histórica, contar as matrículas/funcionários distintos
+      // existentes naquela linha da BASE é a fonte correta do quadro daquele mês.
+      const historicalHeadcountSets = new Map<string, Set<string>>();
+
+      const historicalRowsForHeadcount = (historical ?? []).filter((row: any) => {
+        const period = periods.find(p => p.id === row.period_id);
+        return period?.end_date && period.end_date <= HISTORICAL_CUTOFF;
+      });
+
+      const historicalHeadcountByPeriod = new Map<string, number>();
+      for (const row of historicalRowsForHeadcount) {
+        if (!isAllowedRow(row)) continue;
+        const key = String(row.period_id);
+        const employeeKey = String(
+          row.registration ??
+          row.employee_id ??
+          String(row.employee_name ?? "").trim().toLowerCase()
+        ).trim();
+        if (!employeeKey) continue;
+        const set = historicalHeadcountSets.get(key) ?? new Set<string>();
+        set.add(employeeKey);
+        historicalHeadcountSets.set(key, set);
+      }
+      for (const [periodId, set] of historicalHeadcountSets) {
+        historicalHeadcountByPeriod.set(periodId, set.size);
+      }
+
       const isHistoricalOnly = targetPeriods.length > 0 && targetPeriods.every(
         p => p.end_date <= HISTORICAL_CUTOFF
       );
-      const historicalActiveIds = new Set(
-        (historical ?? [])
-          .map((row: any) => resolveEmployee(row)?.id)
-          .filter((id: string | undefined): id is string => Boolean(id))
-      );
-      const historicalActiveCount = historicalActiveIds.size;
       const currentActiveHeadcount = allowedEmployees.filter(e =>
         (!e.hireDate || e.hireDate <= rangeEnd) &&
         (!e.terminationDate || e.terminationDate > rangeEnd)
       ).length;
 
       const activeHeadcount = isHistoricalOnly
-        ? historicalActiveCount
+        ? targetPeriods.reduce((sum, period) => sum + (historicalHeadcountByPeriod.get(period.id) ?? 0), 0) / targetPeriods.length
         : currentActiveHeadcount;
 
       next.employees = activeHeadcount;
