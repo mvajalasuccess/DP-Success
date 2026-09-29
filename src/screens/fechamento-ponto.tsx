@@ -313,6 +313,7 @@ export function PointClosing() {
 
   function beginEdit(row: any) {
     setEditingRow({...row, expected: minutesToHHMM(row.expected_minutes), worked: minutesToHHMM(row.worked_minutes),
+      absence_quantity: Number(row.absence_quantity || 0),
       certificate: minutesToHHMM(row.certificate_minutes), declaration: minutesToHHMM(row.declaration_minutes),
       allowance: minutesToHHMM(row.allowance_minutes), debit: minutesToHHMM(row.debit_minutes),
       he60: minutesToHHMM(row.he_60_minutes), he60night: minutesToHHMM(row.he_60_night_minutes),
@@ -484,7 +485,7 @@ export function PointClosing() {
                 <tbody className="divide-y">{historicalRows.map(row => editingRow?.id === row.id ? (
                   <tr key={row.id} className="bg-primary/5">
                     <td className="whitespace-nowrap px-3 py-2 font-medium">{row.employee_name}</td>
-                    {[["expected","Previstas"],["worked","Trabalhadas"],["certificate","Atestados"],["declaration","Declaração"],["allowance","Abonos"],["debit","Débito"],["he60","HE 60%"],["he60night","HE 60%+20%"],["he100","HE 100%"],["he20","HE 20%"],["interjornada","Interjornada"]].map(([key,label]) => <td key={String(key)} className="px-2 py-2"><input aria-label={String(label)} value={editingRow[String(key)]} onChange={e => setEditingRow((v: any) => ({...v,[String(key)]:e.target.value}))} className="w-24 rounded-md border bg-background px-2 py-1.5 text-center font-mono" placeholder="00:00" /></td>)}
+                    {[["expected","Previstas"],["worked","Trabalhadas"],["absence_quantity","Faltas"],["certificate","Atestados"],["declaration","Declaração"],["allowance","Abonos"],["debit","Débito"],["he60","HE 60%"],["he60night","HE 60%+20%"],["he100","HE 100%"],["he20","HE 20%"],["interjornada","Interjornada"]].map(([key,label]) => <td key={String(key)} className="px-2 py-2"><input aria-label={String(label)} type={String(key) === "absence_quantity" ? "number" : "text"} min={String(key) === "absence_quantity" ? "0" : undefined} step={String(key) === "absence_quantity" ? "0.01" : undefined} value={editingRow[String(key)] ?? ""} onChange={e => setEditingRow((v: any) => ({...v,[String(key)]: String(key) === "absence_quantity" ? e.target.value : e.target.value}))} className="w-24 rounded-md border bg-background px-2 py-1.5 text-center font-mono" placeholder={String(key) === "absence_quantity" ? "0" : "00:00"} /></td>)}
                     <td className="px-3 py-2"><div className="flex gap-1.5"><button disabled={rowSaving} onClick={() => void saveHistoricalRow()} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs text-primary-foreground"><Save className="h-3.5 w-3.5" /> Salvar</button><button disabled={rowSaving} onClick={() => setEditingRow(null)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><X className="h-3.5 w-3.5" /> Cancelar</button></div></td>
                   </tr>
                 ) : (
