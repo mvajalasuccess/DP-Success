@@ -479,7 +479,7 @@ export function Kpis() {
         : 0;
 
       for (const item of comparison.values()) {
-        item.total = item.he60 + item.he60Night + item.he100 + item.he100Night + item.he20 + item.interjornada;
+        item.total = item.he60 + item.he100 + item.he100Night + item.he20 + item.interjornada;
       }
 
       const comparisonRows = [...comparison.values()].filter(item => item.total > 0).sort((a, b) => b.total - a.total);
@@ -662,7 +662,7 @@ export function Kpis() {
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Funcionários desligados</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
-              <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários</p><p className="mt-1 text-3xl font-bold">{metrics.averageHeadcount.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</p></Card>
+              <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários</p><p className="mt-1 text-3xl font-bold">{metrics.activeHeadcount.toLocaleString("pt-BR")}</p></Card>
               <Card className="p-6"><Percent className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Índice de Turnover</p><p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p></Card>
             </div>
             <Card className="mt-4 p-5">
