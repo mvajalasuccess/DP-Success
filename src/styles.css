@@ -155,3 +155,22 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+
+
+/* Cursor de interação: elementos acionáveis mostram que podem ser clicados. */
+button:not(:disabled),
+a[href],
+select,
+[role="button"],
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
