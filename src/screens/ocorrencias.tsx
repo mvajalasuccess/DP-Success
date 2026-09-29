@@ -302,7 +302,6 @@ export function Ocorrencias() {
                   onChange={e => setForm({ ...form, quantity: e.target.value })}
                   className="rounded-lg border px-3 py-2"
                 />
-}
 
               
 
