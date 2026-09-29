@@ -101,7 +101,9 @@ export function PointClosing() {
       .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
       .eq("period_id", p.id);
 
-    if (overrideError) {
+    // A migration pode ainda não ter sido aplicada no Supabase. Nesse caso,
+    // mantemos o fechamento funcionando com os dados originais até a tabela existir.
+    if (overrideError && !String(overrideError.message ?? "").toLowerCase().includes("point_closing_overrides")) {
       setError(overrideError.message);
       setHistoricalRows([]);
       setLoadingRows(false);
