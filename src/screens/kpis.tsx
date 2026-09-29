@@ -313,27 +313,10 @@ export function Kpis() {
         const key = employee?.id ?? `historical:${row.registration ?? row.employee_name}`;
         if (employee) historicalCount += 1;
 
-        const historicalPeriod = periods.find(p => p.id === row.period_id);
-        const hireYear = employee?.hireDate ? Number(employee.hireDate.slice(0, 4)) : null;
-        const is2026Hire = hireYear === 2026;
-        const admissionAfterPeriodStart = Boolean(employee?.hireDate && historicalPeriod && employee.hireDate > historicalPeriod.start_date);
-        const terminationBeforePeriodEnd = Boolean(
-          employee?.terminationDate &&
-          historicalPeriod &&
-          employee.terminationDate < historicalPeriod.end_date
-        );
-        const scheduleWeeklyMinutes = employee?.workScheduleId
-          ? (scheduleMinutes.get(employee.workScheduleId) ?? 0)
-          : 0;
-        const shouldProrateHistoricalExpected = Boolean(
-          employee &&
-          historicalPeriod &&
-          scheduleWeeklyMinutes > 0 &&
-          ((is2026Hire && admissionAfterPeriodStart) || terminationBeforePeriodEnd)
-        );
-        const expectedMinutes = shouldProrateHistoricalExpected
-          ? expectedFromSchedule(employee!, historicalPeriod!)
-          : Number(row.expected_minutes || 0);
+        // Histórico da BASE: usar exatamente os valores importados.
+        // Não recalcular horas previstas por jornada/admissão/desligamento aqui,
+        // pois Jan-Jul já foi validado contra o Power BI e deve permanecer fechado.
+        const expectedMinutes = Number(row.expected_minutes || 0);
         next.expected += expectedMinutes;
         next.worked += Number(row.worked_minutes || 0);
         const dailyMinutes = employee ? dailyMinutesFromSchedule(employee) : 8.8 * 60;
@@ -417,9 +400,8 @@ export function Kpis() {
           next.faltasMinutes += minutes;
           next.absenceMinutes += minutes;
         } else if (code === "atestado") {
-          next.atestadosDays += quantity;
-          next.atestadosMinutes += minutes;
-          next.absenceMinutes += minutes;
+          // Atestados atuais têm como fonte oficial medical_certificates.
+          // Evita duplicar o mesmo atestado se houver uma ocorrência legada.
         } else if (code === "declaracao_horas" || code === "declaracao") {
           next.declaracoesMinutes += minutes;
           next.absenceMinutes += minutes;
