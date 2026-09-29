@@ -26,7 +26,6 @@ const ALLOWED_CODES = new Set([
   "folga_descontada",
   "falta_justificada",
   "falta_injustificada",
-  "declaracao_horas",
 ]);
 
 const DECLARATION_REASONS = ["Acompanhante", "Consulta", "Exame", "Outros"];
@@ -79,7 +78,7 @@ export function Ocorrencias() {
   const selectedCode = selectedType?.code ?? "";
   const isFalta = ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(selectedCode);
   const isAtestado = false;
-  const isDeclaration = selectedCode === "declaracao_horas";
+  const isDeclaration = false;
 
   async function load() {
     setError("");
