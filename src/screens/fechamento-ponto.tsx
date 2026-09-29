@@ -96,6 +96,25 @@ export function PointClosing() {
       return;
     }
 
+    const { data: overrideRows, error: overrideError } = await (supabase as any)
+      .from("point_closing_overrides")
+      .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+      .eq("period_id", p.id);
+
+    if (overrideError) {
+      setError(overrideError.message);
+      setHistoricalRows([]);
+      setLoadingRows(false);
+      return;
+    }
+
+    const overrides = (overrideRows ?? []) as any[];
+    const overrideByEmployee = new Map(overrides.map((row: any) => [String(row.employee_id), row]));
+    const applyOverride = (row: any) => {
+      const override = overrideByEmployee.get(String(row.employee_id));
+      return override ? { ...row, ...override, has_manual_override: true } : row;
+    };
+
     // A BASE histórica foi importada somente até a competência de julho/2026.
     // A partir de agosto/2026, o fechamento deve sempre usar os dados atuais
     // do DP-Success, mesmo que existam registros históricos antigos para a mesma
@@ -104,7 +123,7 @@ export function PointClosing() {
     const HISTORICAL_CUTOFF = "2026-07-20";
     if (p.end_date <= HISTORICAL_CUTOFF && (historical ?? []).length > 0) {
       setRowsSource("historical");
-      setHistoricalRows(historical ?? []);
+      setHistoricalRows((historical ?? []).map(applyOverride));
       setLoadingRows(false);
       return;
     }
@@ -286,7 +305,7 @@ export function PointClosing() {
     });
 
     setRowsSource("manual");
-    setHistoricalRows(rows);
+    setHistoricalRows(rows.map(applyOverride));
     setLoadingRows(false);
   }
 
@@ -300,19 +319,42 @@ export function PointClosing() {
   }
 
   async function saveHistoricalRow() {
-    if (!editingRow) return;
+    if (!editingRow || !selectedPeriod || !editingRow.employee_id) return;
     setRowSaving(true); setError("");
+
     const payload = {
-      expected_minutes: hhmmToMinutes(editingRow.expected), worked_minutes: hhmmToMinutes(editingRow.worked),
-      absence_quantity: Number(editingRow.absence_quantity || 0), certificate_minutes: hhmmToMinutes(editingRow.certificate),
-      declaration_minutes: hhmmToMinutes(editingRow.declaration), allowance_minutes: hhmmToMinutes(editingRow.allowance),
-      debit_minutes: hhmmToMinutes(editingRow.debit), he_60_minutes: hhmmToMinutes(editingRow.he60),
-      he_60_night_minutes: hhmmToMinutes(editingRow.he60night), he_100_minutes: hhmmToMinutes(editingRow.he100),
-      he_20_minutes: hhmmToMinutes(editingRow.he20), interjornada_minutes: hhmmToMinutes(editingRow.interjornada),
+      period_id: selectedPeriod.id,
+      employee_id: editingRow.employee_id,
+      expected_minutes: hhmmToMinutes(editingRow.expected),
+      worked_minutes: hhmmToMinutes(editingRow.worked),
+      absence_quantity: Number(editingRow.absence_quantity || 0),
+      certificate_minutes: hhmmToMinutes(editingRow.certificate),
+      declaration_minutes: hhmmToMinutes(editingRow.declaration),
+      allowance_minutes: hhmmToMinutes(editingRow.allowance),
+      debit_minutes: hhmmToMinutes(editingRow.debit),
+      he_60_minutes: hhmmToMinutes(editingRow.he60),
+      he_60_night_minutes: hhmmToMinutes(editingRow.he60night),
+      he_100_minutes: hhmmToMinutes(editingRow.he100),
+      he_20_minutes: hhmmToMinutes(editingRow.he20),
+      interjornada_minutes: hhmmToMinutes(editingRow.interjornada),
     };
-    const { data, error } = await supabase.from("historical_kpi_data").update(payload).eq("id", editingRow.id).select("id,employee_id,registration,employee_name,department_name,position_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes").single();
-    if (error) setError("Não foi possível salvar a alteração: " + error.message);
-    else { setHistoricalRows(rows => rows.map(row => row.id === data.id ? data : row)); setEditingRow(null); }
+
+    const { data, error } = await (supabase as any)
+      .from("point_closing_overrides")
+      .upsert(payload, { onConflict: "employee_id,period_id" })
+      .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+      .single();
+
+    if (error) {
+      setError("Não foi possível salvar a correção da competência: " + error.message);
+    } else {
+      setHistoricalRows(rows => rows.map(row =>
+        row.id === editingRow.id
+          ? { ...row, ...data, has_manual_override: true }
+          : row
+      ));
+      setEditingRow(null);
+    }
     setRowSaving(false);
   }
 
@@ -428,16 +470,16 @@ export function PointClosing() {
               <h2 className="text-xl font-bold">{periodName(selectedPeriod)}</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 {rowsSource === "historical"
-                  ? "Dados importados da BASE. Você pode editar os valores diretamente nesta tabela."
-                  : "Visão consolidada de todos os funcionários da competência, formada pelos lançamentos atuais do DP-Success."}
+                  ? "Dados importados da BASE. Ajustes feitos aqui ficam salvos como correção oficial da competência e também alimentam o Banco de Horas e os KPIs."
+                  : "Visão consolidada da competência. Ajustes feitos aqui ficam salvos como correção oficial e também alimentam o Banco de Horas e os KPIs."}
               </p>
             </Card>
             <Card className="mt-4 overflow-hidden">
               {loadingRows ? <div className="p-8 text-center text-muted-foreground">Carregando fechamento...</div> :
               historicalRows.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhum lançamento histórico encontrado nesta competência.</div> :
               <div className="overflow-x-auto"><table className="min-w-[1500px] w-full text-xs">
-                <thead className="bg-muted/50"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada",...(rowsSource === "historical" ? ["Ação"] : [])].map(h => <th key={h} className="whitespace-nowrap px-3 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
-                <tbody className="divide-y">{historicalRows.map(row => editingRow?.id === row.id && rowsSource === "historical" ? (
+                <thead className="bg-muted/50"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada",["Ação"]].map(h => <th key={h} className="whitespace-nowrap px-3 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
+                <tbody className="divide-y">{historicalRows.map(row => editingRow?.id === row.id ? (
                   <tr key={row.id} className="bg-primary/5">
                     <td className="whitespace-nowrap px-3 py-2 font-medium">{row.employee_name}</td>
                     {[["expected","Previstas"],["worked","Trabalhadas"],["certificate","Atestados"],["declaration","Declaração"],["allowance","Abonos"],["debit","Débito"],["he60","HE 60%"],["he60night","HE 60%+20%"],["he100","HE 100%"],["he20","HE 20%"],["interjornada","Interjornada"]].map(([key,label]) => <td key={String(key)} className="px-2 py-2"><input aria-label={String(label)} value={editingRow[String(key)]} onChange={e => setEditingRow((v: any) => ({...v,[String(key)]:e.target.value}))} className="w-24 rounded-md border bg-background px-2 py-1.5 text-center font-mono" placeholder="00:00" /></td>)}
@@ -449,7 +491,7 @@ export function PointClosing() {
                     {[row.expected_minutes,row.worked_minutes].map((v,i) => <td key={i} className="whitespace-nowrap px-3 py-2 font-mono">{minutesToHHMM(v)}</td>)}
                     <td className="px-3 py-2 font-mono">{Number(row.absence_quantity || 0)}</td>
                     {[row.certificate_minutes,row.declaration_minutes,row.allowance_minutes,row.debit_minutes,row.he_60_minutes,row.he_60_night_minutes,row.he_100_minutes,row.he_20_minutes,row.interjornada_minutes].map((v,i) => <td key={i} className="whitespace-nowrap px-3 py-2 font-mono">{minutesToHHMM(v)}</td>)}
-                    {rowsSource === "historical" && <td className="px-3 py-2"><button onClick={() => beginEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Editar</button></td>}
+                    <td className="px-3 py-2"><div className="flex items-center gap-2"><button onClick={() => beginEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Editar</button>{row.has_manual_override && <span className="text-[11px] font-medium text-primary">Ajustado</span>}</div></td>
                   </tr>
                 ))}</tbody>
               </table></div>}
