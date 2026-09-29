@@ -463,7 +463,9 @@ export function Kpis() {
 
       const historicalHeadcountByPeriod = new Map<string, number>();
       for (const row of historicalRowsForHeadcount) {
-        if (!isAllowedRow(row)) continue;
+        // A contagem histórica deve vir diretamente da BASE. Não cruzar com
+        // o cadastro atual, porque funcionários desligados posteriormente
+        // continuam fazendo parte do quadro daquela competência.
         const key = String(row.period_id);
         const employeeKey = String(
           row.registration ??
