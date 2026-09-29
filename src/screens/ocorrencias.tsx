@@ -53,12 +53,14 @@ export function Ocorrencias() {
     setForm({
       employee_id: row.employee_id, occurrence_type_id: row.occurrence_type_id,
       occurrence_date: row.occurrence_date, end_date: row.end_date ?? "",
-      quantity: row.quantity == null ? "" : String(row.quantity),
+      quantity: isDeclarationCode(row.occurrence_types?.code) ? decimalHoursToText(row.quantity) : (row.quantity == null ? "" : String(row.quantity)),
       justification: row.justification ?? "", notes: row.notes ?? "",
     });
     setError("");
     setOpen(true);
   }
+
+  function isDeclarationCode(value?: string | null) { return value === "declaracao_horas"; }
 
   const selectedType = types.find(t => t.id === form.occurrence_type_id);
   const unit = selectedType?.unit || "horas";
