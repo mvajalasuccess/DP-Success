@@ -196,22 +196,25 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
       .order("entry_date", { ascending: true }),
     supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle(),
   ]);
-  const overrides = check(overridesResult) as Array<{
-    period_id: string;
-    employee_id: string;
-    expected_minutes: number;
-    worked_minutes: number;
-    absence_quantity: number;
-    certificate_minutes: number;
-    declaration_minutes: number;
-    allowance_minutes: number;
-    debit_minutes: number;
-    he_60_minutes: number;
-    he_60_night_minutes: number;
-    he_100_minutes: number;
-    he_20_minutes: number;
-    interjornada_minutes: number;
-  }>;
+  const overrideQueryError = (overridesResult as any)?.error;
+  const overrides = !overrideQueryError || !String(overrideQueryError.message ?? "").toLowerCase().includes("point_closing_overrides")
+    ? check(overridesResult) as Array<{
+        period_id: string;
+        employee_id: string;
+        expected_minutes: number;
+        worked_minutes: number;
+        absence_quantity: number;
+        certificate_minutes: number;
+        declaration_minutes: number;
+        allowance_minutes: number;
+        debit_minutes: number;
+        he_60_minutes: number;
+        he_60_night_minutes: number;
+        he_100_minutes: number;
+        he_20_minutes: number;
+        interjornada_minutes: number;
+      }>
+    : [];
   const overridesByPeriod = new Map(overrides.map(row => [row.period_id, row]));
   const adjustments = check(adjustmentsResult) as ManualAdjustment[];
   const payments = check(paymentsResult) as Array<{ id: string; entry_date: string; minutes: number; period_id: string | null; justification: string | null }>;
