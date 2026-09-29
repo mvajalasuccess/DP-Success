@@ -294,7 +294,9 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
       .filter(p => p.period_id === period.id || (!p.period_id && inRange(p.entry_date, period)))
       .reduce((sum, p) => sum + Math.abs(Number(p.minutes) || 0), 0);
 
-    const calculatedBalance = balanceOf(comp) + adjustment;
+    const calculatedBalance = employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20"
+      ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.HE_20 - comp.debit + adjustment
+      : balanceOf(comp) + adjustment;
     const monthBalance = isFelipeHilmann && Object.prototype.hasOwnProperty.call(felipeHilmannManualBalances, period.end_date)
       ? felipeHilmannManualBalances[period.end_date] ?? calculatedBalance
       : isRichard && Object.prototype.hasOwnProperty.call(richardManualBalances, period.end_date)
