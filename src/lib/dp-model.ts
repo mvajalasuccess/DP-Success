@@ -9,7 +9,7 @@ export type CreditType = "HE_60" | "HE_60_NOTURNO" | "HE_100" | "HE_100_NOTURNO"
 
 export const CREDIT_TYPES: Record<CreditType, { label: string; ratePercent: number; affectsBalance: boolean }> = {
   HE_60: { label: "HE 60%", ratePercent: 60, affectsBalance: true },
-  HE_60_NOTURNO: { label: "HE 60% + 20% noturno", ratePercent: 80, affectsBalance: true },
+  HE_60_NOTURNO: { label: "HE 60% + 20% noturno", ratePercent: 80, affectsBalance: false },
   HE_100: { label: "HE 100% (domingo/feriado)", ratePercent: 100, affectsBalance: true },
   HE_100_NOTURNO: { label: "HE 100% + 20% noturno", ratePercent: 120, affectsBalance: true },
   ADICIONAL_NOTURNO: { label: "Adicional noturno 20%", ratePercent: 20, affectsBalance: true },
