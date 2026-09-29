@@ -222,7 +222,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
   const cards = [
     ["Funcionários ativos", String(metrics.employees), Users],
     ["Horas extras", fmt(metrics.overtime), Clock3],
-    ["Faltas", metrics.absenceDays.toFixed(2).replace(".", ",") + " dias", AlertTriangle],
+    ["Faltas", String(Math.round(metrics.absenceDays)), AlertTriangle],
     ["Atestados", String(metrics.certificates), FileText],
     ["Absenteísmo", metrics.absenteeism.toFixed(1) + "%", Gauge],
   ] as const;
