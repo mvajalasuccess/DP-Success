@@ -272,9 +272,6 @@ export function Kpis() {
       );
 
       const expectedFromSchedule = (employee: Employee, period: Period) => {
-        const weekly = employee.workScheduleId ? (scheduleMinutes.get(employee.workScheduleId) ?? 0) : 0;
-        if (!weekly) return 0;
-
         const employeeStart = employee.hireDate && employee.hireDate > period.start_date
           ? employee.hireDate
           : period.start_date;
@@ -284,16 +281,12 @@ export function Kpis() {
 
         if (employeeEnd < employeeStart) return 0;
 
-        // A jornada cadastrada atualmente é semanal. Para o cálculo das horas
-        // previstas, consideramos a jornada padrão de segunda a sexta e
-        // retiramos automaticamente os feriados nacionais que caem em dias úteis.
-        // Ex.: 21/08/2026 a 20/09/2026 tem 20 dias úteis após 07/09,
-        // então uma jornada de 44h/semana resulta em 20 × 08:48 = 176:00.
+        // O fechamento de ponto usa 08:48 (528 min) por dia útil.
+        // Essa regra também precisa funcionar para funcionários já inativos
+        // que participaram da competência; portanto, não dependemos do status
+        // atual nem de uma jornada ainda ativa no cadastro.
         const workingDays = countWorkingWeekdays(employeeStart, employeeEnd);
-        // Regra oficial do fechamento: 08:48 por dia útil (528 min),
-        // independentemente da jornada cadastrada.
-        const dailyMinutes = 528;
-        return Math.round(workingDays * dailyMinutes);
+        return Math.round(workingDays * 528);
       };
 
       const dailyMinutesFromSchedule = (employee: Employee) => {
@@ -610,7 +603,7 @@ export function Kpis() {
               const key = period.reference_year + "-" + period.reference_month;
               return sum + (historicalHeadcountByPeriod.get(key) ?? 0);
             }, 0) / targetPeriods.length
-          : currentActiveHeadcount;
+          : distinctEmployeesInSelection.size;
 
       next.employees = activeHeadcount;
       next.admissions = admissionEmployees.length;
