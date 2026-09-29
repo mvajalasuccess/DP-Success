@@ -163,8 +163,12 @@ export function PointClosing() {
       (!employee.hire_date || employee.hire_date <= p.end_date) &&
       (!employee.termination_date || employee.termination_date >= p.start_date);
 
+    // O status atual não pode excluir quem participou da competência.
+    // Ex.: João Victor Lima e Leandro Ricci podem estar inativos hoje,
+    // mas devem continuar na competência de agosto/setembro se estavam
+    // contratados durante o período.
     const employeesInPeriod = (employeeRows ?? []).filter((e: any) =>
-      e.status !== "inativo" && inCompetence(e)
+      inCompetence(e)
     );
 
     const dailyMinutes = (employee: any) => {
