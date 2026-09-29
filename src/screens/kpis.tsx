@@ -242,8 +242,14 @@ export function Kpis() {
           .in("period_id", periodIds),
       ]);
 
-      if (historicalError || overtimeError || timeError || occurrenceError || debitError || certificateError || scheduleError || overrideError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? overrideError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || timeError || occurrenceError || debitError || certificateError || scheduleError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
+        return;
+      }
+      // Enquanto a migration não estiver aplicada, a ausência da tabela de ajustes
+      // não impede o KPI de funcionar com as fontes originais.
+      if (overrideError && !String(overrideError.message ?? "").toLowerCase().includes("point_closing_overrides")) {
+        setError(overrideError.message);
         return;
       }
 
