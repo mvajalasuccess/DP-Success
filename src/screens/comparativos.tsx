@@ -209,4 +209,5 @@ export function Comparativos() {
         </table>
       </Card>
     </main>
-  </div>
+  </div>;
+}
