@@ -2,6 +2,7 @@ import { ArrowLeft, CalendarDays, CheckCircle2, LockKeyhole, Plus, Trash2, Penci
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { countWorkingWeekdays } from "@/lib/feriados";
 
 type Period = {
   id: string;
@@ -155,10 +156,6 @@ export function PointClosing() {
       return;
     }
 
-    const schedules = new Map<string, number>(
-      (scheduleRows ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0)])
-    );
-
     const inCompetence = (employee: any) =>
       (!employee.hire_date || employee.hire_date <= p.end_date) &&
       (!employee.termination_date || employee.termination_date >= p.start_date);
@@ -171,22 +168,28 @@ export function PointClosing() {
       inCompetence(e)
     );
 
-    const dailyMinutes = (employee: any) => {
-      const weekly = employee.work_schedule_id ? schedules.get(String(employee.work_schedule_id)) ?? 0 : 0;
-      return weekly ? weekly / 5 : 528;
+    // Regra oficial do fechamento manual:
+    // cada dia útil dentro da competência vale 08:48 (528 minutos),
+    // descontando sábados, domingos e feriados.
+    const expectedMinutesForEmployee = (employee: any) => {
+      const effectiveStart = employee.hire_date && employee.hire_date > p.start_date
+        ? employee.hire_date
+        : p.start_date;
+      const effectiveEnd = employee.termination_date && employee.termination_date < p.end_date
+        ? employee.termination_date
+        : p.end_date;
+      if (effectiveStart > effectiveEnd) return 0;
+      return countWorkingWeekdays(effectiveStart, effectiveEnd) * 528;
     };
 
     const expectedByEmployee = new Map<string, number>();
-    const workedByEmployee = new Map<string, number>();
-    for (const row of timeRows ?? []) {
-      expectedByEmployee.set(row.employee_id, Number(row.expected_minutes || 0));
-      workedByEmployee.set(row.employee_id, Number(row.worked_minutes || 0));
+    for (const employee of employeesInPeriod) {
+      expectedByEmployee.set(employee.id, expectedMinutesForEmployee(employee));
     }
 
     const rows = employeesInPeriod.map((employee: any) => {
       const id = employee.id;
       const expected = expectedByEmployee.get(id) ?? 0;
-      const worked = workedByEmployee.get(id) ?? 0;
       let faltasDays = 0;
       let certificateMinutes = 0;
       let declarationMinutes = 0;
@@ -220,11 +223,14 @@ export function PointClosing() {
 
       for (const row of certificateRows ?? []) {
         if (row.employee_id !== id) continue;
-        const days = Math.max(0, Math.min(
-          Number(row.days || 0),
-          Math.floor((new Date(row.end_date + "T00:00:00").getTime() - new Date(row.start_date + "T00:00:00").getTime()) / 86400000) + 1
-        ));
-        certificateMinutes += Math.round(days * dailyMinutes(employee));
+        const overlapStart = row.start_date > p.start_date ? row.start_date : p.start_date;
+        const overlapEnd = row.end_date < p.end_date ? row.end_date : p.end_date;
+        if (overlapStart > overlapEnd) continue;
+        const calendarDays = Math.floor(
+          (new Date(overlapEnd + "T00:00:00").getTime() - new Date(overlapStart + "T00:00:00").getTime()) / 86400000
+        ) + 1;
+        const days = Math.max(0, Math.min(Number(row.days || 0), calendarDays));
+        certificateMinutes += Math.round(days * 528);
       }
 
       for (const row of debitRows ?? []) {
@@ -242,6 +248,12 @@ export function PointClosing() {
         else if (type === "INTERJORNADA_50") interjornada += minutes;
       }
 
+      // Abono = atestados + declarações de horas.
+      // Horas trabalhadas = horas previstas - faltas - abonos.
+      const allowanceTotal = certificateMinutes + declarationMinutes;
+      const absenceMinutes = Math.round(faltasDays * 528);
+      const worked = Math.max(0, expected - absenceMinutes - allowanceTotal);
+
       return {
         id: id + "::manual",
         employee_id: id,
@@ -254,7 +266,7 @@ export function PointClosing() {
         absence_quantity: faltasDays,
         certificate_minutes: certificateMinutes,
         declaration_minutes: declarationMinutes,
-        allowance_minutes: allowanceMinutes,
+        allowance_minutes: allowanceTotal,
         debit_minutes: debitMinutes,
         he_60_minutes: he60,
         he_60_night_minutes: he60Night,
