@@ -321,7 +321,9 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
     // - histórico importado da BASE (jan-jul/2026): não entra no saldo;
     // - competências atuais do DP-Success (ago/2026 em diante): entra no saldo.
     // As exceções manuais abaixo continuam prevalecendo sobre este cálculo.
-    const he60NightAffectsBalance = period.end_date > "2026-07-20";
+    const he60NightAffectsBalance =
+      period.reference_year > 2026 ||
+      (period.reference_year === 2026 && period.reference_month >= 8);
     const calculatedBalance = employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20"
       ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.HE_20 - comp.debit + adjustment
       : balanceOf(comp) + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
