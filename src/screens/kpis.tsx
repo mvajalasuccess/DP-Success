@@ -447,10 +447,25 @@ export function Kpis() {
       // [(Admissões + Desligamentos) ÷ 2] ÷ total de colaboradores ativos × 100.
       // O quadro ativo é o número de colaboradores que estavam ativos no fim
       // do período analisado, respeitando os filtros de setor/funcionários.
-      const activeHeadcount = allowedEmployees.filter(e =>
+      // Quadro ativo: histórico (Jan-Jul) vem da BASE; competências atuais
+      // continuam sendo calculadas pelo cadastro de funcionários.
+      const isHistoricalOnly = targetPeriods.length > 0 && targetPeriods.every(
+        p => p.end_date <= HISTORICAL_CUTOFF
+      );
+      const historicalActiveIds = new Set(
+        (historical ?? [])
+          .map((row: any) => resolveEmployee(row)?.id)
+          .filter((id: string | undefined): id is string => Boolean(id))
+      );
+      const historicalActiveCount = historicalActiveIds.size;
+      const currentActiveHeadcount = allowedEmployees.filter(e =>
         (!e.hireDate || e.hireDate <= rangeEnd) &&
         (!e.terminationDate || e.terminationDate > rangeEnd)
       ).length;
+
+      const activeHeadcount = isHistoricalOnly
+        ? historicalActiveCount
+        : currentActiveHeadcount;
 
       next.employees = activeHeadcount;
       next.admissions = admissionEmployees.length;
