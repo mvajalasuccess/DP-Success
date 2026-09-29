@@ -210,3 +210,4 @@ export function Comparativos() {
       </Card>
     </main>
   </div>
+}
