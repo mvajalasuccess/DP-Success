@@ -17,6 +17,7 @@ import { Kpis } from "@/screens/kpis";
 import { Relatorios } from "@/screens/relatorios";
 import { Parametros } from "@/screens/parametros";
 import { ImportacaoHistorico } from "@/screens/importacao-historico";
+import { countWorkingWeekdays } from "@/lib/feriados";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
@@ -155,7 +156,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       setUserEmail(sessionData.session.user.email || "Usuário RH");
       const db = supabase;
       const [emps, comp, overtimeRows, occ, cert, timeRows, bankRows, scheduleRows] = await Promise.all([
-        db.from("employees").select("id,full_name,department_id,work_schedule_id,departments(name)").eq("status", "ativo"),
+        db.from("employees").select("id,full_name,department_id,work_schedule_id,hire_date,termination_date,status,departments(name)"),
         db.from("time_periods").select("id,reference_year,reference_month,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
         db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
         db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_date,end_date,period_id,occurrence_types(code)").order("occurrence_date", { ascending: false }),
@@ -165,25 +166,32 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         db.from("work_schedules").select("id,weekly_minutes"),
       ]);
 
-      const employees = emps.data ?? [];
+      const allEmployees = emps.data ?? [];
+      const competence = comp.data?.[0];
+      const employees = competence
+        ? allEmployees.filter((e: any) =>
+            (!e.hire_date || e.hire_date <= competence.end_date) &&
+            (!e.termination_date || e.termination_date >= competence.start_date)
+          )
+        : allEmployees.filter((e: any) => e.status === "ativo");
+      const activeEmployeeIds = new Set(employees.map((e: any) => e.id));
       const scheduleMap = new Map((scheduleRows.data ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0) / 5]));
       const dailyMinutes = (employeeId: string) => {
         const employee = employees.find((e: any) => e.id === employeeId);
         return employee?.work_schedule_id ? (scheduleMap.get(String(employee.work_schedule_id)) ?? 528) : 528;
       };
-      const competence = comp.data?.[0];
       const overtimeData = overtimeRows.data ?? [];
       const occurrences = occ.data ?? [];
 
       const currentOvertime = competence
-        ? overtimeData.filter((x: any) => x.period_id === competence.id)
-        : overtimeData;
+        ? overtimeData.filter((x: any) => x.period_id === competence.id && activeEmployeeIds.has(x.employee_id))
+        : overtimeData.filter((x: any) => activeEmployeeIds.has(x.employee_id));
       const overtime = currentOvertime.reduce((sum: number, row: any) => sum + (row.minutes || 0), 0);
 
       const periodId = competence?.id ?? null;
       const absenceRows = occurrences.filter((x: any) => {
         const code = String(x.occurrence_types?.code ?? "").toLowerCase();
-        return periodId && x.period_id === periodId && ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code);
+        return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code);
       });
       const absenceDays = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
       const declarationMinutes = occurrences
@@ -191,13 +199,22 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         .reduce((sum: number, x: any) => sum + Math.round(Number(x.quantity || 0) * 60), 0);
       const certificateRows = (cert.data ?? []).filter((x: any) => {
         if (!competence) return false;
-        return x.start_date <= competence.end_date && x.end_date >= competence.start_date;
+        return x.start_date <= competence.end_date && x.end_date >= competence.start_date && activeEmployeeIds.has(x.employee_id);
       });
       const certificateDays = certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0), 0);
-      const currentTime = (timeRows.data ?? []).filter((x: any) => !periodId || x.period_id === periodId);
-      const expectedMinutes = currentTime.reduce((sum: number, x: any) => sum + Number(x.expected_minutes || 0), 0);
+      const currentTime = (timeRows.data ?? []).filter((x: any) => (!periodId || x.period_id === periodId) && activeEmployeeIds.has(x.employee_id));
+      const expectedMinutes = competence
+        ? employees.reduce((sum: number, employee: any) => {
+            const weekly = employee.work_schedule_id ? (scheduleRows.data ?? []).find((s: any) => String(s.id) === String(employee.work_schedule_id))?.weekly_minutes : 0;
+            if (!weekly) return sum;
+            const start = employee.hire_date && employee.hire_date > competence.start_date ? employee.hire_date : competence.start_date;
+            const end = employee.termination_date && employee.termination_date < competence.end_date ? employee.termination_date : competence.end_date;
+            if (end < start) return sum;
+            return sum + Math.round(countWorkingWeekdays(start, end) * (Number(weekly) / 5));
+          }, 0)
+        : currentTime.reduce((sum: number, x: any) => sum + Number(x.expected_minutes || 0), 0);
       const debitMinutes = (bankRows.data ?? [])
-        .filter((x: any) => periodId && x.period_id === periodId && x.kind === "debito")
+        .filter((x: any) => periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && x.kind === "debito")
         .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
       const absenceMinutes = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0) * dailyMinutes(x.employee_id), 0) + certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0) * dailyMinutes(x.employee_id), 0) + declarationMinutes + debitMinutes;
 
