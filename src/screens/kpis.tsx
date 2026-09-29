@@ -189,6 +189,7 @@ export function Kpis() {
         { data: timeRecords, error: timeError },
         { data: currentOccurrences, error: occurrenceError },
         { data: currentDebits, error: debitError },
+        { data: currentCertificates, error: certificateError },
         { data: scheduleRows, error: scheduleError },
       ] = await Promise.all([
         historicalPeriodIds.length
@@ -217,11 +218,17 @@ export function Kpis() {
               .eq("kind", "debito")
               .in("period_id", currentPeriodIds)
           : Promise.resolve({ data: [], error: null }),
+        currentPeriodIds.length
+          ? db.from("medical_certificates")
+              .select("employee_id,start_date,end_date,days")
+              .lte("start_date", rangeEnd)
+              .gte("end_date", rangeStart)
+          : Promise.resolve({ data: [], error: null }),
         db.from("work_schedules").select("id,weekly_minutes").eq("active", true),
       ]);
 
-      if (historicalError || overtimeError || timeError || occurrenceError || debitError || scheduleError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || timeError || occurrenceError || debitError || certificateError || scheduleError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
         return;
       }
 
@@ -419,6 +426,21 @@ export function Kpis() {
           next.abonosMinutes += minutes;
           next.absenceMinutes += minutes;
         }
+      }
+
+      for (const row of currentCertificates ?? []) {
+        if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
+        const employee = employees.find(e => e.id === row.employee_id);
+        if (!employee) continue;
+        const selectedDays = Math.max(0, Math.min(
+          Number(row.days || 0),
+          Math.floor((new Date(row.end_date + "T00:00:00").getTime() - new Date(row.start_date + "T00:00:00").getTime()) / 86400000) + 1,
+        ));
+        const dailyMinutes = dailyMinutesFromSchedule(employee);
+        const minutes = Math.round(selectedDays * dailyMinutes);
+        next.atestadosDays += selectedDays;
+        next.atestadosMinutes += minutes;
+        next.absenceMinutes += minutes;
       }
 
       for (const row of currentDebits ?? []) {
