@@ -59,6 +59,7 @@ export function PointClosing() {
   const [historicalRows, setHistoricalRows] = useState<any[]>([]);
   const [loadingRows, setLoadingRows] = useState(false);
   const [editingRow, setEditingRow] = useState<any | null>(null);
+  const [rowsSource, setRowsSource] = useState<"historical" | "manual">("historical");
   const [rowSaving, setRowSaving] = useState(false);
 
   async function load() {
@@ -77,11 +78,190 @@ export function PointClosing() {
   useEffect(() => { void load(); }, []);
 
   async function openPeriod(p: Period) {
-    setSelectedPeriod(p); setEditingRow(null); setLoadingRows(true); setError("");
-    const { data, error } = await supabase.from("historical_kpi_data")
+    setSelectedPeriod(p);
+    setEditingRow(null);
+    setLoadingRows(true);
+    setError("");
+
+    const { data: historical, error: historicalError } = await supabase.from("historical_kpi_data")
       .select("id,employee_id,registration,employee_name,department_name,position_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-      .eq("period_id", p.id).order("employee_name", { ascending: true });
-    if (error) setError(error.message); else setHistoricalRows(data ?? []);
+      .eq("period_id", p.id)
+      .order("employee_name", { ascending: true });
+
+    if (historicalError) {
+      setError(historicalError.message);
+      setHistoricalRows([]);
+      setLoadingRows(false);
+      return;
+    }
+
+    if ((historical ?? []).length > 0) {
+      setRowsSource("historical");
+      setHistoricalRows(historical ?? []);
+      setLoadingRows(false);
+      return;
+    }
+
+    // Competências criadas manualmente não possuem historical_kpi_data.
+    // Para elas, montamos a mesma visão diretamente dos lançamentos atuais
+    // do DP-Success, consolidando todos os funcionários da competência.
+    const [
+      { data: employeeRows, error: employeeError },
+      { data: timeRows, error: timeError },
+      { data: overtimeRows, error: overtimeError },
+      { data: occurrenceRows, error: occurrenceError },
+      { data: debitRows, error: debitError },
+      { data: certificateRows, error: certificateError },
+      { data: scheduleRows, error: scheduleError },
+    ] = await Promise.all([
+      supabase.from("employees")
+        .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,departments(name),positions(name)")
+        .order("full_name"),
+      supabase.from("time_records")
+        .select("employee_id,period_id,expected_minutes,worked_minutes")
+        .eq("period_id", p.id),
+      supabase.from("overtime_records")
+        .select("employee_id,period_id,minutes,launch_type")
+        .eq("period_id", p.id),
+      supabase.from("occurrences")
+        .select("employee_id,period_id,quantity,unit,occurrence_types(code)")
+        .eq("period_id", p.id),
+      supabase.from("bank_hours")
+        .select("employee_id,period_id,minutes,kind")
+        .eq("period_id", p.id)
+        .eq("kind", "debito"),
+      supabase.from("medical_certificates")
+        .select("employee_id,start_date,end_date,days")
+        .lte("start_date", p.end_date)
+        .gte("end_date", p.start_date),
+      supabase.from("work_schedules")
+        .select("id,weekly_minutes")
+        .eq("active", true),
+    ]);
+
+    if (employeeError || timeError || overtimeError || occurrenceError || debitError || certificateError || scheduleError) {
+      setError(
+        employeeError?.message ??
+        timeError?.message ??
+        overtimeError?.message ??
+        occurrenceError?.message ??
+        debitError?.message ??
+        certificateError?.message ??
+        scheduleError?.message ??
+        "Não foi possível carregar a visão da competência."
+      );
+      setHistoricalRows([]);
+      setLoadingRows(false);
+      return;
+    }
+
+    const schedules = new Map<string, number>(
+      (scheduleRows ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0)])
+    );
+
+    const inCompetence = (employee: any) =>
+      (!employee.hire_date || employee.hire_date <= p.end_date) &&
+      (!employee.termination_date || employee.termination_date >= p.start_date);
+
+    const employeesInPeriod = (employeeRows ?? []).filter((e: any) =>
+      e.status !== "inativo" && inCompetence(e)
+    );
+
+    const dailyMinutes = (employee: any) => {
+      const weekly = employee.work_schedule_id ? schedules.get(String(employee.work_schedule_id)) ?? 0 : 0;
+      return weekly ? weekly / 5 : 528;
+    };
+
+    const expectedByEmployee = new Map<string, number>();
+    const workedByEmployee = new Map<string, number>();
+    for (const row of timeRows ?? []) {
+      expectedByEmployee.set(row.employee_id, Number(row.expected_minutes || 0));
+      workedByEmployee.set(row.employee_id, Number(row.worked_minutes || 0));
+    }
+
+    const rows = employeesInPeriod.map((employee: any) => {
+      const id = employee.id;
+      const expected = expectedByEmployee.get(id) ?? 0;
+      const worked = workedByEmployee.get(id) ?? 0;
+      let faltasDays = 0;
+      let certificateMinutes = 0;
+      let declarationMinutes = 0;
+      let allowanceMinutes = 0;
+      let debitMinutes = 0;
+      let he60 = 0;
+      let he60Night = 0;
+      let he100 = 0;
+      let he20 = 0;
+      let interjornada = 0;
+
+      for (const row of occurrenceRows ?? []) {
+        if (row.employee_id !== id) continue;
+        const code = String(row.occurrence_types?.code ?? "").toLowerCase();
+        const quantity = Number(row.quantity || 0);
+        const unit = String(row.unit ?? "dias").toLowerCase();
+        const minutes = unit.startsWith("dia")
+          ? Math.round(quantity * dailyMinutes(employee))
+          : unit.startsWith("hor")
+            ? Math.round(quantity * 60)
+            : Math.round(quantity);
+
+        if (["falta", "folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code)) {
+          faltasDays += quantity;
+        } else if (code === "declaracao_horas" || code === "declaracao") {
+          declarationMinutes += minutes;
+        } else if (code === "abono") {
+          allowanceMinutes += minutes;
+        }
+      }
+
+      for (const row of certificateRows ?? []) {
+        if (row.employee_id !== id) continue;
+        const days = Math.max(0, Math.min(
+          Number(row.days || 0),
+          Math.floor((new Date(row.end_date + "T00:00:00").getTime() - new Date(row.start_date + "T00:00:00").getTime()) / 86400000) + 1
+        ));
+        certificateMinutes += Math.round(days * dailyMinutes(employee));
+      }
+
+      for (const row of debitRows ?? []) {
+        if (row.employee_id === id) debitMinutes += Math.abs(Number(row.minutes || 0));
+      }
+
+      for (const row of overtimeRows ?? []) {
+        if (row.employee_id !== id) continue;
+        const minutes = Math.abs(Number(row.minutes || 0));
+        const type = String(row.launch_type ?? "").toUpperCase();
+        if (type === "HE_60") he60 += minutes;
+        else if (type === "HE_60_NOTURNO") he60Night += minutes;
+        else if (type === "HE_100" || type === "HE_100_NOTURNO") he100 += minutes;
+        else if (type === "ADICIONAL_NOTURNO") he20 += minutes;
+        else if (type === "INTERJORNADA_50") interjornada += minutes;
+      }
+
+      return {
+        id: id + "::manual",
+        employee_id: id,
+        registration: employee.registration,
+        employee_name: employee.full_name,
+        department_name: employee.departments?.name ?? "",
+        position_name: employee.positions?.name ?? "",
+        expected_minutes: expected,
+        worked_minutes: worked,
+        absence_quantity: faltasDays,
+        certificate_minutes: certificateMinutes,
+        declaration_minutes: declarationMinutes,
+        allowance_minutes: allowanceMinutes,
+        debit_minutes: debitMinutes,
+        he_60_minutes: he60,
+        he_60_night_minutes: he60Night,
+        he_100_minutes: he100,
+        he_20_minutes: he20,
+        interjornada_minutes: interjornada,
+      };
+    });
+
+    setRowsSource("manual");
+    setHistoricalRows(rows);
     setLoadingRows(false);
   }
 
@@ -221,14 +401,18 @@ export function PointClosing() {
             <Card className="p-5">
               <button type="button" onClick={() => setSelectedPeriod(null)} className="mb-2 inline-flex items-center gap-2 text-xs text-muted-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Voltar para competências</button>
               <h2 className="text-xl font-bold">{periodName(selectedPeriod)}</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Edite os dados importados da BASE diretamente no sistema. Não é necessário importar novamente a planilha.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {rowsSource === "historical"
+                  ? "Dados importados da BASE. Você pode editar os valores diretamente nesta tabela."
+                  : "Visão consolidada de todos os funcionários da competência, formada pelos lançamentos atuais do DP-Success."}
+              </p>
             </Card>
             <Card className="mt-4 overflow-hidden">
               {loadingRows ? <div className="p-8 text-center text-muted-foreground">Carregando fechamento...</div> :
               historicalRows.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhum lançamento histórico encontrado nesta competência.</div> :
               <div className="overflow-x-auto"><table className="min-w-[1500px] w-full text-xs">
-                <thead className="bg-muted/50"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada","Ação"].map(h => <th key={h} className="whitespace-nowrap px-3 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
-                <tbody className="divide-y">{historicalRows.map(row => editingRow?.id === row.id ? (
+                <thead className="bg-muted/50"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada",...(rowsSource === "historical" ? ["Ação"] : [])].map(h => <th key={h} className="whitespace-nowrap px-3 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
+                <tbody className="divide-y">{historicalRows.map(row => editingRow?.id === row.id && rowsSource === "historical" ? (
                   <tr key={row.id} className="bg-primary/5">
                     <td className="whitespace-nowrap px-3 py-2 font-medium">{row.employee_name}</td>
                     {[["expected","Previstas"],["worked","Trabalhadas"],["certificate","Atestados"],["declaration","Declaração"],["allowance","Abonos"],["debit","Débito"],["he60","HE 60%"],["he60night","HE 60%+20%"],["he100","HE 100%"],["he20","HE 20%"],["interjornada","Interjornada"]].map(([key,label]) => <td key={key} className="px-2 py-2"><input aria-label={label} value={editingRow[key]} onChange={e => setEditingRow((v: any) => ({...v,[key]:e.target.value}))} className="w-24 rounded-md border bg-background px-2 py-1.5 text-center font-mono" placeholder="00:00" /></td>)}
@@ -240,7 +424,7 @@ export function PointClosing() {
                     {[row.expected_minutes,row.worked_minutes].map((v,i) => <td key={i} className="whitespace-nowrap px-3 py-2 font-mono">{minutesToHHMM(v)}</td>)}
                     <td className="px-3 py-2 font-mono">{Number(row.absence_quantity || 0)}</td>
                     {[row.certificate_minutes,row.declaration_minutes,row.allowance_minutes,row.debit_minutes,row.he_60_minutes,row.he_60_night_minutes,row.he_100_minutes,row.he_20_minutes,row.interjornada_minutes].map((v,i) => <td key={i} className="whitespace-nowrap px-3 py-2 font-mono">{minutesToHHMM(v)}</td>)}
-                    <td className="px-3 py-2"><button onClick={() => beginEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Editar</button></td>
+                    {rowsSource === "historical" && <td className="px-3 py-2"><button onClick={() => beginEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Editar</button></td>}
                   </tr>
                 ))}</tbody>
               </table></div>}
