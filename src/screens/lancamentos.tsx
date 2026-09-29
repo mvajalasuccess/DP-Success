@@ -9,7 +9,7 @@ import {
   formatDateBR, composeMinutes, creditTotal, balanceOf,
 } from "@/lib/dp-model";
 
-type Employee = { id: string; full_name: string; status?: string };
+type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null };
 type Group = { key: string; employee_id: string; date: string; credits: CreditRow[]; debits: DebitRow[] };
 type Line = { type: CreditType; hours: string };
 
@@ -18,7 +18,6 @@ export function Launches() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [periodId, setPeriodId] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [credits, setCredits] = useState<CreditRow[]>([]);
   const [debits, setDebits] = useState<DebitRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,19 +32,24 @@ export function Launches() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const period = periods.find(p => p.id === periodId) ?? null;
-  const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));
+  const employeesInPeriod = useMemo(() => {
+    if (!period) return [];
+    return employees.filter(e =>
+      (!e.hire_date || e.hire_date <= period.end_date) &&
+      (!e.termination_date || e.termination_date >= period.start_date)
+    );
+  }, [employees, period]);
 
   async function loadBase() {
     try {
       const [emps, ps] = await Promise.all([
-        supabase.from("employees").select("id,full_name,status").order("full_name"),
+        supabase.from("employees").select("id,full_name,status,hire_date,termination_date").order("full_name"),
         fetchPeriods(),
       ]);
       if (emps.error) throw new Error(emps.error.message);
       setEmployees(emps.data ?? []);
       setPeriods(ps);
       if (!periodId && ps[0]) setPeriodId(ps[0].id);
-      if (!employeeFilter) { const first = (emps.data ?? []).find((e: any) => e.status !== "inativo"); if (first) setEmployeeFilter(first.id); }
       if (!ps.length) setLoading(false);
     } catch (e) { setError((e as Error).message); setLoading(false); }
   }
@@ -59,7 +63,14 @@ export function Launches() {
     setLoading(false);
   }
   useEffect(() => { void loadBase(); }, []);
-  useEffect(() => { void loadLaunches(); }, [periodId, employeeFilter]);
+  useEffect(() => {
+    if (!period) return;
+    if (employeeFilter && !employeesInPeriod.some(e => e.id === employeeFilter)) {
+      setEmployeeFilter("");
+      return;
+    }
+    void loadLaunches();
+  }, [periodId, employeeFilter, employeesInPeriod]);
 
   const groups = useMemo(() => {
     const map = new Map<string, Group>();
@@ -152,7 +163,7 @@ export function Launches() {
         <label className="grid gap-1.5 text-sm font-medium">Funcionário
           <select className={inputCls} value={employeeFilter} onChange={e => setEmployeeFilter(e.target.value)}>
             <option value="">Todos</option>
-            {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+            {employeesInPeriod.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
           </select>
         </label>
       </Card>
@@ -201,7 +212,7 @@ export function Launches() {
             <label className="grid gap-1.5 text-sm font-medium">Funcionário
               <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
                 <option value="">Selecione</option>
-                {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                {employeesInPeriod.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
               </select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Data
