@@ -31,6 +31,8 @@ export function BankHours() {
   const [paymentHours, setPaymentHours] = useState("");
   const [paymentJustification, setPaymentJustification] = useState("");
   const [savingPayment, setSavingPayment] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<any | null>(null);
+  const [confirmPaymentDelete, setConfirmPaymentDelete] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -78,10 +80,20 @@ export function BankHours() {
   }
 
   function openPaymentNew() {
+    setEditingPayment(null);
     const targetPeriod = rows.find(r => r.period.status === "aberto") ?? rows[0];
     setPaymentDate(targetPeriod?.period.end_date ?? new Date().toISOString().slice(0, 10));
     setPaymentHours("");
     setPaymentJustification("");
+    setError("");
+    setPaymentOpen(true);
+  }
+
+  function openPaymentEdit(payment: any) {
+    setEditingPayment(payment);
+    setPaymentDate(payment.entry_date ?? new Date().toISOString().slice(0, 10));
+    setPaymentHours(minutesToHours(Math.abs(Number(payment.minutes || 0))));
+    setPaymentJustification(payment.justification ?? "");
     setError("");
     setPaymentOpen(true);
   }
@@ -101,19 +113,38 @@ export function BankHours() {
         setError("A data do pagamento precisa estar dentro de uma competência existente.");
         return;
       }
-      const result = await supabase.from("bank_hours").insert({
+      const payload = {
         employee_id: employeeId,
         entry_date: paymentDate,
         period_id: target.id,
-        kind: "pagamento_he",
+        kind: "pagamento_he" as const,
         minutes: Math.abs(parsed),
-        adjustment_direction: "debito",
+        adjustment_direction: "debito" as const,
         justification: paymentJustification.trim() || "Pagamento de horas extras",
-      });
+      };
+      const result = editingPayment
+        ? await supabase.from("bank_hours").update(payload).eq("id", editingPayment.id)
+        : await supabase.from("bank_hours").insert(payload);
       if (result.error) throw new Error(result.error.message);
       setPaymentOpen(false);
+      setEditingPayment(null);
       setPaymentHours("");
       setPaymentJustification("");
+      await loadBankData();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingPayment(false);
+    }
+  }
+
+  async function deletePayment(id: string) {
+    setSavingPayment(true);
+    setError("");
+    try {
+      const result = await supabase.from("bank_hours").delete().eq("id", id).eq("kind", "pagamento_he");
+      if (result.error) throw new Error(result.error.message);
+      setConfirmPaymentDelete(null);
       await loadBankData();
     } catch (e) {
       setError((e as Error).message);
@@ -277,19 +308,19 @@ export function BankHours() {
       <Card className="mt-6 border-dashed p-5">
         <div><h2 className="font-bold">Movimentações separadas</h2><p className="text-sm text-muted-foreground">Ajustes e correções continuam contabilizados no saldo, mas ficam fora dos cards das competências.</p></div>
         {adjustments.length ? <div className="mt-4 space-y-2">{adjustments.map(a => { const value = a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes || 0)) : Math.abs(Number(a.minutes || 0)); return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"><div><span className="font-medium">{formatDateBR(a.entry_date)}</span><span className={`ml-3 font-semibold ${cls(value)}`}>{minutesToHours(value, true)}</span><span className="ml-3 text-muted-foreground">{a.justification ?? "Ajuste"}</span></div><div className="flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => openAdjustmentEdit(a)}><Pencil className="inline h-3 w-3" /> Editar</button>{confirmAdjustmentDelete === a.id ? <><button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingAdjustment} onClick={() => void deleteAdjustment(a.id)}>Confirmar exclusão</button><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setConfirmAdjustmentDelete(null)}>Cancelar</button></> : <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" onClick={() => setConfirmAdjustmentDelete(a.id)}><Trash2 className="inline h-3 w-3" /> Excluir</button>}</div></div>; })}</div> : <p className="mt-4 text-sm text-muted-foreground">Nenhum ajuste registrado.</p>}
-        {payments.length ? <div className="mt-6 space-y-2"><p className="text-sm font-semibold">Pagamentos de HE</p>{payments.map(p => <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"><div><span className="font-medium">{formatDateBR(p.entry_date)}</span><span className="ml-3 font-semibold text-destructive">-{minutesToHours(Number(p.minutes || 0))}</span><span className="ml-3 text-muted-foreground">{p.justification ?? "Pagamento de horas extras"}</span></div></div>)}</div> : <p className="mt-4 text-sm text-muted-foreground">Nenhum pagamento de HE registrado.</p>}
+        {payments.length ? <div className="mt-6 space-y-2"><p className="text-sm font-semibold">Pagamentos de HE</p>{payments.map(p => <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm"><div><span className="font-medium">{formatDateBR(p.entry_date)}</span><span className="ml-3 font-semibold text-destructive">-{minutesToHours(Number(p.minutes || 0))}</span><span className="ml-3 text-muted-foreground">{p.justification ?? "Pagamento de horas extras"}</span></div><div className="flex gap-2"><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => openPaymentEdit(p)}><Pencil className="inline h-3 w-3" /> Editar</button>{confirmPaymentDelete === p.id ? <><button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" disabled={savingPayment} onClick={() => void deletePayment(p.id)}>Confirmar exclusão</button><button type="button" className="rounded-md border px-2 py-1 text-xs" onClick={() => setConfirmPaymentDelete(null)}>Cancelar</button></> : <button type="button" className="rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive" onClick={() => setConfirmPaymentDelete(p.id)}><Trash2 className="inline h-3 w-3" /> Excluir</button>}</div></div>)}</div> : <p className="mt-4 text-sm text-muted-foreground">Nenhum pagamento de HE registrado.</p>}
       </Card>
 
       {paymentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <Card className="w-full max-w-lg p-6 shadow-xl">
-            <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">Registrar pagamento de HE</h2><p className="mt-1 text-sm text-muted-foreground">O pagamento não altera o saldo da competência original; apenas reduz o saldo disponível acumulado.</p></div><button type="button" onClick={() => setPaymentOpen(false)}><X className="h-5 w-5" /></button></div>
+            <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">{editingPayment ? "Editar pagamento de HE" : "Registrar pagamento de HE"}</h2><p className="mt-1 text-sm text-muted-foreground">O pagamento não altera o saldo da competência original; apenas reduz o saldo disponível acumulado.</p></div><button type="button" onClick={() => setPaymentOpen(false)}><X className="h-5 w-5" /></button></div>
             <div className="mt-5 grid gap-4">
               <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">{employees.find(e => e.id === employeeId)?.full_name ?? "—"}</div>
               <label className="grid gap-1.5 text-sm font-medium">Data do pagamento<input type="date" className={inputCls} value={paymentDate} onChange={e => setPaymentDate(e.target.value)} /></label>
               <label className="grid gap-1.5 text-sm font-medium">Horas pagas<input type="text" inputMode="numeric" placeholder="Ex.: 20:00" className={inputCls} value={paymentHours} onChange={e => setPaymentHours(e.target.value)} /></label>
               <label className="grid gap-1.5 text-sm font-medium">Observação<textarea className={inputCls} rows={3} placeholder="Ex.: pagamento das horas extras da competência de julho." value={paymentJustification} onChange={e => setPaymentJustification(e.target.value)} /></label>
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setPaymentOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={savingPayment} onClick={() => void savePayment()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{savingPayment ? "Salvando..." : "Registrar pagamento"}</button></div>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setPaymentOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={savingPayment} onClick={() => void savePayment()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{savingPayment ? "Salvando..." : editingPayment ? "Salvar alterações" : "Registrar pagamento"}</button></div>
             </div>
           </Card>
         </div>
