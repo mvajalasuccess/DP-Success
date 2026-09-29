@@ -529,12 +529,40 @@ export function Kpis() {
         (!e.terminationDate || e.terminationDate > rangeEnd)
       ).length;
 
-      const activeHeadcount = isHistoricalOnly
-        ? targetPeriods.reduce((sum, period) => {
-            const key = `${period.reference_year}-${period.reference_month}`;
-            return sum + (historicalHeadcountByPeriod.get(key) ?? 0);
-          }, 0) / targetPeriods.length
-        : currentActiveHeadcount;
+      // Quando "Todos" os meses estão selecionados, o cartão deve mostrar
+      // o total de funcionários distintos que fizeram parte da empresa no
+      // período analisado, e não a média mensal nem somente os ativos hoje.
+      // Ex.: se a BASE de janeiro a julho teve 38 pessoas diferentes ao longo
+      // do ano, o indicador permanece 38 mesmo que hoje existam menos pessoas.
+      const distinctEmployeesInSelection = new Set<string>();
+      for (const row of historical ?? []) {
+        if (!isAllowedRow(row)) continue;
+        const employee = resolveEmployee(row);
+        const registration = String(row.registration ?? "").trim();
+        const employeeName = String(row.employee_name ?? "").trim().toLowerCase();
+        const key = employee?.id
+          ?? (registration && employeeName ? registration + "|" + employeeName : employeeName || registration);
+        if (key) distinctEmployeesInSelection.add(key);
+      }
+
+      // Inclui também funcionários das competências atuais que não existiam
+      // na BASE histórica, evitando perder admissões posteriores.
+      for (const employee of allowedEmployees) {
+        const activeInSelection = targetPeriods.some(period =>
+          (!employee.hireDate || employee.hireDate <= period.end_date) &&
+          (!employee.terminationDate || employee.terminationDate >= period.start_date)
+        );
+        if (activeInSelection) distinctEmployeesInSelection.add(employee.id);
+      }
+
+      const activeHeadcount = selectedMonth === "todos"
+        ? distinctEmployeesInSelection.size
+        : isHistoricalOnly
+          ? targetPeriods.reduce((sum, period) => {
+              const key = period.reference_year + "-" + period.reference_month;
+              return sum + (historicalHeadcountByPeriod.get(key) ?? 0);
+            }, 0) / targetPeriods.length
+          : currentActiveHeadcount;
 
       next.employees = activeHeadcount;
       next.admissions = admissionEmployees.length;
