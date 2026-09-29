@@ -138,7 +138,7 @@ function AppShell({
 }
 
 function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void }) {
-  const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, bank: 0, absence: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
+  const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
   const [top, setTop] = useState<Array<{ name: string; minutes: number }>>([]);
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [alerts, setAlerts] = useState<string[]>([]);
@@ -154,11 +154,10 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       }
       setUserEmail(sessionData.session.user.email || "Usuário RH");
       const db = supabase;
-      const [emps, comp, overtimeRows, bankRows, occ, cert] = await Promise.all([
+      const [emps, comp, overtimeRows, occ, cert] = await Promise.all([
         db.from("employees").select("id,full_name,department_id,departments(name)").eq("status", "ativo"),
         db.from("time_periods").select("id,reference_year,reference_month,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
         db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
-        db.from("bank_hours").select("employee_id,balance_minutes,entry_date").order("entry_date", { ascending: false }),
         db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_types(code)").order("occurrence_date", { ascending: false }),
         db.from("medical_certificates").select("id"),
       ]);
@@ -166,7 +165,6 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       const employees = emps.data ?? [];
       const competence = comp.data?.[0];
       const overtimeData = overtimeRows.data ?? [];
-      const bankData = bankRows.data ?? [];
       const occurrences = occ.data ?? [];
 
       const currentOvertime = competence
@@ -174,30 +172,12 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         : overtimeData;
       const overtime = currentOvertime.reduce((sum: number, row: any) => sum + (row.minutes || 0), 0);
 
-      const latestBankByEmployee = new Map<string, number>();
-      for (const row of bankData as any[]) {
-        if (!latestBankByEmployee.has(row.employee_id)) {
-          latestBankByEmployee.set(row.employee_id, row.balance_minutes || 0);
-        }
-      }
-      const bank = employees.reduce(
-        (sum: number, row: any) => sum + (latestBankByEmployee.get(row.id) || 0),
-        0,
-      );
-
-      const absence = occurrences
+      const absenceDays = occurrences
         .filter((x: any) => {
           const code = String(x.occurrence_types?.code ?? "").toLowerCase();
-          return code === "falta" || code === "absence";
+          return ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code);
         })
-        .reduce((sum: number, x: any) => {
-          const quantity = Number(x.quantity || 0);
-          const unit = String(x.unit ?? "").toLowerCase();
-          if (unit === "minutos" || unit === "minutes") return sum + quantity;
-          if (unit === "horas" || unit === "hours") return sum + quantity * 60;
-          if (unit === "dias" || unit === "days") return sum + quantity * 480;
-          return sum;
-        }, 0);
+        .reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
 
       const byEmployee = new Map<string, number>();
       currentOvertime.forEach((row: any) => {
@@ -223,11 +203,10 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       setMetrics({
         employees: employees.length,
         overtime,
-        bank,
-        absence,
+        absenceDays,
         certificates: (cert.data ?? []).length,
         absenteeism: employees.length > 0
-          ? Math.round((absence / (employees.length * 22 * 480)) * 1000) / 10
+          ? Math.round((absenceDays * 8.8 * 60 / (employees.length * 22 * 480)) * 1000) / 10
           : 0,
         period: periodLabel,
       });
@@ -243,8 +222,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
   const cards = [
     ["Funcionários ativos", String(metrics.employees), Users],
     ["Horas extras", fmt(metrics.overtime), Clock3],
-    ["Saldo do banco", fmt(metrics.bank), WalletCards],
-    ["Faltas", Math.round(metrics.absence / 60 * 100) / 100 + "h", AlertTriangle],
+    ["Faltas", metrics.absenceDays.toFixed(2).replace(".", ",") + " dias", AlertTriangle],
     ["Atestados", String(metrics.certificates), FileText],
     ["Absenteísmo", metrics.absenteeism.toFixed(1) + "%", Gauge],
   ] as const;
@@ -261,7 +239,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         </header>
         <div className="mx-auto max-w-[1500px] px-6 py-7">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Visão geral da empresa</p><h1 className="mt-1 text-3xl font-bold">Dashboard</h1><p className="mt-1 text-sm text-muted-foreground">Acompanhe ponto, banco de horas, absenteísmo e indicadores.</p></div><div className="rounded-lg border bg-card px-4 py-2 text-xs font-medium">Competência: <strong>{metrics.period}</strong></div></div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">{cards.map(([label, value, Icon]) => <Card key={label} className="p-4"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><p className="mt-4 text-xs text-muted-foreground">{label}</p><p className="mt-1 font-display text-2xl font-bold">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{metrics.employees === 0 ? "sem dados cadastrados" : "dados atuais"}</p></Card>)}</div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{cards.map(([label, value, Icon]) => <Card key={label} className="p-4"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><p className="mt-4 text-xs text-muted-foreground">{label}</p><p className="mt-1 font-display text-2xl font-bold">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{metrics.employees === 0 ? "sem dados cadastrados" : "dados atuais"}</p></Card>)}</div>
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2 p-5"><h2 className="font-display font-bold">Funcionários com mais horas extras</h2><p className="text-xs text-muted-foreground">Dados reais dos lançamentos registrados</p><div className="mt-4 divide-y">{top.map((r, i) => <div key={r.name} className="flex items-center justify-between py-3 text-xs"><span className="w-6 text-muted-foreground">{i + 1}</span><span className="flex-1 font-medium">{r.name}</span><span className="w-24 text-right font-semibold">{fmt(r.minutes)}</span></div>)}{!top.length && <p className="py-6 text-sm text-muted-foreground">Nenhum dado de horas extras registrado.</p>}</div></Card>
             <Card className="p-5"><h2 className="font-display font-bold">Alertas</h2><p className="text-xs text-muted-foreground">Pontos que merecem atenção</p><div className="mt-4 space-y-3">{alerts.length ? alerts.map(x => <div key={x} className="flex gap-3 rounded-lg border p-3"><AlertTriangle className="mt-0.5 h-4 w-4 text-warning" /><p className="text-xs font-semibold">{x}</p></div>) : <p className="py-6 text-sm text-muted-foreground">Nenhum alerta no momento.</p>}</div></Card>
