@@ -317,9 +317,14 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
       .filter(p => p.period_id === period.id || (!p.period_id && inRange(p.entry_date, period)))
       .reduce((sum, p) => sum + Math.abs(Number(p.minutes) || 0), 0);
 
+    // HE 60% + 20% (noturno):
+    // - histórico importado da BASE (jan-jul/2026): apenas informativo;
+    // - competências atuais do DP-Success (ago/2026 em diante): entra no saldo.
+    // As exceções manuais abaixo continuam prevalecendo sobre este cálculo.
+    const he60NightAffectsBalance = period.end_date > "2026-07-20";
     const calculatedBalance = employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20"
       ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.HE_20 - comp.debit + adjustment
-      : balanceOf(comp) + adjustment;
+      : balanceOf(comp) + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
     const monthBalance = isFelipeHilmann && Object.prototype.hasOwnProperty.call(felipeHilmannManualBalances, period.end_date)
       ? felipeHilmannManualBalances[period.end_date] ?? calculatedBalance
       : isRichard && Object.prototype.hasOwnProperty.call(richardManualBalances, period.end_date)
