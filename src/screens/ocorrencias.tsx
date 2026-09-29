@@ -16,7 +16,6 @@ type Occ = {
   unit: string;
   justification: string | null;
   notes: string | null;
-  cid?: string | null;
   employees?: { full_name: string } | null;
   occurrence_types?: { name: string; code: string } | null;
 };
@@ -36,27 +35,9 @@ const emptyForm = {
   occurrence_date: "",
   end_date: "",
   quantity: "",
-  cid: "",
-  declaration_reason: "",
   justification: "",
   notes: "",
 };
-
-function decimalHoursToText(value: number | null) {
-  if (value == null || !Number.isFinite(Number(value))) return "";
-  const totalMinutes = Math.round(Number(value) * 60);
-  return `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
-}
-
-function hoursTextToDecimal(value: string) {
-  const text = value.trim();
-  if (!text) return 0;
-  if (text.includes(":")) {
-    const [h, m] = text.split(":");
-    return Number(h || 0) + Number(m || 0) / 60;
-  }
-  return Number(text.replace(",", ".")) || 0;
-}
 
 export function Ocorrencias() {
   const [rows, setRows] = useState<Occ[]>([]);
@@ -77,14 +58,12 @@ export function Ocorrencias() {
   const selectedType = visibleTypes.find(t => t.id === form.occurrence_type_id);
   const selectedCode = selectedType?.code ?? "";
   const isFalta = ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(selectedCode);
-  const isAtestado = false;
-  const isDeclaration = false;
 
   async function load() {
     setError("");
     const { data, error } = await supabase
       .from("occurrences")
-      .select("id,employee_id,occurrence_type_id,period_id,occurrence_date,end_date,quantity,unit,justification,notes,cid,employees(full_name),occurrence_types(name,code)")
+      .select("id,employee_id,occurrence_type_id,period_id,occurrence_date,end_date,quantity,unit,justification,notes,employees(full_name),occurrence_types(name,code)")
       .order("occurrence_date", { ascending: false });
 
     if (error) setError(error.message);
@@ -120,15 +99,13 @@ export function Ocorrencias() {
 
   function startEdit(row: Occ) {
     const code = row.occurrence_types?.code ?? "";
-    const reason = code === "declaracao_horas" ? (row.notes?.match(/^Motivo: (.+?)(?:\n|$)/)?.[1] ?? "") : "";
-
     setEditing(row);
     setForm({
       employee_id: row.employee_id,
       occurrence_type_id: row.occurrence_type_id,
       occurrence_date: row.occurrence_date,
       end_date: row.end_date ?? "",
-      quantity: code === "declaracao_horas" ? decimalHoursToText(row.quantity) : row.quantity == null ? "" : String(row.quantity),
+      quantity: row.quantity == null ? "" : String(row.quantity),
       cid: "",
       declaration_reason: reason,
       justification: row.justification ?? "",
@@ -163,11 +140,6 @@ export function Ocorrencias() {
       return;
     }
 
-    if (isDeclaration && hoursTextToDecimal(form.quantity) <= 0) {
-      setError("Informe as horas realmente abonadas.");
-      return;
-    }
-
     if (selectedType?.requires_justification && !form.justification.trim()) {
       setError("Este tipo de ocorrência exige justificativa.");
       return;
@@ -176,12 +148,9 @@ export function Ocorrencias() {
     setSaving(true);
 
     const period = periods.find(p => form.occurrence_date >= p.start_date && form.occurrence_date <= p.end_date);
-    const quantity = isDeclaration ? hoursTextToDecimal(form.quantity) : Number(form.quantity);
+    const quantity = Number(form.quantity);
 
-    let notes = form.notes.trim() || null;
-    if (isDeclaration && form.declaration_reason) {
-      notes = `Motivo: ${form.declaration_reason}${notes ? `\n${notes}` : ""}`;
-    }
+    const notes = form.notes.trim() || null;
 
     const payload = {
       employee_id: form.employee_id,
@@ -190,7 +159,7 @@ export function Ocorrencias() {
       occurrence_date: form.occurrence_date,
       end_date: form.end_date || null,
       quantity,
-      unit: isDeclaration ? "horas" : "dias",
+      unit: "dias",
       justification: form.justification.trim() || null,
       notes,
 
@@ -224,7 +193,6 @@ export function Ocorrencias() {
   }
 
   function displayQuantity(row: Occ) {
-    if (row.occurrence_types?.code === "declaracao_horas") return decimalHoursToText(row.quantity);
     return row.quantity == null ? "—" : `${row.quantity} ${Number(row.quantity) === 1 ? "dia" : "dias"}`;
   }
 
@@ -246,7 +214,7 @@ export function Ocorrencias() {
             <p className="text-sm text-primary">Ponto</p>
             <h1 className="text-3xl font-bold">Faltas e Ocorrências</h1>
             <p className="text-sm text-muted-foreground">
-              Registre faltas em dias, atestados com CID e declarações com as horas realmente abonadas.
+              Registre folgas e faltas em dias.
             </p>
           </div>
           <button onClick={startNew} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground">
@@ -284,7 +252,7 @@ export function Ocorrencias() {
                     <td className="px-5 py-4">{row.occurrence_date}{row.end_date ? ` → ${row.end_date}` : ""}</td>
                     <td className="px-5 py-4">{row.occurrence_types?.name ?? "—"}</td>
                     <td className="px-5 py-4">{displayQuantity(row)}</td>
-                    <td className="px-5 py-4">{row.occurrence_types?.code === "declaracao_horas" ? "horas" : "dias"}</td>
+                    <td className="px-5 py-4">dias</td>
                     <td className="px-5 py-4 text-right">
                       <button onClick={() => startEdit(row)} className="mr-2 rounded-md border p-2" title="Editar">
                         <Pencil className="h-4 w-4" />
@@ -324,24 +292,7 @@ export function Ocorrencias() {
 
               <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" />
 
-              {isDeclaration ? (
-                <>
-                  <select value={form.declaration_reason} onChange={e => setForm({ ...form, declaration_reason: e.target.value })} className="rounded-lg border px-3 py-2">
-                    <option value="">Motivo da declaração</option>
-                    {DECLARATION_REASONS.map(reason => <option key={reason} value={reason}>{reason}</option>)}
-                  </select>
-                  <input
-                    inputMode="numeric"
-                    placeholder="Horas realmente abonadas (HH:MM)"
-                    value={form.quantity}
-                    onChange={e => setForm({ ...form, quantity: e.target.value })}
-                    className="rounded-lg border px-3 py-2"
-                  />
-                  <p className="text-xs text-muted-foreground md:col-span-2">
-                    Informe o total de horas que a empresa realmente abonou, mesmo que seja maior que o tempo da consulta/exame.
-                  </p>
-                </>
-              ) : (
+
                 <input
                   type="number"
                   min="0"
@@ -351,7 +302,7 @@ export function Ocorrencias() {
                   onChange={e => setForm({ ...form, quantity: e.target.value })}
                   className="rounded-lg border px-3 py-2"
                 />
-              )}
+}
 
               
 
