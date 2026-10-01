@@ -290,7 +290,7 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
         HE_60: Number(override.he_60_minutes || 0),
         HE_60_NOTURNO: Number(override.he_60_night_minutes || 0),
         HE_100: Number(override.he_100_minutes || 0),
-        HE_20: Number(override.he_20_minutes || 0),
+        ADICIONAL_NOTURNO: Number(override.he_20_minutes || 0),
         INTERJORNADA_50: Number(override.interjornada_minutes || 0),
         debit: Number(override.debit_minutes || 0),
       };
@@ -331,7 +331,7 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
     // O HE 60% + 20% só passa a compor o saldo a partir dela.
     const he60NightAffectsBalance = period.end_date >= "2026-08-20";
     const calculatedBalance = employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20"
-      ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.HE_20 - comp.debit + adjustment
+      ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.ADICIONAL_NOTURNO - comp.debit + adjustment
       : balanceOf(comp) + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
     const monthBalance = isGlecio && Object.prototype.hasOwnProperty.call(glecioManualBalances, period.end_date)
       ? glecioManualBalances[period.end_date] ?? calculatedBalance

@@ -313,6 +313,7 @@ function DashboardHome() {
             if (index < 0) return null;
 
             const monthly = balances[index];
+            if (!monthly) return null;
             const monthlyCredit = Number(monthly.monthBalance || 0);
             if (monthlyCredit <= 0) return null;
 
