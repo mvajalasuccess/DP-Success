@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -112,7 +112,7 @@ function AppShell({
   onToggleCollapsed: () => void;
   onToggleCompany: () => void;
   onToggleClosing: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const go = (key: ScreenKey) => onNavigate(key);
   const buttonClass = (key: ScreenKey) =>
