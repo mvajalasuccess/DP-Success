@@ -373,6 +373,12 @@ function DashboardHome() {
       setSavingNote(false);
       return;
     }
+    const { data: savedNote } = await supabase
+      .from("dashboard_competence_notes")
+      .select("note")
+      .eq("period_id", competence.id)
+      .maybeSingle();
+    setCompetenceNote(savedNote?.note ?? competenceNote);
     setNoteSaved(true);
     setSavingNote(false);
   }
@@ -415,7 +421,7 @@ function DashboardHome() {
                 <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5"/>{savingNote ? "Salvando..." : "Salvar"}</button>
               </div>
               <textarea value={competenceNote} onChange={e => { setCompetenceNote(e.target.value); setNoteSaved(false); }} placeholder={"Ex.:\n• Marcelo — pagar VT sábado 14/09\n• Mariana — almoço de domingo não pago\n• Conferir jantar dos funcionários do final de semana"} className="mt-4 min-h-48 w-full resize-y rounded-xl border bg-muted/20 p-3 text-sm leading-6 outline-none focus:border-primary" />
-              <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">A anotação fica vinculada à competência aberta do Dashboard.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
+              <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">A anotação fica vinculada à competência atual do Dashboard.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Anotação salva ✓</span>}</div>
             </Card>
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
