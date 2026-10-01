@@ -60,6 +60,28 @@ function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(true);
   const [closingOpen, setClosingOpen] = useState(true);
+  const [isConsulta, setIsConsulta] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) return;
+      const { data: profile } = await (supabase as any)
+        .from("profiles")
+        .select("role")
+        .eq("id", sessionData.session.user.id)
+        .maybeSingle();
+      if (active) setIsConsulta(profile?.role === "consulta");
+    })();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("role-consulta", isConsulta);
+    return () => document.body.classList.remove("role-consulta");
+  }, [isConsulta]);
+
   const Screen = screen === "dashboard" ? null : screenComponents[screen];
 
   return (
