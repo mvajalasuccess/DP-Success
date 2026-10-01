@@ -313,19 +313,9 @@ function DashboardHome() {
             if (index < 0) return null;
 
             const monthly = balances[index];
-            const competenceCredit = Number(monthly?.monthBalance || 0);
-            const previousAccumulated = index > 0
-              ? Number(balances[index - 1]?.accumulated || 0)
-              : 0;
-            const finalAccumulated = Number(monthly?.accumulated || 0);
-
-            // Regra do Dashboard:
-            // - banco anterior zero/positivo: considerar o crédito gerado na competência;
-            // - banco anterior negativo: considerar o saldo acumulado final após compensar o negativo;
-            // - se o resultado ficar negativo, não exibir.
-            const payableMinutes = previousAccumulated < 0
-              ? finalAccumulated
-              : competenceCredit;
+            // O saldo exibido é calculado na mesma camada central do Banco de Horas.
+            // O Dashboard apenas consome o resultado, sem duplicar a regra.
+            const payableMinutes = Number(monthly?.dashboardBalance || 0);
 
             return payableMinutes > 0
               ? { name: employee.full_name, minutes: payableMinutes }
