@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ComponentType } from "react";
-import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { Employees } from "@/screens/funcionarios";
@@ -145,6 +145,9 @@ function DashboardHome() {
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
+  const [competenceNote, setCompetenceNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(true);
   const [userEmail, setUserEmail] = useState("Usuário RH");
 
@@ -170,6 +173,17 @@ function DashboardHome() {
       ]);
 
       const allEmployees = emps.data ?? [];
+      if (comp.data?.[0]?.id) {
+        const { data: noteRow } = await db
+          .from("dashboard_competence_notes")
+          .select("note")
+          .eq("period_id", comp.data[0].id)
+          .maybeSingle();
+        setCompetenceNote(noteRow?.note ?? "");
+      } else {
+        setCompetenceNote("");
+      }
+      setNoteSaved(false);
       const competence = comp.data?.[0];
       const employees = competence
         ? allEmployees.filter((e: any) =>
@@ -339,6 +353,32 @@ function DashboardHome() {
     })();
   }, []);
 
+  async function saveCompetenceNote() {
+    setSavingNote(true);
+    setNoteSaved(false);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: competence } = await supabase
+      .from("time_periods")
+      .select("id")
+      .order("reference_year", { ascending: false })
+      .order("reference_month", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!competence?.id) {
+      setSavingNote(false);
+      return;
+    }
+    const { error } = await supabase
+      .from("dashboard_competence_notes")
+      .upsert({
+        period_id: competence.id,
+        note: competenceNote,
+        updated_by: sessionData.session?.user.id ?? null,
+      }, { onConflict: "period_id" });
+    if (!error) setNoteSaved(true);
+    setSavingNote(false);
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     window.location.href = "/login";
@@ -365,8 +405,20 @@ function DashboardHome() {
         <div className="mx-auto max-w-[1500px] px-6 py-7">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Visão geral da empresa</p><h1 className="mt-1 text-3xl font-bold">Dashboard</h1><p className="mt-1 text-sm text-muted-foreground">Acompanhe ponto, banco de horas, absenteísmo e indicadores.</p></div><div className="rounded-lg border bg-card px-4 py-2 text-xs font-medium">Competência: <strong>{metrics.period}</strong></div></div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{cards.map(([label, value, Icon]) => <Card key={label} className="p-4"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><p className="mt-4 text-xs text-muted-foreground">{label}</p><p className="mt-1 font-display text-2xl font-bold">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{metrics.employees === 0 ? "sem dados cadastrados" : "dados atuais"}</p></Card>)}</div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-1">
-            <Card className="p-5"><h2 className="font-display font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Crédito disponível no banco de horas nesta competência</p><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com crédito disponível nesta competência.</p>}</div></Card>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Card className="p-5">
+              <h2 className="font-display font-bold">Saldos positivos</h2>
+              <p className="text-xs text-muted-foreground">Crédito disponível no banco de horas nesta competência</p>
+              <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com crédito disponível nesta competência.</p>}</div>
+            </Card>
+            <Card className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div><h2 className="font-display font-bold">Anotações da competência</h2><p className="text-xs text-muted-foreground">Use este espaço para lembrar pagamentos ou pendências antes dos holerites.</p></div>
+                <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5"/>{savingNote ? "Salvando..." : "Salvar"}</button>
+              </div>
+              <textarea value={competenceNote} onChange={e => { setCompetenceNote(e.target.value); setNoteSaved(false); }} placeholder={"Ex.:\n• Marcelo — pagar VT sábado 14/09\n• Mariana — almoço de domingo não pago\n• Conferir jantar dos funcionários do final de semana"} className="mt-4 min-h-48 w-full resize-y rounded-xl border bg-muted/20 p-3 text-sm leading-6 outline-none focus:border-primary" />
+              <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">A anotação fica vinculada à competência aberta do Dashboard.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
+            </Card>
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Card className="p-5"><h2 className="font-display font-bold">Visão por departamento</h2><p className="text-xs text-muted-foreground">Dados reais de funcionários e horas extras</p><div className="mt-4 grid grid-cols-2 gap-3">{departments.map(d => <div key={d.name} className="rounded-xl border p-4"><p className="text-xs font-semibold">{d.name}</p><div className="mt-3 grid grid-cols-2 gap-2 text-[10px]"><span>{d.employees}<br /><em className="text-muted-foreground not-italic">func.</em></span><span>{fmt(d.minutes)}<br /><em className="text-muted-foreground not-italic">HE</em></span></div></div>)}{!departments.length && <p className="text-sm text-muted-foreground">Nenhum departamento com dados cadastrados.</p>}</div></Card>
