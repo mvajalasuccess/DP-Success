@@ -18,18 +18,19 @@ import { Relatorios } from "@/screens/relatorios";
 import { Parametros } from "@/screens/parametros";
 import { Tarefas } from "@/screens/tarefas";
 import { ImportacaoHistorico } from "@/screens/importacao-historico";
+import { ImportarCartaoPonto } from "@/screens/importar-cartao-ponto";
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployee } from "@/lib/dp-model";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
-type ScreenKey = "dashboard" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "importacao-historico";
+type ScreenKey = "dashboard" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "importacao-historico" | "importar-cartao-ponto";
 
 const screenComponents: Record<string, ComponentType> = {
   funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
-  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "importacao-historico": ImportacaoHistorico,
+  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto,
 };
 
 const companyNav: Array<[string, ScreenKey]> = [
@@ -46,7 +47,7 @@ const closingNav: Array<[string, ScreenKey]> = [
 const mainNav: Array<[string, ScreenKey]> = [
   ["Tarefas & Agenda", "tarefas"],
   ["Banco de Horas", "banco-horas"],
-  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"], ["Importar histórico", "importacao-historico"],
+  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"], ["Importar histórico", "importacao-historico"], ["Importar Cartão Ponto", "importar-cartao-ponto"],
 ];
 
 function fmt(minutes: number) {
