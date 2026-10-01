@@ -319,8 +319,17 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
       })
       .reduce((sum, a) => sum + (a.adjustment_direction === "debito" ? -Math.abs(Number(a.minutes) || 0) : Math.abs(Number(a.minutes) || 0)), 0);
 
-    const paymentMinutes = payments
-      .filter(p => p.period_id === period.id || (!p.period_id && inRange(p.entry_date, period)))
+    const periodPayments = payments.filter(
+      p => p.period_id === period.id || (!p.period_id && inRange(p.entry_date, period)),
+    );
+    const paymentMinutes = periodPayments.reduce(
+      (sum, p) => sum + Math.abs(Number(p.minutes) || 0),
+      0,
+    );
+    // Pagamentos identificados como horas anteriores liquidam o saldo acumulado
+    // de competências anteriores e não devem reduzir o crédito gerado na competência atual.
+    const currentCompetencePaymentMinutes = periodPayments
+      .filter(p => !/anterior/i.test(String(p.justification ?? "")))
       .reduce((sum, p) => sum + Math.abs(Number(p.minutes) || 0), 0);
 
     // HE 60% + 20% (noturno):
@@ -361,7 +370,9 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
     // - banco anterior zero/positivo: considera o saldo gerado na competência;
     // - banco anterior negativo: considera o acumulado final após compensação;
     // - saldo final negativo: não é positivo/pagável.
-    const dashboardBalance = previousAccumulated < 0 ? accumulated : monthBalance - paymentMinutes;
+    const dashboardBalance = previousAccumulated < 0
+      ? accumulated
+      : monthBalance - currentCompetencePaymentMinutes;
 
     return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes, dashboardBalance };
   });
