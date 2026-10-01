@@ -317,7 +317,7 @@ function DashboardHome() {
             // e não o crédito bruto gerado na competência.
             // Ex.: se foram geradas 10h de crédito, mas o saldo acumulado disponível
             // no banco é 05h, o Dashboard deve exibir somente 05h.
-            const bankBalance = Number(monthly.accumulated || 0);
+            const bankBalance = Number(monthly?.accumulated || 0);
 
             return bankBalance > 0
               ? { name: employee.full_name, minutes: bankBalance }
