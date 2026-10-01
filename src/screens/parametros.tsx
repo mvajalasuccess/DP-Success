@@ -60,7 +60,7 @@ export function Parametros(){
   async function addHoliday(){if(!holidayForm.date||!holidayForm.name)return;const {error:e}=await(supabase as any).from("holidays").insert({holiday_date:holidayForm.date,name:holidayForm.name,scope:holidayForm.scope,is_demo:false});if(e)setError(e.message);else{setHolidayForm({date:"",name:"",scope:"nacional"});await load()}}
   async function deleteHoliday(id:string){const {error:e}=await(supabase as any).from("holidays").delete().eq("id",id);if(e)setError(e.message);else await load()}
   async function updateProfile(id:string,patch:any){const {error:e}=await(supabase as any).from("profiles").update(patch).eq("id",id);if(e)setError(e.message);else{setSaved("Usuário atualizado.");setTimeout(()=>setSaved(""),1800);await load()}}
-  const isAdmin = currentProfile?.role === "administrador";
+  const isAdmin = currentProfile?.role === "administrador" || currentProfile?.role === "rh";
   return <div className="min-h-screen bg-background">
     <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1180px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4"/>Voltar</a><b>DP Success · Configurações</b></div></header>
     <main className="mx-auto max-w-[1180px] px-6 py-7 space-y-6">
@@ -78,7 +78,7 @@ export function Parametros(){
         <div className="divide-y">{holidays.map(h=><div key={h.id} className="flex items-center justify-between p-4"><div><b className="text-sm">{h.name}</b><p className="text-xs text-muted-foreground">{brDate(h.holiday_date)} · {h.scope}</p></div><button onClick={()=>void deleteHoliday(h.id)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir"><Trash2 className="h-4 w-4"/></button></div>)}</div>
       </Card>
       <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Administrador e RH têm acesso total. Consulta pode apenas visualizar.</p></div></div>
-        {!isAdmin && <div className="m-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Seu usuário ainda não é Administrador. Você pode visualizar os cadastros, mas a edição de acessos ficará disponível depois que seu perfil receber esse papel.</div>}
+        {!isAdmin && <div className="m-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Seu usuário é Consulta. O acesso deste perfil é somente para visualização.</div>}
         <div className="divide-y">{profiles.map(p=><div key={p.id} className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div><p className="text-sm font-medium">{p.full_name||"Usuário"}</p><p className="text-xs text-muted-foreground">{p.email}</p></div>
