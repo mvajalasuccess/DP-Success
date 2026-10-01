@@ -216,7 +216,25 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       const debitMinutes = (bankRows.data ?? [])
         .filter((x: any) => periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && x.kind === "debito")
         .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
-      const absenceMinutes = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0) * dailyMinutes(x.employee_id), 0) + certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0) * dailyMinutes(x.employee_id), 0) + declarationMinutes + debitMinutes;
+      // Absenteísmo segue exatamente a mesma regra da tela de KPIs:
+      // (faltas + débitos + abonos) / horas previstas.
+      // Atestados e declarações são exibidos separadamente e não entram no indicador.
+      const allowanceRows = (occ.data ?? []).filter((x: any) => {
+        const code = String(x.occurrence_types?.code ?? "").toLowerCase();
+        return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && code === "abono";
+      });
+      const allowanceMinutes = allowanceRows.reduce(
+        (sum: number, x: any) => sum + (String(x.unit ?? "dias").toLowerCase().startsWith("dia")
+          ? Number(x.quantity || 0) * dailyMinutes(x.employee_id)
+          : String(x.unit ?? "").toLowerCase().startsWith("hor")
+            ? Number(x.quantity || 0) * 60
+            : Number(x.quantity || 0)),
+        0,
+      );
+      const absenceMinutes =
+        absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0) * dailyMinutes(x.employee_id), 0)
+        + allowanceMinutes
+        + debitMinutes;
 
       const byEmployee = new Map<string, number>();
       currentOvertime.forEach((row: any) => {
