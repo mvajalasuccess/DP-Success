@@ -370,7 +370,12 @@ function DashboardHome() {
         note: competenceNote,
         updated_by: sessionData.session?.user.id ?? null,
       }, { onConflict: "period_id" });
-    if (!error) setNoteSaved(true);
+    if (error) {
+      window.alert("Não foi possível salvar a anotação: " + error.message);
+      setSavingNote(false);
+      return;
+    }
+    setNoteSaved(true);
     setSavingNote(false);
   }
 
