@@ -97,7 +97,6 @@ export function ImportarCartaoPonto() {
       let insertedCredits = 0;
       let insertedDebits = 0;
       let insertedSummary = 0;
-      let insertedCertificates = 0;
 
       for (const row of matches) {
         const groupPrefix = "pdf:" + document.fingerprint + ":" + row.page;
