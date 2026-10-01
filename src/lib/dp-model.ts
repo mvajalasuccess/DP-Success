@@ -361,7 +361,9 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
     // - banco anterior zero/positivo: considera o saldo gerado na competência;
     // - banco anterior negativo: considera o acumulado final após compensação;
     // - saldo final negativo: não é positivo/pagável.
-    const dashboardBalance = previousAccumulated < 0 ? accumulated : monthBalance;
+    const dashboardBalance = previousAccumulated < 0
+      ? accumulated
+      : monthBalance - paymentMinutes;
 
     return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes, dashboardBalance };
   });
