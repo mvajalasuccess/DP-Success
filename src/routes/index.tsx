@@ -155,7 +155,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       }
       setUserEmail(sessionData.session.user.email || "Usuário RH");
       const db = supabase;
-      const [emps, comp, overtimeRows, occ, cert, timeRows, bankRows, scheduleRows] = await Promise.all([
+      const [emps, comp, overtimeRows, occ, cert, timeRows, bankRows, scheduleRows, overrideRows] = await Promise.all([
         db.from("employees").select("id,full_name,department_id,work_schedule_id,hire_date,termination_date,status,departments(name)"),
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
         db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
@@ -164,6 +164,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         db.from("time_records").select("employee_id,period_id,expected_minutes,worked_minutes"),
         db.from("bank_hours").select("employee_id,period_id,minutes,kind"),
         db.from("work_schedules").select("id,weekly_minutes"),
+        db.from("point_closing_overrides").select("employee_id,period_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes"),
       ]);
 
       const allEmployees = emps.data ?? [];
@@ -203,18 +204,41 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
       });
       const certificateDays = certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0), 0);
       const currentTime = (timeRows.data ?? []).filter((x: any) => (!periodId || x.period_id === periodId) && activeEmployeeIds.has(x.employee_id));
+      const overrides = (overrideRows.data ?? []) as any[];
+      const overrideByEmployee = new Map<string, any>(
+        overrides
+          .filter((x: any) => !periodId || x.period_id === periodId)
+          .map((x: any) => [String(x.employee_id), x]),
+      );
+      const timeExpectedByEmployee = new Map<string, number>();
+      currentTime.forEach((x: any) => {
+        timeExpectedByEmployee.set(
+          String(x.employee_id),
+          (timeExpectedByEmployee.get(String(x.employee_id)) ?? 0) + Number(x.expected_minutes || 0),
+        );
+      });
+      // Mesma regra do KPI para competências atuais: usa o previsto do ponto
+      // quando informado; caso contrário, 08:48 por dia útil.
       const expectedMinutes = competence
         ? employees.reduce((sum: number, employee: any) => {
-            const weekly = employee.work_schedule_id ? (scheduleRows.data ?? []).find((s: any) => String(s.id) === String(employee.work_schedule_id))?.weekly_minutes : 0;
-            if (!weekly) return sum;
+            const override = overrideByEmployee.get(String(employee.id));
+            if (override) return sum + Number(override.expected_minutes || 0);
+            const recordedExpected = timeExpectedByEmployee.get(String(employee.id));
+            if (recordedExpected !== undefined) return sum + recordedExpected;
             const start = employee.hire_date && employee.hire_date > competence.start_date ? employee.hire_date : competence.start_date;
             const end = employee.termination_date && employee.termination_date < competence.end_date ? employee.termination_date : competence.end_date;
             if (end < start) return sum;
-            return sum + Math.round(countWorkingWeekdays(start, end) * (Number(weekly) / 5));
+            return sum + Math.round(countWorkingWeekdays(start, end) * 528);
           }, 0)
         : currentTime.reduce((sum: number, x: any) => sum + Number(x.expected_minutes || 0), 0);
       const debitMinutes = (bankRows.data ?? [])
-        .filter((x: any) => periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && x.kind === "debito")
+        .filter((x: any) =>
+          periodId &&
+          x.period_id === periodId &&
+          activeEmployeeIds.has(x.employee_id) &&
+          x.kind === "debito" &&
+          !overrideByEmployee.has(String(x.employee_id))
+        )
         .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
       // Absenteísmo segue exatamente a mesma regra da tela de KPIs:
       // (faltas + débitos + abonos) / horas previstas.
@@ -231,10 +255,19 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
             : Number(x.quantity || 0)),
         0,
       );
-      const absenceMinutes =
-        absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0) * dailyMinutes(x.employee_id), 0)
+      let absenceMinutes =
+        absenceRows
+          .filter((x: any) => !overrideByEmployee.has(String(x.employee_id)))
+          .reduce((sum: number, x: any) => sum + Number(x.quantity || 0) * dailyMinutes(x.employee_id), 0)
         + allowanceMinutes
         + debitMinutes;
+      for (const override of overrides) {
+        if (!periodId || override.period_id !== periodId || !activeEmployeeIds.has(override.employee_id)) continue;
+        absenceMinutes +=
+          Math.round(Number(override.absence_quantity || 0) * 528)
+          + Number(override.allowance_minutes || 0)
+          + Number(override.debit_minutes || 0);
+      }
 
       const byEmployee = new Map<string, number>();
       currentOvertime.forEach((row: any) => {
