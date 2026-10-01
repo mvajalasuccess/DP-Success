@@ -142,7 +142,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
   const [top, setTop] = useState<Array<{ name: string; minutes: number }>>([]);
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
-  const [alerts, setAlerts] = useState<string[]>([]);
+  const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
   const [companyOpen, setCompanyOpen] = useState(true);
   const [userEmail, setUserEmail] = useState("Usuário RH");
 
@@ -162,7 +162,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_date,end_date,period_id,occurrence_types(code)").order("occurrence_date", { ascending: false }),
         db.from("medical_certificates").select("id,employee_id,start_date,end_date,days"),
         db.from("time_records").select("employee_id,period_id,expected_minutes,worked_minutes"),
-        db.from("bank_hours").select("employee_id,period_id,minutes,kind"),
+        db.from("bank_hours").select("employee_id,period_id,minutes,kind,adjustment_direction"),
         db.from("work_schedules").select("id,weekly_minutes"),
         db.from("point_closing_overrides").select("employee_id,period_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes"),
       ]);
@@ -287,6 +287,63 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
         if (deptMap.has(name)) deptMap.get(name)!.minutes += x.minutes || 0;
       });
       setDepartments([...deptMap.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 6));
+      const positiveByEmployee = new Map<string, number>();
+      const currentOverrides = new Map(
+        overrides
+          .filter((x: any) => periodId && x.period_id === periodId)
+          .map((x: any) => [String(x.employee_id), x]),
+      );
+      employees.forEach((employee: any) => {
+        const override = currentOverrides.get(String(employee.id));
+        if (override) {
+          const balance =
+            Number(override.he_60_minutes || 0) +
+            Number(override.he_60_night_minutes || 0) +
+            Number(override.he_100_minutes || 0) +
+            Number(override.he_20_minutes || 0) -
+            Number(override.debit_minutes || 0);
+          if (balance > 0) positiveByEmployee.set(employee.id, balance);
+          return;
+        }
+        const credits = overtimeData.filter(
+          (x: any) => periodId && x.period_id === periodId && x.employee_id === employee.id,
+        );
+        const debits = (bankRows.data ?? []).filter(
+          (x: any) => periodId && x.period_id === periodId && x.employee_id === employee.id && x.kind === "debito",
+        );
+        const adjustments = (bankRows.data ?? []).filter(
+          (x: any) => periodId && x.period_id === periodId && x.employee_id === employee.id && x.kind === "ajuste",
+        );
+        const regularCredits = credits
+          .filter((x: any) => x.launch_type !== "HE_60_NOTURNO")
+          .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
+        const nightCredits = credits
+          .filter((x: any) => x.launch_type === "HE_60_NOTURNO")
+          .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
+        const debit = debits.reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
+        const adjustment = adjustments.reduce(
+          (sum: number, x: any) =>
+            sum + (x.adjustment_direction === "debito"
+              ? -Math.abs(Number(x.minutes || 0))
+              : Math.abs(Number(x.minutes || 0))),
+          0,
+        );
+        const balance =
+          regularCredits +
+          (competence && competence.end_date >= "2026-08-20" ? nightCredits : 0) -
+          debit +
+          adjustment;
+        if (balance > 0) positiveByEmployee.set(employee.id, balance);
+      });
+      setPositiveBalances(
+        employees
+          .map((employee: any) => ({
+            name: employee.full_name,
+            minutes: positiveByEmployee.get(employee.id) || 0,
+          }))
+          .filter(x => x.minutes > 0)
+          .sort((a, b) => b.minutes - a.minutes),
+      );
       const periodLabel = competence
         ? `Competência ${String(competence.reference_month).padStart(2, "0")}/${competence.reference_year}`
         : "Nenhuma competência";
@@ -300,7 +357,6 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
           : 0,
         period: periodLabel,
       });
-      setAlerts(competence && competence.status !== "fechado" ? ["Competência não fechada"] : []);
     })();
   }, []);
 
@@ -332,11 +388,11 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{cards.map(([label, value, Icon]) => <Card key={label} className="p-4"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><p className="mt-4 text-xs text-muted-foreground">{label}</p><p className="mt-1 font-display text-2xl font-bold">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{metrics.employees === 0 ? "sem dados cadastrados" : "dados atuais"}</p></Card>)}</div>
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2 p-5"><h2 className="font-display font-bold">Funcionários com mais horas extras</h2><p className="text-xs text-muted-foreground">Dados reais dos lançamentos registrados</p><div className="mt-4 divide-y">{top.map((r, i) => <div key={r.name} className="flex items-center justify-between py-3 text-xs"><span className="w-6 text-muted-foreground">{i + 1}</span><span className="flex-1 font-medium">{r.name}</span><span className="w-24 text-right font-semibold">{fmt(r.minutes)}</span></div>)}{!top.length && <p className="py-6 text-sm text-muted-foreground">Nenhum dado de horas extras registrado.</p>}</div></Card>
-            <Card className="p-5"><h2 className="font-display font-bold">Alertas</h2><p className="text-xs text-muted-foreground">Pontos que merecem atenção</p><div className="mt-4 space-y-3">{alerts.length ? alerts.map(x => <div key={x} className="flex gap-3 rounded-lg border p-3"><AlertTriangle className="mt-0.5 h-4 w-4 text-warning" /><p className="text-xs font-semibold">{x}</p></div>) : <p className="py-6 text-sm text-muted-foreground">Nenhum alerta no momento.</p>}</div></Card>
+            <Card className="p-5"><h2 className="font-display font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Funcionários com saldo positivo nesta competência</p><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com saldo positivo nesta competência.</p>}</div></Card>
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Card className="p-5"><h2 className="font-display font-bold">Visão por departamento</h2><p className="text-xs text-muted-foreground">Dados reais de funcionários e horas extras</p><div className="mt-4 grid grid-cols-2 gap-3">{departments.map(d => <div key={d.name} className="rounded-xl border p-4"><p className="text-xs font-semibold">{d.name}</p><div className="mt-3 grid grid-cols-2 gap-2 text-[10px]"><span>{d.employees}<br /><em className="text-muted-foreground not-italic">func.</em></span><span>{fmt(d.minutes)}<br /><em className="text-muted-foreground not-italic">HE</em></span></div></div>)}{!departments.length && <p className="text-sm text-muted-foreground">Nenhum departamento com dados cadastrados.</p>}</div></Card>
-            <Card className="p-5"><h2 className="font-display font-bold">Próximas ações</h2><div className="mt-4 grid gap-2"><button type="button" onClick={() => onNavigate("fechamento-ponto")} className="rounded-lg border p-3 text-left text-sm hover:bg-muted">Conferir fechamento de ponto</button><button type="button" onClick={() => onNavigate("lancamentos")} className="rounded-lg border p-3 text-left text-sm hover:bg-muted">Registrar lançamento</button><button type="button" onClick={() => onNavigate("kpis")} className="rounded-lg border p-3 text-left text-sm hover:bg-muted">Analisar KPIs</button><button type="button" onClick={() => onNavigate("relatorios")} className="rounded-lg border p-3 text-left text-sm hover:bg-muted">Gerar relatório</button></div></Card>
+            <Card className="p-5"><h2 className="font-display font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Funcionários com saldo positivo nesta competência</p><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com saldo positivo nesta competência.</p>}</div></Card>
           </div>
         </div>
     </div>
