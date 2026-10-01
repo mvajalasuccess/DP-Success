@@ -225,6 +225,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          items: Json
           note: string
           period_id: string
           updated_at: string
@@ -233,6 +234,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          items?: Json
           note?: string
           period_id: string
           updated_at?: string
@@ -241,6 +243,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          items?: Json
           note?: string
           period_id?: string
           updated_at?: string
@@ -941,6 +944,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          permissions: Json
           role: string
           updated_at: string
         }
@@ -950,6 +954,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          permissions?: Json
           role?: string
           updated_at?: string
         }
@@ -959,6 +964,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          permissions?: Json
           role?: string
           updated_at?: string
         }
@@ -1415,6 +1421,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_profile_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_profile_manager: { Args: { _user_id: string }; Returns: boolean }
       is_rh_user: { Args: never; Returns: boolean }
     }
     Enums: {

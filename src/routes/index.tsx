@@ -182,7 +182,7 @@ function DashboardHome() {
           .eq("period_id", comp.data[0].id)
           .maybeSingle();
         setCompetenceNote(noteRow?.note ?? "");
-        setNoteItems(Array.isArray(noteRow?.items) ? noteRow.items : []);
+        setNoteItems(Array.isArray(noteRow?.items) ? (noteRow.items as unknown as { id: string; text: string; done: boolean }[]) : []);
       } else {
         setCompetenceNote("");
         setNoteItems([]);
