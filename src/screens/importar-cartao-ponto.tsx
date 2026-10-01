@@ -75,7 +75,15 @@ export function ImportarCartaoPonto() {
     }));
   }, [document, employees, periods]);
 
-  const totals = useMemo(() => matches.reduce((acc, row) => {,    acc.creditMinutes += row.creditMinutes;,    acc.debitMinutes += row.debitMinutes;,    acc.monthBalanceMinutes += row.monthBalanceMinutes;,    acc.interjornada += row.interjornadaMinutes;,    acc.additionalNight += row.additionalNightMinutes;,    return acc;,  }, { creditMinutes: 0, debitMinutes: 0, monthBalanceMinutes: 0, interjornada: 0, additionalNight: 0 }), [matches]);,  const unmatched = matches.filter(m => !m.employeeId || !m.period);
+  const totals = useMemo(() => matches.reduce((acc, row) => {
+    acc.creditMinutes += row.creditMinutes;
+    acc.debitMinutes += row.debitMinutes;
+    acc.monthBalanceMinutes += row.monthBalanceMinutes;
+    acc.interjornada += row.interjornadaMinutes;
+    acc.additionalNight += row.additionalNightMinutes;
+    return acc;
+  }, { creditMinutes: 0, debitMinutes: 0, monthBalanceMinutes: 0, interjornada: 0, additionalNight: 0 }), [matches]);
+  const unmatched = matches.filter(m => !m.employeeId || !m.period);
 
   async function importRows() {
     if (!document) return;
@@ -140,7 +148,7 @@ export function ImportarCartaoPonto() {
         }
       }
 
-      setMessage(`Importação concluída: ${formatCount(insertedCredits)} créditos, ${formatCount(insertedDebits)} débitos, ${formatCount(insertedSummary)} lançamentos de resumo e ${formatCount(insertedCertificates)} atestado(s).`);
+      setMessage(`Importação concluída: ${formatCount(insertedCredits)} créditos, ${formatCount(insertedDebits)} débitos e ${formatCount(insertedSummary)} lançamentos de resumo.`);
     } catch (e) {
       setError((e as Error).message || "Não foi possível concluir a importação.");
     } finally {
