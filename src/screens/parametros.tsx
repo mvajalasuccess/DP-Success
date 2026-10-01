@@ -5,6 +5,26 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Setting = { id:string; setting_group:string; setting_key:string; setting_value:string; label:string; description:string|null };
 type Holiday = { id:string; holiday_date:string; name:string; scope:string; is_demo:boolean };
+const ACCESS_OPTIONS = [
+  ["dashboard","Dashboard"],
+  ["funcionarios","Funcionários"],
+  ["empresa","Empresa"],
+  ["fechamento","Fechamento de Ponto"],
+  ["lancamentos","Lançamentos"],
+  ["atestados","Atestados"],
+  ["ocorrencias","Faltas e Ocorrências"],
+  ["banco_horas","Banco de Horas"],
+  ["relatorios","Relatórios"],
+  ["comparativos","Comparativos"],
+  ["kpis","KPIs"],
+  ["configuracoes","Configurações"],
+  ["importar","Importar histórico"],
+  ["tarefas","Tarefas & Agenda"],
+] as const;
+type AccessKey = typeof ACCESS_OPTIONS[number][0];
+const DEFAULT_PERMISSIONS: Record<AccessKey, {view:boolean; edit:boolean}> = Object.fromEntries(
+  ACCESS_OPTIONS.map(([key]) => [key, { view: true, edit: true }]),
+) as Record<AccessKey, {view:boolean; edit:boolean}>;
 const groups = [
   { key:"ponto", title:"Regras de ponto", icon:Clock3, keys:["daily_minutes","weekly_minutes","closing_day","competence_start_day","late_tolerance_minutes","overtime_tolerance_minutes"] },
   { key:"he", title:"Horas extras", icon:DollarSign, keys:["he_60_rate","he_60_night_rate","he_100_rate","he_100_night_rate","night_rate","he_60_night_balance_from"] },
@@ -13,18 +33,20 @@ const groups = [
 function brDate(v:string){ const parts=v.slice(0,10).split("-"); return parts[2]+"/"+parts[1]+"/"+parts[0]; }
 
 export function Parametros(){
-  const [settings,setSettings]=useState<Setting[]>([]),[company,setCompany]=useState<any>({}),[holidays,setHolidays]=useState<Holiday[]>([]),[profiles,setProfiles]=useState<any[]>([]),[error,setError]=useState(""),[saved,setSaved]=useState(""),[holidayForm,setHolidayForm]=useState({date:"",name:"",scope:"nacional"});
+  const [settings,setSettings]=useState<Setting[]>([]),[company,setCompany]=useState<any>({}),[holidays,setHolidays]=useState<Holiday[]>([]),[profiles,setProfiles]=useState<any[]>([]),[currentProfile,setCurrentProfile]=useState<any>(null),[error,setError]=useState(""),[saved,setSaved]=useState(""),[holidayForm,setHolidayForm]=useState({date:"",name:"",scope:"nacional"});
   async function load(){
     setError("");
+    const { data: sessionData } = await supabase.auth.getSession();
     const [s,c,h,p]=await Promise.all([
       (supabase as any).from("system_settings").select("id,setting_group,setting_key,setting_value,label,description").order("setting_group").order("label"),
       (supabase as any).from("company_settings").select("*").limit(1).maybeSingle(),
       (supabase as any).from("holidays").select("id,holiday_date,name,scope,is_demo").order("holiday_date"),
-      (supabase as any).from("profiles").select("id,email,full_name,role,active").order("full_name"),
+      (supabase as any).from("profiles").select("id,email,full_name,role,active,permissions").order("full_name"),
     ]);
     const firstError=[s,c,h,p].find(x=>x.error)?.error;
     if(firstError)setError(firstError.message);
     setSettings(s.data??[]);setCompany(c.data??{});setHolidays(h.data??[]);setProfiles(p.data??[]);
+    setCurrentProfile((p.data ?? []).find((x:any) => x.id === sessionData.session?.user.id) ?? null);
   }
   useEffect(()=>{void load()},[]);
   const settingMap=useMemo(()=>new Map(settings.map(x=>[x.setting_key,x])),[settings]);
@@ -37,7 +59,24 @@ export function Parametros(){
   }
   async function addHoliday(){if(!holidayForm.date||!holidayForm.name)return;const {error:e}=await(supabase as any).from("holidays").insert({holiday_date:holidayForm.date,name:holidayForm.name,scope:holidayForm.scope,is_demo:false});if(e)setError(e.message);else{setHolidayForm({date:"",name:"",scope:"nacional"});await load()}}
   async function deleteHoliday(id:string){const {error:e}=await(supabase as any).from("holidays").delete().eq("id",id);if(e)setError(e.message);else await load()}
-  async function updateProfile(id:string,patch:any){const {error:e}=await(supabase as any).from("profiles").update(patch).eq("id",id);if(e)setError(e.message);else await load()}
+  async function updateProfile(id:string,patch:any){const {error:e}=await(supabase as any).from("profiles").update(patch).eq("id",id);if(e)setError(e.message);else{setSaved("Usuário atualizado.");setTimeout(()=>setSaved(""),1800);await load()}}
+  const isAdmin = currentProfile?.role === "administrador";
+  function permissionsFor(p:any){
+    const raw = p.permissions && typeof p.permissions === "object" ? p.permissions : {};
+    return ACCESS_OPTIONS.reduce((acc,[key]) => {
+      acc[key] = { view: raw[key]?.view !== false, edit: raw[key]?.edit === true };
+      return acc;
+    }, {} as Record<AccessKey,{view:boolean;edit:boolean}>);
+  }
+  function setPermission(p:any,key:AccessKey,type:"view"|"edit",value:boolean){
+    const next = permissionsFor(p);
+    next[key] = { ...next[key], [type]: value, ...(type === "view" && !value ? {edit:false} : {}) };
+    setProfiles(old => old.map(x => x.id === p.id ? { ...x, permissions: next } : x));
+  }
+  async function savePermissions(p:any){
+    const {error:e}=await(supabase as any).from("profiles").update({permissions:permissionsFor(p)}).eq("id",p.id);
+    if(e)setError(e.message);else{setSaved("Permissões salvas.");setTimeout(()=>setSaved(""),1800);await load()}
+  }
 
   return <div className="min-h-screen bg-background">
     <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1180px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4"/>Voltar</a><b>DP Success · Configurações</b></div></header>
@@ -55,8 +94,22 @@ export function Parametros(){
         <div className="grid gap-3 p-5 md:grid-cols-[180px_1fr_180px_auto]"><input type="date" value={holidayForm.date} onChange={e=>setHolidayForm({...holidayForm,date:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><input placeholder="Nome do feriado" value={holidayForm.name} onChange={e=>setHolidayForm({...holidayForm,name:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><select value={holidayForm.scope} onChange={e=>setHolidayForm({...holidayForm,scope:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="nacional">Nacional</option><option value="estadual">Estadual</option><option value="municipal">Municipal</option></select><button onClick={()=>void addHoliday()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Adicionar</button></div>
         <div className="divide-y">{holidays.map(h=><div key={h.id} className="flex items-center justify-between p-4"><div><b className="text-sm">{h.name}</b><p className="text-xs text-muted-foreground">{brDate(h.holiday_date)} · {h.scope}</p></div><button onClick={()=>void deleteHoliday(h.id)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir"><Trash2 className="h-4 w-4"/></button></div>)}</div>
       </Card>
-      <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Controle o perfil e o acesso dos usuários cadastrados.</p></div></div>
-        <div className="divide-y">{profiles.map(p=><div key={p.id} className="grid items-center gap-4 p-5 md:grid-cols-[1fr_160px_120px]"><div><p className="text-sm font-medium">{p.full_name||"Usuário"}</p><p className="text-xs text-muted-foreground">{p.email}</p></div><select value={p.role||"rh"} onChange={e=>void updateProfile(p.id,{role:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="rh">RH</option><option value="consulta">Consulta</option></select><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={p.active!==false} onChange={e=>void updateProfile(p.id,{active:e.target.checked})}/>Ativo</label></div>)}</div>
+      <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Cadastros já existentes no sistema. Administradores podem definir o perfil e os módulos que cada usuário pode visualizar e editar.</p></div></div>
+        {!isAdmin && <div className="m-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Seu usuário ainda não é Administrador. Você pode visualizar os cadastros, mas a edição de acessos ficará disponível depois que seu perfil receber esse papel.</div>}
+        <div className="divide-y">{profiles.map(p=>{const perms=permissionsFor(p);return <div key={p.id} className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div><p className="text-sm font-medium">{p.full_name||"Usuário"}</p><p className="text-xs text-muted-foreground">{p.email}</p></div>
+            <div className="flex items-center gap-2">
+              <select disabled={!isAdmin} value={p.role||"rh"} onChange={e=>void updateProfile(p.id,{role:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="rh">RH</option><option value="consulta">Consulta</option></select>
+              <label className="flex items-center gap-2 text-sm"><input disabled={!isAdmin} type="checkbox" checked={p.active!==false} onChange={e=>void updateProfile(p.id,{active:e.target.checked})}/>Ativo</label>
+              {isAdmin && <button onClick={()=>void savePermissions(p)} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Save className="h-4 w-4"/>Salvar acessos</button>}
+            </div>
+          </div>
+          <div className="mt-4 overflow-x-auto rounded-lg border">
+            <table className="w-full min-w-[720px] text-sm"><thead className="bg-muted/50"><tr><th className="px-3 py-2 text-left">Módulo</th><th className="px-3 py-2 text-center">Visualizar</th><th className="px-3 py-2 text-center">Editar</th></tr></thead>
+            <tbody>{ACCESS_OPTIONS.map(([key,label])=><tr key={key} className="border-t"><td className="px-3 py-2">{label}</td><td className="px-3 py-2 text-center"><input disabled={!isAdmin} type="checkbox" checked={perms[key].view} onChange={e=>setPermission(p,key,"view",e.target.checked)} /></td><td className="px-3 py-2 text-center"><input disabled={!isAdmin || !perms[key].view} type="checkbox" checked={perms[key].edit} onChange={e=>setPermission(p,key,"edit",e.target.checked)} /></td></tr>)}</tbody></table>
+          </div>
+        </div>})}</div>
       </Card>
       <Card className="p-5"><div className="flex items-start gap-3"><Settings2 className="mt-0.5 h-5 w-5 text-primary"/><div><h2 className="font-bold">Cadastros da empresa</h2><p className="text-sm text-muted-foreground">Cargos, departamentos e jornadas/escalas continuam nas telas próprias do menu Empresa.</p></div></div></Card>
     </main>
