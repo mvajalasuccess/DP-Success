@@ -221,6 +221,48 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboard_competence_notes: {
+        Row: {
+          created_at: string
+          id: string
+          note: string
+          period_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string
+          period_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string
+          period_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dashboard_competence_notes_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: true
+            referencedRelation: "time_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dashboard_competence_notes_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           active: boolean

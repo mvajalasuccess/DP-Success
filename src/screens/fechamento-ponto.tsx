@@ -481,7 +481,7 @@ export function PointClosing() {
               {loadingRows ? <div className="p-8 text-center text-muted-foreground">Carregando fechamento...</div> :
               historicalRows.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhum lançamento histórico encontrado nesta competência.</div> :
               <div className="overflow-x-auto"><table className="min-w-[1500px] w-full text-xs">
-                <thead className="bg-muted/50"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada",["Ação"]].map(h => <th key={h} className="whitespace-nowrap px-3 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
+                <thead className="bg-muted/50"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada","Ação"].map(h => <th key={h} className="whitespace-nowrap px-3 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
                 <tbody className="divide-y">{historicalRows.map(row => editingRow?.id === row.id ? (
                   <tr key={row.id} className="bg-primary/5">
                     <td className="whitespace-nowrap px-3 py-2 font-medium">{row.employee_name}</td>

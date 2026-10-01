@@ -290,7 +290,7 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
         HE_60: Number(override.he_60_minutes || 0),
         HE_60_NOTURNO: Number(override.he_60_night_minutes || 0),
         HE_100: Number(override.he_100_minutes || 0),
-        HE_20: Number(override.he_20_minutes || 0),
+        ADICIONAL_NOTURNO: Number(override.he_20_minutes || 0),
         INTERJORNADA_50: Number(override.interjornada_minutes || 0),
         debit: Number(override.debit_minutes || 0),
       };
@@ -331,7 +331,7 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
     // O HE 60% + 20% só passa a compor o saldo a partir dela.
     const he60NightAffectsBalance = period.end_date >= "2026-08-20";
     const calculatedBalance = employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20"
-      ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.HE_20 - comp.debit + adjustment
+      ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.ADICIONAL_NOTURNO - comp.debit + adjustment
       : balanceOf(comp) + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
     const monthBalance = isGlecio && Object.prototype.hasOwnProperty.call(glecioManualBalances, period.end_date)
       ? glecioManualBalances[period.end_date] ?? calculatedBalance
@@ -352,12 +352,22 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
             : isOrmindo && Object.prototype.hasOwnProperty.call(ormindoManualBalances, period.end_date)
               ? ormindoManualBalances[period.end_date] ?? calculatedBalance
               : calculatedBalance;
+    const previousAccumulated = accumulated;
     accumulated += monthBalance - paymentMinutes;
-    return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes };
+
+    // Saldo que o Dashboard deve exibir como positivo/pagável.
+    // Esta regra fica centralizada aqui para que o Dashboard nunca replique
+    // uma lógica diferente da usada pelo Banco de Horas:
+    // - banco anterior zero/positivo: considera o saldo gerado na competência;
+    // - banco anterior negativo: considera o acumulado final após compensação;
+    // - saldo final negativo: não é positivo/pagável.
+    const dashboardBalance = previousAccumulated < 0 ? accumulated : monthBalance;
+
+    return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes, dashboardBalance };
   });
 }
 
-export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number; adjustment: number; paymentMinutes: number };
+export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number; adjustment: number; paymentMinutes: number; dashboardBalance: number };
 
 /** Saldo por competência (ordem cronológica), com acumulado. Cada lançamento cai em uma única competência pelo intervalo de datas. */
 export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits: DebitRow[]): PeriodBalance[] {
@@ -366,8 +376,10 @@ export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits
   return ordered.map(p => {
     const comp = composeMinutes(credits.filter(r => inRange(r.reference_date, p)), debits.filter(r => inRange(r.entry_date, p)));
     const monthBalance = balanceOf(comp);
+    const previousAccumulated = acc;
     acc += monthBalance;
-    return { period: p, composition: comp, monthBalance, accumulated: acc, adjustment: 0, paymentMinutes: 0 };
+    const dashboardBalance = previousAccumulated < 0 ? acc : monthBalance;
+    return { period: p, composition: comp, monthBalance, accumulated: acc, adjustment: 0, paymentMinutes: 0, dashboardBalance };
   });
 }
 
