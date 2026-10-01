@@ -143,7 +143,6 @@ function AppShell({
 
 function DashboardHome() {
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
-  const [top, setTop] = useState<Array<{ name: string; minutes: number }>>([]);
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
   const [companyOpen, setCompanyOpen] = useState(true);
@@ -276,7 +275,6 @@ function DashboardHome() {
       currentOvertime.forEach((row: any) => {
         byEmployee.set(row.employee_id, (byEmployee.get(row.employee_id) || 0) + (row.minutes || 0));
       });
-      setTop(employees.map((x: any) => ({ name: x.full_name, minutes: byEmployee.get(x.id) || 0 })).filter(x => x.minutes > 0).sort((a, b) => b.minutes - a.minutes).slice(0, 5));
       const deptMap = new Map<string, { name: string; employees: number; minutes: number }>();
       employees.forEach((x: any) => {
         const name = x.departments?.name || "Sem departamento";
@@ -297,9 +295,24 @@ function DashboardHome() {
         employees.map(async (employee: any) => {
           try {
             const balances = await balancesByEmployee(employee.id);
-            const monthly = balances.find((item: any) => item.period.id === targetPeriodId);
-            const minutes = Number(monthly?.monthBalance || 0);
-            return minutes > 0 ? { name: employee.full_name, minutes } : null;
+            const index = balances.findIndex((item: any) => item.period.id === targetPeriodId);
+            if (index < 0) return null;
+
+            const monthly = balances[index];
+            const monthlyCredit = Number(monthly.monthBalance || 0);
+            if (monthlyCredit <= 0) return null;
+
+            // Para identificar o que realmente pode ser pago, a lista usa:
+            // - o crédito da competência quando o banco já estava zerado/positivo;
+            // - o saldo acumulado do banco quando o funcionário vinha negativo.
+            // Ex.: -05:00 anterior + 10:00 na competência = +05:00 disponível.
+            const previousAccumulated = index > 0 ? Number(balances[index - 1]?.accumulated || 0) : 0;
+            const bankBalance = Number(monthly.accumulated || 0);
+            const payableMinutes = previousAccumulated < 0 ? bankBalance : monthlyCredit;
+
+            return payableMinutes > 0
+              ? { name: employee.full_name, minutes: payableMinutes }
+              : null;
           } catch {
             return null;
           }
@@ -352,9 +365,8 @@ function DashboardHome() {
         <div className="mx-auto max-w-[1500px] px-6 py-7">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Visão geral da empresa</p><h1 className="mt-1 text-3xl font-bold">Dashboard</h1><p className="mt-1 text-sm text-muted-foreground">Acompanhe ponto, banco de horas, absenteísmo e indicadores.</p></div><div className="rounded-lg border bg-card px-4 py-2 text-xs font-medium">Competência: <strong>{metrics.period}</strong></div></div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{cards.map(([label, value, Icon]) => <Card key={label} className="p-4"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><p className="mt-4 text-xs text-muted-foreground">{label}</p><p className="mt-1 font-display text-2xl font-bold">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{metrics.employees === 0 ? "sem dados cadastrados" : "dados atuais"}</p></Card>)}</div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            <Card className="lg:col-span-2 p-5"><h2 className="font-display font-bold">Funcionários com mais horas extras</h2><p className="text-xs text-muted-foreground">Dados reais dos lançamentos registrados</p><div className="mt-4 divide-y">{top.map((r, i) => <div key={r.name} className="flex items-center justify-between py-3 text-xs"><span className="w-6 text-muted-foreground">{i + 1}</span><span className="flex-1 font-medium">{r.name}</span><span className="w-24 text-right font-semibold">{fmt(r.minutes)}</span></div>)}{!top.length && <p className="py-6 text-sm text-muted-foreground">Nenhum dado de horas extras registrado.</p>}</div></Card>
-            <Card className="p-5"><h2 className="font-display font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Funcionários com saldo positivo nesta competência</p><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com saldo positivo nesta competência.</p>}</div></Card>
+          <div className="mt-4 grid gap-4 lg:grid-cols-1">
+            <Card className="p-5"><h2 className="font-display font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Crédito disponível no banco de horas nesta competência</p><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com crédito disponível nesta competência.</p>}</div></Card>
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Card className="p-5"><h2 className="font-display font-bold">Visão por departamento</h2><p className="text-xs text-muted-foreground">Dados reais de funcionários e horas extras</p><div className="mt-4 grid grid-cols-2 gap-3">{departments.map(d => <div key={d.name} className="rounded-xl border p-4"><p className="text-xs font-semibold">{d.name}</p><div className="mt-3 grid grid-cols-2 gap-2 text-[10px]"><span>{d.employees}<br /><em className="text-muted-foreground not-italic">func.</em></span><span>{fmt(d.minutes)}<br /><em className="text-muted-foreground not-italic">HE</em></span></div></div>)}{!departments.length && <p className="text-sm text-muted-foreground">Nenhum departamento com dados cadastrados.</p>}</div></Card>
