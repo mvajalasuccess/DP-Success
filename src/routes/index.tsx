@@ -313,14 +313,22 @@ function DashboardHome() {
             if (index < 0) return null;
 
             const monthly = balances[index];
-            // O Dashboard deve mostrar o saldo realmente disponível no Banco de Horas,
-            // e não o crédito bruto gerado na competência.
-            // Ex.: se foram geradas 10h de crédito, mas o saldo acumulado disponível
-            // no banco é 05h, o Dashboard deve exibir somente 05h.
-            const bankBalance = Number(monthly?.accumulated || 0);
+            const competenceCredit = Number(monthly?.monthBalance || 0);
+            const previousAccumulated = index > 0
+              ? Number(balances[index - 1]?.accumulated || 0)
+              : 0;
+            const finalAccumulated = Number(monthly?.accumulated || 0);
 
-            return bankBalance > 0
-              ? { name: employee.full_name, minutes: bankBalance }
+            // Regra do Dashboard:
+            // - banco anterior zero/positivo: considerar o crédito gerado na competência;
+            // - banco anterior negativo: considerar o saldo acumulado final após compensar o negativo;
+            // - se o resultado ficar negativo, não exibir.
+            const payableMinutes = previousAccumulated < 0
+              ? finalAccumulated
+              : competenceCredit;
+
+            return payableMinutes > 0
+              ? { name: employee.full_name, minutes: payableMinutes }
               : null;
           } catch {
             return null;
