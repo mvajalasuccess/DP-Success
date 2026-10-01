@@ -352,12 +352,22 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
             : isOrmindo && Object.prototype.hasOwnProperty.call(ormindoManualBalances, period.end_date)
               ? ormindoManualBalances[period.end_date] ?? calculatedBalance
               : calculatedBalance;
+    const previousAccumulated = accumulated;
     accumulated += monthBalance - paymentMinutes;
-    return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes };
+
+    // Saldo que o Dashboard deve exibir como positivo/pagável.
+    // Esta regra fica centralizada aqui para que o Dashboard nunca replique
+    // uma lógica diferente da usada pelo Banco de Horas:
+    // - banco anterior zero/positivo: considera o saldo gerado na competência;
+    // - banco anterior negativo: considera o acumulado final após compensação;
+    // - saldo final negativo: não é positivo/pagável.
+    const dashboardBalance = previousAccumulated < 0 ? accumulated : monthBalance;
+
+    return { period, composition: comp, monthBalance, accumulated, adjustment, paymentMinutes, dashboardBalance };
   });
 }
 
-export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number; adjustment: number; paymentMinutes: number };
+export type PeriodBalance = { period: Period; composition: Composition; monthBalance: number; accumulated: number; adjustment: number; paymentMinutes: number; dashboardBalance: number };
 
 /** Saldo por competência (ordem cronológica), com acumulado. Cada lançamento cai em uma única competência pelo intervalo de datas. */
 export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits: DebitRow[]): PeriodBalance[] {
@@ -367,7 +377,10 @@ export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits
     const comp = composeMinutes(credits.filter(r => inRange(r.reference_date, p)), debits.filter(r => inRange(r.entry_date, p)));
     const monthBalance = balanceOf(comp);
     acc += monthBalance;
-    return { period: p, composition: comp, monthBalance, accumulated: acc, adjustment: 0, paymentMinutes: 0 };
+    const previousAccumulated = acc;
+    acc += monthBalance;
+    const dashboardBalance = previousAccumulated < 0 ? acc : monthBalance;
+    return { period: p, composition: comp, monthBalance, accumulated: acc, adjustment: 0, paymentMinutes: 0, dashboardBalance };
   });
 }
 
