@@ -22,7 +22,7 @@ export function Tarefas(){
   const[tasks,setTasks]=useState<Task[]>([]),[employees,setEmployees]=useState<Employee[]>([]),[profiles,setProfiles]=useState<Profile[]>([]);
   const[view,setView]=useState<"list"|"kanban"|"calendar">("list"),[status,setStatus]=useState("all"),[priority,setPriority]=useState("all"),[category,setCategory]=useState("all"),[search,setSearch]=useState("");
   const[modal,setModal]=useState(false),[editing,setEditing]=useState<Task|null>(null),[error,setError]=useState(""),[saving,setSaving]=useState(false);
-  const[form,setForm]=useState<any>({title:"",description:"",status:"todo",priority:"medium",due_date:"",due_time:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:"",checklist:""});
+  const[form,setForm]=useState<any>({title:"",description:"",status:"todo",priority:"medium",due_date:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:"",checklist:""});
 
   async function load(){
     const[t,e,p]=await Promise.all([
@@ -44,7 +44,7 @@ export function Tarefas(){
   function newTask(){setEditing(null);setForm({title:"",description:"",status:"todo",priority:"medium",due_date:"",due_time:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:"",checklist:""});setModal(true)}
   async function editTask(t:Task){
     const{data}=await(supabase as any).from("task_checklist_items").select("title").eq("task_id",t.id).order("position");
-    setEditing(t);setForm({title:t.title,description:t.description||"",status:t.status,priority:t.priority,due_date:t.due_date||"",due_time:t.due_time?.slice(0,5)||"",reminder_at:t.reminder_at?new Date(t.reminder_at).toISOString().slice(0,16):"",category:t.category,assignee_id:t.assignee_id||"",employee_id:t.employee_id||"",recurrence:t.recurrence,recurrence_until:t.recurrence_until||"",checklist:(data||[]).map((x:any)=>x.title).join("\n")});setModal(true);
+    setEditing(t);setForm({title:t.title,description:t.description||"",status:t.status,priority:t.priority,due_date:t.due_date||"",reminder_at:t.reminder_at?new Date(t.reminder_at).toISOString().slice(0,16):"",category:t.category,assignee_id:t.assignee_id||"",employee_id:t.employee_id||"",recurrence:t.recurrence,recurrence_until:t.recurrence_until||"",checklist:(data||[]).map((x:any)=>x.title).join("\n")});setModal(true);
   }
   async function save(){
     if(!form.title.trim())return;setSaving(true);setError("");
