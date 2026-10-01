@@ -376,7 +376,6 @@ export function balancesByPeriod(periods: Period[], credits: CreditRow[], debits
   return ordered.map(p => {
     const comp = composeMinutes(credits.filter(r => inRange(r.reference_date, p)), debits.filter(r => inRange(r.entry_date, p)));
     const monthBalance = balanceOf(comp);
-    acc += monthBalance;
     const previousAccumulated = acc;
     acc += monthBalance;
     const dashboardBalance = previousAccumulated < 0 ? acc : monthBalance;
