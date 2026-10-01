@@ -146,6 +146,8 @@ function DashboardHome() {
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
   const [competenceNote, setCompetenceNote] = useState("");
+  const [noteItems, setNoteItems] = useState<Array<{ id: string; text: string; done: boolean }>>([]);
+  const [newNoteItem, setNewNoteItem] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(true);
@@ -176,10 +178,11 @@ function DashboardHome() {
       if (comp.data?.[0]?.id) {
         const { data: noteRow } = await db
           .from("dashboard_competence_notes")
-          .select("note")
+          .select("note,items")
           .eq("period_id", comp.data[0].id)
           .maybeSingle();
         setCompetenceNote(noteRow?.note ?? "");
+        setNoteItems(Array.isArray(noteRow?.items) ? noteRow.items : []);
       } else {
         setCompetenceNote("");
       }
@@ -350,37 +353,25 @@ function DashboardHome() {
     setSavingNote(true);
     setNoteSaved(false);
     const { data: sessionData } = await supabase.auth.getSession();
-    const { data: competence } = await supabase
-      .from("time_periods")
-      .select("id")
-      .order("reference_year", { ascending: false })
-      .order("reference_month", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!competence?.id) {
-      setSavingNote(false);
-      return;
-    }
-    const { error } = await supabase
-      .from("dashboard_competence_notes")
-      .upsert({
-        period_id: competence.id,
-        note: competenceNote,
-        updated_by: sessionData.session?.user.id ?? null,
-      }, { onConflict: "period_id" });
-    if (error) {
-      window.alert("Não foi possível salvar a anotação: " + error.message);
-      setSavingNote(false);
-      return;
-    }
-    const { data: savedNote } = await supabase
-      .from("dashboard_competence_notes")
-      .select("note")
-      .eq("period_id", competence.id)
-      .maybeSingle();
-    setCompetenceNote(savedNote?.note ?? competenceNote);
+    const { data: competence } = await supabase.from("time_periods").select("id").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1).maybeSingle();
+    if (!competence?.id) { setSavingNote(false); return; }
+    const { error } = await supabase.from("dashboard_competence_notes").upsert({
+      period_id: competence.id,
+      note: competenceNote,
+      items: noteItems,
+      updated_by: sessionData.session?.user.id ?? null,
+    }, { onConflict: "period_id" });
+    if (error) { window.alert("Não foi possível salvar as pendências: " + error.message); setSavingNote(false); return; }
     setNoteSaved(true);
     setSavingNote(false);
+  }
+
+  function addNoteItem() {
+    const text = newNoteItem.trim();
+    if (!text) return;
+    setNoteItems(items => [...items, { id: crypto.randomUUID(), text, done: false }]);
+    setNewNoteItem("");
+    setNoteSaved(false);
   }
 
   async function signOut() {
@@ -414,6 +405,25 @@ function DashboardHome() {
               <h2 className="font-display font-bold">Saldos positivos</h2>
               <p className="text-xs text-muted-foreground">Crédito disponível no banco de horas nesta competência</p>
               <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com crédito disponível nesta competência.</p>}</div>
+            </Card>
+            <Card className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div><h2 className="font-display font-bold">Pendências da competência</h2><p className="text-xs text-muted-foreground">Adicione as pendências e marque cada uma conforme for resolvida.</p></div>
+                <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5"/>{savingNote ? "Salvando..." : "Salvar"}</button>
+              </div>
+              <div className="mt-4 space-y-2">
+                {noteItems.map(item => <div key={item.id} className="flex items-center gap-3 rounded-xl border bg-muted/20 p-3">
+                  <input type="checkbox" checked={item.done} onChange={e => { setNoteItems(items => items.map(x => x.id === item.id ? { ...x, done: e.target.checked } : x)); setNoteSaved(false); }} className="h-4 w-4" />
+                  <span className={item.done ? "flex-1 text-sm text-muted-foreground line-through" : "flex-1 text-sm"}>{item.text}</span>
+                  <button type="button" onClick={() => { setNoteItems(items => items.filter(x => x.id !== item.id)); setNoteSaved(false); }} className="text-xs text-muted-foreground hover:text-destructive">Excluir</button>
+                </div>)}
+                {!noteItems.length && <p className="rounded-xl border border-dashed p-5 text-center text-xs text-muted-foreground">Nenhuma pendência adicionada nesta competência.</p>}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <input value={newNoteItem} onChange={e => setNewNoteItem(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addNoteItem(); } }} placeholder="Digite uma pendência..." className="flex-1 rounded-xl border bg-muted/20 px-3 py-2 text-sm outline-none focus:border-primary" />
+                <button type="button" onClick={addNoteItem} className="rounded-xl border px-3 py-2 text-sm font-medium">Adicionar</button>
+              </div>
+              <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">As pendências ficam vinculadas à competência atual.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
             </Card>
             <Card className="p-5">
               <div className="flex items-start justify-between gap-3">
