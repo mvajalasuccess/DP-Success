@@ -182,6 +182,45 @@ export type Database = {
           },
         ]
       }
+      company_settings: {
+        Row: {
+          address: string
+          cnpj: string
+          company_name: string
+          email: string
+          id: string
+          logo_url: string | null
+          phone: string
+          primary_color: string | null
+          trade_name: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string
+          cnpj?: string
+          company_name?: string
+          email?: string
+          id?: string
+          logo_url?: string | null
+          phone?: string
+          primary_color?: string | null
+          trade_name?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          cnpj?: string
+          company_name?: string
+          email?: string
+          id?: string
+          logo_url?: string | null
+          phone?: string
+          primary_color?: string | null
+          trade_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       departments: {
         Row: {
           active: boolean
@@ -737,6 +776,84 @@ export type Database = {
           },
         ]
       }
+      point_closing_overrides: {
+        Row: {
+          absence_quantity: number
+          allowance_minutes: number
+          certificate_minutes: number
+          created_at: string
+          debit_minutes: number
+          declaration_minutes: number
+          employee_id: string
+          expected_minutes: number
+          he_100_minutes: number
+          he_20_minutes: number
+          he_60_minutes: number
+          he_60_night_minutes: number
+          id: string
+          interjornada_minutes: number
+          justification: string | null
+          period_id: string
+          updated_at: string
+          worked_minutes: number
+        }
+        Insert: {
+          absence_quantity?: number
+          allowance_minutes?: number
+          certificate_minutes?: number
+          created_at?: string
+          debit_minutes?: number
+          declaration_minutes?: number
+          employee_id: string
+          expected_minutes?: number
+          he_100_minutes?: number
+          he_20_minutes?: number
+          he_60_minutes?: number
+          he_60_night_minutes?: number
+          id?: string
+          interjornada_minutes?: number
+          justification?: string | null
+          period_id: string
+          updated_at?: string
+          worked_minutes?: number
+        }
+        Update: {
+          absence_quantity?: number
+          allowance_minutes?: number
+          certificate_minutes?: number
+          created_at?: string
+          debit_minutes?: number
+          declaration_minutes?: number
+          employee_id?: string
+          expected_minutes?: number
+          he_100_minutes?: number
+          he_20_minutes?: number
+          he_60_minutes?: number
+          he_60_night_minutes?: number
+          id?: string
+          interjornada_minutes?: number
+          justification?: string | null
+          period_id?: string
+          updated_at?: string
+          worked_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_closing_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_closing_overrides_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "time_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           active: boolean
@@ -777,27 +894,209 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active: boolean
           created_at: string
           email: string | null
           full_name: string | null
           id: string
+          role: string
           updated_at: string
         }
         Insert: {
+          active?: boolean
           created_at?: string
           email?: string | null
           full_name?: string | null
           id: string
+          role?: string
           updated_at?: string
         }
         Update: {
+          active?: boolean
           created_at?: string
           email?: string | null
           full_name?: string | null
           id?: string
+          role?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      system_settings: {
+        Row: {
+          description: string | null
+          id: string
+          label: string
+          setting_group: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          label?: string
+          setting_group: string
+          setting_key: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          label?: string
+          setting_group?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      task_checklist_items: {
+        Row: {
+          completed: boolean
+          created_at: string
+          id: string
+          position: number
+          task_id: string
+          title: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          position?: number
+          task_id: string
+          title: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          position?: number
+          task_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_checklist_items_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_reminders: {
+        Row: {
+          completed: boolean
+          created_at: string
+          id: string
+          reminder_at: string
+          task_id: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          reminder_at: string
+          task_id: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          id?: string
+          reminder_at?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_reminders_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assignee_id: string | null
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_date: string | null
+          due_time: string | null
+          employee_id: string | null
+          id: string
+          priority: string
+          recurrence: string
+          recurrence_until: string | null
+          reminder_at: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          due_time?: string | null
+          employee_id?: string | null
+          id?: string
+          priority?: string
+          recurrence?: string
+          recurrence_until?: string | null
+          reminder_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_date?: string | null
+          due_time?: string | null
+          employee_id?: string | null
+          id?: string
+          priority?: string
+          recurrence?: string
+          recurrence_until?: string | null
+          reminder_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       time_adjustments: {
         Row: {
@@ -1074,6 +1373,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_rh_user: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "administrador" | "rh" | "gestor" | "consulta"
