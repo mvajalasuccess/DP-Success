@@ -47,13 +47,16 @@ function hhmmToMinutes(value: string) {
 }
 
 function parsePage(text: string, page: number): PointImportEmployee | null {
-  const period = text.match(/Período de\s+(\d{2}\/\d{2}\/\d{4})\s+à\s+(\d{2}\/\d{2}\/\d{4})/i);
-  const employee = text.match(/Funcionário:\s*(?:\d+\s*-\s*)?([^\n\r]+)/i);
+  // PDF.js pode separar os campos do cabeçalho em vários itens de texto.
+  // Por isso, não dependemos de espaços/linhas exatos no PDF.
+  const period = text.match(/Per[ií]odo\s+de\s*(\d{2}\/\d{2}\/\d{4})\s*[àa]\s*(\d{2}\/\d{2}\/\d{4})/i);
+  const employee = text.match(/Funcion[aá]rio\s*:\s*(?:\d+\s*-\s*)?(.+?)(?=\s+Matr[ií]cula\s*:|\n|$)/i)
+    || text.match(/Funcion[aá]rio\s*:\s*(?:\d+\s*-\s*)?([^\n\r]+)/i);
   if (!period || !employee) return null;
 
-  const registration = text.match(/Matrícula:\s*([^\n\r]+)/i)?.[1]?.trim() || null;
-  const tableStart = text.indexOf("Observação");
-  const summaryStart = text.indexOf("Saldo Anterior:");
+  const registration = text.match(/Matr[ií]cula\s*:\s*([^\n\r]+)/i)?.[1]?.trim() || null;
+  const tableStart = text.search(/Observa[cç][aã]o/i);
+  const summaryStart = text.search(/Saldo Anterior\s*:/i);
   const table = text.slice(tableStart >= 0 ? tableStart : 0, summaryStart >= 0 ? summaryStart : text.length);
 
   const dateRegex = /(\d{2}\/\d{2}\/\d{2})/g;
@@ -112,7 +115,11 @@ export async function parsePointCardPdf(file: File): Promise<PointImportDocument
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
     const page = await pdf.getPage(pageNumber);
     const content = await page.getTextContent();
-    const text = content.items.map(item => ("str" in item ? item.str : "")).join("\n");
+    const text = content.items
+      .map(item => ("str" in item ? item.str : ""))
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
     const parsed = parsePage(text, pageNumber);
     if (parsed) employees.push(parsed);
   }
