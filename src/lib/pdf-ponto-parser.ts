@@ -18,8 +18,9 @@ export type PointImportEmployee = {
   periodStart: string;
   periodEnd: string;
   entries: PointImportEntry[];
-  atestados: string[];
-  afastamentos: string[];
+  creditMinutes: number;
+  debitMinutes: number;
+  monthBalanceMinutes: number;
   interjornadaMinutes: number;
   additionalNightMinutes: number;
 };
@@ -84,8 +85,18 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
     if (/Outros Afastamentos/i.test(segment)) afastamentos.push(date);
   }
 
-  const interjornada = text.match(/Interjornada\s+(\d{2,3}:\d{2})/i);
-  const adNot = text.match(/Ad\.Not\.\s*\n?\s*\d+\s+\n?\s*(\d{2,3}:\d{2})/i);
+  const summaryTime = (label: RegExp) => {
+    const match = text.match(new RegExp(label.source + "\\\\s+(?:[A-Za-zÀ-ÿ]+\\\\s+)?(\\\\d{2,3}:\\\\d{2})", "i"));
+    return match ? hhmmToMinutes(match[1]) : 0;
+  };
+
+  // O relatório traz os totais no resumo do funcionário. Esses são os valores
+  // usados na importação; os eventos diários ficam apenas como apoio de leitura.
+  const creditMinutes = summaryTime(/Cr[eé]dito/);
+  const debitMinutes = summaryTime(/D[eé]bito/);
+  const monthBalanceMinutes = summaryTime(/Saldo do M[eê]s/);
+  const interjornada = text.match(/Interjornada\\s+(\\d{2,3}:\\d{2})/i);
+  const adNot = text.match(/Ad\\.Not\\.\\s*(?:\\d+\\s+)?(\\d{2,3}:\\d{2})/i);
 
   return {
     page,
@@ -94,8 +105,9 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
     periodStart: toISODate(period[1]),
     periodEnd: toISODate(period[2]),
     entries,
-    atestados,
-    afastamentos,
+    creditMinutes,
+    debitMinutes,
+    monthBalanceMinutes,
     interjornadaMinutes: interjornada ? hhmmToMinutes(interjornada[1]) : 0,
     additionalNightMinutes: adNot ? hhmmToMinutes(adNot[1]) : 0,
   };
