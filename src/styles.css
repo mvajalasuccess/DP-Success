@@ -177,3 +177,19 @@ input:disabled,
 textarea:disabled {
   cursor: not-allowed;
 }
+
+
+/* Perfil Consulta: remove ações de criação, edição, exclusão e salvamento. */
+body.role-consulta button:has(svg.lucide-plus),
+body.role-consulta button:has(svg.lucide-pencil),
+body.role-consulta button:has(svg.lucide-trash-2),
+body.role-consulta button:has(svg.lucide-save),
+body.role-consulta button:has(svg.lucide-power) {
+  display: none !important;
+}
+
+/* Consulta também não deve conseguir acionar controles de alteração via teclado. */
+body.role-consulta input[type="submit"],
+body.role-consulta button[type="submit"] {
+  display: none !important;
+}
