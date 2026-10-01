@@ -174,12 +174,12 @@ function DashboardHome() {
 
       const allEmployees = emps.data ?? [];
       if (comp.data?.[0]?.id) {
-        const { data: noteRow } = await db
+        const { data: noteRow } = await (supabase as any)
           .from("dashboard_competence_notes")
           .select("note")
           .eq("period_id", comp.data[0].id)
           .maybeSingle();
-        setCompetenceNote(noteRow?.note ?? "");
+        setCompetenceNote(String(noteRow?.note ?? ""));
       } else {
         setCompetenceNote("");
       }
@@ -313,6 +313,7 @@ function DashboardHome() {
             if (index < 0) return null;
 
             const monthly = balances[index];
+            if (!monthly) return null;
             const monthlyCredit = Number(monthly.monthBalance || 0);
             if (monthlyCredit <= 0) return null;
 
@@ -368,7 +369,7 @@ function DashboardHome() {
       setSavingNote(false);
       return;
     }
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("dashboard_competence_notes")
       .upsert({
         period_id: competence.id,
