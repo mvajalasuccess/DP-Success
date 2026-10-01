@@ -1,5 +1,10 @@
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/legacy/build/pdf.worker.mjs",
+  import.meta.url,
+).toString();
+
 export type PointImportEntry = {
   date: string;
   minutes: number;
@@ -101,7 +106,7 @@ async function sha256(bytes: Uint8Array) {
 export async function parsePointCardPdf(file: File): Promise<PointImportDocument> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const fingerprint = await sha256(bytes);
-  const pdf = await pdfjsLib.getDocument({ data: bytes, disableWorker: true }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
   const employees: PointImportEmployee[] = [];
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
