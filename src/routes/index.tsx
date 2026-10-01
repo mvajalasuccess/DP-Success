@@ -70,7 +70,7 @@ function Dashboard() {
       onToggleCompany={() => setCompanyOpen(value => !value)}
       onToggleClosing={() => setClosingOpen(value => !value)}
     >
-      {Screen ? <Screen /> : <DashboardHome onNavigate={setScreen} />}
+      {Screen ? <Screen /> : <DashboardHome />}
     </AppShell>
   );
 }
@@ -138,7 +138,7 @@ function AppShell({
   );
 }
 
-function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void }) {
+function DashboardHome() {
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
   const [top, setTop] = useState<Array<{ name: string; minutes: number }>>([]);
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
@@ -392,7 +392,7 @@ function DashboardHome({ onNavigate }: { onNavigate: (screen: ScreenKey) => void
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Card className="p-5"><h2 className="font-display font-bold">Visão por departamento</h2><p className="text-xs text-muted-foreground">Dados reais de funcionários e horas extras</p><div className="mt-4 grid grid-cols-2 gap-3">{departments.map(d => <div key={d.name} className="rounded-xl border p-4"><p className="text-xs font-semibold">{d.name}</p><div className="mt-3 grid grid-cols-2 gap-2 text-[10px]"><span>{d.employees}<br /><em className="text-muted-foreground not-italic">func.</em></span><span>{fmt(d.minutes)}<br /><em className="text-muted-foreground not-italic">HE</em></span></div></div>)}{!departments.length && <p className="text-sm text-muted-foreground">Nenhum departamento com dados cadastrados.</p>}</div></Card>
-            <Card className="p-5"><h2 className="font-display font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Funcionários com saldo positivo nesta competência</p><div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com saldo positivo nesta competência.</p>}</div></Card>
+
           </div>
         </div>
     </div>
