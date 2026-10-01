@@ -86,7 +86,7 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
   }
 
   const summaryTime = (label: RegExp) => {
-    const match = text.match(new RegExp(label.source + "\\\\s+(?:[A-Za-zÀ-ÿ]+\\\\s+)?(\\\\d{2,3}:\\\\d{2})", "i"));
+    const match = text.match(new RegExp(label.source + "\\s+(?:[A-Za-zÀ-ÿ]+\\s+)?(\\d{2,3}:\\d{2})", "i"));
     return match ? hhmmToMinutes(match[1]) : 0;
   };
 
@@ -95,8 +95,8 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
   const creditMinutes = summaryTime(/Cr[eé]dito/);
   const debitMinutes = summaryTime(/D[eé]bito/);
   const monthBalanceMinutes = summaryTime(/Saldo do M[eê]s/);
-  const interjornada = text.match(/Interjornada\\s+(\\d{2,3}:\\d{2})/i);
-  const adNot = text.match(/Ad\\.Not\\.\\s*(?:\\d+\\s+)?(\\d{2,3}:\\d{2})/i);
+  const interjornada = text.match(/Interjornada\s+(\d{2,3}:\d{2})/i);
+  const adNot = text.match(/Ad\.Not\.\s*(?:\d+\s+)?(\d{2,3}:\d{2})/i);
 
   return {
     page,
