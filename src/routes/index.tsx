@@ -146,6 +146,8 @@ function DashboardHome() {
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
   const [competenceNote, setCompetenceNote] = useState("");
+  const [noteItems, setNoteItems] = useState<Array<{ id: string; text: string; done: boolean }>>([]);
+  const [newNoteItem, setNewNoteItem] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(true);
@@ -176,12 +178,14 @@ function DashboardHome() {
       if (comp.data?.[0]?.id) {
         const { data: noteRow } = await db
           .from("dashboard_competence_notes")
-          .select("note")
+          .select("note,items")
           .eq("period_id", comp.data[0].id)
           .maybeSingle();
         setCompetenceNote(noteRow?.note ?? "");
+        setNoteItems(Array.isArray(noteRow?.items) ? noteRow.items : []);
       } else {
         setCompetenceNote("");
+        setNoteItems([]);
       }
       setNoteSaved(false);
       const competence = comp.data?.[0];
@@ -366,15 +370,24 @@ function DashboardHome() {
       .upsert({
         period_id: competence.id,
         note: competenceNote,
+        items: noteItems,
         updated_by: sessionData.session?.user.id ?? null,
       }, { onConflict: "period_id" });
     if (error) {
-      window.alert("Não foi possível salvar a anotação: " + error.message);
+      window.alert("Não foi possível salvar as pendências: " + error.message);
       setSavingNote(false);
       return;
     }
     setNoteSaved(true);
     setSavingNote(false);
+  }
+
+  function addNoteItem() {
+    const text = newNoteItem.trim();
+    if (!text) return;
+    setNoteItems(items => [...items, { id: crypto.randomUUID(), text, done: false }]);
+    setNewNoteItem("");
+    setNoteSaved(false);
   }
 
   async function signOut() {
@@ -411,11 +424,22 @@ function DashboardHome() {
             </Card>
             <Card className="p-5">
               <div className="flex items-start justify-between gap-3">
-                <div><h2 className="font-display font-bold">Anotações da competência</h2><p className="text-xs text-muted-foreground">Use este espaço para lembrar pagamentos ou pendências antes dos holerites.</p></div>
+                <div><h2 className="font-display font-bold">Pendências da competência</h2><p className="text-xs text-muted-foreground">Organize aqui o que precisa ser resolvido nesta competência.</p></div>
                 <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5"/>{savingNote ? "Salvando..." : "Salvar"}</button>
               </div>
-              <textarea value={competenceNote} onChange={e => { setCompetenceNote(e.target.value); setNoteSaved(false); }} placeholder={"Ex.:\n• Marcelo — pagar VT sábado 14/09\n• Mariana — almoço de domingo não pago\n• Conferir jantar dos funcionários do final de semana"} className="mt-4 min-h-48 w-full resize-y rounded-xl border bg-muted/20 p-3 text-sm leading-6 outline-none focus:border-primary" />
-              <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">A anotação fica vinculada à competência aberta do Dashboard.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
+              <div className="mt-4 space-y-2">
+                {noteItems.map(item => <div key={item.id} className="flex items-center gap-3 rounded-xl border bg-muted/20 p-3">
+                  <input type="checkbox" checked={item.done} onChange={e => { setNoteItems(items => items.map(x => x.id === item.id ? { ...x, done: e.target.checked } : x)); setNoteSaved(false); }} className="h-4 w-4" />
+                  <span className={item.done ? "flex-1 text-sm text-muted-foreground line-through" : "flex-1 text-sm"}>{item.text}</span>
+                  <button type="button" onClick={() => { setNoteItems(items => items.filter(x => x.id !== item.id)); setNoteSaved(false); }} className="text-xs text-muted-foreground hover:text-destructive">Excluir</button>
+                </div>)}
+                {!noteItems.length && <p className="rounded-xl border border-dashed p-5 text-center text-xs text-muted-foreground">Nenhuma pendência adicionada.</p>}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <input value={newNoteItem} onChange={e => setNewNoteItem(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addNoteItem(); } }} placeholder="Digite uma pendência..." className="flex-1 rounded-xl border bg-muted/20 px-3 py-2 text-sm outline-none focus:border-primary" />
+                <button type="button" onClick={addNoteItem} className="rounded-xl border px-3 py-2 text-sm font-medium">Adicionar</button>
+              </div>
+              <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">As pendências ficam vinculadas à competência atual.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
             </Card>
           </div>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
