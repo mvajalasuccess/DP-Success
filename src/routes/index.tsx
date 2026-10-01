@@ -18,6 +18,7 @@ import { Relatorios } from "@/screens/relatorios";
 import { Parametros } from "@/screens/parametros";
 import { ImportacaoHistorico } from "@/screens/importacao-historico";
 import { countWorkingWeekdays } from "@/lib/feriados";
+import { balancesByEmployee } from "@/lib/dp-model";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
@@ -287,61 +288,24 @@ function DashboardHome() {
         if (deptMap.has(name)) deptMap.get(name)!.minutes += x.minutes || 0;
       });
       setDepartments([...deptMap.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 6));
-      const positiveByEmployee = new Map<string, number>();
-      const currentOverrides = new Map(
-        overrides
-          .filter((x: any) => periodId && x.period_id === periodId)
-          .map((x: any) => [String(x.employee_id), x]),
+      // Usa exatamente a mesma regra do Banco de Horas para o saldo mensal,
+      // incluindo históricos, correções, ajustes, pagamentos e exceções manuais.
+      const targetPeriodId = competence?.id ?? null;
+      const positiveResults = await Promise.all(
+        employees.map(async (employee: any) => {
+          try {
+            const balances = await balancesByEmployee(employee.id);
+            const monthly = balances.find((item: any) => item.period.id === targetPeriodId);
+            const minutes = Number(monthly?.monthBalance || 0);
+            return minutes > 0 ? { name: employee.full_name, minutes } : null;
+          } catch {
+            return null;
+          }
+        }),
       );
-      employees.forEach((employee: any) => {
-        const override = currentOverrides.get(String(employee.id));
-        if (override) {
-          const balance =
-            Number(override.he_60_minutes || 0) +
-            Number(override.he_60_night_minutes || 0) +
-            Number(override.he_100_minutes || 0) +
-            Number(override.he_20_minutes || 0) -
-            Number(override.debit_minutes || 0);
-          if (balance > 0) positiveByEmployee.set(employee.id, balance);
-          return;
-        }
-        const credits = overtimeData.filter(
-          (x: any) => periodId && x.period_id === periodId && x.employee_id === employee.id,
-        );
-        const debits = (bankRows.data ?? []).filter(
-          (x: any) => periodId && x.period_id === periodId && x.employee_id === employee.id && x.kind === "debito",
-        );
-        const adjustments = (bankRows.data ?? []).filter(
-          (x: any) => periodId && x.period_id === periodId && x.employee_id === employee.id && x.kind === "ajuste",
-        );
-        const regularCredits = credits
-          .filter((x: any) => x.launch_type !== "HE_60_NOTURNO")
-          .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
-        const nightCredits = credits
-          .filter((x: any) => x.launch_type === "HE_60_NOTURNO")
-          .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
-        const debit = debits.reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
-        const adjustment = adjustments.reduce(
-          (sum: number, x: any) =>
-            sum + (x.adjustment_direction === "debito"
-              ? -Math.abs(Number(x.minutes || 0))
-              : Math.abs(Number(x.minutes || 0))),
-          0,
-        );
-        const balance =
-          regularCredits +
-          (competence && competence.end_date >= "2026-08-20" ? nightCredits : 0) -
-          debit +
-          adjustment;
-        if (balance > 0) positiveByEmployee.set(employee.id, balance);
-      });
       setPositiveBalances(
-        employees
-          .map((employee: any) => ({
-            name: employee.full_name,
-            minutes: positiveByEmployee.get(employee.id) || 0,
-          }))
-          .filter(x => x.minutes > 0)
+        positiveResults
+          .filter((item): item is { name: string; minutes: number } => Boolean(item))
           .sort((a, b) => b.minutes - a.minutes),
       );
       const periodLabel = competence
