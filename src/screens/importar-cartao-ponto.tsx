@@ -147,7 +147,7 @@ export function ImportarCartaoPonto() {
           insertedDebits += debitRows.length;
         }
 
-        const summaryRows = [];
+        const summaryRows: Array<{ employee_id: string; reference_date: string; period_id: string; minutes: number; launch_type: "INTERJORNADA_50" | "ADICIONAL_NOTURNO"; rate_percent: number; launch_group_id: string; notes: string }> = [];
         if (row.interjornadaMinutes > 0) summaryRows.push({
           employee_id: row.employeeId, reference_date: row.period!.end_date, period_id: row.period!.id,
           minutes: row.interjornadaMinutes, launch_type: "INTERJORNADA_50", rate_percent: 50,
