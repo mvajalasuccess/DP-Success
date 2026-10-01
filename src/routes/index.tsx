@@ -174,6 +174,7 @@ function DashboardHome() {
   const [noteSaved, setNoteSaved] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(true);
   const [userEmail, setUserEmail] = useState("Usuário RH");
+  const [userRoleLabel, setUserRoleLabel] = useState("Usuário RH");
 
   useEffect(() => {
     void (async () => {
@@ -184,6 +185,12 @@ function DashboardHome() {
       }
       setUserEmail(sessionData.session.user.email || "Usuário RH");
       const db = supabase;
+      const { data: profile } = await (supabase as any)
+        .from("profiles")
+        .select("role")
+        .eq("id", sessionData.session.user.id)
+        .maybeSingle();
+      setUserRoleLabel(profile?.role === "consulta" ? "Consulta" : "Usuário RH");
       const [emps, comp, overtimeRows, occ, cert, timeRows, bankRows, scheduleRows, overrideRows] = await Promise.all([
         db.from("employees").select("id,full_name,department_id,work_schedule_id,hire_date,termination_date,status,departments(name)"),
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
@@ -431,7 +438,7 @@ function DashboardHome() {
           <span className="text-xs text-muted-foreground">RH / Visão geral</span>
           <div className="flex items-center gap-2 rounded-xl border bg-card px-2 py-1.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">RH</div>
-            <div className="hidden max-w-56 md:block"><p className="truncate text-xs font-medium">{userEmail}</p><p className="text-[10px] text-muted-foreground">Usuário RH</p></div>
+            <div className="hidden max-w-56 md:block"><p className="truncate text-xs font-medium">{userEmail}</p><p className="text-[10px] text-muted-foreground">{userRoleLabel}</p></div>
             <button type="button" onClick={() => void signOut()} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Sair"><LogOut className="h-4 w-4" /></button>
           </div>
         </header>
