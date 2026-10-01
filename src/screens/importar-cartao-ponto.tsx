@@ -75,18 +75,7 @@ export function ImportarCartaoPonto() {
     }));
   }, [document, employees, periods]);
 
-  const totals = useMemo(() => matches.reduce((acc, row) => {
-    acc.credits += row.entries.filter(e => e.kind === "credito").length;
-    acc.debits += row.entries.filter(e => e.kind === "debito").length;
-    acc.creditMinutes += row.entries.filter(e => e.kind === "credito").reduce((s, e) => s + e.minutes, 0);
-    acc.debitMinutes += row.entries.filter(e => e.kind === "debito").reduce((s, e) => s + e.minutes, 0);
-    acc.atestados += row.atestados.length;
-    acc.interjornada += row.interjornadaMinutes;
-    acc.additionalNight += row.additionalNightMinutes;
-    return acc;
-  }, { credits: 0, debits: 0, creditMinutes: 0, debitMinutes: 0, atestados: 0, interjornada: 0, additionalNight: 0 }), [matches]);
-
-  const unmatched = matches.filter(m => !m.employeeId || !m.period);
+  const totals = useMemo(() => matches.reduce((acc, row) => {,    acc.creditMinutes += row.creditMinutes;,    acc.debitMinutes += row.debitMinutes;,    acc.monthBalanceMinutes += row.monthBalanceMinutes;,    acc.interjornada += row.interjornadaMinutes;,    acc.additionalNight += row.additionalNightMinutes;,    return acc;,  }, { creditMinutes: 0, debitMinutes: 0, monthBalanceMinutes: 0, interjornada: 0, additionalNight: 0 }), [matches]);,  const unmatched = matches.filter(m => !m.employeeId || !m.period);
 
   async function importRows() {
     if (!document) return;
@@ -111,71 +100,44 @@ export function ImportarCartaoPonto() {
       let insertedCertificates = 0;
 
       for (const row of matches) {
-        const groupPrefix = `pdf:${document.fingerprint}:${row.page}`;
-        const creditRows = row.entries.filter(e => e.kind === "credito");
-        const debitRows = row.entries.filter(e => e.kind === "debito");
+        const groupPrefix = "pdf:" + document.fingerprint + ":" + row.page;
 
-        if (creditRows.length) {
-          const result = await supabase.from("overtime_records").insert(creditRows.map((entry, index) => ({
-            employee_id: row.employeeId,
-            reference_date: entry.date,
-            period_id: row.period!.id,
-            minutes: entry.minutes,
-            launch_type: "HE_60",
-            rate_percent: 60,
-            launch_group_id: `${groupPrefix}:credito:${index}`,
-            notes: "Importado do Cartão Ponto — Crédito no BH",
-          })));
-          if (result.error) throw new Error(`${row.employeeName}: ${result.error.message}`);
-          insertedCredits += creditRows.length;
+        if (row.creditMinutes > 0) {
+          const result = await supabase.from("overtime_records").insert({
+            employee_id: row.employeeId, reference_date: row.period!.end_date, period_id: row.period!.id,
+            minutes: row.creditMinutes, launch_type: "HE_60", rate_percent: 60,
+            launch_group_id: groupPrefix + ":credito", notes: "Importado do Cartão Ponto — Crédito total do período",
+          });
+          if (result.error) throw new Error(row.employeeName + ": " + result.error.message);
+          insertedCredits++;
         }
 
-        if (debitRows.length) {
-          const result = await supabase.from("bank_hours").insert(debitRows.map((entry, index) => ({
-            employee_id: row.employeeId,
-            entry_date: entry.date,
-            period_id: row.period!.id,
-            kind: "debito",
-            minutes: entry.minutes,
-            previous_balance_minutes: 0,
-            balance_minutes: 0,
-            justification: "Importado do Cartão Ponto — Débito no BH",
-            launch_group_id: `${groupPrefix}:debito:${index}`,
-            created_by: auth.user?.id ?? null,
-          })));
-          if (result.error) throw new Error(`${row.employeeName}: ${result.error.message}`);
-          insertedDebits += debitRows.length;
+        if (row.debitMinutes > 0) {
+          const result = await supabase.from("bank_hours").insert({
+            employee_id: row.employeeId, entry_date: row.period!.end_date, period_id: row.period!.id,
+            kind: "debito", minutes: row.debitMinutes, previous_balance_minutes: 0, balance_minutes: row.monthBalanceMinutes,
+            justification: "Importado do Cartão Ponto — Débito total do período",
+            launch_group_id: groupPrefix + ":debito", created_by: auth.user?.id ?? null,
+          });
+          if (result.error) throw new Error(row.employeeName + ": " + result.error.message);
+          insertedDebits++;
         }
 
         const summaryRows: Array<{ employee_id: string; reference_date: string; period_id: string; minutes: number; launch_type: "INTERJORNADA_50" | "ADICIONAL_NOTURNO"; rate_percent: number; launch_group_id: string; notes: string }> = [];
         if (row.interjornadaMinutes > 0) summaryRows.push({
           employee_id: row.employeeId, reference_date: row.period!.end_date, period_id: row.period!.id,
           minutes: row.interjornadaMinutes, launch_type: "INTERJORNADA_50", rate_percent: 50,
-          launch_group_id: `${groupPrefix}:interjornada`, notes: "Importado do Cartão Ponto — total de interjornada",
+          launch_group_id: groupPrefix + ":interjornada", notes: "Importado do Cartão Ponto — Interjornada",
         });
         if (row.additionalNightMinutes > 0) summaryRows.push({
           employee_id: row.employeeId, reference_date: row.period!.end_date, period_id: row.period!.id,
           minutes: row.additionalNightMinutes, launch_type: "ADICIONAL_NOTURNO", rate_percent: 20,
-          launch_group_id: `${groupPrefix}:adicional-noturno`, notes: "Importado do Cartão Ponto — adicional noturno do período",
+          launch_group_id: groupPrefix + ":adicional-noturno", notes: "Importado do Cartão Ponto — Adicional noturno",
         });
         if (summaryRows.length) {
           const result = await supabase.from("overtime_records").insert(summaryRows);
-          if (result.error) throw new Error(`${row.employeeName}: ${result.error.message}`);
+          if (result.error) throw new Error(row.employeeName + ": " + result.error.message);
           insertedSummary += summaryRows.length;
-        }
-
-        for (const date of row.atestados) {
-          const existing = await supabase.from("medical_certificates").select("id").eq("employee_id", row.employeeId).eq("start_date", date).eq("end_date", date).maybeSingle();
-          if (existing.error) throw new Error(existing.error.message);
-          if (!existing.data) {
-            const result = await supabase.from("medical_certificates").insert({
-              employee_id: row.employeeId, start_date: date, end_date: date, days: 1,
-              certificate_type: "medico", cid: null,
-              notes: "Importado do Cartão Ponto — CID não informado no relatório",
-            });
-            if (result.error) throw new Error(`${row.employeeName}: ${result.error.message}`);
-            insertedCertificates++;
-          }
         }
       }
 
@@ -227,10 +189,8 @@ export function ImportarCartaoPonto() {
               <div className="grid gap-4 md:grid-cols-6">
                 <div><p className="text-xs text-muted-foreground">Arquivo</p><p className="truncate font-semibold">{document.fileName}</p></div>
                 <div><p className="text-xs text-muted-foreground">Funcionários</p><p className="font-semibold">{formatCount(matches.length)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Créditos</p><p className="font-semibold">{formatCount(totals.credits)} · {minutesToHours(totals.creditMinutes)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Débitos</p><p className="font-semibold">{formatCount(totals.debits)} · {minutesToHours(totals.debitMinutes)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Atestados</p><p className="font-semibold">{formatCount(totals.atestados)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Interjornada</p><p className="font-semibold">{minutesToHours(totals.interjornada)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Crédito</p><p className="font-semibold">{minutesToHours(totals.creditMinutes)}</p></div><div><p className="text-xs text-muted-foreground">Débito</p><p className="font-semibold">{minutesToHours(totals.debitMinutes)}</p></div><div><p className="text-xs text-muted-foreground">Saldo do mês</p><p className="font-semibold">{minutesToHours(totals.monthBalanceMinutes)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Ad. Noturno</p><p className="font-semibold">{minutesToHours(totals.additionalNight)}</p></div><div><p className="text-xs text-muted-foreground">Interjornada</p><p className="font-semibold">{minutesToHours(totals.interjornada)}</p></div>
               </div>
             </Card>
 
@@ -241,24 +201,15 @@ export function ImportarCartaoPonto() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-muted/40 text-xs text-muted-foreground"><tr>
-                    <th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Competência</th><th className="px-5 py-3">Créditos</th><th className="px-5 py-3">Débitos</th><th className="px-5 py-3">Atestados</th><th className="px-5 py-3">Resumo</th><th className="px-5 py-3">Status</th>
-                  </tr></thead>
+                  <thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Competência</th><th className="px-5 py-3">Crédito</th><th className="px-5 py-3">Débito</th><th className="px-5 py-3">Saldo do mês</th><th className="px-5 py-3">Ad. Noturno</th><th className="px-5 py-3">Interjornada</th><th className="px-5 py-3">Status</th></tr></thead>
                   <tbody className="divide-y">
                     {matches.map(row => <tr key={row.page}>
-                      <td className="px-5 py-4 font-medium">{row.employeeName}<div className="text-xs text-muted-foreground">Matrícula {row.registration ?? "—"}</div></td>
-                      <td className="px-5 py-4">{row.period ? periodRangeLabel(row.period) : <span className="text-destructive">Não encontrada</span>}</td>
-                      <td className="px-5 py-4">{row.entries.filter(e => e.kind === "credito").length} · {minutesToHours(row.entries.filter(e => e.kind === "credito").reduce((s, e) => s + e.minutes, 0))}</td>
-                      <td className="px-5 py-4">{row.entries.filter(e => e.kind === "debito").length} · {minutesToHours(row.entries.filter(e => e.kind === "debito").reduce((s, e) => s + e.minutes, 0))}</td>
-                      <td className="px-5 py-4">{row.atestados.length}</td>
-                      <td className="px-5 py-4 text-xs">Interjornada {minutesToHours(row.interjornadaMinutes)}<br />Ad. noturno {minutesToHours(row.additionalNightMinutes)}</td>
-                      <td className="px-5 py-4">{row.employeeId && row.period ? <span className="inline-flex items-center gap-1 text-primary"><CheckCircle2 className="h-4 w-4" />Pronto</span> : <span className="text-destructive">Revisar cadastro</span>}</td>
-                    </tr>)}
+                      <td className="px-5 py-4 font-medium">{row.employeeName}<div className="text-xs text-muted-foreground">Matrícula {row.registration ?? "—"}</div></td><td className="px-5 py-4">{row.period ? periodRangeLabel(row.period) : <span className="text-destructive">Não encontrada</span>}</td><td className="px-5 py-4">{minutesToHours(row.creditMinutes)}</td><td className="px-5 py-4">{minutesToHours(row.debitMinutes)}</td><td className="px-5 py-4">{minutesToHours(row.monthBalanceMinutes)}</td><td className="px-5 py-4">{minutesToHours(row.additionalNightMinutes)}</td><td className="px-5 py-4">{minutesToHours(row.interjornadaMinutes)}</td><td className="px-5 py-4">{row.employeeId && row.period ? <span className="inline-flex items-center gap-1 text-primary"><CheckCircle2 className="h-4 w-4" />Pronto</span> : <span className="text-destructive">Revisar cadastro</span>}</td>)}
                   </tbody>
                 </table>
               </div>
               <div className="flex flex-col gap-3 border-t bg-muted/20 p-5 md:flex-row md:items-center md:justify-between">
-                <div className="text-xs text-muted-foreground"><strong>Regra:</strong> “Crédito no BH” entra como HE 60%; “Débito no BH” entra como débito; interjornada não altera o saldo. CID não é inventado.</div>
+                <div className="text-xs text-muted-foreground"><strong>Importação:</strong> somente Crédito, Débito, Saldo do mês, Ad. Noturno e Interjornada. Os demais dados do relatório são ignorados.</div>
                 <button type="button" disabled={saving || unmatched.length > 0} onClick={() => void importRows()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                   {saving ? "Importando..." : "Importar lançamentos"}
