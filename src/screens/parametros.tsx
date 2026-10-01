@@ -60,6 +60,18 @@ export function Parametros(){
   async function addHoliday(){if(!holidayForm.date||!holidayForm.name)return;const {error:e}=await(supabase as any).from("holidays").insert({holiday_date:holidayForm.date,name:holidayForm.name,scope:holidayForm.scope,is_demo:false});if(e)setError(e.message);else{setHolidayForm({date:"",name:"",scope:"nacional"});await load()}}
   async function deleteHoliday(id:string){const {error:e}=await(supabase as any).from("holidays").delete().eq("id",id);if(e)setError(e.message);else await load()}
   async function updateProfile(id:string,patch:any){const {error:e}=await(supabase as any).from("profiles").update(patch).eq("id",id);if(e)setError(e.message);else{setSaved("Usuário atualizado.");setTimeout(()=>setSaved(""),1800);await load()}}
+  async function deleteProfile(id:string,email:string){
+    if(!isAdmin)return;
+    if(id===currentProfile?.id){setError("Você não pode excluir o próprio usuário.");return}
+    if(!window.confirm(`Excluir o usuário ${email}? Esta ação remove o cadastro e o acesso ao sistema.`))return;
+    setError("");
+    const { data, error:e } = await (supabase as any).functions.invoke("delete-user", { body: { user_id: id } });
+    if(e){setError(e.message);return}
+    if(data?.error){setError(data.error);return}
+    setSaved("Usuário excluído.");
+    setTimeout(()=>setSaved(""),1800);
+    await load();
+  }
   const isAdmin = currentProfile?.role === "administrador" || currentProfile?.role === "rh";
   return <div className="min-h-screen bg-background">
     <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1180px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4"/>Voltar</a><b>DP Success · Configurações</b></div></header>
@@ -85,7 +97,7 @@ export function Parametros(){
             <div className="flex items-center gap-2">
               <select disabled={!isAdmin || p.id === currentProfile?.id} value={p.role||"consulta"} onChange={e=>void updateProfile(p.id,{role:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="rh">RH</option><option value="consulta">Consulta</option></select>
               <label className="flex items-center gap-2 text-sm"><input disabled={!isAdmin} type="checkbox" checked={p.active!==false} onChange={e=>void updateProfile(p.id,{active:e.target.checked})}/>Ativo</label>
-              
+              {isAdmin && p.id !== currentProfile?.id && <button onClick={()=>void deleteProfile(p.id,p.email)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir usuário"><Trash2 className="h-4 w-4"/></button>}
             </div>
           </div>
           <div className="mt-4 rounded-lg border bg-muted/20 p-4">
