@@ -76,7 +76,7 @@ export function Ocorrencias() {
       .order("occurrence_date", { ascending: false });
 
     if (error) setError(error.message);
-    else setRows((data ?? []) as Occ[]);
+    else setRows(((data ?? []) as Occ[]).filter(row => ALLOWED_CODES.has(String(row.occurrence_types?.code ?? ""))));
   }
 
   async function loadOptions() {
