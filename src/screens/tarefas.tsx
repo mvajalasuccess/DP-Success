@@ -9,6 +9,7 @@ type Task = {
   reminder_at:string|null; category:string; assignee_id:string|null; employee_id:string|null;
   created_by:string|null; recurrence:"none"|"daily"|"weekly"|"monthly"|"yearly"; recurrence_until:string|null;
 };
+type ChecklistItem={id:string;task_id:string;title:string;completed:boolean;position:number};
 type Employee={id:string;full_name:string};
 type Profile={id:string;full_name:string|null;email:string|null};
 
@@ -20,18 +21,23 @@ const overdue=(t:Task)=>Boolean(t.due_date&&t.status!=="done"&&t.due_date<new Da
 
 export function Tarefas(){
   const[tasks,setTasks]=useState<Task[]>([]),[employees,setEmployees]=useState<Employee[]>([]),[profiles,setProfiles]=useState<Profile[]>([]);
+  const[checklists,setChecklists]=useState<Record<string,ChecklistItem[]>>({});
   const[view,setView]=useState<"list"|"kanban"|"calendar">("list"),[status,setStatus]=useState("all"),[priority,setPriority]=useState("all"),[category,setCategory]=useState("all"),[search,setSearch]=useState("");
   const[modal,setModal]=useState(false),[editing,setEditing]=useState<Task|null>(null),[error,setError]=useState(""),[saving,setSaving]=useState(false);
   const[form,setForm]=useState<any>({title:"",description:"",status:"todo",priority:"medium",due_date:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:"",checklist:""});
 
   async function load(){
-    const[t,e,p]=await Promise.all([
+    const[t,e,p,c]=await Promise.all([
       (supabase as any).from("tasks").select("*").order("due_date",{ascending:true,nullsFirst:false}).order("created_at",{ascending:false}),
       supabase.from("employees").select("id,full_name").order("full_name"),
-      (supabase as any).from("profiles").select("id,full_name,email").order("full_name")
+      (supabase as any).from("profiles").select("id,full_name,email").order("full_name"),
+      (supabase as any).from("task_checklist_items").select("*").order("position",{ascending:true})
     ]);
-    const er=[t,e,p].find(x=>x.error)?.error;if(er)setError(er.message);
+    const er=[t,e,p,c].find(x=>x.error)?.error;if(er)setError(er.message);
     setTasks(t.data??[]);setEmployees(e.data??[]);setProfiles(p.data??[]);
+    const grouped:Record<string,ChecklistItem[]>={};
+    (c.data??[]).forEach((item:ChecklistItem)=>{(grouped[item.task_id]??=[]).push(item)});
+    setChecklists(grouped);
   }
   useEffect(()=>{void load()},[]);
 
@@ -41,25 +47,33 @@ export function Tarefas(){
   }),[tasks,status,priority,category,search]);
   const counts={todo:tasks.filter(t=>t.status==="todo").length,in_progress:tasks.filter(t=>t.status==="in_progress").length,done:tasks.filter(t=>t.status==="done").length,overdue:tasks.filter(overdue).length};
 
-  function newTask(){setEditing(null);setForm({title:"",description:"",status:"todo",priority:"medium",due_date:"",due_time:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:"",checklist:""});setModal(true)}
+  function newTask(){setEditing(null);setForm({title:"",description:"",status:"todo",priority:"medium",due_date:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:"",checklist:""});setModal(true)}
   async function editTask(t:Task){
-    const{data}=await(supabase as any).from("task_checklist_items").select("title").eq("task_id",t.id).order("position");
+    const{data}=await(supabase as any).from("task_checklist_items").select("title,completed").eq("task_id",t.id).order("position");
     setEditing(t);setForm({title:t.title,description:t.description||"",status:t.status,priority:t.priority,due_date:t.due_date||"",reminder_at:t.reminder_at?new Date(t.reminder_at).toISOString().slice(0,16):"",category:t.category,assignee_id:t.assignee_id||"",employee_id:t.employee_id||"",recurrence:t.recurrence,recurrence_until:t.recurrence_until||"",checklist:(data||[]).map((x:any)=>x.title).join("\n")});setModal(true);
   }
   async function save(){
     if(!form.title.trim())return;setSaving(true);setError("");
-    const{sesson}= {sesson:null as any};
     const sessionResult=await supabase.auth.getSession();
-    const payload={title:form.title.trim(),description:form.description.trim()||null,status:form.status,priority:form.priority,due_date:form.due_date||null,due_time:form.due_time||null,reminder_at:form.reminder_at?new Date(form.reminder_at).toISOString():null,category:form.category,assignee_id:form.assignee_id||null,employee_id:form.employee_id||null,created_by:editing?.created_by||sessionResult.data.session?.user.id||null,recurrence:form.recurrence,recurrence_until:form.recurrence_until||null};
+    const payload={title:form.title.trim(),description:form.description.trim()||null,status:form.status,priority:form.priority,due_date:form.due_date||null,due_time:null,reminder_at:form.reminder_at?new Date(form.reminder_at).toISOString():null,category:form.category,assignee_id:form.assignee_id||null,employee_id:form.employee_id||null,created_by:editing?.created_by||sessionResult.data.session?.user.id||null,recurrence:form.recurrence,recurrence_until:form.recurrence_until||null};
     const r=editing?await(supabase as any).from("tasks").update(payload).eq("id",editing.id).select("*").single():await(supabase as any).from("tasks").insert(payload).select("*").single();
     if(r.error){setError(r.error.message);setSaving(false);return}
     await(supabase as any).from("task_checklist_items").delete().eq("task_id",r.data.id);
     const items=form.checklist.split("\n").map((x:string)=>x.trim()).filter(Boolean).map((title:string,i:number)=>({task_id:r.data.id,title,position:i}));
-    if(items.length)await(supabase as any).from("task_checklist_items").insert(items);
+    if(items.length){const{error:e}=await(supabase as any).from("task_checklist_items").insert(items);if(e){setError(e.message);setSaving(false);return}}
     setModal(false);setSaving(false);await load();
   }
   async function setTaskStatus(t:Task,s:Task["status"]){const{error:e}=await(supabase as any).from("tasks").update({status:s}).eq("id",t.id);if(e)setError(e.message);else setTasks(x=>x.map(a=>a.id===t.id?{...a,status:s}:a))}
-  async function remove(t:Task){if(!window.confirm("Excluir a tarefa \""+t.title+"\"?"))return;const{error:e}=await(supabase as any).from("tasks").delete().eq("id",t.id);if(e)setError(e.message);else setTasks(x=>x.filter(a=>a.id!==t.id))}
+  async function toggleChecklist(item:ChecklistItem){const{error:e}=await(supabase as any).from("task_checklist_items").update({completed:!item.completed}).eq("id",item.id);if(e)setError(e.message);else setChecklists(x=>({...x,[item.task_id]:(x[item.task_id]??[]).map(i=>i.id===item.id?{...i,completed:!i.completed}:i)}))}
+  async function removeChecklist(item:ChecklistItem){const{error:e}=await(supabase as any).from("task_checklist_items").delete().eq("id",item.id);if(e)setError(e.message);else setChecklists(x=>({...x,[item.task_id]:(x[item.task_id]??[]).filter(i=>i.id!==item.id)}))}
+  async function addChecklist(task:Task){
+    const title=window.prompt("Nome da etapa do checklist:");
+    if(!title?.trim())return;
+    const current=checklists[task.id]??[];
+    const{data,error:e}=await(supabase as any).from("task_checklist_items").insert({task_id:task.id,title:title.trim(),position:current.length}).select("*").single();
+    if(e)setError(e.message);else setChecklists(x=>({...x,[task.id]:[...(x[task.id]??[]),data]}));
+  }
+  async function remove(t:Task){if(!window.confirm("Excluir a tarefa \""+t.title+"\"?"))return;const{error:e}=await(supabase as any).from("tasks").delete().eq("id",t.id);if(e)setError(e.message);else {setTasks(x=>x.filter(a=>a.id!==t.id));setChecklists(x=>{const n={...x};delete n[t.id];return n})}}
   const emp=(id:string|null)=>employees.find(x=>x.id===id)?.full_name;
   const prof=(id:string|null)=>{const p=profiles.find(x=>x.id===id);return p?.full_name||p?.email};
 
@@ -79,9 +93,9 @@ export function Tarefas(){
         <div className="ml-auto flex rounded-lg border p-1"><button onClick={()=>setView("list")} className={view==="list"?"rounded-md bg-muted p-2":"rounded-md p-2"}><List className="h-4 w-4"/></button><button onClick={()=>setView("kanban")} className={view==="kanban"?"rounded-md bg-muted p-2":"rounded-md p-2"}><ClipboardList className="h-4 w-4"/></button><button onClick={()=>setView("calendar")} className={view==="calendar"?"rounded-md bg-muted p-2":"rounded-md p-2"}><CalendarDays className="h-4 w-4"/></button></div>
       </div></Card>
 
-      {view==="list"&&<Card className="overflow-hidden">{filtered.length===0?<div className="p-12 text-center text-sm text-muted-foreground">Nenhuma tarefa encontrada.</div>:<div className="divide-y">{filtered.map(t=><Row key={t.id} task={t} emp={emp(t.employee_id)} prof={prof(t.assignee_id)} edit={()=>void editTask(t)} remove={()=>void remove(t)} status={s=>void setTaskStatus(t,s)}/>)}</div>}</Card>}
+      {view==="list"&&<Card className="overflow-hidden">{filtered.length===0?<div className="p-12 text-center text-sm text-muted-foreground">Nenhuma tarefa encontrada.</div>:<div className="divide-y">{filtered.map(t=><Row key={t.id} task={t} emp={emp(t.employee_id)} prof={prof(t.assignee_id)} checklist={checklists[t.id]??[]} edit={()=>void editTask(t)} remove={()=>void remove(t)} addChecklist={()=>void addChecklist(t)} toggleChecklist={toggleChecklist} removeChecklist={removeChecklist} status={s=>void setTaskStatus(t,s)}/>)}</div>}</Card>}
       {view==="kanban"&&<div className="grid gap-4 lg:grid-cols-3">{(["todo","in_progress","done"] as Task["status"][]).map(s=><Card key={s} className="min-h-[420px] p-3"><div className="mb-3 flex items-center justify-between px-2"><b>{statusLabel(s)}</b><span className="rounded-full bg-muted px-2 py-0.5 text-xs">{filtered.filter(t=>t.status===s).length}</span></div><div className="space-y-2">{filtered.filter(t=>t.status===s).map(t=><button key={t.id} onClick={()=>void editTask(t)} className="w-full rounded-xl border p-4 text-left hover:border-primary/40"><b>{t.title}</b><p className="mt-1 text-xs text-muted-foreground">{t.category}{t.due_date?" · "+dateLabel(t.due_date):""}</p></button>)}</div></Card>)}</div>}
-      {view==="calendar"&&<Card className="p-5"><div className="mb-4 flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary"/><b>Próximos prazos</b></div><div className="divide-y">{filtered.filter(t=>t.due_date).sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date))).map(t=><Row key={t.id} task={t} emp={emp(t.employee_id)} prof={prof(t.assignee_id)} edit={()=>void editTask(t)} remove={()=>void remove(t)} status={s=>void setTaskStatus(t,s)}/>)}</div></Card>}
+      {view==="calendar"&&<Card className="p-5"><div className="mb-4 flex items-center gap-2"><CalendarDays className="h-5 w-5 text-primary"/><b>Próximos prazos</b></div><div className="divide-y">{filtered.filter(t=>t.due_date).sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date))).map(t=><Row key={t.id} task={t} emp={emp(t.employee_id)} prof={prof(t.assignee_id)} checklist={checklists[t.id]??[]} edit={()=>void editTask(t)} remove={()=>void remove(t)} addChecklist={()=>void addChecklist(t)} toggleChecklist={toggleChecklist} removeChecklist={removeChecklist} status={s=>void setTaskStatus(t,s)}/>)}</div></Card>}
 
       {modal&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border bg-background shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background px-6 py-4"><div><h2 className="font-bold">{editing?"Editar tarefa":"Nova tarefa"}</h2><p className="text-xs text-muted-foreground">Prazo, responsável, funcionário e lembrete são opcionais.</p></div><button onClick={()=>setModal(false)} className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5"/></button></div>
@@ -94,7 +108,6 @@ export function Tarefas(){
           <Field label="Funcionário relacionado"><select value={form.employee_id} onChange={e=>setForm({...form,employee_id:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="">Nenhum</option>{employees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></Field>
           <Field label="Responsável"><select value={form.assignee_id} onChange={e=>setForm({...form,assignee_id:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="">Eu / sem responsável</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name||p.email||"Usuário"}</option>)}</select></Field>
           <Field label="Prazo"><input type="date" value={form.due_date} onChange={e=>setForm({...form,due_date:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>
-          <Field label="Horário do prazo"><input type="time" value={form.due_time} onChange={e=>setForm({...form,due_time:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>
           <Field label="Lembrar em"><input type="datetime-local" value={form.reminder_at} onChange={e=>setForm({...form,reminder_at:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>
           <Field label="Repetir"><select value={form.recurrence} onChange={e=>setForm({...form,recurrence:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="none">Não repetir</option><option value="daily">Diariamente</option><option value="weekly">Semanalmente</option><option value="monthly">Mensalmente</option><option value="yearly">Anualmente</option></select></Field>
           {form.recurrence!=="none"&&<Field label="Repetir até"><input type="date" value={form.recurrence_until} onChange={e=>setForm({...form,recurrence_until:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>}
@@ -107,7 +120,8 @@ export function Tarefas(){
 }
 
 function Field({label,children}:{label:string;children:React.ReactNode}){return <label><span className="mb-1 block text-sm font-medium">{label}</span>{children}</label>}
-function Row({task,emp,prof,edit,remove,status}:{task:Task;emp?:string;prof?:string;edit:()=>void;remove:()=>void;status:(s:Task["status"])=>void}){
+function Row({task,emp,prof,checklist,edit,remove,addChecklist,toggleChecklist,removeChecklist,status}:{task:Task;emp?:string;prof?:string;checklist:ChecklistItem[];edit:()=>void;remove:()=>void;addChecklist:()=>void;toggleChecklist:(item:ChecklistItem)=>void;removeChecklist:(item:ChecklistItem)=>void;status:(s:Task["status"])=>void}){
   const done=task.status==="done";
-  return <div className="flex items-center gap-3 p-4 hover:bg-muted/30"><button onClick={()=>status(done?"todo":"done")} title={done?"Reabrir":"Concluir"}>{done?<CheckCircle2 className="h-5 w-5 text-primary"/>:<Circle className="h-5 w-5 text-muted-foreground"/>}</button><button onClick={edit} className="min-w-0 flex-1 text-left"><div className="flex flex-wrap items-center gap-2"><span className={done?"font-medium line-through text-muted-foreground":"font-medium"}>{task.title}</span><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{task.category}</span><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{priorities.find(p=>p[0]===task.priority)?.[1]}</span></div><div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">{task.due_date&&<span className={overdue(task)?"text-destructive":""}><Clock3 className="mr-1 inline h-3.5 w-3.5"/>{dateLabel(task.due_date)}{task.due_time?" · "+task.due_time.slice(0,5):""}{overdue(task)?" · atrasada":""}</span>}{task.reminder_at&&<span>🔔 {new Date(task.reminder_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</span>}{emp&&<span>👤 {emp}</span>}{prof&&<span>Responsável: {prof}</span>}</div></button><button onClick={remove} className="rounded-lg p-2 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4"/></button></div>
+  const completed=checklist.filter(i=>i.completed).length;
+  return <div className="p-4 hover:bg-muted/30"><div className="flex items-center gap-3"><button onClick={()=>status(done?"todo":"done")} title={done?"Reabrir":"Concluir"}>{done?<CheckCircle2 className="h-5 w-5 text-primary"/>:<Circle className="h-5 w-5 text-muted-foreground" />}</button><button onClick={edit} className="min-w-0 flex-1 text-left"><div className="flex flex-wrap items-center gap-2"><span className={done?"font-medium line-through text-muted-foreground":"font-medium"}>{task.title}</span><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{task.category}</span><span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{priorities.find(p=>p[0]===task.priority)?.[1]}</span>{checklist.length>0&&<span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">Checklist {completed}/{checklist.length}</span></div><div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">{task.due_date&&<span className={overdue(task)?"text-destructive":""}><Clock3 className="mr-1 inline h-3.5 w-3.5"/>{dateLabel(task.due_date)}{overdue(task)?" · atrasada":""}</span>}{task.reminder_at&&<span>🔔 {new Date(task.reminder_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</span>}{emp&&<span>👤 {emp}</span>}{prof&&<span>Responsável: {prof}</span>}</div></button><button onClick={remove} className="rounded-lg p-2 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4"/></button></div>{checklist.length>0&&<div className="mt-3 ml-8 space-y-1 rounded-lg bg-muted/30 p-2">{checklist.map(item=><div key={item.id} className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-background"><button onClick={()=>void toggleChecklist(item)} className="shrink-0">{item.completed?<CheckCircle2 className="h-4 w-4 text-primary"/>:<Circle className="h-4 w-4 text-muted-foreground" />}</button><span className={item.completed?"text-sm line-through text-muted-foreground":"text-sm"}>{item.title}</span><button onClick={()=>void removeChecklist(item)} className="ml-auto hidden rounded p-1 text-muted-foreground group-hover:block hover:text-destructive"><Trash2 className="h-3.5 w-3.5"/></button></div>)}</div>}{<button onClick={addChecklist} className="mt-2 ml-8 inline-flex items-center gap-1 text-xs text-primary hover:underline"><Plus className="h-3 w-3"/>Adicionar etapa</button>}</div>
 }
