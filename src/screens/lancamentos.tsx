@@ -74,7 +74,7 @@ export function Launches() {
 
   const groups = useMemo(() => {
     const map = new Map<string, Group>();
-    const importedToken = (value?: string | null) => value?.match(/\[PDF_IMPORT:[^\]]+\]/)?.[0] ?? null;
+    const importedToken = (value?: string | null) => value?.match(/\[(?:PDF_IMPORT|XLSX_IMPORT):[^\]]+\]/)?.[0] ?? null;
     const add = (key: string, groupId: string | null, employee_id: string, d: string) => {
       let g = map.get(key);
       if (!g) { g = { key, groupId, employee_id, date: d, credits: [], debits: [] }; map.set(key, g); }
