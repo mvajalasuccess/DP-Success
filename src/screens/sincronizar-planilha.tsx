@@ -504,7 +504,50 @@ export function SincronizarPlanilha() {
     }
   }
 
-  function setFormulaCell(cell: ExcelCell, formula: string) {
+  function cloneRowContent(sourceRow: any, targetRow: any, maxColumn = 19) {
+  targetRow.height = sourceRow.height;
+  targetRow.hidden = sourceRow.hidden;
+  targetRow.outlineLevel = sourceRow.outlineLevel;
+  for (let col = 1; col <= maxColumn; col += 1) {
+    const sourceCell = sourceRow.getCell(col);
+    const targetCell = targetRow.getCell(col);
+    targetCell.style = sourceCell.style;
+    targetCell.numFmt = sourceCell.numFmt;
+    targetCell.alignment = sourceCell.alignment;
+    targetCell.border = sourceCell.border;
+    targetCell.fill = sourceCell.fill;
+    targetCell.font = sourceCell.font;
+    targetCell.protection = sourceCell.protection;
+    const value: any = sourceCell.value;
+    if (value && typeof value === "object" && "formula" in value) {
+      targetCell.value = {
+        formula: translateFormulaRows(String(value.formula), sourceRow.number, targetRow.number),
+        result: value.result,
+      };
+    } else if (typeof value === "string" && value.startsWith("=")) {
+      targetCell.value = { formula: translateFormulaRows(value.slice(1), sourceRow.number, targetRow.number) };
+    } else {
+      targetCell.value = value;
+    }
+  }
+}
+
+function insertDataRowWithoutSplice(worksheet: any, totalRowNumber: number, templateRowNumber: number) {
+  // Desloca apenas as linhas do bloco que estão abaixo do ponto de inserção.
+  // Isso evita o insertRow/spliceRows do ExcelJS, que pode congelar o navegador
+  // ao reindexar uma planilha grande.
+  const sourceTotal = worksheet.getRow(totalRowNumber);
+  const targetTotal = worksheet.getRow(totalRowNumber + 1);
+  cloneRowContent(sourceTotal, targetTotal, 19);
+
+  const templateRow = worksheet.getRow(templateRowNumber);
+  const insertedRow = worksheet.getRow(totalRowNumber);
+  cloneRowContent(templateRow, insertedRow, 19);
+
+  return insertedRow;
+}
+
+function setFormulaCell(cell: ExcelCell, formula: string) {
     cell.value = { formula };
   }
 
@@ -671,14 +714,11 @@ export function SincronizarPlanilha() {
           if (existingStarts.has(period.start_date)) continue;
 
           const insertAt = block.totalRow;
-          // ExcelJS pode ficar bloqueado por vários segundos ao inserir uma linha
-          // em uma planilha grande. Fazemos a inserção e cedemos o controle ao navegador
-          // antes de continuar com a formatação/escrita.
-          block.worksheet.insertRow(insertAt, [], "i+");
-          await new Promise<void>(resolve => setTimeout(resolve, 0));
-          const insertedRow = block.worksheet.getRow(insertAt);
-          const templateRow = block.worksheet.getRow(Math.max(block.startRow, insertAt - 1));
-          copyInsertedRowStyle(templateRow, insertedRow, 19);
+          const insertedRow = insertDataRowWithoutSplice(
+            block.worksheet,
+            insertAt,
+            Math.max(block.startRow, insertAt - 1),
+          );
 
           insertedRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
           const comp = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
