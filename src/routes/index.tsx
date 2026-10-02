@@ -178,6 +178,8 @@ function DashboardHome() {
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, turnover: 0, admissions: 0, terminations: 0, bankBalance: 0, period: "Nenhuma competência" });
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
+  const [absencePeople, setAbsencePeople] = useState<string[]>([]);
+  const [certificatePeople, setCertificatePeople] = useState<string[]>([]);
   const [competenceNote, setCompetenceNote] = useState("");
   const [noteItems, setNoteItems] = useState<Array<{ id: string; text: string; done: boolean }>>([]);
   const [newNoteItem, setNewNoteItem] = useState("");
@@ -255,6 +257,8 @@ function DashboardHome() {
         return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code);
       });
       const absenceDays = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
+      const employeeMap = new Map(allEmployees.map((e: any) => [String(e.id), String(e.full_name || "Funcionário")]));
+      setAbsencePeople(Array.from(new Set(absenceRows.map((x: any) => employeeMap.get(String(x.employee_id)) || "Funcionário"))));
       const declarationMinutes = occurrences
         .filter((x: any) => periodId && x.period_id === periodId && String(x.occurrence_types?.code ?? "").toLowerCase() === "declaracao_horas")
         .reduce((sum: number, x: any) => sum + Math.round(Number(x.quantity || 0) * 60), 0);
@@ -263,6 +267,7 @@ function DashboardHome() {
         return x.start_date <= competence.end_date && x.end_date >= competence.start_date && activeEmployeeIds.has(x.employee_id);
       });
       const certificateDays = certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0), 0);
+      setCertificatePeople(Array.from(new Set(certificateRows.map((x: any) => employeeMap.get(String(x.employee_id)) || "Funcionário"))));
       const currentTime = (timeRows.data ?? []).filter((x: any) => (!periodId || x.period_id === periodId) && activeEmployeeIds.has(x.employee_id));
       const overrides = (overrideRows.data ?? []) as any[];
       const overrideByEmployee = new Map<string, any>(
@@ -524,18 +529,30 @@ function DashboardHome() {
                 <p className="mt-1 text-2xl font-bold">{fmt(metrics.overtime)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">registradas na competência</p>
               </Card>
-              <Card className="p-5">
-                <AlertTriangle className="h-5 w-5 text-primary" />
-                <p className="mt-4 text-sm text-muted-foreground">Faltas</p>
-                <p className="mt-1 text-2xl font-bold">{Math.round(metrics.absenceDays)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">dias registrados</p>
-              </Card>
-              <Card className="p-5">
-                <FileText className="h-5 w-5 text-primary" />
-                <p className="mt-4 text-sm text-muted-foreground">Atestados</p>
-                <p className="mt-1 text-2xl font-bold">{metrics.certificates}</p>
-                <p className="mt-1 text-xs text-muted-foreground">registros na competência</p>
-              </Card>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
+                <Card className="h-full p-5 transition-shadow hover:shadow-md">
+                  <AlertTriangle className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">Faltas</p>
+                  <p className="mt-1 text-2xl font-bold">{Math.round(metrics.absenceDays)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">dias registrados · clique para ver</p>
+                  {absencePeople.length > 0 && <div className="mt-3 border-t pt-3">
+                    {absencePeople.slice(0, 3).map(name => <p key={name} className="truncate text-xs font-medium">{name}</p>)}
+                    {absencePeople.length > 3 && <p className="mt-1 text-[11px] text-muted-foreground">+ {absencePeople.length - 3} funcionário(s)</p>}
+                  </div>}
+                </Card>
+              </button>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "atestados" }))} className="text-left">
+                <Card className="h-full p-5 transition-shadow hover:shadow-md">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">Atestados</p>
+                  <p className="mt-1 text-2xl font-bold">{metrics.certificates}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">registros na competência · clique para ver</p>
+                  {certificatePeople.length > 0 && <div className="mt-3 border-t pt-3">
+                    {certificatePeople.slice(0, 3).map(name => <p key={name} className="truncate text-xs font-medium">{name}</p>)}
+                    {certificatePeople.length > 3 && <p className="mt-1 text-[11px] text-muted-foreground">+ {certificatePeople.length - 3} funcionário(s)</p>}
+                  </div>}
+                </Card>
+              </button>
               <Card className="p-5">
                 <Users className="h-5 w-5 text-primary" />
                 <p className="mt-4 text-sm text-muted-foreground">Movimentações</p>
