@@ -958,18 +958,63 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
         const insertAt = block.totalRow;
         const templateRowNumber = Math.max(block.firstPeriodRow, block.lastPeriodRow);
         const templateRow = worksheet.getRow(templateRowNumber);
+        const oldTotalRow = worksheet.getRow(insertAt);
+        const newTotalRow = worksheet.getRow(insertAt + 1);
 
-        // Insere antes do TOTAL e copia somente a formatação. Não copiamos
-        // fórmulas/shared formulas do ExcelJS.
-        worksheet.spliceRows(insertAt, 0, []);
-        const insertedRow = worksheet.getRow(insertAt);
-        insertedRow.height = templateRow.height;
-        insertedRow.hidden = templateRow.hidden;
-        insertedRow.outlineLevel = templateRow.outlineLevel;
+        // Não usamos spliceRows: o ExcelJS pode quebrar Shared Formulas ao
+        // deslocar uma linha que contém uma fórmula compartilhada (ex.: I64).
+        // Em vez disso, movemos manualmente o TOTAL para a linha vazia seguinte
+        // e reutilizamos a antiga linha TOTAL como a nova competência.
+        const nextHasContent = Array.from({ length: 19 }, (_, index) =>
+          excelCellText(newTotalRow.getCell(index + 1))
+        ).some(Boolean);
+
+        if (nextHasContent) {
+          throw new Error(
+            `Não foi possível adicionar a competência de ${change.employeeName} na aba "${worksheet.name}" porque não há uma linha vazia logo abaixo do TOTAL.`
+          );
+        }
+
+        // Copia a aparência do TOTAL para a linha seguinte, mas transforma
+        // fórmulas compartilhadas em fórmulas normais.
+        newTotalRow.height = oldTotalRow.height;
+        newTotalRow.hidden = oldTotalRow.hidden;
+        newTotalRow.outlineLevel = oldTotalRow.outlineLevel;
+
+        for (let col = 1; col <= 19; col += 1) {
+          const sourceCell = oldTotalRow.getCell(col);
+          const targetCell = newTotalRow.getCell(col);
+          targetCell.style = sourceCell.style;
+          targetCell.numFmt = sourceCell.numFmt;
+          targetCell.alignment = sourceCell.alignment;
+          targetCell.border = sourceCell.border;
+          targetCell.fill = sourceCell.fill;
+          targetCell.font = sourceCell.font;
+          targetCell.protection = sourceCell.protection;
+
+          const value: any = sourceCell.value;
+          if (value && typeof value === "object" && "formula" in value) {
+            targetCell.value = {
+              formula: translateFormulaRows(String(value.formula), insertAt, insertAt + 1),
+            };
+          } else if (typeof value === "string" && value.startsWith("=")) {
+            targetCell.value = {
+              formula: translateFormulaRows(value.slice(1), insertAt, insertAt + 1),
+            };
+          } else {
+            targetCell.value = value;
+          }
+        }
+
+        // A antiga linha TOTAL vira a nova competência. Copiamos somente
+        // formatação da última linha de competência, nunca fórmulas.
+        oldTotalRow.height = templateRow.height;
+        oldTotalRow.hidden = templateRow.hidden;
+        oldTotalRow.outlineLevel = templateRow.outlineLevel;
 
         for (let col = 1; col <= 19; col += 1) {
           const sourceCell = templateRow.getCell(col);
-          const targetCell = insertedRow.getCell(col);
+          const targetCell = oldTotalRow.getCell(col);
           targetCell.style = sourceCell.style;
           targetCell.numFmt = sourceCell.numFmt;
           targetCell.alignment = sourceCell.alignment;
@@ -980,16 +1025,17 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
           targetCell.value = null;
         }
 
-        insertedRow.getCell(1).value = periodShortLabel(period.start_date, period.end_date);
-        insertedRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
+        oldTotalRow.getCell(1).value = periodShortLabel(period.start_date, period.end_date);
+        oldTotalRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
 
         writeExcelComposition(
-          insertedRow,
+          oldTotalRow,
           creditMap.get(`${employee.id}|${period.id}`) ?? {},
           debitMap.get(`${employee.id}|${period.id}`) ?? 0,
           worksheet.name,
         );
 
+        inserted += 1;
         inserted += 1;
       }
 
