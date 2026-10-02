@@ -467,8 +467,13 @@ export function Kpis() {
           // Atestados atuais têm como fonte oficial medical_certificates.
           // Evita duplicar o mesmo atestado se houver uma ocorrência legada.
         } else if (code === "declaracao_horas" || code === "declaracao") {
+          // A declaração registra as horas realmente abonadas. Ela continua
+          // demonstrada separadamente, mas suas horas abonadas compõem o
+          // indicador como ABONO, conforme a regra do KPI.
           next.declaracoesMinutes += minutes;
-          // Declarações são exibidas separadamente, mas NÃO entram no absenteísmo.
+          next.abonosMinutes += minutes;
+          next.absenceMinutes += minutes;
+          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
         } else if (code === "abono") {
           next.abonosMinutes += minutes;
           next.absenceMinutes += minutes;
@@ -728,23 +733,8 @@ export function Kpis() {
       next.interjornada = comparisonRows.reduce((sum, row) => sum + row.interjornada, 0);
       setOvertimeEmployees(comparisonRows);
 
-      try {
-        const lastTarget = [...targetPeriods].sort((a, b) => a.end_date.localeCompare(b.end_date)).at(-1);
-        if (lastTarget) {
-          const balances = await Promise.all(
-            allowedEmployees.map(async employee => {
-              const rows = await balancesByEmployee(employee.id);
-              return rows.find(row => row.period.id === lastTarget.id)?.accumulated ?? 0;
-            }),
-          );
-          setBankBalance(balances.reduce((sum, value) => sum + value, 0));
-        } else {
-          setBankBalance(0);
-        }
-      } catch {
-        setBankBalance(0);
-      }
-
+      // Não bloquear a renderização dos KPIs com dezenas de consultas
+      // individuais do Banco de Horas. O saldo é carregado em segundo plano.
       setMetrics(next);
       setSource(
         historicalCount && operationalCount
@@ -753,6 +743,46 @@ export function Kpis() {
             ? "Histórico consolidado da aba BASE do Power BI"
             : "Lançamentos atuais do DP-Success"
       );
+    })();
+  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees]);
+
+  // O Banco de Horas usa uma função que consulta várias fontes por funcionário.
+  // Mantemos esse cálculo fora do carregamento principal para a tela aparecer
+  // rapidamente; o card é atualizado assim que o saldo termina de carregar.
+  useEffect(() => {
+    if (!periods.length || !employees.length) return;
+
+    const targetPeriods = selectedMonth === "todos"
+      ? periods.filter(p => p.reference_year === selectedYear)
+      : periods.filter(p => p.id === selectedMonth);
+    const lastTarget = [...targetPeriods].sort((a, b) => a.end_date.localeCompare(b.end_date)).at(-1);
+    if (!lastTarget) {
+      setBankBalance(0);
+      return;
+    }
+
+    const selectedEmployeeSet = new Set(selectedEmployees);
+    const allowedEmployees = employees.filter(e =>
+      employeeMatches(e, [], selectedDepartment) &&
+      (!selectedEmployees.length || selectedEmployeeSet.has(e.id)) &&
+      targetPeriods.some(period =>
+        (!e.hireDate || e.hireDate <= period.end_date) &&
+        (!e.terminationDate || e.terminationDate >= period.start_date)
+      )
+    );
+
+    void (async () => {
+      try {
+        const balances = await Promise.all(
+          allowedEmployees.map(async employee => {
+            const rows = await balancesByEmployee(employee.id);
+            return rows.find(row => row.period.id === lastTarget.id)?.accumulated ?? 0;
+          }),
+        );
+        setBankBalance(balances.reduce((sum, value) => sum + value, 0));
+      } catch {
+        setBankBalance(0);
+      }
     })();
   }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees]);
 
@@ -855,7 +885,7 @@ export function Kpis() {
             const quantity = Number(row.quantity || 0);
             const unit = String(row.unit ?? "dias").toLowerCase();
             const minutes = unit.startsWith("dia") ? quantity * 528 : unit.startsWith("hor") ? quantity * 60 : quantity;
-            if (["falta","folga_abonada","folga_descontada","falta_justificada","falta_injustificada","abono"].includes(code)) {
+            if (["falta","folga_abonada","folga_descontada","falta_justificada","falta_injustificada","abono","declaracao_horas","declaracao"].includes(code)) {
               lost += Math.round(minutes);
             }
           }
