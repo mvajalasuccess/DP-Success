@@ -1227,7 +1227,7 @@ export function Kpis() {
 
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <div>
                     <h3 className="font-bold">Evolução das horas extras</h3>
                     <p className="text-xs text-muted-foreground">Total de HE por competência.</p>
@@ -1263,22 +1263,30 @@ export function Kpis() {
                   ] as [string, number][];
                   const total = parts.reduce((sum, [, value]) => sum + value, 0);
                   let cursor = 0;
-                  const stops = parts.map(([, value]) => {
-                    const start = total ? (cursor / total) * 360 : 0;
+                  const colors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+                  const stops = parts.map(([label, value], index) => {
+                    const segmentStart = total ? (cursor / total) * 360 : 0;
                     cursor += value;
-                    return `${start}deg ${total ? (cursor / total) * 360 : 0}deg`;
+                    const segmentEnd = total ? (cursor / total) * 360 : 0;
+                    return `${colors[index]} ${segmentStart}deg ${segmentEnd}deg`;
                   }).join(", ");
                   return (
                     <div className="mt-5 flex items-center gap-6">
-                      <div className="relative h-36 w-36 shrink-0 rounded-full" style={{ background: total ? `conic-gradient(var(--primary) ${stops})` : "var(--muted)" }}>
+                      <div
+                        className="relative h-36 w-36 shrink-0 rounded-full"
+                        style={{ background: total ? `conic-gradient(${stops})` : "var(--muted)" }}
+                      >
                         <div className="absolute inset-6 flex items-center justify-center rounded-full bg-card text-center">
                           <div><p className="text-xs text-muted-foreground">Total</p><p className="text-sm font-bold">{fmt(total)}</p></div>
                         </div>
                       </div>
-                      <div className="min-w-0 space-y-2 text-xs">
-                        {parts.map(([label, value]) => (
-                          <div key={label} className="flex items-center justify-between gap-4">
-                            <span className="truncate">{label}</span>
+                      <div className="min-w-0 flex-1 space-y-2 text-xs">
+                        {parts.map(([label, value], index) => (
+                          <div key={label} className="flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colors[index] }} />
+                              <span className="truncate">{label}</span>
+                            </div>
                             <strong>{fmt(value)}</strong>
                           </div>
                         ))}
@@ -1290,28 +1298,6 @@ export function Kpis() {
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <Card className="p-5">
-                <h3 className="font-bold">Horas extras por departamento</h3>
-                <p className="text-xs text-muted-foreground">Distribuição do total de HE entre os setores.</p>
-                <div className="mt-5 space-y-4">
-                  {(() => {
-                    const departmentMap = new Map<string, number>();
-                    for (const item of overtimeEmployees) {
-                      const department = employees.find(e => e.id === item.employeeId)?.department || "Sem departamento";
-                      departmentMap.set(department, (departmentMap.get(department) ?? 0) + item.total - item.interjornada);
-                    }
-                    const rows = [...departmentMap.entries()].filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]);
-                    const max = Math.max(...rows.map(([, value]) => value), 1);
-                    return rows.length ? rows.map(([department, value]) => (
-                      <div key={department}>
-                        <div className="flex justify-between gap-3 text-sm"><span className="truncate">{department}</span><strong>{fmt(value)}</strong></div>
-                        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, value / max * 100)}%` }} /></div>
-                      </div>
-                    )) : <p className="py-8 text-center text-sm text-muted-foreground">Sem horas extras.</p>;
-                  })()}
-                </div>
-              </Card>
-
               <Card className="p-5">
                 <h3 className="font-bold">Funcionários com maior volume de HE</h3>
                 <p className="text-xs text-muted-foreground">Até 10 funcionários, considerando o período selecionado.</p>
@@ -1328,46 +1314,29 @@ export function Kpis() {
                   {!overtimeEmployees.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem horas extras.</p>}
                 </div>
               </Card>
-            </div>
-
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <Card className="p-5">
-                <h3 className="font-bold">HE × funcionários</h3>
-                <p className="text-xs text-muted-foreground">Quantidade de funcionários com HE e média de horas por pessoa em cada competência.</p>
-                <div className="mt-5 space-y-3">
-                  {monthlyOvertime.map(item => {
-                    const average = item.employees ? item.total / item.employees : 0;
-                    const maxAverage = Math.max(...monthlyOvertime.map(x => x.employees ? x.total / x.employees : 0), 1);
-                    return (
-                      <div key={item.periodId} className="grid grid-cols-[42px_1fr_90px] items-center gap-3">
-                        <span className="text-xs text-muted-foreground">{item.label}</span>
-                        <div>
-                          <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, average / maxAverage * 100)}%` }} /></div>
-                          <p className="mt-1 text-[10px] text-muted-foreground">{item.employees} {item.employees === 1 ? "funcionário" : "funcionários"} · {fmt(average)} por pessoa</p>
-                        </div>
-                        <strong className="text-right text-xs">{fmt(item.total)}</strong>
-                      </div>
-                    );
-                  })}
-                  {!monthlyOvertime.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados.</p>}
-                </div>
-              </Card>
 
               <Card className="p-5">
                 <h3 className="font-bold">Interjornada por competência</h3>
-                <p className="text-xs text-muted-foreground">Acompanhamento separado das horas de interjornada.</p>
-                <div className="mt-5 space-y-3">
-                  {monthlyOvertime.map(item => {
-                    const max = Math.max(...monthlyOvertime.map(x => x.interjornada), 1);
-                    return (
-                      <div key={item.periodId} className="grid grid-cols-[42px_1fr_72px] items-center gap-3">
-                        <span className="text-xs text-muted-foreground">{item.label}</span>
-                        <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, item.interjornada / max * 100)}%` }} /></div>
-                        <strong className="text-right text-xs">{fmt(item.interjornada)}</strong>
-                      </div>
-                    );
-                  })}
-                  {!monthlyOvertime.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados.</p>}
+                <p className="text-xs text-muted-foreground">Funcionários que possuem interjornada no período selecionado.</p>
+                <div className="mt-5 overflow-hidden rounded-xl border">
+                  <div className="grid grid-cols-[1fr_auto] gap-4 border-b bg-muted/30 px-4 py-3 text-xs font-semibold text-muted-foreground">
+                    <span>Funcionário</span>
+                    <span>Interjornada</span>
+                  </div>
+                  <div className="divide-y">
+                    {overtimeEmployees
+                      .filter(item => item.interjornada > 0)
+                      .sort((a, b) => b.interjornada - a.interjornada)
+                      .map(item => (
+                        <div key={item.employeeId} className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 text-sm">
+                          <span className="truncate">{item.name}</span>
+                          <strong>{fmt(item.interjornada)}</strong>
+                        </div>
+                      ))}
+                    {!overtimeEmployees.some(item => item.interjornada > 0) && (
+                      <p className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum funcionário com interjornada no período selecionado.</p>
+                    )}
+                  </div>
                 </div>
               </Card>
             </div>
