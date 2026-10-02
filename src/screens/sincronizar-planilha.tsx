@@ -32,7 +32,7 @@ type PreviewRow = {
 
 type Employee = { id: string; full_name: string; status?: string };
 
-const TARGET_END_DATES = new Set(["2026-08-20", "2026-09-20"]);
+const TARGET_PERIOD_START_DATES = new Set(["2026-07-21", "2026-08-21"]);
 const TEMPLATE_DB = "dp-success-planilha-sync";
 const TEMPLATE_STORE = "template";
 
@@ -171,10 +171,13 @@ async function readWorkbookRows(
 
       if (!currentEmployee) continue;
       const range = parseRange(b);
-      if (!range || !TARGET_END_DATES.has(range.endDate)) continue;
+      // A planilha possui períodos parciais para desligamentos (ex.: 21/07–22/08).
+      // A competência correta é determinada pela data de início; linhas de férias e outras
+      // linhas auxiliares não entram na sincronização.
+      if (!range || !TARGET_PERIOD_START_DATES.has(range.startDate)) continue;
 
       const resolved = resolveEmployee(currentEmployee, employees, exact, aliases);
-      const period = periods.find(p => p.start_date === range.startDate && p.end_date === range.endDate);
+      const period = periods.find(p => p.start_date === range.startDate);
       const debit = cellMinutes(row.getCell(3));
       const he60 = cellMinutes(row.getCell(4));
       const he60Night = cellMinutes(row.getCell(5));
