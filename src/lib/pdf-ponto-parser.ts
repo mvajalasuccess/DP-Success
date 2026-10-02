@@ -85,18 +85,29 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
     if (/Outros Afastamentos/i.test(segment)) afastamentos.push(date);
   }
 
-  const summaryTime = (label: RegExp) => {
-    const match = text.match(new RegExp(label.source + "\\s+(?:[A-Za-zÀ-ÿ]+\\s+)?(\\d{2,3}:\\d{2})", "i"));
-    return match ? hhmmToMinutes(match[1]) : 0;
-  };
+  // O relatório traz os totais no resumo do funcionário.
+  // Não procuramos "Crédito" ou "Débito" no documento inteiro, porque essas
+  // palavras também aparecem nos eventos diários e isso fazia o parser
+  // capturar horários como 00:00.
+  const summary = summaryStart >= 0 ? text.slice(summaryStart) : "";
 
-  // O relatório traz os totais no resumo do funcionário. Esses são os valores
-  // usados na importação; os eventos diários ficam apenas como apoio de leitura.
-  const creditMinutes = summaryTime(/Cr[eé]dito/);
-  const debitMinutes = summaryTime(/D[eé]bito/);
-  const monthBalanceMinutes = summaryTime(/Saldo do M[eê]s/);
-  const interjornada = text.match(/Interjornada\s+(\d{2,3}:\d{2})/i);
-  const adNot = text.match(/Ad\.Not\.\s*(?:\d+\s+)?(\d{2,3}:\d{2})/i);
+  const monthBalanceMatch = summary.match(
+    /Saldo do M[eê]s:\s*(\d{2,3}:\d{2})\s*(Cr[eé]dito|D[eé]bito)/i,
+  );
+
+  const currentBalanceMatch = summary.match(
+    /Saldo Atual:\s*\d{2,3}:\d{2}\s*(?:Cr[eé]dito|D[eé]bito)\s*\|\s*(\d{2,3}:\d{2})\s+(\d{2,3}:\d{2})/i,
+  );
+
+  const creditMinutes = currentBalanceMatch ? hhmmToMinutes(currentBalanceMatch[1]) : 0;
+  const debitMinutes = currentBalanceMatch ? hhmmToMinutes(currentBalanceMatch[2]) : 0;
+
+  const rawMonthBalance = monthBalanceMatch ? hhmmToMinutes(monthBalanceMatch[1]) : 0;
+  const monthBalanceMinutes =
+    monthBalanceMatch?.[2]?.toLowerCase().startsWith("d") ? -rawMonthBalance : rawMonthBalance;
+
+  const interjornada = summary.match(/Interjornada\s+(\d{2,3}:\d{2})/i);
+  const adNot = summary.match(/Ad\.Not\.\s*(?:\d+\s+)?(\d{2,3}:\d{2})/i);
 
   return {
     page,
