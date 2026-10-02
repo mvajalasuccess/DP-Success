@@ -465,6 +465,7 @@ export function SincronizarPlanilha() {
         });
       }
       workbookRef.current = null;
+      templateBufferRef.current = null;
       fileNameRef.current = "planilha-atualizada.xlsx";
       setFileName("");
       setRows([]);
