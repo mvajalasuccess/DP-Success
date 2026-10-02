@@ -811,27 +811,77 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
     }
   }
 
+  function periodShortLabel(startDate: string, endDate: string) {
+    const months = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+    const startMonth = Number(startDate.slice(5, 7));
+    const endMonth = Number(endDate.slice(5, 7));
+    return `${months[startMonth - 1]}-${months[endMonth - 1]}`;
+  }
+
+  function findEmployeeBlockForExport(worksheet: any, employeeName: string) {
+    for (let r = 1; r <= worksheet.rowCount; r += 1) {
+      const row = worksheet.getRow(r);
+      const b = excelCellText(row.getCell(2));
+      const c = excelCellText(row.getCell(3));
+      if (b.toUpperCase() !== "EMPRESA" || c.toUpperCase() !== "FUNCIONÁRIO") continue;
+
+      const name = excelCellText(worksheet.getRow(r + 1).getCell(3));
+      if (normalizeName(name) !== normalizeName(employeeName)) continue;
+
+      let lastPeriodRow = r + 1;
+      for (let currentRow = r + 2; currentRow <= worksheet.rowCount; currentRow += 1) {
+        const range = parseRange(excelCellText(worksheet.getRow(currentRow).getCell(2)));
+        if (!range) break;
+        lastPeriodRow = currentRow;
+      }
+
+      return {
+        firstPeriodRow: r + 2,
+        lastPeriodRow,
+        totalRow: lastPeriodRow + 1,
+      };
+    }
+    return null;
+  }
+
   async function exportUpdated() {
     if (!templateBufferRef.current) {
       setError("Importe novamente a planilha para gerar a cópia atualizada.");
       return;
     }
-    setExporting(true); setError(""); setMessage("");
+
+    setExporting(true);
+    setError("");
+    setMessage("");
+
     try {
       const { default: ExcelJS } = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(templateBufferRef.current);
-      const periodIds = [...new Set(rows.map(r => r.periodId).filter((id): id is string => Boolean(id)))];
+
+      const periodIds = [...new Set([
+        ...rows.map(r => r.periodId).filter((id): id is string => Boolean(id)),
+        ...syncChanges
+          .filter(change => change.kind === "nova_linha")
+          .map(change => currentPeriods.find(period => periodRangeLabel({
+            start_date: period.start_date,
+            end_date: period.end_date,
+          }) === change.periodLabel)?.id)
+          .filter((id): id is string => Boolean(id)),
+      ])];
+
       const { allPeriods, creditMap, debitMap } = await getCurrentSyncData(periodIds);
       let updated = 0;
+      let inserted = 0;
 
-      // Mantém a estrutura original do arquivo: somente as linhas já existentes
-      // são preenchidas. Não usamos spliceRows nem criamos novas linhas.
+      // Atualiza somente as linhas que já existem.
       for (const row of rows) {
         const worksheet = workbook.getWorksheet(row.sheet);
         if (!worksheet || row.status !== "ok" || !row.employeeId || !row.periodId) continue;
+
         const period = allPeriods.find(p => p.id === row.periodId);
         if (!period) continue;
+
         writeExcelComposition(
           worksheet.getRow(row.rowNumber),
           creditMap.get(`${row.employeeId}|${period.id}`) ?? {},
@@ -841,10 +891,74 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
         updated += 1;
       }
 
+      // Insere cada competência nova exatamente no bloco do funcionário indicado
+      // pela pré-visualização. Ex.: Mariana -> aba CSC -> antes do TOTAL.
+      const newChanges = syncChanges.filter(change => change.kind === "nova_linha");
+
+      for (const change of newChanges) {
+        const worksheet = workbook.getWorksheet(change.sheet);
+        if (!worksheet) continue;
+
+        const employee = employees.find(item => normalizeName(item.full_name) === normalizeName(change.employeeName))
+          ?? resolveEmployee(change.employeeName, employees, buildEmployeeIndex(employees), aliases).employee;
+        if (!employee) continue;
+
+        const period = allPeriods.find(item =>
+          periodRangeLabel({ start_date: item.start_date, end_date: item.end_date }) === change.periodLabel
+        );
+        if (!period) continue;
+
+        const block = findEmployeeBlockForExport(worksheet, change.employeeName);
+        if (!block) continue;
+
+        // Não inserir duas vezes se a competência já estiver presente no bloco.
+        let alreadyExists = false;
+        for (let r = block.firstPeriodRow; r <= block.lastPeriodRow; r += 1) {
+          const range = parseRange(excelCellText(worksheet.getRow(r).getCell(2)));
+          if (range?.startDate === period.start_date) {
+            alreadyExists = true;
+            break;
+          }
+        }
+        if (alreadyExists) continue;
+
+        const insertAt = block.totalRow;
+        const templateRowNumber = Math.max(block.firstPeriodRow, block.lastPeriodRow);
+        const templateRow = worksheet.getRow(templateRowNumber);
+
+        // ExcelJS insere a linha antes do TOTAL. Em seguida copiamos o estilo
+        // e as fórmulas relativas da última competência do funcionário.
+        worksheet.spliceRows(insertAt, 0, []);
+        const insertedRow = worksheet.getRow(insertAt);
+        cloneRowContent(templateRow, insertedRow, 19);
+
+        insertedRow.getCell(1).value = periodShortLabel(period.start_date, period.end_date);
+        insertedRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
+
+        writeExcelComposition(
+          insertedRow,
+          creditMap.get(`${employee.id}|${period.id}`) ?? {},
+          debitMap.get(`${employee.id}|${period.id}`) ?? 0,
+          worksheet.name,
+        );
+
+        // A linha TOTAL foi deslocada uma posição. Ajustamos apenas as fórmulas
+        // de total do bloco; o Excel continuará calculando os valores ao abrir.
+        const newTotalRow = insertAt + 1;
+        const firstDataRow = block.firstPeriodRow;
+        setFormulaCell(worksheet.getRow(newTotalRow).getCell(9), `SUM(I${firstDataRow}:I${insertAt})`);
+        setFormulaCell(worksheet.getRow(newTotalRow).getCell(14), `SUM(N${firstDataRow}:N${insertAt})`);
+
+        inserted += 1;
+      }
+
       setMessage("Gerando o arquivo Excel atualizado…");
       await new Promise(resolve => setTimeout(resolve, 50));
+
       const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -853,8 +967,12 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       anchor.style.display = "none";
       document.body.appendChild(anchor);
       anchor.click();
-      setTimeout(() => { anchor.remove(); URL.revokeObjectURL(url); }, 1500);
-      setMessage(`Download iniciado. ${updated} linha(s) existente(s) atualizada(s). Somente as horas foram preenchidas; saldo e totais permanecem por conta do Excel.`);
+      setTimeout(() => {
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }, 1500);
+
+      setMessage(`Download iniciado. ${inserted} nova(s) competência(s) adicionada(s) e ${updated} linha(s) existente(s) atualizada(s). Mariana, por exemplo, será inserida no bloco dela na aba CSC.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao gerar/baixar a planilha.");
     } finally {
