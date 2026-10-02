@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { Employees } from "@/screens/funcionarios";
@@ -133,7 +133,26 @@ function AppShell({
 
   return (
     <div className="min-h-screen bg-background">
-      <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r bg-sidebar transition-[width] duration-200 lg:flex lg:flex-col ${collapsed ? "w-16" : "w-64"}`}>
+      {collapsed && (
+        <div className="fixed inset-x-0 top-0 z-50 hidden h-16 items-center border-b bg-background/95 px-6 shadow-sm backdrop-blur lg:flex">
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="mr-4 rounded-lg p-2 text-foreground transition-colors hover:bg-muted"
+            title="Abrir menu"
+            aria-label="Abrir menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Clock3 className="h-4 w-4" />
+            </div>
+            <span className="font-display text-base font-bold text-foreground">DP Success</span>
+          </div>
+        </div>
+      )}
+      <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r bg-sidebar transition-[transform,width] duration-200 lg:flex lg:flex-col ${collapsed ? "-translate-x-full w-64" : "translate-x-0 w-64"}`}>
         <div className={`flex h-16 shrink-0 items-center border-b ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
           {!collapsed && <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></div><div><div className="font-display text-base font-bold">DP Success</div><div className="text-[9px] uppercase tracking-widest text-muted-foreground">RH · DP · Gestão</div></div></div>}
           {collapsed && <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></div>}
@@ -204,7 +223,7 @@ function AppShell({
         <SidebarProfile collapsed={collapsed} onNavigate={go} />
       </aside>
 
-      <main className={`transition-[padding] duration-200 ${collapsed ? "lg:pl-16" : "lg:pl-64"}`}>
+      <main className={`transition-[padding] duration-200 ${collapsed ? "lg:pl-0 lg:pt-16" : "lg:pl-64"}`}>
         {children}
       </main>
     </div>
