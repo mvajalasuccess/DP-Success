@@ -111,7 +111,7 @@ export function ImportarCartaoPonto() {
 
         if (row.creditMinutes > 0) {
           const result = await supabase.from("overtime_records").insert({
-            employee_id: row.employeeId, reference_date: row.period!.end_date, period_id: row.period!.id,
+            employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
             minutes: row.creditMinutes, launch_type: "HE_60", rate_percent: 60,
             launch_group_id: groupPrefix + ":credito", notes: "Importado do Cartão Ponto — Crédito total do período",
           });
@@ -121,7 +121,7 @@ export function ImportarCartaoPonto() {
 
         if (row.debitMinutes > 0) {
           const result = await supabase.from("bank_hours").insert({
-            employee_id: row.employeeId, entry_date: row.period!.end_date, period_id: row.period!.id,
+            employee_id: row.employeeId!, entry_date: row.period!.end_date, period_id: row.period!.id,
             kind: "debito", minutes: row.debitMinutes, previous_balance_minutes: 0, balance_minutes: row.monthBalanceMinutes,
             justification: "Importado do Cartão Ponto — Débito total do período",
             launch_group_id: groupPrefix + ":debito", created_by: auth.user?.id ?? null,
@@ -132,12 +132,12 @@ export function ImportarCartaoPonto() {
 
         const summaryRows: Array<{ employee_id: string; reference_date: string; period_id: string; minutes: number; launch_type: "INTERJORNADA_50" | "ADICIONAL_NOTURNO"; rate_percent: number; launch_group_id: string; notes: string }> = [];
         if (row.interjornadaMinutes > 0) summaryRows.push({
-          employee_id: row.employeeId, reference_date: row.period!.end_date, period_id: row.period!.id,
+          employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
           minutes: row.interjornadaMinutes, launch_type: "INTERJORNADA_50", rate_percent: 50,
           launch_group_id: groupPrefix + ":interjornada", notes: "Importado do Cartão Ponto — Interjornada",
         });
         if (row.additionalNightMinutes > 0) summaryRows.push({
-          employee_id: row.employeeId, reference_date: row.period!.end_date, period_id: row.period!.id,
+          employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
           minutes: row.additionalNightMinutes, launch_type: "ADICIONAL_NOTURNO", rate_percent: 20,
           launch_group_id: groupPrefix + ":adicional-noturno", notes: "Importado do Cartão Ponto — Adicional noturno",
         });
