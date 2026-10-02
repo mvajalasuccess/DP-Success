@@ -27,8 +27,6 @@ const ALLOWED_CODES = new Set([
   "falta_injustificada",
 ]);
 
-const DECLARATION_REASONS = ["Acompanhante", "Consulta", "Exame", "Outros"];
-
 const emptyForm = {
   employee_id: "",
   occurrence_type_id: "",
@@ -197,7 +195,13 @@ export function Ocorrencias() {
   }
 
   function displayQuantity(row: Occ) {
-    return row.quantity == null ? "—" : `${row.quantity} ${Number(row.quantity) === 1 ? "dia" : "dias"}`;
+    return row.quantity == null ? "—" : String(Math.round(Number(row.quantity)));
+  }
+
+  function formatDate(value: string) {
+    if (!value) return "—";
+    const [year, month, day] = value.split("-");
+    return `${day}/${month}/${year}`;
   }
 
   return (
@@ -208,7 +212,7 @@ export function Ocorrencias() {
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </a>
-          <b>DP Success · Faltas e Ocorrências</b>
+          <b>DP Success · Faltas</b>
         </div>
       </header>
 
@@ -216,14 +220,14 @@ export function Ocorrencias() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-primary">Ponto</p>
-            <h1 className="text-3xl font-bold">Faltas e Ocorrências</h1>
+            <h1 className="text-3xl font-bold">Faltas</h1>
             <p className="text-sm text-muted-foreground">
-              Registre folgas e faltas em dias.
+              Registre faltas e folgas em dias.
             </p>
           </div>
           <button onClick={startNew} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground">
             <Plus className="mr-2 inline h-4 w-4" />
-            Nova ocorrência
+            Novo registro
           </button>
         </div>
 
@@ -238,14 +242,13 @@ export function Ocorrencias() {
                   <th className="px-5 py-3">Data</th>
                   <th className="px-5 py-3">Tipo</th>
                   <th className="px-5 py-3">Quantidade</th>
-                  <th className="px-5 py-3">Unidade</th>
                   <th className="px-5 py-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">
+                    <td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">
                       Nenhuma ocorrência cadastrada.
                     </td>
                   </tr>
@@ -253,10 +256,9 @@ export function Ocorrencias() {
                 {rows.map(row => (
                   <tr key={row.id}>
                     <td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td>
-                    <td className="px-5 py-4">{row.occurrence_date}{row.end_date ? ` → ${row.end_date}` : ""}</td>
+                    <td className="px-5 py-4">{formatDate(row.occurrence_date)}{row.end_date ? ` → ${formatDate(row.end_date)}` : ""}</td>
                     <td className="px-5 py-4">{row.occurrence_types?.name ?? "—"}</td>
                     <td className="px-5 py-4">{displayQuantity(row)}</td>
-                    <td className="px-5 py-4">dias</td>
                     <td className="px-5 py-4 text-right">
                       <button onClick={() => startEdit(row)} className="mr-2 rounded-md border p-2" title="Editar">
                         <Pencil className="h-4 w-4" />
@@ -276,9 +278,9 @@ export function Ocorrencias() {
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <Card className="w-full max-w-xl p-6">
-            <h2 className="text-xl font-bold">{editing ? "Editar ocorrência" : "Nova ocorrência"}</h2>
+            <h2 className="text-xl font-bold">{editing ? "Editar registro" : "Novo registro"}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Faltas são registradas em dias. Declarações são registradas pelas horas realmente abonadas.
+              Registre a falta ou folga e a quantidade de dias correspondente.
             </p>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -299,8 +301,8 @@ export function Ocorrencias() {
 
                 <input
                   type="number"
-                  min="0"
-                  step="0.5"
+                  min="1"
+                  step="1"
                   placeholder="Quantidade de dias"
                   value={form.quantity}
                   onChange={e => setForm({ ...form, quantity: e.target.value })}
