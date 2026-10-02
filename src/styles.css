@@ -5,9 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system — "Prancheta de Ponto"
+ * Design system — DP Success
+ * Identidade: verde assinatura #06CAA0 + grafite + neutros claros.
  * Todos os valores de cor são tokens semânticos em oklch.
- * Nunca escreva cores literais nos componentes.
  */
 
 @theme inline {
@@ -19,7 +19,7 @@
 
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-mono: "IBM Plex Mono", ui-monospace, system-ui, monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -64,54 +64,58 @@
 :root {
   --radius: 1rem;
 
-  /* DP Success — luxo corporativo: marfim, grafite, verde profundo e dourado discreto */
-  --background: oklch(0.972 0.008 95);
-  --foreground: oklch(0.205 0.018 80);
-  --panel: oklch(0.986 0.006 95);
-  --card: oklch(0.995 0.003 95);
-  --card-foreground: oklch(0.205 0.018 80);
-  --popover: oklch(0.995 0.003 95);
-  --popover-foreground: oklch(0.205 0.018 80);
+  /* DP Success — #06CAA0 como assinatura, com base grafite e neutra */
+  --background: oklch(0.978 0.006 160);
+  --foreground: oklch(0.205 0.018 155);
+  --panel: oklch(0.988 0.004 160);
+  --card: oklch(0.998 0.002 160);
+  --card-foreground: oklch(0.205 0.018 155);
+  --popover: oklch(0.998 0.002 160);
+  --popover-foreground: oklch(0.205 0.018 155);
 
-  --primary: oklch(0.31 0.055 160);
-  --primary-foreground: oklch(0.985 0.004 95);
+  /* #06CAA0 */
+  --primary: oklch(0.735 0.16 168);
+  --primary-foreground: oklch(0.985 0.004 160);
 
-  --secondary: oklch(0.936 0.008 95);
-  --secondary-foreground: oklch(0.30 0.015 80);
+  --secondary: oklch(0.92 0.025 160);
+  --secondary-foreground: oklch(0.27 0.02 155);
 
-  --muted: oklch(0.936 0.008 95);
-  --muted-foreground: oklch(0.49 0.018 80);
+  --muted: oklch(0.94 0.012 160);
+  --muted-foreground: oklch(0.49 0.018 155);
 
-  --accent: oklch(0.90 0.018 160);
-  --accent-foreground: oklch(0.25 0.02 80);
+  --accent: oklch(0.90 0.055 168);
+  --accent-foreground: oklch(0.23 0.02 155);
 
-  --info: oklch(0.446 0.084 245);
-  --info-foreground: oklch(0.99 0.004 240);
+  /* Azul petróleo para informação */
+  --info: oklch(0.43 0.075 225);
+  --info-foreground: oklch(0.99 0.004 225);
 
-  --warning: oklch(0.601 0.124 65);
+  /* Âmbar discreto para atenção */
+  --warning: oklch(0.63 0.12 72);
   --warning-foreground: oklch(0.99 0.006 80);
 
-  --destructive: oklch(0.503 0.144 15);
+  --destructive: oklch(0.53 0.14 25);
   --destructive-foreground: oklch(0.99 0.005 20);
 
-  --border: oklch(0.885 0.012 90);
-  --input: oklch(0.86 0.012 90);
-  --ring: oklch(0.31 0.055 160);
+  --border: oklch(0.89 0.015 160);
+  --input: oklch(0.86 0.018 160);
+  --ring: oklch(0.735 0.16 168);
 
-  --chart-1: oklch(0.47 0.086 167);
-  --chart-2: oklch(0.446 0.084 245);
-  --chart-3: oklch(0.601 0.124 65);
-  --chart-4: oklch(0.503 0.144 15);
-  --chart-5: oklch(0.503 0.021 236);
+  --chart-1: oklch(0.735 0.16 168);
+  --chart-2: oklch(0.43 0.075 225);
+  --chart-3: oklch(0.63 0.12 72);
+  --chart-4: oklch(0.53 0.14 25);
+  --chart-5: oklch(0.52 0.025 220);
 
-  --sidebar: oklch(0.22 0.018 155);
-  --sidebar-foreground: oklch(0.93 0.008 95);
-  --sidebar-primary: oklch(0.69 0.055 83);
-  --sidebar-primary-foreground: oklch(0.20 0.018 80);
-  --sidebar-accent: oklch(0.29 0.022 155);
-  --sidebar-accent-foreground: oklch(0.96 0.006 95);
-  --sidebar-border: oklch(0.34 0.02 155);
-  --sidebar-ring: oklch(0.69 0.055 83);
+  /* Sidebar grafite, com verde como assinatura */
+  --sidebar: oklch(0.205 0.018 155);
+  --sidebar-foreground: oklch(0.94 0.008 160);
+  --sidebar-primary: oklch(0.735 0.16 168);
+  --sidebar-primary-foreground: oklch(0.19 0.018 155);
+  --sidebar-accent: oklch(0.27 0.022 155);
+  --sidebar-accent-foreground: oklch(0.97 0.006 160);
+  --sidebar-border: oklch(0.33 0.02 155);
+  --sidebar-ring: oklch(0.735 0.16 168);
 }
 
 @layer base {
@@ -123,7 +127,8 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;\n    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   h1,
@@ -157,8 +162,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-
-/* Cursor de interação: elementos acionáveis mostram que podem ser clicados. */
+/* Cursor de interação */
 button:not(:disabled),
 a[href],
 select:not(:disabled),
@@ -179,7 +183,6 @@ textarea:disabled {
   cursor: not-allowed;
 }
 
-
 /* Perfil Consulta: remove ações de criação, edição, exclusão e salvamento. */
 body.role-consulta button:has(svg.lucide-plus),
 body.role-consulta button:has(svg.lucide-pencil),
@@ -189,7 +192,6 @@ body.role-consulta button:has(svg.lucide-power) {
   display: none !important;
 }
 
-/* Consulta também não deve conseguir acionar controles de alteração via teclado. */
 body.role-consulta input[type="submit"],
 body.role-consulta button[type="submit"] {
   display: none !important;
