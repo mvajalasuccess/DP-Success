@@ -266,7 +266,6 @@ export function SincronizarPlanilha() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [syncChanges, setSyncChanges] = useState<SyncChange[]>([]);
@@ -482,31 +481,6 @@ export function SincronizarPlanilha() {
   }
 
 
-  function formatExcelDate(date: string) {
-    const [year, month, day] = date.split("-");
-    return `${day}/${month}/${year.slice(-2)}`;
-  }
-
-  function formatExcelPeriod(startDate: string, endDate: string) {
-    return `${formatExcelDate(startDate)} - ${formatExcelDate(endDate)}`;
-  }
-
-  function writeExcelComposition(
-    excelRow: any,
-    composition: Record<string, number>,
-    debit: number,
-    sheetName: string,
-  ) {
-    // Somente horas de entrada. Saldo e totais ficam para o Excel.
-    setTimeCell(excelRow.getCell(3), debit);
-    setTimeCell(excelRow.getCell(4), composition.HE_60 ?? 0);
-    setTimeCell(excelRow.getCell(5), composition.HE_60_NOTURNO ?? 0);
-    setTimeCell(excelRow.getCell(6), composition.HE_100 ?? 0);
-    setTimeCell(excelRow.getCell(7), composition.HE_100_NOTURNO ?? 0);
-    setTimeCell(excelRow.getCell(8), composition.ADICIONAL_NOTURNO ?? 0);
-    setTimeCell(excelRow.getCell(sheetName === "SEV.EXC.EMP" ? 14 : 19), composition.INTERJORNADA_50 ?? 0);
-  }
-
   function isNonZeroComposition(composition: Record<string, number>, debit: number) {
     return debit > 0 || Object.values(composition).some(value => Number(value) > 0);
   }
@@ -682,39 +656,6 @@ export function SincronizarPlanilha() {
     } finally {
       setPreviewLoading(false);
     }
-  }
-
-  function periodShortLabel(startDate: string, endDate: string) {
-    const months = ["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
-    const startMonth = Number(startDate.slice(5, 7));
-    const endMonth = Number(endDate.slice(5, 7));
-    return `${months[startMonth - 1]}-${months[endMonth - 1]}`;
-  }
-
-  function findEmployeeBlockForExport(worksheet: any, employeeName: string) {
-    for (let r = 1; r <= worksheet.rowCount; r += 1) {
-      const row = worksheet.getRow(r);
-      const b = excelCellText(row.getCell(2));
-      const c = excelCellText(row.getCell(3));
-      if (b.toUpperCase() !== "EMPRESA" || c.toUpperCase() !== "FUNCIONÁRIO") continue;
-
-      const name = excelCellText(worksheet.getRow(r + 1).getCell(3));
-      if (normalizeName(name) !== normalizeName(employeeName)) continue;
-
-      let lastPeriodRow = r + 1;
-      for (let currentRow = r + 2; currentRow <= worksheet.rowCount; currentRow += 1) {
-        const range = parseRange(excelCellText(worksheet.getRow(currentRow).getCell(2)));
-        if (!range) break;
-        lastPeriodRow = currentRow;
-      }
-
-      return {
-        firstPeriodRow: r + 2,
-        lastPeriodRow,
-        totalRow: lastPeriodRow + 1,
-      };
-    }
-    return null;
   }
 
   const actionAllowed = typeof document === "undefined" || !document.body.classList.contains("role-consulta");
