@@ -159,7 +159,7 @@ function AppShell({
           <button type="button" onClick={onToggleCollapsed} className="rounded-lg p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" title={collapsed ? "Expandir menu" : "Minimizar menu"} aria-label={collapsed ? "Expandir menu" : "Minimizar menu"}><ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : "rotate-90"}`} /></button>
         </div>
 
-        <nav className={`flex-1 overflow-y-auto p-3 ${collapsed ? "space-y-2" : "space-y-2"}`}>
+        <nav className={`flex-1 overflow-y-auto sidebar-scrollbar-hidden p-3 ${collapsed ? "space-y-2" : "space-y-2"}`}>
           {!collapsed ? (
             <>
               <div>
