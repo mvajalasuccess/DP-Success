@@ -215,6 +215,24 @@ export function PointClosing() {
       expectedByEmployee.set(employee.id, expectedMinutesForEmployee(employee));
     }
 
+    // Agrupa os registros uma única vez. Antes, cada funcionário percorria
+    // todas as linhas de ocorrências/atestados/débitos/HE, o que crescia
+    // desnecessariamente com o volume da competência.
+    const groupByEmployee = (items: any[]) => {
+      const map = new Map<string, any[]>();
+      for (const item of items) {
+        const key = String(item.employee_id);
+        const list = map.get(key);
+        if (list) list.push(item);
+        else map.set(key, [item]);
+      }
+      return map;
+    };
+    const occurrenceByEmployee = groupByEmployee(occurrenceRows ?? []);
+    const certificateByEmployee = groupByEmployee(certificateRows ?? []);
+    const debitByEmployee = groupByEmployee(debitRows ?? []);
+    const overtimeByEmployee = groupByEmployee(overtimeRows ?? []);
+
     const rows = employeesInPeriod.map((employee: any) => {
       const id = employee.id;
       const expected = expectedByEmployee.get(id) ?? 0;
@@ -229,7 +247,7 @@ export function PointClosing() {
       let he20 = 0;
       let interjornada = 0;
 
-      for (const row of occurrenceRows ?? []) {
+      for (const row of occurrenceByEmployee.get(String(id)) ?? []) {
         if (row.employee_id !== id) continue;
         const code = String(row.occurrence_types?.code ?? "").toLowerCase();
         const quantity = Number(row.quantity || 0);
@@ -249,7 +267,7 @@ export function PointClosing() {
         }
       }
 
-      for (const row of certificateRows ?? []) {
+      for (const row of certificateByEmployee.get(String(id)) ?? []) {
         if (row.employee_id !== id) continue;
         const overlapStart = row.start_date > p.start_date ? row.start_date : p.start_date;
         const overlapEnd = row.end_date < p.end_date ? row.end_date : p.end_date;
@@ -261,11 +279,11 @@ export function PointClosing() {
         certificateMinutes += Math.round(days * 528);
       }
 
-      for (const row of debitRows ?? []) {
+      for (const row of debitByEmployee.get(String(id)) ?? []) {
         if (row.employee_id === id) debitMinutes += Math.abs(Number(row.minutes || 0));
       }
 
-      for (const row of overtimeRows ?? []) {
+      for (const row of overtimeByEmployee.get(String(id)) ?? []) {
         if (row.employee_id !== id) continue;
         const minutes = Math.abs(Number(row.minutes || 0));
         const type = String(row.launch_type ?? "").toUpperCase();
@@ -308,8 +326,8 @@ export function PointClosing() {
 
     // Recalcula os campos derivados de cada funcionário a partir dos lançamentos atuais.
     const syncedRows = rows.map((row: any) => {
-      const liveOvertime = (overtimeRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
-      const liveDebits = (debitRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
+      const liveOvertime = overtimeByEmployee.get(String(row.employee_id)) ?? [];
+      const liveDebits = debitByEmployee.get(String(row.employee_id)) ?? [];
       const he60 = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "HE_60" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
       const he60Night = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "HE_60_NOTURNO" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
       const he100 = liveOvertime.reduce((sum: number, item: any) => ["HE_100", "HE_100_NOTURNO"].includes(String(item.launch_type ?? "").toUpperCase()) ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
