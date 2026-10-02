@@ -223,21 +223,21 @@ export function Employees() {
             <div><h2 className="font-display font-bold">Lista de funcionários</h2><p className="text-xs text-muted-foreground">Funcionários cadastrados</p></div>
             <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><div className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 sm:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "todos" | "ativo" | "inativo")} className="rounded-lg border bg-background px-3 py-2 text-sm outline-none"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select></div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="max-h-[calc(100vh-250px)] overflow-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-muted/40 text-xs text-muted-foreground"><tr>
+              <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
                 <th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Cargo</th><th className="px-5 py-3">Departamento</th><th className="px-5 py-3">Admissão</th><th className="px-5 py-3">Desligamento</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Ações</th>
               </tr></thead>
               <tbody className="divide-y">
                 {loading ? <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Carregando...</td></tr> :
                 filtered.length === 0 ? <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Nenhum funcionário encontrado.</td></tr> :
-                filtered.map((e) => <tr key={e.id}>
+                filtered.map((e) => <tr key={e.id} className="transition-colors hover:bg-muted/25">
                   <td className="px-5 py-4 font-medium">{e.full_name}</td>
                   <td className="px-5 py-4 text-muted-foreground">{e.positions?.name ?? "—"}</td>
                   <td className="px-5 py-4 text-muted-foreground">{e.departments?.name ?? "—"}</td>
                   <td className="px-5 py-4">{e.hire_date ? new Date(e.hire_date + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</td>
                   <td className="px-5 py-4">{e.termination_date ? new Date(e.termination_date + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</td>
-                  <td className="px-5 py-4"><span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">{e.status === "ativo" ? "Ativo" : "Inativo"}</span></td>
+                  <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${e.status === "ativo" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{e.status === "ativo" ? "Ativo" : "Inativo"}</span></td>
                   <td className="px-5 py-4"><div className="flex justify-end gap-2">
                     <button type="button" disabled={actionLoading===e.id} onClick={()=>openEdit(e)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50"><Pencil className="h-3.5 w-3.5"/>Editar</button>
                     {e.status==="ativo" && <button type="button" disabled={actionLoading===e.id} onClick={()=>void deactivateEmployee(e)} className="rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50">Desligar</button>}
