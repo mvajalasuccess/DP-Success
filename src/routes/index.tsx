@@ -83,6 +83,15 @@ function Dashboard() {
     return () => document.body.classList.remove("role-consulta");
   }, [isConsulta]);
 
+  useEffect(() => {
+    const onNavigate = (event: Event) => {
+      const target = (event as CustomEvent<ScreenKey>).detail;
+      if (target) setScreen(target);
+    };
+    window.addEventListener("dp-success:navigate", onNavigate);
+    return () => window.removeEventListener("dp-success:navigate", onNavigate);
+  }, []);
+
   const Screen = screen === "dashboard" ? null : screenComponents[screen];
 
   return (
