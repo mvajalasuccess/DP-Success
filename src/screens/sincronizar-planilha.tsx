@@ -533,16 +533,23 @@ export function SincronizarPlanilha() {
 }
 
 function insertDataRowWithoutSplice(worksheet: any, totalRowNumber: number, templateRowNumber: number) {
-  // Desloca as linhas da planilha de baixo para cima, evitando worksheet.insertRow(),
-  // que pode congelar o navegador ao reindexar um arquivo grande.
-  const lastRow = worksheet.rowCount;
-  for (let r = lastRow; r >= totalRowNumber; r -= 1) {
-    cloneRowContent(worksheet.getRow(r), worksheet.getRow(r + 1), 19);
+  // O modelo possui linhas vazias entre os blocos. Aproveitamos a primeira linha
+  // vazia logo abaixo do TOTAL, evitando qualquer insert/splice no ExcelJS.
+  const nextRow = worksheet.getRow(totalRowNumber + 1);
+  const hasContent = Array.from({ length: 19 }, (_, index) => excelCellText(nextRow.getCell(index + 1))).some(Boolean);
+  if (hasContent) {
+    throw new Error(
+      `Não foi possível criar a nova competência porque não há uma linha vazia após o TOTAL do funcionário na aba "${worksheet.name}".`
+    );
   }
+
+  const sourceTotal = worksheet.getRow(totalRowNumber);
+  cloneRowContent(sourceTotal, nextRow, 19);
 
   const insertedRow = worksheet.getRow(totalRowNumber);
   const templateRow = worksheet.getRow(templateRowNumber);
   cloneRowContent(templateRow, insertedRow, 19);
+
   return insertedRow;
 }
 function setFormulaCell(cell: ExcelCell, formula: string) {
