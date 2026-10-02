@@ -488,7 +488,7 @@ export function PointClosing() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] px-6 py-7">
+      <main className="mx-auto w-full max-w-none px-4 py-7">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
             <p className="text-sm font-medium text-primary">Operação</p>
@@ -524,21 +524,21 @@ export function PointClosing() {
             <Card className="mt-4 overflow-hidden">
               {loadingRows ? <div className="p-8 text-center text-muted-foreground">Carregando fechamento...</div> :
               historicalRows.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhum lançamento histórico encontrado nesta competência.</div> :
-              <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="min-w-[1500px] w-full text-xs">
-                <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada","Ação"].map(h => <th key={h} className="whitespace-nowrap px-3 py-3 text-left font-semibold">{h}</th>)}</tr></thead>
+              <div className="max-h-[calc(100vh-260px)] overflow-y-auto overflow-x-hidden"><table className="w-full table-fixed text-[11px] leading-tight">
+                <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada","Ação"].map(h => <th key={h} className="px-2 py-2.5 text-left font-semibold whitespace-normal">{h}</th>)}</tr></thead>
                 <tbody className="divide-y">{historicalRows.map(row => editingRow?.id === row.id ? (
                   <tr key={row.id} className="bg-primary/5">
-                    <td className="whitespace-nowrap px-3 py-2 font-medium">{row.employee_name}</td>
-                    {[["expected","Previstas"],["worked","Trabalhadas"],["absence_quantity","Faltas"],["certificate","Atestados"],["declaration","Declaração"],["allowance","Abonos"],["debit","Débito"],["he60","HE 60%"],["he60night","HE 60%+20%"],["he100","HE 100%"],["he20","HE 20%"],["interjornada","Interjornada"]].map(([key,label]) => <td key={String(key)} className="px-2 py-2"><input aria-label={String(label)} type={String(key) === "absence_quantity" ? "number" : "text"} min={String(key) === "absence_quantity" ? "0" : undefined} step={String(key) === "absence_quantity" ? "0.01" : undefined} value={editingRow[String(key)] ?? ""} onChange={e => setEditingRow((v: any) => ({...v,[String(key)]: String(key) === "absence_quantity" ? e.target.value : e.target.value}))} className="w-24 rounded-md border bg-background px-2 py-1.5 text-center font-mono" placeholder={String(key) === "absence_quantity" ? "0" : "00:00"} /></td>)}
-                    <td className="px-3 py-2"><div className="flex gap-1.5"><button disabled={rowSaving} onClick={() => void saveHistoricalRow()} className="inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1.5 text-xs text-primary-foreground"><Save className="h-3.5 w-3.5" /> Salvar</button><button disabled={rowSaving} onClick={() => setEditingRow(null)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><X className="h-3.5 w-3.5" /> Cancelar</button></div></td>
+                    <td className="px-2 py-2 font-medium whitespace-normal break-words">{row.employee_name}</td>
+                    {[["expected","Previstas"],["worked","Trabalhadas"],["absence_quantity","Faltas"],["certificate","Atestados"],["declaration","Declaração"],["allowance","Abonos"],["debit","Débito"],["he60","HE 60%"],["he60night","HE 60%+20%"],["he100","HE 100%"],["he20","HE 20%"],["interjornada","Interjornada"]].map(([key,label]) => <td key={String(key)} className="px-2 py-2"><input aria-label={String(label)} type={String(key) === "absence_quantity" ? "number" : "text"} min={String(key) === "absence_quantity" ? "0" : undefined} step={String(key) === "absence_quantity" ? "0.01" : undefined} value={editingRow[String(key)] ?? ""} onChange={e => setEditingRow((v: any) => ({...v,[String(key)]: String(key) === "absence_quantity" ? e.target.value : e.target.value}))} className="w-[68px] rounded-md border bg-background px-1.5 py-1 text-center font-mono text-[11px]" placeholder={String(key) === "absence_quantity" ? "0" : "00:00"} /></td>)}
+                    <td className="px-3 py-2"><div className="flex gap-1.5"><button disabled={rowSaving} onClick={() => void saveHistoricalRow()} className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[11px text-primary-foreground"><Save className="h-3.5 w-3.5" /> Salvar</button><button disabled={rowSaving} onClick={() => setEditingRow(null)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]"><X className="h-3.5 w-3.5" /> Cancelar</button></div></td>
                   </tr>
                 ) : (
                   <tr key={row.id} className="hover:bg-muted/30">
                     <td className="whitespace-nowrap px-3 py-2 font-medium">{row.employee_name}</td>
-                    {[row.expected_minutes,row.worked_minutes].map((v,i) => <td key={i} className="whitespace-nowrap px-3 py-2 font-mono">{minutesToHHMM(v)}</td>)}
-                    <td className="px-3 py-2 font-mono">{Number(row.absence_quantity || 0)}</td>
+                    {[row.expected_minutes,row.worked_minutes].map((v,i) => <td key={i} className="px-2 py-2 font-mono whitespace-nowrap">{minutesToHHMM(v)}</td>)}
+                    <td className="px-2 py-2 font-mono whitespace-nowrap">{Number(row.absence_quantity || 0)}</td>
                     {[row.certificate_minutes,row.declaration_minutes,row.allowance_minutes,row.debit_minutes,row.he_60_minutes,row.he_60_night_minutes,row.he_100_minutes,row.he_20_minutes,row.interjornada_minutes].map((v,i) => <td key={i} className="whitespace-nowrap px-3 py-2 font-mono">{minutesToHHMM(v)}</td>)}
-                    <td className="px-3 py-2"><div className="flex items-center gap-2"><button onClick={() => beginEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs"><Pencil className="h-3.5 w-3.5" /> Editar</button>{row.has_manual_override && <span className="text-[11px] font-medium text-primary">Ajustado</span>}</div></td>
+                    <td className="px-2 py-2"><div className="flex items-center gap-1.5"><button onClick={() => beginEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px"><Pencil className="h-3.5 w-3.5" /> Editar</button>{row.has_manual_override && <span className="text-[11px] font-medium text-primary">Ajustado</span>}</div></td>
                   </tr>
                 ))}</tbody>
               </table></div>}
