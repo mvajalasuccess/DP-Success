@@ -275,6 +275,9 @@ export function BankHours() {
               <button type="button" onClick={goToPreviousEmployee} disabled={visibleEmployees.length < 2} title="Funcionário anterior" aria-label="Funcionário anterior" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
                 <ChevronLeft className="h-5 w-5" />
               </button>
+              <button type="button" onClick={goToPreviousEmployee} disabled={visibleEmployees.length < 2} title="Funcionário anterior" aria-label="Funcionário anterior" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
+                <ChevronLeft className="h-5 w-5" />
+              </button>
               <select className={inputCls + " min-w-0 flex-1"} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
                 {!visibleEmployees.length && <option value="">Nenhum funcionário neste filtro</option>}
                 {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
