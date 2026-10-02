@@ -470,10 +470,9 @@ function DashboardHome() {
           + Number(override.debit_minutes || 0);
       }
 
-      const byEmployee = new Map<string, number>();
-      currentOvertime.forEach((row: any) => {
-        byEmployee.set(row.employee_id, (byEmployee.get(row.employee_id) || 0) + (row.minutes || 0));
-      });
+      const departmentByEmployee = new Map(
+        employees.map((employee: any) => [String(employee.id), employee.departments?.name || "Sem departamento"]),
+      );
       const deptMap = new Map<string, { name: string; employees: number; minutes: number }>();
       employees.forEach((x: any) => {
         const name = x.departments?.name || "Sem departamento";
@@ -482,9 +481,9 @@ function DashboardHome() {
         deptMap.set(name, d);
       });
       currentOvertime.forEach((x: any) => {
-        const employee = employees.find((e: any) => e.id === x.employee_id);
-        const name = employee?.departments?.name || "Sem departamento";
-        if (deptMap.has(name)) deptMap.get(name)!.minutes += x.minutes || 0;
+        const name = departmentByEmployee.get(String(x.employee_id)) || "Sem departamento";
+        const department = deptMap.get(name);
+        if (department) department.minutes += x.minutes || 0;
       });
       setDepartments([...deptMap.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 6));
       // Renderiza os indicadores principais antes do cálculo mais pesado do Banco de Horas.
