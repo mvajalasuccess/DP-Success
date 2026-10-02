@@ -1095,31 +1095,6 @@ export function Kpis() {
           )}
 
         {activeSection === "horas-extras" && (
-            <div className="mb-5 flex items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
-                <h2 className="mt-1 text-2xl font-bold">Absenteísmo</h2>
-              </div>
-              <div className="rounded-2xl border bg-card px-6 py-4 text-right shadow-sm">
-                <p className="text-xs text-muted-foreground">Absenteísmo</p>
-                <p className="mt-1 text-3xl font-bold">{pct(absenteeismRate)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{periodLabel}</p>
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p></Card>
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p></Card>
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
-              <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas perdidas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.absenceMinutes)}</p></Card>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
-              <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas trabalhadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.worked)}</p></Card>
-              <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Funcionários</p><p className="mt-1 text-2xl font-bold">{metrics.employees}</p></Card>
-            </div>
-          </section>
-
-        {activeSection === "horas-extras" && (
           <section className="mt-6">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
