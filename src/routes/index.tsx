@@ -140,18 +140,22 @@ function AppShell({
         <nav className={`flex-1 overflow-y-auto p-3 ${collapsed ? "space-y-2" : "space-y-4"}`}>
           {!collapsed && <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Funcionários</div>}
           <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")} title={collapsed ? "Funcionários" : undefined}><Users className="h-4 w-4 shrink-0" />{!collapsed && <span>Funcionários</span>}</button>
+
           {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Gestão</div>}
           {[
             ["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText],
           ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={collapsed ? String(label) : undefined}><Icon className="h-4 w-4 shrink-0" />{!collapsed && <span>{label as string}</span>}</button>)}
+
           {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Fechamento de Ponto</div>}
           {[
             ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Faltas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText],
           ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={collapsed ? String(label) : undefined}><Icon className="h-4 w-4 shrink-0" />{!collapsed && <span>{label as string}</span>}</button>)}
+
           {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Empresa</div>}
           {[
             ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
           ].map(([label, key]) => <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={collapsed ? String(label) : undefined}><Building2 className="h-4 w-4 shrink-0" />{!collapsed && <span>{label}</span>}</button>)}
+
           {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Tarefas</div>}
           <button type="button" onClick={() => go("tarefas")} className={buttonClass("tarefas")} title={collapsed ? "Tarefas" : undefined}><FileText className="h-4 w-4 shrink-0" />{!collapsed && <span>Tarefas</span>}</button>
         </nav>
