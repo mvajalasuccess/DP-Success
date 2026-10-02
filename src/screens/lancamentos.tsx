@@ -174,7 +174,7 @@ export function Launches() {
   }
 
   return (
-    <ScreenShell section="Operação" title="Lançamentos" name="Lançamentos" subtitle="Créditos e débitos do banco de horas por funcionário e data."
+    <ScreenShell section="Operação" title="Lançamentos" name="Lançamentos" subtitle="Registre créditos, débitos e adicionais do banco de horas por funcionário e data."
       error={open ? "" : error}
       actions={<button className={btnPrimary} disabled={!periods.length} onClick={openNew}><Plus className="h-4 w-4" /> Novo lançamento</button>}>
       <Card className="mt-6 grid gap-4 p-5 md:grid-cols-3">
