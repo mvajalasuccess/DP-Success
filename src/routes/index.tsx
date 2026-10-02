@@ -60,6 +60,7 @@ function fmt(minutes: number) {
 function Dashboard() {
   const [screen, setScreen] = useState<ScreenKey>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [companyOpen, setCompanyOpen] = useState(true);
   const [closingOpen, setClosingOpen] = useState(true);
   const [isConsulta, setIsConsulta] = useState(false);
 
