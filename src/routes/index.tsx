@@ -40,8 +40,8 @@ const companyNav: Array<[string, ScreenKey]> = [
 const closingNav: Array<[string, ScreenKey]> = [
   ["Fechamento", "fechamento-ponto"],
   ["Lançamentos", "lancamentos"],
-  ["Atestados", "atestados"],
-  ["Faltas e Ocorrências", "ocorrencias"],
+  ["Declarações e Atestados", "atestados"],
+  ["Faltas", "ocorrencias"],
   ["Importar Cartão Ponto", "importar-cartao-ponto"],
 ];
 
