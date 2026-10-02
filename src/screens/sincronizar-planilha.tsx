@@ -132,9 +132,12 @@ function cellMinutesFromText(text: string): number | null {
 
 function cellMinutesFromValue(value: any): number {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    // ExcelJS pode materializar horários como Date. Use os componentes locais
-    // da própria data, sem converter para ISO/fuso.
-    return value.getHours() * 60 + value.getMinutes();
+    // ExcelJS materializa células de duração formatadas como [h]:mm como Date.
+    // NUNCA usar getHours()/getMinutes(): para a data-base do Excel (1899),
+    // o fuso histórico de São Paulo desloca até mesmo 00:00 para 20:53.
+    // Recuperamos o número serial do Excel diretamente em UTC.
+    const excelEpochUtc = Date.UTC(1899, 11, 30);
+    return Math.round((value.getTime() - excelEpochUtc) / 60000);
   }
   if (typeof value === "number") {
     return Math.round(value * 24 * 60);
