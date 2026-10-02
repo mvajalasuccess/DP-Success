@@ -257,7 +257,8 @@ async function readWorkbookRows(
 
 export function SincronizarPlanilha() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const workbookRef = useRef<ExcelWorkbook | null>(null);\n  const templateBufferRef = useRef<ArrayBuffer | null>(null);
+  const workbookRef = useRef<ExcelWorkbook | null>(null);
+  const templateBufferRef = useRef<ArrayBuffer | null>(null);
   const fileNameRef = useRef("planilha-atualizada.xlsx");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -265,7 +266,10 @@ export function SincronizarPlanilha() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);\n  const [previewLoading, setPreviewLoading] = useState(false);\n  const [previewOpen, setPreviewOpen] = useState(false);\n  const [syncChanges, setSyncChanges] = useState<SyncChange[]>([]);
+  const [exporting, setExporting] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [syncChanges, setSyncChanges] = useState<SyncChange[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [aliases, setAliases] = useState<Record<string, string>>(() => {
@@ -818,11 +822,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
           existingStarts.add(period.start_date);
           block.endRow += 1; block.totalRow += 1; inserted += 1;
         }
-        updateEmployeeTotalFormulas(block.worksheet, block.startRow, block.endRow, block.totalRow);
       }
-
-      const calc: any = (workbook as any).calcProperties;
-      if (calc) { calc.fullCalcOnLoad = true; calc.forceFullCalc = true; calc.calcMode = "auto"; }
 
       setMessage("Gerando o arquivo Excel atualizado…");
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -837,7 +837,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       document.body.appendChild(anchor);
       anchor.click();
       setTimeout(() => { anchor.remove(); URL.revokeObjectURL(url); }, 1500);
-      setMessage(`Download iniciado. ${updated} linha(s) existente(s) atualizada(s) e ${inserted} nova(s) linha(s) criada(s).`);
+      setMessage(`Download iniciado. ${updated} linha(s) existente(s) atualizada(s) e ${inserted} nova(s) linha(s) criada(s). Somente as horas foram preenchidas; saldo e totais não foram calculados pelo sistema.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao gerar/baixar a planilha.");
     } finally {
@@ -872,7 +872,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-bold">Fluxo de teste</h2>
-            <p className="mt-1 text-sm text-muted-foreground">1) importe a planilha · 2) confira os nomes · 3) importe os lançamentos · 4) faça alterações manuais · 5) pré-visualize as alterações · 6) baixe a planilha atualizada.</p>
+            <p className="mt-1 text-sm text-muted-foreground">1) importe a planilha · 2) confira os nomes · 3) importe os lançamentos · 4) faça alterações manuais · 5) pré-visualize as alterações · 6) baixe a planilha atualizada; saldo e totais continuam por conta do Excel.</p>
           </div>
           {actionAllowed && (
             <div className="flex flex-wrap items-center gap-2">
@@ -928,7 +928,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
                 </table>
               </div>
               <div className="flex flex-col gap-3 border-t p-5 md:flex-row md:items-center md:justify-between">
-                <p className="text-sm text-muted-foreground">A planilha original não será sobrescrita. Será baixada uma nova cópia com as alterações.</p>
+                <p className="text-sm text-muted-foreground">Serão preenchidas somente as horas. Saldo, totais e fórmulas não serão alterados pelo sistema.</p>
                 <button data-role-sensitive className={btnPrimary} onClick={() => void exportUpdated()} disabled={exporting || loading}><Download className="h-4 w-4" /> {exporting ? "Gerando Excel..." : "Baixar planilha atualizada"}</button>
               </div>
             </>
@@ -944,7 +944,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
                 <tr>
                   <th className="px-4 py-3">Importar</th><th className="px-4 py-3">Funcionário</th><th className="px-4 py-3">Competência</th>
                   <th className="px-4 py-3">Débito</th><th className="px-4 py-3">HE 60%</th><th className="px-4 py-3">60%+20%</th>
-                  <th className="px-4 py-3">HE 100%</th><th className="px-4 py-3">100%+20%</th><th className="px-4 py-3">Noturno</th><th className="px-4 py-3">Interj.</th><th className="px-4 py-3">Saldo</th><th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">HE 100%</th><th className="px-4 py-3">100%+20%</th><th className="px-4 py-3">Noturno</th><th className="px-4 py-3">Interj.</th><th className="px-4 py-3">Saldo (informativo)</th><th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
