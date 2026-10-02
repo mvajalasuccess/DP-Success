@@ -93,7 +93,7 @@ export function Departments() {
       <main className="mx-auto max-w-[1500px] px-6 py-7">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-sm font-medium text-primary">Cadastro base</p>
+            <p className="text-sm font-medium text-primary">Empresas</p>
             <h1 className="text-3xl font-bold">Departamentos</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Estruture os centros de gestão e indicadores.
@@ -127,7 +127,7 @@ export function Departments() {
                 <tr>
                   <th className="px-5 py-3">Departamento</th>
                   <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Ação</th>
+                  <th className="px-5 py-3">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -163,7 +163,7 @@ export function Departments() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold">{editingId ? "Editar departamento" : "Novo departamento"}</h2>
-                <p className="mt-1 text-xs text-muted-foreground">O cadastro será salvo no banco.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Informe o nome do departamento para cadastrá-lo no sistema.</p>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="text-muted-foreground">
                 <X className="h-5 w-5" />
