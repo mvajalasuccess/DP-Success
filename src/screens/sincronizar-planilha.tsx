@@ -1,12 +1,13 @@
 import { useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, RefreshCw, Upload, CheckCircle2, AlertTriangle } from "lucide-react";
-import ExcelJS from "exceljs";
 import { Card } from "@/components/ui/card";
 import { ScreenShell, btnOutline, btnPrimary, inputCls } from "@/components/screen-shell";
 import { supabase } from "@/integrations/supabase/client";
 import { CREDIT_TYPES, fetchPeriods, minutesToHours, periodRangeLabel, type CreditType } from "@/lib/dp-model";
 
 type Period = Awaited<ReturnType<typeof fetchPeriods>>[number];
+type ExcelWorkbook = import("exceljs").Workbook;
+type ExcelCell = import("exceljs").Cell;
 
 type PreviewRow = {
   id: string;
@@ -59,7 +60,7 @@ function parseRange(value: unknown) {
   return startDate && endDate ? { startDate, endDate } : null;
 }
 
-function cellMinutes(cell: ExcelJS.Cell) {
+function cellMinutes(cell: ExcelCell) {
   const value: any = cell.value;
   if (value && typeof value === "object" && "result" in value) return cellMinutesFromValue(value.result);
   return cellMinutesFromValue(value);
@@ -116,7 +117,7 @@ function resolveEmployee(name: string, employees: Employee[], exact: Map<string,
 }
 
 async function readWorkbookRows(
-  workbook: ExcelJS.Workbook,
+  workbook: ExcelWorkbook,
   employees: Employee[],
   periods: Period[],
   aliases: Record<string, string>,
@@ -180,7 +181,7 @@ async function readWorkbookRows(
 
 export function SincronizarPlanilha() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const workbookRef = useRef<ExcelJS.Workbook | null>(null);
+  const workbookRef = useRef<ExcelWorkbook | null>(null);
   const fileNameRef = useRef("planilha-atualizada.xlsx");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -192,7 +193,8 @@ export function SincronizarPlanilha() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [aliases, setAliases] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(localStorage.getItem("dp-success:xlsx-aliases") || "{}"); } catch { return {}; }
+    if (typeof window === "undefined") return {};
+    try { return JSON.parse(window.localStorage.getItem("dp-success:xlsx-aliases") || "{}"); } catch { return {}; }
   });
 
   const counts = useMemo(() => ({
@@ -216,6 +218,7 @@ export function SincronizarPlanilha() {
     setLoading(true); setError(""); setMessage("");
     try {
       const { employees: loadedEmployees, periods: loadedPeriods } = await ensureBase();
+      const { default: ExcelJS } = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(await file.arrayBuffer());
       const parsed = await readWorkbookRows(workbook, loadedEmployees, loadedPeriods, aliases);
@@ -238,7 +241,7 @@ export function SincronizarPlanilha() {
   function saveAlias(row: PreviewRow, employeeId: string) {
     const next = { ...aliases, [normalizeName(row.employeeName)]: employeeId };
     setAliases(next);
-    localStorage.setItem("dp-success:xlsx-aliases", JSON.stringify(next));
+    window.localStorage.setItem("dp-success:xlsx-aliases", JSON.stringify(next));
     setRows(current => current.map(item => item.id === row.id ? { ...item, employeeId, status: "ok", message: "Funcionário associado" } : item));
     setSelectedIds(current => current.includes(row.id) ? current : [...current, row.id]);
   }
