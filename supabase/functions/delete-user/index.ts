@@ -89,10 +89,20 @@ Deno.serve(async (req) => {
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const message = deleteError.message?.toLowerCase() ?? "";
+      const authUserAlreadyMissing =
+        message.includes("user not found") ||
+        message.includes("user doesn't exist") ||
+        message.includes("not found");
+
+      // O usuário pode ter sido excluído diretamente pelo Lovable/Supabase.
+      // Nesse caso, ainda removemos o registro órfão em profiles.
+      if (!authUserAlreadyMissing) {
+        return new Response(JSON.stringify({ error: deleteError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const { error: profileDeleteError } = await adminClient
