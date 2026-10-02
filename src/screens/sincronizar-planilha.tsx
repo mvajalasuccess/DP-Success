@@ -409,6 +409,50 @@ export function SincronizarPlanilha() {
     }
   }
 
+  async function discardImported() {
+    if (!rows.length) return;
+    if (!window.confirm("Desconsiderar os lançamentos importados desta planilha? Isso removerá somente registros marcados como XLSX_IMPORT e não apagará lançamentos manuais.")) return;
+    setLoading(true); setError(""); setMessage("");
+    try {
+      const db = supabase as any;
+      let removed = 0;
+      for (const row of rows) {
+        if (!row.employeeId || !row.periodId) continue;
+        const sourceToken = `[XLSX_IMPORT:${row.sheet}|${normalizeName(row.employeeName)}|${row.startDate}|${row.endDate}]`;
+
+        const credits = await db.from("overtime_records")
+          .select("id")
+          .eq("employee_id", row.employeeId)
+          .eq("period_id", row.periodId)
+          .ilike("notes", `%${sourceToken}%`);
+        if (credits.error) throw new Error(credits.error.message);
+        if (credits.data?.length) {
+          const del = await db.from("overtime_records").delete().in("id", credits.data.map((x: any) => x.id));
+          if (del.error) throw new Error(del.error.message);
+          removed += credits.data.length;
+        }
+
+        const debits = await db.from("bank_hours")
+          .select("id")
+          .eq("employee_id", row.employeeId)
+          .eq("period_id", row.periodId)
+          .eq("kind", "debito")
+          .ilike("justification", `%${sourceToken}%`);
+        if (debits.error) throw new Error(debits.error.message);
+        if (debits.data?.length) {
+          const del = await db.from("bank_hours").delete().in("id", debits.data.map((x: any) => x.id));
+          if (del.error) throw new Error(del.error.message);
+          removed += debits.data.length;
+        }
+      }
+      setMessage(`Importação desconsiderada. ${removed} lançamento(s) importado(s) foram removidos. Lançamentos manuais foram preservados.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao desconsiderar a importação.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function exportUpdated() {
     if (!workbookRef.current) return;
     setExporting(true); setError(""); setMessage("");
@@ -453,7 +497,7 @@ export function SincronizarPlanilha() {
         const resolved = row.employeeId
           ? employees.find(e => e.id === row.employeeId) ?? null
           : resolveEmployee(row.employeeName, employees, exact, aliasesCurrent).employee;
-        const period = periods.find(p => p.start_date === row.startDate && p.end_date === row.endDate);
+        const period = periods.find(p => p.start_date === row.startDate);
         if (!resolved || !period) continue;
 
         const key = `${resolved.id}|${period.id}`;
@@ -502,6 +546,7 @@ export function SincronizarPlanilha() {
       actions={actionAllowed ? <>
         <button data-role-sensitive className={btnOutline} onClick={() => inputRef.current?.click()} disabled={loading}><Upload className="h-4 w-4" /> Importar planilha</button>
         <button data-role-sensitive className={btnPrimary} onClick={() => void exportUpdated()} disabled={!workbookRef.current || exporting}><Download className="h-4 w-4" /> {exporting ? "Atualizando..." : "Atualizar planilha"}</button>
+        <button data-role-sensitive className={btnOutline} onClick={() => void discardImported()} disabled={loading || !rows.length}><AlertTriangle className="h-4 w-4" /> Desconsiderar importação</button>
       </> : undefined}
     >
       <input ref={inputRef} type="file" accept=".xlsx" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) void readFile(file); e.currentTarget.value = ""; }} />
