@@ -578,13 +578,13 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
     debit: number,
     sheetName: string,
   ) {
+    // Somente horas de entrada. Saldo e totais ficam para o Excel.
     setTimeCell(excelRow.getCell(3), debit);
     setTimeCell(excelRow.getCell(4), composition.HE_60 ?? 0);
     setTimeCell(excelRow.getCell(5), composition.HE_60_NOTURNO ?? 0);
     setTimeCell(excelRow.getCell(6), composition.HE_100 ?? 0);
     setTimeCell(excelRow.getCell(7), composition.HE_100_NOTURNO ?? 0);
     setTimeCell(excelRow.getCell(8), composition.ADICIONAL_NOTURNO ?? 0);
-    setFormulaCell(excelRow.getCell(9), `SUM(D${excelRow.number}:H${excelRow.number})-C${excelRow.number}`);
     setTimeCell(excelRow.getCell(sheetName === "SEV.EXC.EMP" ? 14 : 19), composition.INTERJORNADA_50 ?? 0);
   }
 
@@ -768,7 +768,11 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       for (const [sheetEmployeeKey, employeeName] of employeeEntries) {
         const separator = sheetEmployeeKey.indexOf("|");
         const sheetName = sheetEmployeeKey.slice(0, separator);
-        const resolved = resolveEmployee(employeeName, employees, exact, aliases).employee;
+        // Para sincronização, somente nome exato ou alias cadastrado.
+        // Evita que "MARI" seja interpretado como "MARIANA".
+        const normalizedEmployeeName = normalizeName(employeeName);
+        const resolved = exact.get(normalizedEmployeeName)
+          ?? (aliases[normalizedEmployeeName] ? employees.find(e => e.id === aliases[normalizedEmployeeName]) : undefined);
         if (!resolved) continue;
 
         const existingRowsForEmployee = rows
@@ -955,11 +959,26 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
         const templateRowNumber = Math.max(block.firstPeriodRow, block.lastPeriodRow);
         const templateRow = worksheet.getRow(templateRowNumber);
 
-        // ExcelJS insere a linha antes do TOTAL. Em seguida copiamos o estilo
-        // e as fórmulas relativas da última competência do funcionário.
+        // Insere antes do TOTAL e copia somente a formatação. Não copiamos
+        // fórmulas/shared formulas do ExcelJS.
         worksheet.spliceRows(insertAt, 0, []);
         const insertedRow = worksheet.getRow(insertAt);
-        cloneRowContent(templateRow, insertedRow, 19);
+        insertedRow.height = templateRow.height;
+        insertedRow.hidden = templateRow.hidden;
+        insertedRow.outlineLevel = templateRow.outlineLevel;
+
+        for (let col = 1; col <= 19; col += 1) {
+          const sourceCell = templateRow.getCell(col);
+          const targetCell = insertedRow.getCell(col);
+          targetCell.style = sourceCell.style;
+          targetCell.numFmt = sourceCell.numFmt;
+          targetCell.alignment = sourceCell.alignment;
+          targetCell.border = sourceCell.border;
+          targetCell.fill = sourceCell.fill;
+          targetCell.font = sourceCell.font;
+          targetCell.protection = sourceCell.protection;
+          targetCell.value = null;
+        }
 
         insertedRow.getCell(1).value = periodShortLabel(period.start_date, period.end_date);
         insertedRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
@@ -970,13 +989,6 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
           debitMap.get(`${employee.id}|${period.id}`) ?? 0,
           worksheet.name,
         );
-
-        // A linha TOTAL foi deslocada uma posição. Ajustamos apenas as fórmulas
-        // de total do bloco; o Excel continuará calculando os valores ao abrir.
-        const newTotalRow = insertAt + 1;
-        const firstDataRow = block.firstPeriodRow;
-        setFormulaCell(worksheet.getRow(newTotalRow).getCell(9), `SUM(I${firstDataRow}:I${insertAt})`);
-        setFormulaCell(worksheet.getRow(newTotalRow).getCell(14), `SUM(N${firstDataRow}:N${insertAt})`);
 
         inserted += 1;
       }
