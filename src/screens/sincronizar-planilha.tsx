@@ -155,9 +155,6 @@ function cellMinutesFromValue(value: any, date1904 = false): number {
   return parsed ?? 0;
 }
 
-function setTimeCell(cell: ExcelCell, minutes: number) {
-  cell.value = Math.max(0, Math.round(minutes)) / 1440;
-}
 
 function rowKey(sheet: string, employeeName: string, startDate: string, endDate: string) {
   return [sheet, normalizeName(employeeName), startDate, endDate].join("|");
@@ -587,7 +584,6 @@ export function SincronizarPlanilha() {
         savedKeys.add(`${item.employee_id}|${item.period_id}`);
       }
 
-      const exact = buildEmployeeIndex(employees);
       const pending = new Map<string, { row: PreviewRow; period: Period }>();
 
       for (const row of rows) {
@@ -740,10 +736,8 @@ export function SincronizarPlanilha() {
                   ))}</tbody>
                 </table>
               </div>
-              <div className="flex flex-col gap-3 border-t p-5 md:flex-row md:items-center md:justify-between">
-                <p className="text-sm text-muted-foreground">Serão preenchidas somente as horas. Saldo, totais e fórmulas não serão alterados pelo sistema.</p>
-                <button data-role-sensitive className={btnPrimary} onClick={() => void exportUpdated()} disabled={exporting || loading}><Download className="h-4 w-4" /> {exporting ? "Gerando Excel..." : "Baixar planilha atualizada"}</button>
-              </div>
+              <div className="border-t p-5"><p className="text-sm text-muted-foreground">As competências selecionadas serão importadas para o DP Success. A planilha original não será alterada.</p></div>
+
             </>
           ) : <div className="p-5"><p className="text-sm text-muted-foreground">Não há alterações para exportar.</p></div>}
         </Card>
