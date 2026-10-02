@@ -706,96 +706,143 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       setError("Importe uma planilha antes de pré-visualizar a atualização.");
       return;
     }
-    setPreviewLoading(true); setError(""); setMessage("");
+
+    setPreviewLoading(true);
+    setError("");
+    setMessage("");
+
     try {
-      // Recarrega as competências diretamente para também enxergar competências
-      // criadas depois que a planilha foi importada.
-      const periodsResult = await supabase
+      // A pré-visualização não depende das fórmulas do Excel nem tenta alterar o arquivo.
+      // Ela compara somente os lançamentos salvos no DP Success com as competências
+      // existentes no modelo e também identifica competências novas para funcionários
+      // que já aparecem no modelo.
+      const { data: periodData, error: periodError } = await supabase
         .from("time_periods")
         .select("id,reference_year,reference_month,start_date,end_date,status")
         .order("start_date", { ascending: true });
-      if (periodsResult.error) throw new Error(periodsResult.error.message);
-      const currentPeriods = (periodsResult.data ?? []) as Period[];
 
-      const periodIds = [...new Set(currentPeriods.map(p => p.id))];
+      if (periodError) throw new Error(`Competências: ${periodError.message}`);
+
+      const currentPeriods = (periodData ?? []) as Period[];
+      if (!currentPeriods.length) {
+        throw new Error("Nenhuma competência foi encontrada no DP Success.");
+      }
+
+      const periodIds = currentPeriods.map(period => period.id);
       const { creditMap, debitMap } = await getCurrentSyncData(periodIds);
       const changes: SyncChange[] = [];
 
-      // 1) Compara as linhas que já existem na planilha.
+      // 1) Alterações nas linhas que já existem na planilha.
       for (const row of rows) {
         if (row.status !== "ok" || !row.employeeId || !row.periodId) continue;
-        const period = currentPeriods.find(p => p.id === row.periodId);
-        if (!period) continue;
-        const composition = creditMap.get(`${row.employeeId}|${period.id}`) ?? {};
-        const debit = debitMap.get(`${row.employeeId}|${period.id}`) ?? 0;
+
+        const composition = creditMap.get(`${row.employeeId}|${row.periodId}`) ?? {};
+        const debit = debitMap.get(`${row.employeeId}|${row.periodId}`) ?? 0;
+
         if (!sameComposition(row, composition, debit)) {
           changes.push({
             id: `update|${row.id}`,
             kind: "atualizacao",
             sheet: row.sheet,
             employeeName: row.employeeName,
-            periodLabel: periodRangeLabel({ start_date: period.start_date, end_date: period.end_date }),
-            details: `Planilha: ${compositionLabel({ HE_60: row.he60, HE_60_NOTURNO: row.he60Night, HE_100: row.he100, HE_100_NOTURNO: row.he100Night, ADICIONAL_NOTURNO: row.night, INTERJORNADA_50: row.interjornada }, row.debit)} → DP Success: ${compositionLabel(composition, debit)}`,
+            periodLabel: periodRangeLabel({
+              start_date: row.startDate,
+              end_date: row.endDate,
+            }),
+            details: `Planilha: ${compositionLabel({
+              HE_60: row.he60,
+              HE_60_NOTURNO: row.he60Night,
+              HE_100: row.he100,
+              HE_100_NOTURNO: row.he100Night,
+              ADICIONAL_NOTURNO: row.night,
+              INTERJORNADA_50: row.interjornada,
+            }, row.debit)} → DP Success: ${compositionLabel(composition, debit)}`,
           });
         }
       }
 
-      // 2) Procura competências novas para funcionários que já existem na planilha.
-      // Não altera o arquivo nesta etapa; apenas mostra o que será acrescentado.
+      // 2) Descobre apenas os nomes dos funcionários existentes no modelo.
+      // Não percorremos "rowCount + 1" e nunca acessamos uma célula inexistente.
+      const employeeSheets = new Map<string, string>();
+
       for (const worksheet of workbookRef.current.worksheets) {
-        let employeeName = "";
         for (let r = 1; r <= worksheet.rowCount; r += 1) {
-          const b = excelCellText(worksheet.getRow(r).getCell(2));
-          const c = excelCellText(worksheet.getRow(r).getCell(3));
+          const row = worksheet.getRow(r);
+          const b = excelCellText(row.getCell(2));
+          const c = excelCellText(row.getCell(3));
 
-          if (b.toUpperCase() === "EMPRESA" && c.toUpperCase() === "FUNCIONÁRIO") {
-            employeeName = excelCellText(worksheet.getRow(r + 1).getCell(3));
-            continue;
+          if (b.toUpperCase() !== "EMPRESA" || c.toUpperCase() !== "FUNCIONÁRIO") continue;
+
+          const nextRow = worksheet.getRow(r + 1);
+          const employeeName = excelCellText(nextRow.getCell(3));
+          if (employeeName) {
+            employeeSheets.set(`${worksheet.name}|${normalizeName(employeeName)}`, employeeName);
           }
-          if (!employeeName) continue;
+        }
+      }
 
-          const resolved = resolveEmployee(employeeName, employees, buildEmployeeIndex(employees), aliases).employee;
-          if (!resolved) continue;
+      const exact = buildEmployeeIndex(employees);
 
-          const existingStarts = new Set<string>();
-          for (const item of rows) {
-            if (item.employeeId === resolved.id && item.sheet === worksheet.name) existingStarts.add(item.startDate);
-          }
+      // 3) Para cada funcionário já presente no modelo, procura competências
+      // posteriores à última competência existente na planilha.
+      for (const [sheetEmployeeKey, employeeName] of employeeSheets) {
+        const separator = sheetEmployeeKey.indexOf("|");
+        const sheetName = sheetEmployeeKey.slice(0, separator);
+        const resolvedName = sheetEmployeeKey.slice(separator + 1);
+        const resolved = resolveEmployee(employeeName, employees, exact, aliases).employee;
+        if (!resolved) continue;
 
-          const maxExistingStart = [...existingStarts].sort().at(-1) ?? "";
-          const candidates = currentPeriods
-            .filter(period => period.start_date > maxExistingStart)
-            .filter(period => isNonZeroComposition(
-              creditMap.get(`${resolved.id}|${period.id}`) ?? {},
-              debitMap.get(`${resolved.id}|${period.id}`) ?? 0,
-            ))
-            .sort((a, b) => a.start_date.localeCompare(b.start_date));
+        const existingStarts = new Set(
+          rows
+            .filter(item => item.employeeId === resolved.id && item.sheet === sheetName)
+            .map(item => item.startDate),
+        );
 
-          for (const period of candidates) {
-            if (existingStarts.has(period.start_date)) continue;
-            const composition = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
-            const debit = debitMap.get(`${resolved.id}|${period.id}`) ?? 0;
-            changes.push({
-              id: `new|${worksheet.name}|${resolved.id}|${period.id}`,
-              kind: "nova_linha",
-              sheet: worksheet.name,
-              employeeName,
-              periodLabel: periodRangeLabel({ start_date: period.start_date, end_date: period.end_date }),
-              details: `Nova linha: ${compositionLabel(composition, debit)}`,
-            });
-            existingStarts.add(period.start_date);
-          }
+        const existingRowsForEmployee = rows
+          .filter(item => item.employeeId === resolved.id && item.sheet === sheetName)
+          .sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+        // Se a planilha não tiver nenhuma linha reconhecida para esse funcionário,
+        // não inventamos uma posição. Nesse caso a pessoa precisa aparecer em uma
+        // competência reconhecida pelo parser antes de receber uma nova linha.
+        if (!existingRowsForEmployee.length) continue;
+
+        const maxExistingStart = existingRowsForEmployee[existingRowsForEmployee.length - 1].startDate;
+
+        for (const period of currentPeriods) {
+          if (period.start_date <= maxExistingStart || existingStarts.has(period.start_date)) continue;
+
+          const composition = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
+          const debit = debitMap.get(`${resolved.id}|${period.id}`) ?? 0;
+
+          if (!isNonZeroComposition(composition, debit)) continue;
+
+          changes.push({
+            id: `new|${sheetName}|${resolved.id}|${period.id}`,
+            kind: "nova_linha",
+            sheet: sheetName,
+            employeeName,
+            periodLabel: periodRangeLabel({
+              start_date: period.start_date,
+              end_date: period.end_date,
+            }),
+            details: `Nova linha: ${compositionLabel(composition, debit)}`,
+          });
+
+          existingStarts.add(period.start_date);
         }
       }
 
       setPeriods(currentPeriods);
       setSyncChanges(changes);
       setPreviewOpen(true);
+
+      const novas = changes.filter(change => change.kind === "nova_linha").length;
+      const atualizacoes = changes.filter(change => change.kind === "atualizacao").length;
+
       if (!changes.length) {
         setMessage("Nenhuma alteração foi identificada.");
       } else {
-        const novas = changes.filter(c => c.kind === "nova_linha").length;
-        const atualizacoes = changes.filter(c => c.kind === "atualizacao").length;
         setMessage(`Pré-visualização concluída: ${novas} nova(s) competência(s) e ${atualizacoes} atualização(ões).`);
       }
     } catch (e) {
