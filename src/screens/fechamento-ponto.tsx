@@ -306,27 +306,6 @@ export function PointClosing() {
       };
     });
 
-    // Para competências atuais, Lançamentos é a fonte de verdade das horas extras e débitos.
-    // Correções antigas em point_closing_overrides não podem "congelar" esses valores:
-    // se um lançamento for editado ou excluído, o Fechamento precisa refletir imediatamente
-    // o estado atual de overtime_records/bank_hours.
-    const liveRows = rows.map((row: any) => {
-      const override = overrideByEmployee.get(String(row.employee_id));
-      const merged = override ? { ...row, ...override, has_manual_override: true } : row;
-      const liveOvertime = (overtimeRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
-      const liveDebits = (debitRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
-
-      return {
-        ...merged,
-        debit_minutes: debitMinutes,
-        he_60_minutes: he60,
-        he_60_night_minutes: he60Night,
-        he_100_minutes: he100,
-        he_20_minutes: he20,
-        interjornada_minutes: interjornada,
-      };
-    });
-
     // Recalcula os campos derivados de cada funcionário a partir dos lançamentos atuais.
     const syncedRows = rows.map((row: any) => {
       const liveOvertime = (overtimeRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
