@@ -306,8 +306,53 @@ export function PointClosing() {
       };
     });
 
+    // Para competências atuais, Lançamentos é a fonte de verdade das horas extras e débitos.
+    // Correções antigas em point_closing_overrides não podem "congelar" esses valores:
+    // se um lançamento for editado ou excluído, o Fechamento precisa refletir imediatamente
+    // o estado atual de overtime_records/bank_hours.
+    const liveRows = rows.map((row: any) => {
+      const override = overrideByEmployee.get(String(row.employee_id));
+      const merged = override ? { ...row, ...override, has_manual_override: true } : row;
+      const liveOvertime = (overtimeRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
+      const liveDebits = (debitRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
+
+      return {
+        ...merged,
+        debit_minutes: debitMinutes,
+        he_60_minutes: he60,
+        he_60_night_minutes: he60Night,
+        he_100_minutes: he100,
+        he_20_minutes: he20,
+        interjornada_minutes: interjornada,
+      };
+    });
+
+    // Recalcula os campos derivados de cada funcionário a partir dos lançamentos atuais.
+    const syncedRows = rows.map((row: any) => {
+      const liveOvertime = (overtimeRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
+      const liveDebits = (debitRows ?? []).filter((item: any) => item.employee_id === row.employee_id);
+      const he60 = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "HE_60" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
+      const he60Night = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "HE_60_NOTURNO" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
+      const he100 = liveOvertime.reduce((sum: number, item: any) => ["HE_100", "HE_100_NOTURNO"].includes(String(item.launch_type ?? "").toUpperCase()) ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
+      const he20 = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "ADICIONAL_NOTURNO" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
+      const interjornada = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "INTERJORNADA_50" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
+      const debit = liveDebits.reduce((sum: number, item: any) => sum + Math.abs(Number(item.minutes || 0)), 0);
+      const override = overrideByEmployee.get(String(row.employee_id));
+      const merged = override ? { ...row, ...override, has_manual_override: true } : row;
+
+      return {
+        ...merged,
+        debit_minutes: debit,
+        he_60_minutes: he60,
+        he_60_night_minutes: he60Night,
+        he_100_minutes: he100,
+        he_20_minutes: he20,
+        interjornada_minutes: interjornada,
+      };
+    });
+
     setRowsSource("manual");
-    setHistoricalRows(rows.map(applyOverride));
+    setHistoricalRows(syncedRows);
     setLoadingRows(false);
   }
 
