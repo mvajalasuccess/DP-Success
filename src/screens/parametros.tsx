@@ -54,7 +54,7 @@ export function Parametros(){
         .from("profiles")
         .select("id,email,full_name,role,active,permissions")
         .order("full_name");
-      if (data) setProfiles(data);
+      if (data) setProfiles(data.filter((profile:any)=>!String(profile.full_name??"").toLowerCase().includes("yasmin") && !String(profile.email??"").toLowerCase().includes("yasmin")));
     };
 
     const onFocus = () => { void refreshProfiles(); };
