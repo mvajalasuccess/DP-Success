@@ -398,7 +398,6 @@ export function SincronizarPlanilha() {
             rate_percent: CREDIT_TYPES[type].ratePercent,
             launch_group_id: groupId,
             notes: `${sourceToken} ${CREDIT_TYPES[type].label}`,
-            created_by: auth.user?.id ?? null,
           });
         };
         addCredit("HE_60", row.he60);
