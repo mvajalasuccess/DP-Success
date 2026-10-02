@@ -646,18 +646,18 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
   }
 
 
-  async function getCurrentSyncData() {
+  async function getCurrentSyncData(periodIdsOverride?: string[]) {
     const db = supabase as any;
     const allPeriods = await fetchPeriods();
     setPeriods(allPeriods);
-    const periodIds = allPeriods.map(p => p.id);
+    const periodIds = periodIdsOverride?.length ? periodIdsOverride : allPeriods.map(p => p.id);
 
     const [creditResult, debitResult] = await Promise.all([
       periodIds.length
-        ? db.from("overtime_records").select("employee_id,reference_date,minutes,launch_type,period_id").in("period_id", periodIds)
+        ? db.from("overtime_records").select("employee_id,minutes,launch_type,period_id").in("period_id", periodIds)
         : Promise.resolve({ data: [], error: null }),
       periodIds.length
-        ? db.from("bank_hours").select("employee_id,entry_date,minutes,period_id,kind").eq("kind", "debito").in("period_id", periodIds)
+        ? db.from("bank_hours").select("employee_id,minutes,period_id,kind").eq("kind", "debito").in("period_id", periodIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (creditResult.error) throw new Error(creditResult.error.message);
@@ -708,8 +708,10 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
     }
     setPreviewLoading(true); setError(""); setMessage("");
     try {
-      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData();
-      const exact = buildEmployeeIndex(employees);
+      // A pré-visualização usa somente as linhas que já existem na planilha.
+      // Não percorre novamente todos os blocos do Excel nem tenta criar linhas novas.
+      const periodIds = [...new Set(rows.map(r => r.periodId).filter((id): id is string => Boolean(id)))];
+      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData(periodIds);
       const changes: SyncChange[] = [];
 
       for (const row of rows) {
@@ -730,40 +732,9 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
         }
       }
 
-      const blocks = findEmployeeBlocks(workbookRef.current);
-      for (const block of blocks) {
-        const resolved = resolveEmployee(block.employeeName, employees, exact, aliases).employee;
-        if (!resolved) continue;
-        const existingStarts = new Set<string>();
-        for (let r = block.startRow; r <= block.endRow; r += 1) {
-          const range = parseRange(excelCellText(block.worksheet.getRow(r).getCell(2)));
-          if (range) existingStarts.add(range.startDate);
-        }
-        const maxExistingStart = [...existingStarts].sort().at(-1) ?? "";
-        const candidates = allPeriods
-          .filter(period => period.start_date > maxExistingStart)
-          .filter(period => isNonZeroComposition(creditMap.get(`${resolved.id}|${period.id}`) ?? {}, debitMap.get(`${resolved.id}|${period.id}`) ?? 0))
-          .sort((a, b) => a.start_date.localeCompare(b.start_date));
-
-        for (const period of candidates) {
-          if (existingStarts.has(period.start_date)) continue;
-          const composition = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
-          const debit = debitMap.get(`${resolved.id}|${period.id}`) ?? 0;
-          changes.push({
-            id: `new|${block.worksheet.name}|${resolved.id}|${period.id}`,
-            kind: "nova_linha",
-            sheet: block.worksheet.name,
-            employeeName: block.employeeName,
-            periodLabel: periodRangeLabel({ start_date: period.start_date, end_date: period.end_date }),
-            details: `Nova linha será criada com: ${compositionLabel(composition, debit)}`,
-          });
-          existingStarts.add(period.start_date);
-        }
-      }
-
       setSyncChanges(changes);
       setPreviewOpen(true);
-      if (!changes.length) setMessage("Nenhuma alteração foi identificada. A planilha já está sincronizada com os lançamentos atuais do DP Success.");
+      if (!changes.length) setMessage("Nenhuma alteração foi identificada nas linhas existentes. O arquivo será atualizado apenas com as horas atuais.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível calcular a pré-visualização.");
     } finally {
@@ -781,47 +752,24 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       const { default: ExcelJS } = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(templateBufferRef.current);
-      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData();
-      const exact = buildEmployeeIndex(employees);
+      const periodIds = [...new Set(rows.map(r => r.periodId).filter((id): id is string => Boolean(id)))];
+      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData(periodIds);
       let updated = 0;
-      let inserted = 0;
 
+      // Mantém a estrutura original do arquivo: somente as linhas já existentes
+      // são preenchidas. Não usamos spliceRows nem criamos novas linhas.
       for (const row of rows) {
         const worksheet = workbook.getWorksheet(row.sheet);
         if (!worksheet || row.status !== "ok" || !row.employeeId || !row.periodId) continue;
         const period = allPeriods.find(p => p.id === row.periodId);
         if (!period) continue;
-        writeExcelComposition(worksheet.getRow(row.rowNumber), creditMap.get(`${row.employeeId}|${period.id}`) ?? {}, debitMap.get(`${row.employeeId}|${period.id}`) ?? 0, row.sheet);
+        writeExcelComposition(
+          worksheet.getRow(row.rowNumber),
+          creditMap.get(`${row.employeeId}|${period.id}`) ?? {},
+          debitMap.get(`${row.employeeId}|${period.id}`) ?? 0,
+          row.sheet,
+        );
         updated += 1;
-      }
-
-      const blocks = findEmployeeBlocks(workbook);
-      for (const block of blocks) {
-        const resolved = resolveEmployee(block.employeeName, employees, exact, aliases).employee;
-        if (!resolved) continue;
-        const existingStarts = new Set<string>();
-        for (let r = block.startRow; r <= block.endRow; r += 1) {
-          const range = parseRange(excelCellText(block.worksheet.getRow(r).getCell(2)));
-          if (range) existingStarts.add(range.startDate);
-        }
-        const maxExistingStart = [...existingStarts].sort().at(-1) ?? "";
-        const candidates = allPeriods
-          .filter(period => period.start_date > maxExistingStart)
-          .filter(period => isNonZeroComposition(creditMap.get(`${resolved.id}|${period.id}`) ?? {}, debitMap.get(`${resolved.id}|${period.id}`) ?? 0))
-          .sort((a, b) => a.start_date.localeCompare(b.start_date));
-
-        for (const period of candidates) {
-          if (existingStarts.has(period.start_date)) continue;
-          block.worksheet.spliceRows(block.totalRow, 0, Array(19).fill(null));
-          const insertedRow = block.worksheet.getRow(block.totalRow);
-          const templateRow = block.worksheet.getRow(Math.max(block.startRow, block.totalRow - 1));
-          copyInsertedRowStyle(templateRow, insertedRow, 19);
-          insertedRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
-          const comp = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
-          writeExcelComposition(insertedRow, comp, debitMap.get(`${resolved.id}|${period.id}`) ?? 0, block.worksheet.name);
-          existingStarts.add(period.start_date);
-          block.endRow += 1; block.totalRow += 1; inserted += 1;
-        }
       }
 
       setMessage("Gerando o arquivo Excel atualizado…");
@@ -837,7 +785,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       document.body.appendChild(anchor);
       anchor.click();
       setTimeout(() => { anchor.remove(); URL.revokeObjectURL(url); }, 1500);
-      setMessage(`Download iniciado. ${updated} linha(s) existente(s) atualizada(s) e ${inserted} nova(s) linha(s) criada(s). Somente as horas foram preenchidas; saldo e totais não foram calculados pelo sistema.`);
+      setMessage(`Download iniciado. ${updated} linha(s) existente(s) atualizada(s). Somente as horas foram preenchidas; saldo e totais permanecem por conta do Excel.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao gerar/baixar a planilha.");
     } finally {
