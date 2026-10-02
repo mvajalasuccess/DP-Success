@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, History, Plus, X, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronRight, History, Plus, X, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,6 +64,14 @@ export function BankHours() {
   useEffect(() => { void loadBankData(); }, [employeeId]);
 
   const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));
+
+  function goToNextEmployee() {
+    if (!visibleEmployees.length) return;
+    const currentIndex = visibleEmployees.findIndex(e => e.id === employeeId);
+    const nextIndex = currentIndex < 0 || currentIndex >= visibleEmployees.length - 1 ? 0 : currentIndex + 1;
+    setEmployeeId(visibleEmployees[nextIndex].id);
+  }
+
   const accumulated = rows[0]?.accumulated ?? 0;
   const firstPeriod = rows[rows.length - 1]?.period;
   const cls = (n: number) => n < 0 ? "text-destructive" : "text-primary";
@@ -240,33 +248,39 @@ export function BankHours() {
   return (
     <ScreenShell section="Operação" title="Banco de Horas" name="Banco de Horas" subtitle="Saldo por funcionário e competência." error={error}>
 
-      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
-        <label className="grid gap-1.5 text-sm font-medium">Status
-          <select className={inputCls} value={statusFilter} onChange={e => {
-            const next = e.target.value as "ativo" | "inativo" | "todos";
-            setStatusFilter(next);
-            const first = employees.find(x => next === "todos" || (next === "ativo" ? x.status !== "inativo" : x.status === "inativo"));
-            setEmployeeId(first?.id ?? "");
-          }}>
-            <option value="ativo">Ativos</option>
-            <option value="inativo">Inativos</option>
-            <option value="todos">Todos</option>
-          </select>
-        </label>
-        <label className="grid gap-1.5 text-sm font-medium">Funcionário
-          <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
-            {!visibleEmployees.length && <option value="">Nenhum funcionário neste filtro</option>}
-            {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-          </select>
-        </label>
-        <div className="text-right"><p className="text-xs text-muted-foreground">Saldo disponível atual</p><p className={`text-2xl font-bold ${cls(accumulated)}`}>{minutesToHours(accumulated, true)}</p></div>
-        <div className="flex gap-2">
-          <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Novo ajuste</button>
-          <button type="button" onClick={openPaymentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Registrar pagamento de HE</button>
+      <Card className="mt-6 p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="grid w-[150px] gap-1.5 text-sm font-medium">Status
+            <select className={inputCls} value={statusFilter} onChange={e => {
+              const next = e.target.value as "ativo" | "inativo" | "todos";
+              setStatusFilter(next);
+              const first = employees.find(x => next === "todos" || (next === "ativo" ? x.status !== "inativo" : x.status === "inativo"));
+              setEmployeeId(first?.id ?? "");
+            }}>
+              <option value="ativo">Ativos</option>
+              <option value="inativo">Inativos</option>
+              <option value="todos">Todos</option>
+            </select>
+          </label>
+          <div className="grid min-w-0 w-full max-w-[440px] gap-1.5 text-sm font-medium">
+            <span>Funcionário</span>
+            <div className="flex items-center gap-2">
+              <select className={inputCls + " min-w-0 flex-1"} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
+                {!visibleEmployees.length && <option value="">Nenhum funcionário neste filtro</option>}
+                {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+              </select>
+              <button type="button" onClick={goToNextEmployee} disabled={visibleEmployees.length < 2} title="Próximo funcionário" aria-label="Próximo funcionário" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+          <div className="ml-auto text-right"><p className="text-xs text-muted-foreground">Saldo disponível atual</p><p className={"text-2xl font-bold " + cls(accumulated)}>{minutesToHours(accumulated, true)}</p></div>
+          <div className="flex gap-2">
+            <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Novo ajuste</button>
+            <button type="button" onClick={openPaymentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Registrar pagamento de HE</button>
+          </div>
         </div>
       </Card>
-
-
 
       <div className="mt-6 space-y-3">
         {loading ? <Card className="p-8 text-center text-muted-foreground">Carregando saldos...</Card>
