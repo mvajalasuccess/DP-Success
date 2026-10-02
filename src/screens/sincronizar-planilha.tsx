@@ -106,16 +106,16 @@ function excelValueText(value: any): string {
   return String(value ?? "").trim();
 }
 
-function cellMinutes(cell: ExcelCell) {
-  // Para números de duração, o valor bruto do Excel é a fonte de verdade.
-  // cell.text do ExcelJS pode aplicar formatos de data/hora da célula e
-  // reinterpretar o mesmo número como um horário diferente (especialmente em
-  // planilhas com formatos personalizados). A prévia deve reproduzir a célula.
+function cellMinutes(cell: ExcelCell, date1904 = false) {
+  // A planilha enviada usa o sistema de datas 1904. Quando o ExcelJS
+  // materializa uma duração como Date, getHours()/getMinutes() aplica o fuso
+  // histórico de São Paulo e transforma 00:00 em 20:53. Recuperamos o serial
+  // usando o epoch correto do próprio arquivo.
   const value: any = cell.value;
   if (value && typeof value === "object" && "result" in value) {
-    return cellMinutesFromValue(value.result);
+    return cellMinutesFromValue(value.result, date1904);
   }
-  return cellMinutesFromValue(value);
+  return cellMinutesFromValue(value, date1904);
 }
 
 function cellMinutesFromText(text: string): number | null {
@@ -130,13 +130,11 @@ function cellMinutesFromText(text: string): number | null {
   return Number.isFinite(decimal) ? Math.round(decimal * 60) : null;
 }
 
-function cellMinutesFromValue(value: any): number {
+function cellMinutesFromValue(value: any, date1904 = false): number {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    // ExcelJS materializa células de duração formatadas como [h]:mm como Date.
-    // NUNCA usar getHours()/getMinutes(): para a data-base do Excel (1899),
-    // o fuso histórico de São Paulo desloca até mesmo 00:00 para 20:53.
-    // Recuperamos o número serial do Excel diretamente em UTC.
-    const excelEpochUtc = Date.UTC(1899, 11, 30);
+    const excelEpochUtc = date1904
+      ? Date.UTC(1904, 0, 1)
+      : Date.UTC(1899, 11, 30);
     return Math.round((value.getTime() - excelEpochUtc) / 60000);
   }
   if (typeof value === "number") {
@@ -208,17 +206,18 @@ async function readWorkbookRows(
 
       const resolved = resolveEmployee(currentEmployee, employees, exact, aliases);
       const period = periods.find(p => p.start_date === range.startDate);
-      const debit = cellMinutes(row.getCell(3));
-      const he60 = cellMinutes(row.getCell(4));
-      const he60Night = cellMinutes(row.getCell(5));
-      const he100 = cellMinutes(row.getCell(6));
-      const he100Night = cellMinutes(row.getCell(7));
-      const night = cellMinutes(row.getCell(8));
+      const date1904 = Boolean((workbook as any).properties?.date1904);
+      const debit = cellMinutes(row.getCell(3), date1904);
+      const he60 = cellMinutes(row.getCell(4), date1904);
+      const he60Night = cellMinutes(row.getCell(5), date1904);
+      const he100 = cellMinutes(row.getCell(6), date1904);
+      const he100Night = cellMinutes(row.getCell(7), date1904);
+      const night = cellMinutes(row.getCell(8), date1904);
       // O saldo oficial é o TOTAL SALDO da própria linha da planilha (coluna I).
       // Não recalcular, não incluir NOT e não misturar valores de outras linhas.
-      const saldo = cellMinutes(row.getCell(9));
+      const saldo = cellMinutes(row.getCell(9), date1904);
       const interjornadaColumn = worksheet.name === "SEV.EXC.EMP" ? 14 : 19;
-      const interjornada = cellMinutes(row.getCell(interjornadaColumn));
+      const interjornada = cellMinutes(row.getCell(interjornadaColumn), date1904);
 
       let status: PreviewRow["status"] = "ok";
       let message = "Pronto para importar";
