@@ -8,7 +8,7 @@ import { CREDIT_TYPES, balancesByEmployee, periodRangeLabel, minutesToHours, for
 const BALANCE_ITEMS: CreditType[] = ["HE_60", "HE_60_NOTURNO", "HE_100", "HE_100_NOTURNO", "ADICIONAL_NOTURNO"];
 
 export function BankHours() {
-  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string; status?: string }>>([]);
+  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string; status?: string; termination_date?: string | null }>>([]);
   const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [employeeId, setEmployeeId] = useState("");
   const [rows, setRows] = useState<PeriodBalance[]>([]);
@@ -36,7 +36,7 @@ export function BankHours() {
 
   useEffect(() => {
     void (async () => {
-      const r = await supabase.from("employees").select("id,full_name,status").order("full_name");
+      const r = await supabase.from("employees").select("id,full_name,status,termination_date").order("full_name");
       if (r.error) setError(r.error.message);
       else { setEmployees(r.data ?? []); const active = (r.data ?? []).find((e: any) => e.status !== "inativo"); if (active) setEmployeeId(active.id); else if (r.data?.[0]) setEmployeeId(r.data[0].id); }
     })();
@@ -53,8 +53,18 @@ export function BankHours() {
       ]);
       if (adjustmentRows.error) throw new Error(adjustmentRows.error.message);
       if (paymentRows.error) throw new Error(paymentRows.error.message);
-      const orderedRows = [...balanceRows].reverse();
-      setRows(orderedRows);
+      const employee = employees.find(e => e.id === employeeId);
+      const terminationDate = employee?.termination_date ?? null;
+
+      // Para funcionário desligado, o Banco de Horas só exibe competências
+      // cujo início ocorreu até a data do desligamento. Assim, uma pessoa
+      // desligada em 30/07 ainda vê a competência 21/07–20/08, mas não
+      // aparecem as competências iniciadas em 21/08 ou depois.
+      const visibleBalanceRows = [...balanceRows]
+        .reverse()
+        .filter(row => !terminationDate || row.period.start_date <= terminationDate);
+
+      setRows(visibleBalanceRows);
       setAdjustments(adjustmentRows.data ?? []);
       setPayments(paymentRows.data ?? []);
     } catch (e) { setError((e as Error).message); }
