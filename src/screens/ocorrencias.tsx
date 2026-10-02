@@ -236,7 +236,7 @@ export function Ocorrencias() {
         <Card className="mt-6 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-muted/40 text-xs text-muted-foreground">
+              <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur">
                 <tr>
                   <th className="px-5 py-3">Funcionário</th>
                   <th className="px-5 py-3">Data</th>
