@@ -192,7 +192,7 @@ export function Kpis() {
       const rangeStart = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, firstTarget.start_date);
       const rangeEnd = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, firstTarget.end_date);
 
-      setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(firstTarget));
+      setPeriodLabel(selectedMonth === "todos" ? `Ano {selectedYear}` : periodRangeLabel(firstTarget));
 
       const selectedEmployeeSet = new Set(selectedEmployees);
       const allowedEmployees = employees.filter(e => employeeMatches(e, [], selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
@@ -782,6 +782,14 @@ export function Kpis() {
           : Promise.resolve({ data: [] }),
       ]);
 
+      const employeeIncludedForPeriod = (employee: Employee, period: Period) => {
+        const active = (!employee.hireDate || employee.hireDate <= period.end_date)
+          && (!employee.terminationDate || employee.terminationDate >= period.start_date);
+        const departmentOk = selectedDepartment === "todos" || employee.department === selectedDepartment;
+        const employeeOk = !selectedEmployees.length || selectedEmployees.includes(employee.id);
+        return active && departmentOk && employeeOk;
+      };
+
       const result = yearPeriods.map(period => {
         let expected = 0;
         let lost = 0;
@@ -804,13 +812,13 @@ export function Kpis() {
           for (const row of (timeRows ?? []).filter((x: any) => x.period_id === period.id)) {
             if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
             const employee = employees.find(e => e.id === row.employee_id);
-            if (!employee || !employeeWasActiveInSelection(employee)) continue;
+            if (!employee || !employeeIncludedForPeriod(employee, period)) continue;
             expected += Number(row.expected_minutes || 0);
             recorded.add(String(row.employee_id));
           }
 
           for (const employee of employees) {
-            if (!employeeWasActiveInSelection(employee) || overrides.has(employee.id) || recorded.has(employee.id)) continue;
+            if (!employeeIncludedForPeriod(employee, period) || overrides.has(employee.id) || recorded.has(employee.id)) continue;
             const start = employee.hireDate && employee.hireDate > period.start_date ? employee.hireDate : period.start_date;
             const end = employee.terminationDate && employee.terminationDate < period.end_date ? employee.terminationDate : period.end_date;
             if (end >= start) expected += countWorkingWeekdays(start, end) * 528;
@@ -826,7 +834,7 @@ export function Kpis() {
           for (const row of (occurrenceRows ?? []).filter((x: any) => x.period_id === period.id)) {
             if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
             const employee = employees.find(e => e.id === row.employee_id);
-            if (!employee || !employeeWasActiveInSelection(employee)) continue;
+            if (!employee || !employeeIncludedForPeriod(employee, period)) continue;
             const code = String(row.occurrence_types?.code ?? "").toLowerCase();
             const quantity = Number(row.quantity || 0);
             const unit = String(row.unit ?? "dias").toLowerCase();
@@ -839,7 +847,7 @@ export function Kpis() {
           for (const row of (debitRows ?? []).filter((x: any) => x.period_id === period.id)) {
             if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
             const employee = employees.find(e => e.id === row.employee_id);
-            if (employee && employeeWasActiveInSelection(employee)) lost += Math.abs(Number(row.minutes || 0));
+            if (employee && employeeIncludedForPeriod(employee, period)) lost += Math.abs(Number(row.minutes || 0));
           }
         }
 
@@ -912,7 +920,7 @@ export function Kpis() {
               </select>
             </label>
             <div className="relative grid gap-1.5 text-sm font-medium">
-              Funcionários
+              Funcionários da competência
               <button type="button" className="flex h-10 items-center justify-between rounded-lg border bg-background px-3 text-left font-normal" onClick={() => setEmployeeFilterOpen(v => !v)}>
                 <span className="truncate">{selectedEmployees.length === 0 ? "Todos os funcionários" : `${selectedEmployees.length} selecionado(s)`}</span>
                 <span className="ml-2 text-muted-foreground">⌄</span>
@@ -942,25 +950,25 @@ export function Kpis() {
             <Card className="p-5">
               <Users className="h-5 w-5 text-primary" />
               <p className="mt-4 text-sm text-muted-foreground">Funcionários ativos</p>
-              <p className="mt-1 text-3xl font-bold">${metrics.employees}</p>
+              <p className="mt-1 text-3xl font-bold">{metrics.employees}</p>
               <p className="mt-1 text-xs text-muted-foreground">ativos na competência selecionada</p>
             </Card>
             <Card className="p-5">
               <TrendingUp className="h-5 w-5 text-primary" />
               <p className="mt-4 text-sm text-muted-foreground">Absenteísmo</p>
-              <p className="mt-1 text-3xl font-bold">${pct(absenteeismRate)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">${fmt(metrics.absenceMinutes)} perdidas / ${fmt(metrics.expected)} previstas</p>
+              <p className="mt-1 text-3xl font-bold">{pct(absenteeismRate)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{fmt(metrics.absenceMinutes)} perdidas / {fmt(metrics.expected)} previstas</p>
             </Card>
             <Card className="p-5">
               <Percent className="h-5 w-5 text-primary" />
               <p className="mt-4 text-sm text-muted-foreground">Turnover</p>
-              <p className="mt-1 text-3xl font-bold">${pct(metrics.turnover)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">${metrics.admissions} admissões · ${metrics.terminations} desligamentos</p>
+              <p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p>
             </Card>
             <Card className="p-5">
               <WalletCards className="h-5 w-5 text-primary" />
               <p className="mt-4 text-sm text-muted-foreground">Banco de horas</p>
-              <p className={`mt-1 text-3xl font-bold ${bankBalance < 0 ? "text-destructive" : "text-primary"}`}>${fmt(bankBalance)}</p>
+              <p className={`mt-1 text-3xl font-bold ${bankBalance < 0 ? "text-destructive" : "text-primary"}`}>{fmt(bankBalance)}</p>
               <p className="mt-1 text-xs text-muted-foreground">saldo acumulado até o fim da seleção</p>
             </Card>
           </div>
@@ -984,10 +992,10 @@ export function Kpis() {
                 Atestados e declarações ficam demonstrados separadamente e não entram no indicador configurado para o DP-Success.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                <div><p className="text-xs text-muted-foreground">Débitos</p><p className="font-semibold">${fmt(Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes))}</p></div>
-                <div><p className="text-xs text-muted-foreground">Faltas</p><p className="font-semibold">${fmt(metrics.faltasMinutes)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Abonos</p><p className="font-semibold">${fmt(metrics.abonosMinutes)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Total</p><p className="font-semibold">${fmt(metrics.absenceMinutes)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Débitos</p><p className="font-semibold">{fmt(Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes))}</p></div>
+                <div><p className="text-xs text-muted-foreground">Faltas</p><p className="font-semibold">{fmt(metrics.faltasMinutes)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Abonos</p><p className="font-semibold">{fmt(metrics.abonosMinutes)}</p></div>
+                <div><p className="text-xs text-muted-foreground">Total</p><p className="font-semibold">{fmt(metrics.absenceMinutes)}</p></div>
               </div>
             </Card>
           )}
@@ -996,7 +1004,7 @@ export function Kpis() {
             <Card className="p-5">
               <div className="flex items-center justify-between gap-3">
                 <div><h3 className="font-bold">Evolução mensal</h3><p className="text-xs text-muted-foreground">Percentual de horas perdidas consideradas em cada competência.</p></div>
-                <span className="text-xs text-muted-foreground">${selectedYear}</span>
+                <span className="text-xs text-muted-foreground">{selectedYear}</span>
               </div>
               <div className="mt-5 flex h-48 items-end gap-2 overflow-x-auto pb-7">
                 {monthlyAbsenteeism.map(item => {
@@ -1004,9 +1012,9 @@ export function Kpis() {
                   const height = Math.max(8, (item.rate / max) * 150);
                   return (
                     <div key={item.periodId} className="flex min-w-14 flex-1 flex-col items-center justify-end gap-2">
-                      <span className="text-[10px] font-semibold">${pct(item.rate)}</span>
-                      <div className="w-full max-w-12 rounded-t-md bg-primary/70" style={{ height }} title={`${item.label}: ${pct(item.rate)} · ${fmt(item.lost)} / ${fmt(item.expected)}`} />
-                      <span className="text-[10px] text-muted-foreground">${item.label}</span>
+                      <span className="text-[10px] font-semibold">{pct(item.rate)}</span>
+                      <div className="w-full max-w-12 rounded-t-md bg-primary/70" style={{ height }} title={`{item.label}: {pct(item.rate)} · ${fmt(item.lost)} / ${fmt(item.expected)}`} />
+                      <span className="text-[10px] text-muted-foreground">{item.label}</span>
                     </div>
                   );
                 })}
@@ -1024,29 +1032,46 @@ export function Kpis() {
                   ["Abonos", metrics.abonosMinutes],
                 ].map(([label, value]) => (
                   <div key={String(label)}>
-                    <div className="flex justify-between text-sm"><span>${label}</span><strong>${fmt(Number(value))}</strong></div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${metrics.absenceMinutes ? Math.min(100, Number(value) / metrics.absenceMinutes * 100) : 0}$%` }} /></div>
+                    <div className="flex justify-between text-sm"><span>{label}</span><strong>{fmt(Number(value))}</strong></div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${metrics.absenceMinutes ? Math.min(100, Number(value) / metrics.absenceMinutes * 100) : 0}%` }} /></div>
                   </div>
                 ))}
               </div>
             </Card>
           </div>
 
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <Card className="p-5 lg:col-span-2">
+              <div className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-primary" /><h3 className="font-bold">Atenção do RH</h3></div>
+              <p className="mt-1 text-xs text-muted-foreground">Pontos operacionais para acompanhar nesta competência.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Funcionários com HE</p><p className="mt-1 text-2xl font-bold">{overtimeEmployees.length}</p></div>
+                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Horas abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.abonosMinutes)}</p></div>
+                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Desligamentos</p><p className="mt-1 text-2xl font-bold">{metrics.terminations}</p></div>
+              </div>
+            </Card>
+            <Card className="p-5">
+              <h3 className="font-bold">Base do indicador</h3>
+              <p className="mt-2 text-sm text-muted-foreground">O percentual é ponderado pelo total de horas previstas, evitando que equipes com jornadas diferentes distorçam o resultado.</p>
+              <p className="mt-3 text-xs text-muted-foreground">Fonte: metodologia de absenteísmo documentada pela TOTVS.</p>
+            </Card>
+          </div>
+
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">${daysFmt(metrics.faltasDays)}</p></Card>
-            <Card className="p-5"><FileText className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">${daysFmt(metrics.atestadosDays)}</p><p className="mt-1 text-xs text-muted-foreground">fora do cálculo atual</p></Card>
-            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações abonadas</p><p className="mt-1 text-2xl font-bold">${fmt(metrics.declaracoesMinutes)}</p><p className="mt-1 text-xs text-muted-foreground">fora do cálculo atual</p></Card>
-            <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">${fmt(metrics.expected)}</p></Card>
+            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p></Card>
+            <Card className="p-5"><FileText className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p><p className="mt-1 text-xs text-muted-foreground">fora do cálculo atual</p></Card>
+            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p><p className="mt-1 text-xs text-muted-foreground">fora do cálculo atual</p></Card>
+            <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Card className="p-5">
               <h3 className="font-bold">Horas trabalhadas</h3>
-              <p className="mt-1 text-sm text-muted-foreground">${fmt(metrics.worked)} no período selecionado.</p>
+              <p className="mt-1 text-sm text-muted-foreground">{fmt(metrics.worked)} no período selecionado.</p>
             </Card>
             <Card className="p-5">
               <h3 className="font-bold">Funcionários considerados</h3>
-              <p className="mt-1 text-sm text-muted-foreground">${metrics.employees} ativos na competência/seleção.</p>
+              <p className="mt-1 text-sm text-muted-foreground">{metrics.employees} ativos na competência/seleção.</p>
             </Card>
           </div>
         </section>
