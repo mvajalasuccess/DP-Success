@@ -206,6 +206,10 @@ async function readWorkbookRows(
 
       if (!currentEmployee) continue;
       const range = parseRange(b);
+      // Algumas linhas da planilha possuem conteúdo na coluna B que não é uma
+      // competência. Não podemos acessar startDate/endDate antes de validar o range.
+      if (!range) continue;
+
       // Considera todas as competências encontradas na planilha. Isso é importante
       // para recuperar históricos de funcionários que já foram desligados.
 
