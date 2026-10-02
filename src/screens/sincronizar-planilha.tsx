@@ -708,15 +708,23 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
     }
     setPreviewLoading(true); setError(""); setMessage("");
     try {
-      // A pré-visualização usa somente as linhas que já existem na planilha.
-      // Não percorre novamente todos os blocos do Excel nem tenta criar linhas novas.
-      const periodIds = [...new Set(rows.map(r => r.periodId).filter((id): id is string => Boolean(id)))];
-      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData(periodIds);
+      // Recarrega as competências diretamente para também enxergar competências
+      // criadas depois que a planilha foi importada.
+      const periodsResult = await supabase
+        .from("time_periods")
+        .select("id,reference_year,reference_month,start_date,end_date,status")
+        .order("start_date", { ascending: true });
+      if (periodsResult.error) throw new Error(periodsResult.error.message);
+      const currentPeriods = (periodsResult.data ?? []) as Period[];
+
+      const periodIds = [...new Set(currentPeriods.map(p => p.id))];
+      const { creditMap, debitMap } = await getCurrentSyncData(periodIds);
       const changes: SyncChange[] = [];
 
+      // 1) Compara as linhas que já existem na planilha.
       for (const row of rows) {
         if (row.status !== "ok" || !row.employeeId || !row.periodId) continue;
-        const period = allPeriods.find(p => p.id === row.periodId);
+        const period = currentPeriods.find(p => p.id === row.periodId);
         if (!period) continue;
         const composition = creditMap.get(`${row.employeeId}|${period.id}`) ?? {};
         const debit = debitMap.get(`${row.employeeId}|${period.id}`) ?? 0;
@@ -732,9 +740,64 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
         }
       }
 
+      // 2) Procura competências novas para funcionários que já existem na planilha.
+      // Não altera o arquivo nesta etapa; apenas mostra o que será acrescentado.
+      for (const worksheet of workbookRef.current.worksheets) {
+        let employeeName = "";
+        for (let r = 1; r <= worksheet.rowCount; r += 1) {
+          const b = excelCellText(worksheet.getRow(r).getCell(2));
+          const c = excelCellText(worksheet.getRow(r).getCell(3));
+
+          if (b.toUpperCase() === "EMPRESA" && c.toUpperCase() === "FUNCIONÁRIO") {
+            employeeName = excelCellText(worksheet.getRow(r + 1).getCell(3));
+            continue;
+          }
+          if (!employeeName) continue;
+
+          const resolved = resolveEmployee(employeeName, employees, buildEmployeeIndex(employees), aliases).employee;
+          if (!resolved) continue;
+
+          const existingStarts = new Set<string>();
+          for (const item of rows) {
+            if (item.employeeId === resolved.id && item.sheet === worksheet.name) existingStarts.add(item.startDate);
+          }
+
+          const maxExistingStart = [...existingStarts].sort().at(-1) ?? "";
+          const candidates = currentPeriods
+            .filter(period => period.start_date > maxExistingStart)
+            .filter(period => isNonZeroComposition(
+              creditMap.get(`${resolved.id}|${period.id}`) ?? {},
+              debitMap.get(`${resolved.id}|${period.id}`) ?? 0,
+            ))
+            .sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+          for (const period of candidates) {
+            if (existingStarts.has(period.start_date)) continue;
+            const composition = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
+            const debit = debitMap.get(`${resolved.id}|${period.id}`) ?? 0;
+            changes.push({
+              id: `new|${worksheet.name}|${resolved.id}|${period.id}`,
+              kind: "nova_linha",
+              sheet: worksheet.name,
+              employeeName,
+              periodLabel: periodRangeLabel({ start_date: period.start_date, end_date: period.end_date }),
+              details: `Nova linha: ${compositionLabel(composition, debit)}`,
+            });
+            existingStarts.add(period.start_date);
+          }
+        }
+      }
+
+      setPeriods(currentPeriods);
       setSyncChanges(changes);
       setPreviewOpen(true);
-      if (!changes.length) setMessage("Nenhuma alteração foi identificada nas linhas existentes. O arquivo será atualizado apenas com as horas atuais.");
+      if (!changes.length) {
+        setMessage("Nenhuma alteração foi identificada.");
+      } else {
+        const novas = changes.filter(c => c.kind === "nova_linha").length;
+        const atualizacoes = changes.filter(c => c.kind === "atualizacao").length;
+        setMessage(`Pré-visualização concluída: ${novas} nova(s) competência(s) e ${atualizacoes} atualização(ões).`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível calcular a pré-visualização.");
     } finally {
