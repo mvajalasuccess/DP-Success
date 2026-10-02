@@ -1,9 +1,69 @@
-  function goToPreviousEmployee() {
-    if (!visibleEmployees.length) return;
-    const currentIndex = visibleEmployees.findIndex(e => e.id === employeeId);
-    const previousIndex = currentIndex <= 0 ? visibleEmployees.length - 1 : currentIndex - 1;
-    setEmployeeId(visibleEmployees[previousIndex].id);
+import { ChevronDown, ChevronUp, ChevronRight, History, Plus, X, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
+import { ScreenShell, inputCls } from "@/components/screen-shell";
+import { CREDIT_TYPES, balancesByEmployee, periodRangeLabel, minutesToHours, formatDateBR, PERIOD_STATUS_LABEL, type PeriodBalance, type CreditType } from "@/lib/dp-model";
+
+const BALANCE_ITEMS: CreditType[] = ["HE_60", "HE_60_NOTURNO", "HE_100", "HE_100_NOTURNO", "ADICIONAL_NOTURNO"];
+
+export function BankHours() {
+  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string; status?: string }>>([]);
+  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
+  const [employeeId, setEmployeeId] = useState("");
+  const [rows, setRows] = useState<PeriodBalance[]>([]);
+  const [expanded, setExpanded] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false);
+  const [adjustmentDirection, setAdjustmentDirection] = useState<"credito" | "debito">("credito");
+  const [adjustmentDate, setAdjustmentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [adjustmentHours, setAdjustmentHours] = useState("");
+  const [adjustmentReason, setAdjustmentReason] = useState("Saldo inicial");
+  const [adjustmentJustification, setAdjustmentJustification] = useState("");
+  const [savingAdjustment, setSavingAdjustment] = useState(false);
+  const [adjustments, setAdjustments] = useState<any[]>([]);
+  const [editingAdjustment, setEditingAdjustment] = useState<any | null>(null);
+  const [confirmAdjustmentDelete, setConfirmAdjustmentDelete] = useState<string | null>(null);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentHours, setPaymentHours] = useState("");
+  const [paymentJustification, setPaymentJustification] = useState("");
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<any | null>(null);
+  const [confirmPaymentDelete, setConfirmPaymentDelete] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const r = await supabase.from("employees").select("id,full_name,status").order("full_name");
+      if (r.error) setError(r.error.message);
+      else { setEmployees(r.data ?? []); const active = (r.data ?? []).find((e: any) => e.status !== "inativo"); if (active) setEmployeeId(active.id); else if (r.data?.[0]) setEmployeeId(r.data[0].id); }
+    })();
+  }, []);
+
+  async function loadBankData() {
+    if (!employeeId) return;
+    setLoading(true); setError("");
+    try {
+      const [balanceRows, adjustmentRows, paymentRows] = await Promise.all([
+        balancesByEmployee(employeeId),
+        supabase.from("bank_hours").select("id,entry_date,minutes,adjustment_direction,justification,period_id").eq("employee_id", employeeId).eq("kind", "ajuste").order("entry_date", { ascending: false }),
+        supabase.from("bank_hours").select("id,entry_date,minutes,justification,period_id").eq("employee_id", employeeId).eq("kind", "pagamento_he").order("entry_date", { ascending: false }),
+      ]);
+      if (adjustmentRows.error) throw new Error(adjustmentRows.error.message);
+      if (paymentRows.error) throw new Error(paymentRows.error.message);
+      const orderedRows = [...balanceRows].reverse();
+      setRows(orderedRows);
+      setAdjustments(adjustmentRows.data ?? []);
+      setPayments(paymentRows.data ?? []);
+    } catch (e) { setError((e as Error).message); }
+    setLoading(false);
   }
+
+  useEffect(() => { void loadBankData(); }, [employeeId]);
+
+  const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));
 
   function goToNextEmployee() {
     if (!visibleEmployees.length) return;
@@ -189,45 +249,39 @@
     <ScreenShell section="Operação" title="Banco de Horas" name="Banco de Horas" subtitle="Saldo por funcionário e competência." error={error}>
 
       <Card className="mt-6 p-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-end justify-center gap-4">
-            <label className="grid w-[150px] gap-1.5 text-sm font-medium">Status
-              <select className={inputCls} value={statusFilter} onChange={e => {
-                const next = e.target.value as "ativo" | "inativo" | "todos";
-                setStatusFilter(next);
-                const first = employees.find(x => next === "todos" || (next === "ativo" ? x.status !== "inativo" : x.status === "inativo"));
-                setEmployeeId(first?.id ?? "");
-              }}>
-                <option value="ativo">Ativos</option>
-                <option value="inativo">Inativos</option>
-                <option value="todos">Todos</option>
+        <div className="flex flex-wrap items-end gap-4">
+          <label className="grid w-[150px] gap-1.5 text-sm font-medium">Status
+            <select className={inputCls} value={statusFilter} onChange={e => {
+              const next = e.target.value as "ativo" | "inativo" | "todos";
+              setStatusFilter(next);
+              const first = employees.find(x => next === "todos" || (next === "ativo" ? x.status !== "inativo" : x.status === "inativo"));
+              setEmployeeId(first?.id ?? "");
+            }}>
+              <option value="ativo">Ativos</option>
+              <option value="inativo">Inativos</option>
+              <option value="todos">Todos</option>
+            </select>
+          </label>
+          <div className="grid min-w-0 w-full max-w-[440px] gap-1.5 text-sm font-medium">
+            <span>Funcionário</span>
+            <div className="flex items-center gap-2">
+              <select className={inputCls + " min-w-0 flex-1"} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
+                {!visibleEmployees.length && <option value="">Nenhum funcionário neste filtro</option>}
+                {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
               </select>
-            </label>
-            <div className="grid w-full max-w-[460px] gap-1.5 text-sm font-medium">
-              <span>Funcionário</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={goToPreviousEmployee} disabled={visibleEmployees.length < 2} title="Funcionário anterior" aria-label="Funcionário anterior" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <select className={inputCls + " min-w-0 flex-1"} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
-                  {!visibleEmployees.length && <option value="">Nenhum funcionário neste filtro</option>}
-                  {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-                </select>
-                <button type="button" onClick={goToNextEmployee} disabled={visibleEmployees.length < 2} title="Próximo funcionário" aria-label="Próximo funcionário" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
+              <button type="button" onClick={goToNextEmployee} disabled={visibleEmployees.length < 2} title="Próximo funcionário" aria-label="Próximo funcionário" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
+                <ChevronRight className="h-5 w-5" />
+              </button>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-3 border-t pt-3">
-            <div className="mr-auto text-left sm:text-right"><p className="text-xs text-muted-foreground">Saldo disponível atual</p><p className={"text-2xl font-bold " + cls(accumulated)}>{minutesToHours(accumulated, true)}</p></div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Novo ajuste</button>
-              <button type="button" onClick={openPaymentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Registrar pagamento de HE</button>
-            </div>
+          <div className="ml-auto text-right"><p className="text-xs text-muted-foreground">Saldo disponível atual</p><p className={"text-2xl font-bold " + cls(accumulated)}>{minutesToHours(accumulated, true)}</p></div>
+          <div className="flex gap-2">
+            <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Novo ajuste</button>
+            <button type="button" onClick={openPaymentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Registrar pagamento de HE</button>
           </div>
         </div>
       </Card>
+
       <div className="mt-6 space-y-3">
         {loading ? <Card className="p-8 text-center text-muted-foreground">Carregando saldos...</Card>
           : !rows.length ? <Card className="p-8 text-center text-muted-foreground">Nenhuma competência encontrada.</Card>
