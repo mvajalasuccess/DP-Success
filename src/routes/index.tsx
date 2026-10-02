@@ -317,16 +317,11 @@ function DashboardHome() {
         .eq("id", sessionData.session.user.id)
         .maybeSingle();
       setUserRoleLabel(profile?.role === "consulta" ? "Consulta" : "Usuário RH");
-      const [emps, comp, overtimeRows, occ, cert, timeRows, bankRows, scheduleRows, overrideRows] = await Promise.all([
+      // Carrega primeiro apenas o contexto necessário para a primeira pintura.
+      // Os dados operacionais são buscados depois, já filtrados pela competência.
+      const [emps, comp] = await Promise.all([
         db.from("employees").select("id,full_name,department_id,work_schedule_id,hire_date,termination_date,status,departments(name)"),
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
-        db.from("overtime_records").select("employee_id,minutes,period_id").order("reference_date", { ascending: false }),
-        db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_date,end_date,period_id,occurrence_types(code)").order("occurrence_date", { ascending: false }),
-        db.from("medical_certificates").select("id,employee_id,start_date,end_date,days"),
-        db.from("time_records").select("employee_id,period_id,expected_minutes,worked_minutes"),
-        db.from("bank_hours").select("employee_id,period_id,minutes,kind,adjustment_direction"),
-        db.from("work_schedules").select("id,weekly_minutes"),
-        db.from("point_closing_overrides").select("employee_id,period_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes"),
       ]);
 
       const allEmployees = emps.data ?? [];
@@ -351,6 +346,34 @@ function DashboardHome() {
           )
         : allEmployees.filter((e: any) => e.status === "ativo");
       const activeEmployeeIds = new Set(employees.map((e: any) => e.id));
+
+      const [
+        overtimeRows,
+        occ,
+        cert,
+        timeRows,
+        bankRows,
+        scheduleRows,
+        overrideRows,
+      ] = competence
+        ? await Promise.all([
+            db.from("overtime_records").select("employee_id,minutes,period_id").eq("period_id", competence.id),
+            db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_date,end_date,period_id,occurrence_types(code)").eq("period_id", competence.id),
+            db.from("medical_certificates").select("id,employee_id,start_date,end_date,days").lte("start_date", competence.end_date).gte("end_date", competence.start_date),
+            db.from("time_records").select("employee_id,period_id,expected_minutes,worked_minutes").eq("period_id", competence.id),
+            db.from("bank_hours").select("employee_id,period_id,minutes,kind,adjustment_direction").eq("period_id", competence.id),
+            db.from("work_schedules").select("id,weekly_minutes"),
+            db.from("point_closing_overrides").select("employee_id,period_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes").eq("period_id", competence.id),
+          ])
+        : [
+            { data: [], error: null },
+            { data: [], error: null },
+            { data: [], error: null },
+            { data: [], error: null },
+            { data: [], error: null },
+            { data: [], error: null },
+            { data: [], error: null },
+          ];
       const scheduleMap = new Map((scheduleRows.data ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0) / 5]));
       const dailyMinutes = (employeeId: string) => {
         const employee = employees.find((e: any) => e.id === employeeId);
