@@ -42,12 +42,13 @@ const closingNav: Array<[string, ScreenKey]> = [
   ["Lançamentos", "lancamentos"],
   ["Atestados", "atestados"],
   ["Faltas e Ocorrências", "ocorrencias"],
+  ["Importar Cartão Ponto", "importar-cartao-ponto"],
 ];
 
 const mainNav: Array<[string, ScreenKey]> = [
   ["Tarefas & Agenda", "tarefas"],
   ["Banco de Horas", "banco-horas"],
-  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"], ["Importar histórico", "importacao-historico"], ["Importar Cartão Ponto", "importar-cartao-ponto"],
+  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"], ["Importar histórico", "importacao-historico"],
 ];
 
 function fmt(minutes: number) {
