@@ -1014,7 +1014,7 @@ export function Kpis() {
                   return (
                     <div key={item.periodId} className="flex min-w-14 flex-1 flex-col items-center justify-end gap-2">
                       <span className="text-[10px] font-semibold">{pct(item.rate)}</span>
-                      <div className="w-full max-w-12 rounded-t-md bg-primary/70" style={{ height }} title={`{item.label}: {pct(item.rate)} · ${fmt(item.lost)} / ${fmt(item.expected)}`} />
+                      <div className="w-full max-w-12 rounded-t-md bg-primary/70" style={{ height }} title={`${item.label}: ${pct(item.rate)} · ${fmt(item.lost)} / ${fmt(item.expected)}`} />
                       <span className="text-[10px] text-muted-foreground">{item.label}</span>
                     </div>
                   );
