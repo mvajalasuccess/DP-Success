@@ -148,7 +148,7 @@ function AppShell({
 
           {!collapsed && <div className="pt-2">
             <button type="button" onClick={onToggleCompany} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent">
-              <span className="flex items-center gap-2"><Building2 className="h-4 w-4" />Empresa</span><ChevronDown className={`h-4 w-4 transition-transform ${companyOpen ? "rotate-180" : ""}`} />
+              <span className="flex items-center gap-2"><Building2 className="h-4 w-4" />Empresas</span><ChevronDown className={`h-4 w-4 transition-transform ${companyOpen ? "rotate-180" : ""}`} />
             </button>
             {companyOpen && <div className="ml-3 mt-1 space-y-1 border-l pl-3">{companyNav.map(([label, key]) => <button key={key} type="button" onClick={() => go(key)} className={`block w-full rounded-lg px-3 py-2 text-left text-xs ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent"}`}>{label}</button>)}</div>}
           </div>}
