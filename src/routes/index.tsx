@@ -46,7 +46,7 @@ const closingNav: Array<[string, ScreenKey]> = [
 ];
 
 const mainNav: Array<[string, ScreenKey]> = [
-  ["Tarefas & Agenda", "tarefas"],
+  ["Tarefas e Agenda", "tarefas"],
   ["Banco de Horas", "banco-horas"],
   ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"], ["Importar histórico", "importacao-historico"],
 ];
