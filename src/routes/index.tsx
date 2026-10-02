@@ -33,6 +33,10 @@ const screenComponents: Record<string, ComponentType> = {
   relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto,
 };
 
+const peopleNav: Array<[string, ScreenKey]> = [
+  ["Funcionários", "funcionarios"],
+];
+
 const managementNav: Array<[string, ScreenKey]> = [
   ["Dashboard", "dashboard"],
   ["KPIs", "kpis"],
@@ -40,14 +44,10 @@ const managementNav: Array<[string, ScreenKey]> = [
   ["Relatórios", "relatorios"],
 ];
 
-const operationNav: Array<[string, ScreenKey]> = [
+const closingNav: Array<[string, ScreenKey]> = [
   ["Fechamento", "fechamento-ponto"],
   ["Lançamentos", "lancamentos"],
   ["Banco de Horas", "banco-horas"],
-];
-
-const peopleNav: Array<[string, ScreenKey]> = [
-  ["Funcionários", "funcionarios"],
   ["Faltas", "ocorrencias"],
   ["Declarações e Atestados", "atestados"],
 ];
@@ -59,37 +59,37 @@ const companyNav: Array<[string, ScreenKey]> = [
 ];
 
         <nav className={`flex-1 overflow-y-auto p-3 ${collapsed ? "space-y-2" : "space-y-4"}`}>
-          {!collapsed && <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Gestão</p>}
-          <div className="space-y-1">
-            {managementNav.map(([label, key]) => (
-              <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
-                {key === "dashboard" ? <Gauge className="h-4 w-4 shrink-0" /> : key === "kpis" ? <Gauge className="h-4 w-4 shrink-0" /> : key === "comparativos" ? <Users className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}
-                {!collapsed && <span>{label}</span>}
-              </button>
-            ))}
-          </div>
-
-          {!collapsed && <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Operação</p>}
-          <div className="space-y-1">
-            {operationNav.map(([label, key]) => (
-              <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
-                {key === "banco-horas" ? <WalletCards className="h-4 w-4 shrink-0" /> : key === "fechamento-ponto" ? <Clock3 className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}
-                {!collapsed && <span>{label}</span>}
-              </button>
-            ))}
-          </div>
-
-          {!collapsed && <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Pessoas</p>}
+          {!collapsed && <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Funcionários</div>}
           <div className="space-y-1">
             {peopleNav.map(([label, key]) => (
               <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
-                {key === "funcionarios" ? <Users className="h-4 w-4 shrink-0" /> : key === "ocorrencias" ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}
+                <Users className="h-4 w-4 shrink-0" />
                 {!collapsed && <span>{label}</span>}
               </button>
             ))}
           </div>
 
-          {!collapsed && <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Empresa</p>}
+          {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Gestão</div>}
+          <div className="space-y-1">
+            {managementNav.map(([label, key]) => (
+              <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
+                {key === "dashboard" || key === "kpis" ? <Gauge className="h-4 w-4 shrink-0" /> : key === "comparativos" ? <Users className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}
+                {!collapsed && <span>{label}</span>}
+              </button>
+            ))}
+          </div>
+
+          {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Fechamento de Ponto</div>}
+          <div className="space-y-1">
+            {closingNav.map(([label, key]) => (
+              <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
+                {key === "fechamento-ponto" ? <Clock3 className="h-4 w-4 shrink-0" /> : key === "banco-horas" ? <WalletCards className="h-4 w-4 shrink-0" /> : key === "ocorrencias" ? <AlertTriangle className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}
+                {!collapsed && <span>{label}</span>}
+              </button>
+            ))}
+          </div>
+
+          {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Empresa</div>}
           <div className="space-y-1">
             {companyNav.map(([label, key]) => (
               <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
@@ -98,6 +98,12 @@ const companyNav: Array<[string, ScreenKey]> = [
               </button>
             ))}
           </div>
+
+          {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Tarefas</div>}
+          <button type="button" onClick={() => go("tarefas")} className={buttonClass("tarefas")} title={collapsed ? "Tarefas" : undefined}>
+            <FileText className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Tarefas</span>}
+          </button>
         </nav>
         <SidebarProfile collapsed={collapsed} onNavigate={go} />teFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
@@ -134,6 +140,10 @@ const screenComponents: Record<string, ComponentType> = {
   relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto,
 };
 
+const peopleNav: Array<[string, ScreenKey]> = [
+  ["Funcionários", "funcionarios"],
+];
+
 const managementNav: Array<[string, ScreenKey]> = [
   ["Dashboard", "dashboard"],
   ["KPIs", "kpis"],
@@ -141,14 +151,10 @@ const managementNav: Array<[string, ScreenKey]> = [
   ["Relatórios", "relatorios"],
 ];
 
-const operationNav: Array<[string, ScreenKey]> = [
+const closingNav: Array<[string, ScreenKey]> = [
   ["Fechamento", "fechamento-ponto"],
   ["Lançamentos", "lancamentos"],
   ["Banco de Horas", "banco-horas"],
-];
-
-const peopleNav: Array<[string, ScreenKey]> = [
-  ["Funcionários", "funcionarios"],
   ["Faltas", "ocorrencias"],
   ["Declarações e Atestados", "atestados"],
 ];
