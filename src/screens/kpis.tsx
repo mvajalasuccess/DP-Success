@@ -988,9 +988,11 @@ export function Kpis() {
               <p className="mt-1 text-xs text-muted-foreground">saldo acumulado até o fim da seleção</p>
             </Card>
           </div>
+        </section>
 
-          {activeSection === "absenteismo" && (
-          <div className="mt-6 flex items-end justify-between gap-4">
+        {activeSection === "absenteismo" && (
+          <section className="mt-6">
+          <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
               <h2 className="mt-1 text-2xl font-bold">Absenteísmo</h2>
