@@ -1,4 +1,4 @@
-import { ArrowLeft, Users, Clock3, CalendarX2, Percent, UserMinus, Info, WalletCards, FileText, TrendingUp } from "lucide-react";
+import { ArrowLeft, Users, Clock3, CalendarX2, Percent, UserMinus, Info, WalletCards, FileText, TrendingUp, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -840,7 +840,7 @@ export function Kpis() {
             if (end >= start) expected += countWorkingWeekdays(start, end) * 528;
           }
 
-          for (const row of overrides.values()) {
+          for (const row of overrides.values() as Iterable<any>) {
             expected += Number(row.expected_minutes || 0);
             lost += Math.round(Number(row.absence_quantity || 0) * 528)
               + Number(row.allowance_minutes || 0)

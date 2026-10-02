@@ -127,7 +127,7 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
 }
 
 async function sha256(bytes: Uint8Array) {
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const digest = await crypto.subtle.digest("SHA-256", bytes as Uint8Array<ArrayBuffer>);
   return Array.from(new Uint8Array(digest)).map(v => v.toString(16).padStart(2, "0")).join("");
 }
 
