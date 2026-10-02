@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, ChevronRight, History, Plus, X, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, History, Plus, X, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,6 +64,13 @@ export function BankHours() {
   useEffect(() => { void loadBankData(); }, [employeeId]);
 
   const visibleEmployees = employees.filter(e => statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo"));
+
+  function goToPreviousEmployee() {
+    if (!visibleEmployees.length) return;
+    const currentIndex = visibleEmployees.findIndex(e => e.id === employeeId);
+    const previousIndex = currentIndex <= 0 ? visibleEmployees.length - 1 : currentIndex - 1;
+    setEmployeeId(visibleEmployees[previousIndex].id);
+  }
 
   function goToNextEmployee() {
     if (!visibleEmployees.length) return;
@@ -265,6 +272,9 @@ export function BankHours() {
           <div className="grid min-w-0 w-full max-w-[440px] gap-1.5 text-sm font-medium">
             <span>Funcionário</span>
             <div className="flex items-center gap-2">
+              <button type="button" onClick={goToPreviousEmployee} disabled={visibleEmployees.length < 2} title="Funcionário anterior" aria-label="Funcionário anterior" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
+                <ChevronLeft className="h-5 w-5" />
+              </button>
               <select className={inputCls + " min-w-0 flex-1"} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
                 {!visibleEmployees.length && <option value="">Nenhum funcionário neste filtro</option>}
                 {visibleEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
