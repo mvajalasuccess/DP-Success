@@ -93,28 +93,58 @@ function parseRange(value: unknown) {
   return startDate && endDate ? { startDate, endDate } : null;
 }
 
+function excelCellText(cell: ExcelCell) {
+  const value: any = cell.value;
+  if (value && typeof value === "object" && "result" in value) return excelValueText(value.result);
+  return excelValueText(value);
+}
+
+function excelValueText(value: any): string {
+  if (value && typeof value === "object" && Array.isArray(value.richText)) {
+    return value.richText.map((part: any) => String(part?.text ?? "")).join("").trim();
+  }
+  return String(value ?? "").trim();
+}
+
 function cellMinutes(cell: ExcelCell) {
+  // Para a prévia, priorizamos o texto formatado pelo próprio ExcelJS.
+  // Isso evita que datas/horários sejam reinterpretados pelo fuso do navegador
+  // e mantém valores negativos como "-5:20" exatamente como aparecem na planilha.
+  const formatted = String((cell as any).text ?? "").trim();
+  if (formatted) {
+    const parsed = cellMinutesFromText(formatted);
+    if (parsed !== null) return parsed;
+  }
+
   const value: any = cell.value;
   if (value && typeof value === "object" && "result" in value) return cellMinutesFromValue(value.result);
   return cellMinutesFromValue(value);
 }
 
+function cellMinutesFromText(text: string): number | null {
+  const normalized = text.replace(/\u00a0/g, " ").trim();
+  if (!normalized) return 0;
+  const hm = normalized.match(/^(-)?(\d+):(\d{1,2})(?::\d{1,2})?$/);
+  if (hm) {
+    const sign = hm[1] ? -1 : 1;
+    return sign * (Number(hm[2]) * 60 + Number(hm[3]));
+  }
+  const decimal = Number(normalized.replace(",", "."));
+  return Number.isFinite(decimal) ? Math.round(decimal * 60) : null;
+}
+
 function cellMinutesFromValue(value: any): number {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    // ExcelJS pode materializar horários como Date. Use os componentes locais
+    // da própria data, sem converter para ISO/fuso.
     return value.getHours() * 60 + value.getMinutes();
   }
   if (typeof value === "number") {
     return Math.round(value * 24 * 60);
   }
-  const text = String(value ?? "").trim();
-  if (!text) return 0;
-  const hm = text.match(/^-?(\d+):(\d{1,2})$/);
-  if (hm) {
-    const sign = text.startsWith("-") ? -1 : 1;
-    return sign * (Number(hm[1].replace("-", "")) * 60 + Number(hm[2]));
-  }
-  const decimal = Number(text.replace(",", "."));
-  return Number.isFinite(decimal) ? Math.round(decimal * 60) : 0;
+  const text = excelValueText(value);
+  const parsed = cellMinutesFromText(text);
+  return parsed ?? 0;
 }
 
 function setTimeCell(cell: ExcelCell, minutes: number) {
@@ -161,11 +191,11 @@ async function readWorkbookRows(
     let currentEmployee = "";
     for (let r = 1; r <= worksheet.rowCount; r += 1) {
       const row = worksheet.getRow(r);
-      const b = String(row.getCell(2).value ?? "").trim();
-      const c = String(row.getCell(3).value ?? "").trim();
+      const b = excelCellText(row.getCell(2));
+      const c = excelCellText(row.getCell(3));
 
       if (b.toUpperCase() === "EMPRESA" && c.toUpperCase() === "FUNCIONÁRIO") {
-        currentEmployee = String(worksheet.getRow(r + 1).getCell(3).value ?? "").trim();
+        currentEmployee = excelCellText(worksheet.getRow(r + 1).getCell(3));
         continue;
       }
 
