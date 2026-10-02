@@ -671,7 +671,11 @@ export function SincronizarPlanilha() {
           if (existingStarts.has(period.start_date)) continue;
 
           const insertAt = block.totalRow;
+          // ExcelJS pode ficar bloqueado por vários segundos ao inserir uma linha
+          // em uma planilha grande. Fazemos a inserção e cedemos o controle ao navegador
+          // antes de continuar com a formatação/escrita.
           block.worksheet.insertRow(insertAt, [], "i+");
+          await new Promise<void>(resolve => setTimeout(resolve, 0));
           const insertedRow = block.worksheet.getRow(insertAt);
           const templateRow = block.worksheet.getRow(Math.max(block.startRow, insertAt - 1));
           copyInsertedRowStyle(templateRow, insertedRow, 19);
@@ -702,8 +706,13 @@ export function SincronizarPlanilha() {
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = fileNameRef.current;
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
       anchor.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }, 1000);
 
       setMessage(`Planilha atualizada: ${updated} linha(s) existentes e ${inserted} nova(s) competência(s) inserida(s). Os saldos permanecem como fórmulas da planilha.`);
     } catch (e) {
