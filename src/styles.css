@@ -184,7 +184,7 @@ textarea:disabled {
 }
 
 /* Perfil Consulta: remove ações de criação, edição, exclusão e salvamento. */
-body.role-consulta button:has(svg.lucide-plus),
+body.role-consulta [data-role-sensitive] { display: none !important; }\n\nbody.role-consulta button:has(svg.lucide-plus),
 body.role-consulta button:has(svg.lucide-pencil),
 body.role-consulta button:has(svg.lucide-trash-2),
 body.role-consulta button:has(svg.lucide-save),
