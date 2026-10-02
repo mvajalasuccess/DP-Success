@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type ComponentType, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { Employees } from "@/screens/funcionarios";
@@ -166,7 +166,7 @@ function AppShell({
 }
 
 function DashboardHome() {
-  const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, period: "Nenhuma competência" });
+  const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, turnover: 0, admissions: 0, terminations: 0, bankBalance: 0, period: "Nenhuma competência" });
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
   const [competenceNote, setCompetenceNote] = useState("");
@@ -360,6 +360,7 @@ function DashboardHome() {
           }
         }),
       );
+      const bankBalance = positiveResults.reduce((sum, item) => sum + (item?.minutes ?? 0), 0);
       setPositiveBalances(
         positiveResults
           .filter((item): item is { name: string; minutes: number } => Boolean(item))
@@ -376,6 +377,13 @@ function DashboardHome() {
         absenteeism: expectedMinutes > 0
           ? Math.round((absenceMinutes / expectedMinutes) * 1000) / 10
           : 0,
+        turnover: employees.length > 0
+          ? (((allEmployees.filter((e: any) => competence && e.hire_date >= competence.start_date && e.hire_date <= competence.end_date).length +
+              allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length) / 2) / employees.length) * 100
+          : 0,
+        admissions: allEmployees.filter((e: any) => competence && e.hire_date >= competence.start_date && e.hire_date <= competence.end_date).length,
+        terminations: allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length,
+        bankBalance,
         period: periodLabel,
       });
     })();
@@ -427,11 +435,10 @@ function DashboardHome() {
   }
 
   const cards = [
-    ["Funcionários ativos", String(metrics.employees), Users],
-    ["Horas extras", fmt(metrics.overtime), Clock3],
-    ["Faltas", String(Math.round(metrics.absenceDays)), AlertTriangle],
-    ["Atestados", String(metrics.certificates), FileText],
-    ["Absenteísmo", metrics.absenteeism.toFixed(1) + "%", Gauge],
+    ["Funcionários ativos", String(metrics.employees), Users, "ativos na competência"],
+    ["Absenteísmo", metrics.absenteeism.toFixed(1) + "%", Gauge, "horas perdidas ÷ previstas"],
+    ["Turnover", metrics.turnover.toFixed(1) + "%", TrendingUp, metrics.admissions + " admissões · " + metrics.terminations + " desligamentos"],
+    ["Banco de horas", fmt(metrics.bankBalance), WalletCards, "saldo positivo disponível"],
   ] as const;
 
   return (
@@ -445,17 +452,40 @@ function DashboardHome() {
           </div>
         </header>
         <div className="mx-auto max-w-[1500px] px-6 py-7">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="text-sm font-medium text-primary">Visão geral da empresa</p><h1 className="mt-1 text-3xl font-bold">Dashboard</h1><p className="mt-1 text-sm text-muted-foreground">Acompanhe ponto, banco de horas, absenteísmo e indicadores.</p></div><div className="rounded-lg border bg-card px-4 py-2 text-xs font-medium">Competência: <strong>{metrics.period}</strong></div></div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{cards.map(([label, value, Icon]) => <Card key={label} className="p-4"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-5 w-5" /></div><p className="mt-4 text-xs text-muted-foreground">{label}</p><p className="mt-1 font-display text-2xl font-bold">{value}</p><p className="mt-1 text-[11px] text-muted-foreground">{metrics.employees === 0 ? "sem dados cadastrados" : "dados atuais"}</p></Card>)}</div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="text-sm font-medium text-primary">Gestão</p>
+              <h1 className="mt-1 text-3xl font-bold tracking-tight">Dashboard</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Resumo executivo de RH e DP da competência atual.</p>
+            </div>
+            <div className="rounded-2xl border bg-card px-5 py-3 text-sm shadow-sm">
+              <p className="text-xs text-muted-foreground">Competência atual</p>
+              <strong>{metrics.period}</strong>
+            </div>
+          </div>
+          <section className="mt-6">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {cards.map(([label, value, Icon, description]) => (
+                <Card key={label} className="p-5">
+                  <Icon className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-3xl font-bold">{value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+                </Card>
+              ))}
+            </div>
+          </section>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
             <Card className="p-5">
-              <h2 className="font-display font-bold">Saldos positivos</h2>
-              <p className="text-xs text-muted-foreground">Crédito disponível no banco de horas nesta competência</p>
+              <div className="flex items-end justify-between gap-3">
+                <div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Banco de horas</p><h2 className="mt-1 text-xl font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Crédito disponível nesta competência.</p></div>
+                <span className="text-2xl font-bold text-primary">{fmt(metrics.bankBalance)}</span>
+              </div>
               <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com crédito disponível nesta competência.</p>}</div>
             </Card>
             <Card className="p-5">
               <div className="flex items-start justify-between gap-3">
-                <div><h2 className="font-display font-bold">Pendências da competência</h2><p className="text-xs text-muted-foreground">Organize aqui o que precisa ser resolvido nesta competência.</p></div>
+                <div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Acompanhamento</p><h2 className="mt-1 text-xl font-bold">Pendências da competência</h2><p className="text-xs text-muted-foreground">Organize aqui o que precisa ser resolvido nesta competência.</p></div>
                 <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5"/>{savingNote ? "Salvando..." : "Salvar"}</button>
               </div>
               <div className="mt-4 space-y-2">
