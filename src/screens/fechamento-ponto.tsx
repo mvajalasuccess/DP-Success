@@ -124,10 +124,34 @@ export function PointClosing() {
     // competência continuem aparecendo.
     const HISTORICAL_CUTOFF = "2026-07-20";
     if (p.end_date <= HISTORICAL_CUTOFF && (historical ?? []).length > 0) {
-      setRowsSource("historical");
-      setHistoricalRows((historical ?? []).map(applyOverride));
-      setLoadingRows(false);
-      return;
+      // A BASE histórica pode não conter funcionários que foram desligados depois
+      // da importação. Nesse caso, não podemos encerrar o carregamento aqui:
+      // precisamos complementar a competência com os funcionários que estavam
+      // contratados durante o período, inclusive os já inativos hoje.
+      const { data: employeesForHistorical } = await supabase
+        .from("employees")
+        .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,departments(name),positions(name)")
+        .order("full_name");
+
+      const employeesInHistoricalPeriod = (employeesForHistorical ?? []).filter((employee: any) =>
+        (!employee.hire_date || employee.hire_date <= p.end_date) &&
+        (!employee.termination_date || employee.termination_date >= p.start_date)
+      );
+      const historicalIds = new Set((historical ?? []).map((row: any) => String(row.employee_id)));
+      const missingHistoricalEmployees = employeesInHistoricalPeriod.filter(
+        (employee: any) => !historicalIds.has(String(employee.id))
+      );
+
+      if (missingHistoricalEmployees.length === 0) {
+        setRowsSource("historical");
+        setHistoricalRows((historical ?? []).map(applyOverride));
+        setLoadingRows(false);
+        return;
+      }
+
+      // Há funcionários da competência que não existem na BASE histórica.
+      // Deixamos o carregamento seguir para a fonte atual, que consegue
+      // reconstruir também esses funcionários desligados durante o período.
     }
 
     // Competências criadas manualmente não possuem historical_kpi_data.
