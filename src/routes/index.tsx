@@ -464,8 +464,30 @@ function DashboardHome() {
         if (deptMap.has(name)) deptMap.get(name)!.minutes += x.minutes || 0;
       });
       setDepartments([...deptMap.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 6));
-      // Usa exatamente a mesma regra do Banco de Horas para o saldo mensal,
-      // incluindo históricos, correções, ajustes, pagamentos e exceções manuais.
+      // Renderiza os indicadores principais antes do cálculo mais pesado do Banco de Horas.
+      // O saldo detalhado continua sendo carregado em seguida, sem bloquear a primeira pintura.
+      const periodLabel = competence
+        ? `Competência ${String(competence.reference_month).padStart(2, "0")}/${competence.reference_year}`
+        : "Nenhuma competência";
+      setMetrics({
+        employees: employees.length,
+        overtime,
+        absenceDays,
+        certificates: certificateRows.length,
+        absenteeism: expectedMinutes > 0
+          ? Math.round((absenceMinutes / expectedMinutes) * 1000) / 10
+          : 0,
+        turnover: employees.length > 0
+          ? (((allEmployees.filter((e: any) => competence && e.hire_date >= competence.start_date && e.hire_date <= competence.end_date).length +
+              allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length) / 2) / employees.length) * 100
+          : 0,
+        admissions: allEmployees.filter((e: any) => competence && e.hire_date >= competence.start_date && e.hire_date <= competence.end_date).length,
+        terminations: allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length,
+        bankBalance: 0,
+        period: periodLabel,
+      });
+
+      // O saldo positivo detalhado é calculado depois, sem bloquear os cards principais.
       const targetPeriodId = competence?.id ?? null;
       const positiveResults = await Promise.all(
         employees.map(async (employee: any) => {
@@ -493,26 +515,7 @@ function DashboardHome() {
           .filter((item): item is { name: string; minutes: number } => Boolean(item))
           .sort((a, b) => b.minutes - a.minutes),
       );
-      const periodLabel = competence
-        ? `Competência ${String(competence.reference_month).padStart(2, "0")}/${competence.reference_year}`
-        : "Nenhuma competência";
-      setMetrics({
-        employees: employees.length,
-        overtime,
-        absenceDays,
-        certificates: certificateRows.length,
-        absenteeism: expectedMinutes > 0
-          ? Math.round((absenceMinutes / expectedMinutes) * 1000) / 10
-          : 0,
-        turnover: employees.length > 0
-          ? (((allEmployees.filter((e: any) => competence && e.hire_date >= competence.start_date && e.hire_date <= competence.end_date).length +
-              allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length) / 2) / employees.length) * 100
-          : 0,
-        admissions: allEmployees.filter((e: any) => competence && e.hire_date >= competence.start_date && e.hire_date <= competence.end_date).length,
-        terminations: allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length,
-        bankBalance,
-        period: periodLabel,
-      });
+      setMetrics(current => ({ ...current, bankBalance }));
     })();
   }, []);
 
