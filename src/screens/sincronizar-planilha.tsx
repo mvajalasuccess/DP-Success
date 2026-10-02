@@ -732,37 +732,8 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       const { creditMap, debitMap } = await getCurrentSyncData(periodIds);
       const changes: SyncChange[] = [];
 
-      // 1) Alterações nas linhas que já existem na planilha.
-      for (const row of rows) {
-        if (row.status !== "ok" || !row.employeeId || !row.periodId) continue;
-
-        const composition = creditMap.get(`${row.employeeId}|${row.periodId}`) ?? {};
-        const debit = debitMap.get(`${row.employeeId}|${row.periodId}`) ?? 0;
-
-        if (!sameComposition(row, composition, debit)) {
-          changes.push({
-            id: `update|${row.id}`,
-            kind: "atualizacao",
-            sheet: row.sheet,
-            employeeName: row.employeeName,
-            periodLabel: periodRangeLabel({
-              start_date: row.startDate,
-              end_date: row.endDate,
-            }),
-            details: `Planilha: ${compositionLabel({
-              HE_60: row.he60,
-              HE_60_NOTURNO: row.he60Night,
-              HE_100: row.he100,
-              HE_100_NOTURNO: row.he100Night,
-              ADICIONAL_NOTURNO: row.night,
-              INTERJORNADA_50: row.interjornada,
-            }, row.debit)} → DP Success: ${compositionLabel(composition, debit)}`,
-          });
-        }
-      }
-
-      // 2) Descobre apenas os nomes dos funcionários existentes no modelo.
-      // Não percorremos "rowCount + 1" e nunca acessamos uma célula inexistente.
+      // A pré-visualização deve mostrar somente competências novas.
+      // Alterações em linhas que já existem não entram nesta etapa.
       const employeeSheets = new Map<string, string>();
 
       for (const worksheet of workbookRef.current.worksheets) {
@@ -770,7 +741,6 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
           const row = worksheet.getRow(r);
           const b = excelCellText(row.getCell(2));
           const c = excelCellText(row.getCell(3));
-
           if (b.toUpperCase() !== "EMPRESA" || c.toUpperCase() !== "FUNCIONÁRIO") continue;
 
           const nextRow = worksheet.getRow(r + 1);
@@ -783,30 +753,19 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
 
       const exact = buildEmployeeIndex(employees);
 
-      // 3) Para cada funcionário já presente no modelo, procura competências
-      // posteriores à última competência existente na planilha.
       for (const [sheetEmployeeKey, employeeName] of employeeSheets) {
         const separator = sheetEmployeeKey.indexOf("|");
         const sheetName = sheetEmployeeKey.slice(0, separator);
-        const resolvedName = sheetEmployeeKey.slice(separator + 1);
         const resolved = resolveEmployee(employeeName, employees, exact, aliases).employee;
         if (!resolved) continue;
-
-        const existingStarts = new Set(
-          rows
-            .filter(item => item.employeeId === resolved.id && item.sheet === sheetName)
-            .map(item => item.startDate),
-        );
 
         const existingRowsForEmployee = rows
           .filter(item => item.employeeId === resolved.id && item.sheet === sheetName)
           .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
-        // Se a planilha não tiver nenhuma linha reconhecida para esse funcionário,
-        // não inventamos uma posição. Nesse caso a pessoa precisa aparecer em uma
-        // competência reconhecida pelo parser antes de receber uma nova linha.
         if (!existingRowsForEmployee.length) continue;
 
+        const existingStarts = new Set(existingRowsForEmployee.map(item => item.startDate));
         const maxExistingStart = existingRowsForEmployee[existingRowsForEmployee.length - 1].startDate;
 
         for (const period of currentPeriods) {
@@ -826,7 +785,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
               start_date: period.start_date,
               end_date: period.end_date,
             }),
-            details: `Nova linha: ${compositionLabel(composition, debit)}`,
+            details: compositionLabel(composition, debit),
           });
 
           existingStarts.add(period.start_date);
