@@ -85,41 +85,10 @@ export function Parametros(){
     if(!isAdmin)return;
     if(id===currentProfile?.id){setError("Você não pode excluir o próprio usuário.");return}
     if(!window.confirm(`Excluir o usuário ${email}? Esta ação remove o cadastro e o acesso ao sistema.`))return;
-
     setError("");
-    setSaved("Excluindo usuário...");
-
-    // Garante uma sessão atualizada antes de chamar a função administrativa.
-    await supabase.auth.refreshSession();
-
-    let data:any = null;
-    let invokeError:any = null;
-
-    for(let attempt=0; attempt<2; attempt++){
-      const result = await (supabase as any).functions.invoke("delete-user", {
-        body: { user_id: id, email },
-      });
-      data = result.data;
-      invokeError = result.error;
-
-      if(!invokeError && !data?.error) break;
-      if(attempt === 0) await new Promise(resolve => setTimeout(resolve, 600));
-    }
-
-    if(invokeError || data?.error){
-      const rawMessage = data?.error || invokeError?.message || "Não foi possível excluir o usuário.";
-      const normalized = String(rawMessage).toLowerCase();
-      const message = normalized.includes("failed to send") ||
-        normalized.includes("function not found") ||
-        normalized.includes("404")
-        ? "A função de exclusão ainda não está publicada no Supabase. O código do DP Success já está preparado; publique a Edge Function delete-user no projeto Supabase."
-        : String(rawMessage);
-
-      setSaved("");
-      setError(message);
-      return;
-    }
-
+    const { data, error:e } = await (supabase as any).functions.invoke("delete-user", { body: { user_id: id } });
+    if(e){setError(e.message);return}
+    if(data?.error){setError(data.error);return}
     setSaved("Usuário excluído.");
     setTimeout(()=>setSaved(""),1800);
     await load();
