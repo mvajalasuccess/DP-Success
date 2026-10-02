@@ -41,7 +41,7 @@ export function Parametros(){
     ]);
     const firstError=[s,c,h,p].find(x=>x.error)?.error;
     if(firstError)setError(firstError.message);
-    setSettings(s.data??[]);setCompany(c.data??{});setHolidays(h.data??[]);setProfiles((p.data??[]).filter((profile:any)=>!String(profile.full_name??"").toLowerCase().includes("yasmin")));
+    setSettings(s.data??[]);setCompany(c.data??{});setHolidays(h.data??[]);setProfiles((p.data??[]).filter((profile:any)=>!String(profile.full_name??"").toLowerCase().includes("yasmin") && !String(profile.email??"").toLowerCase().includes("yasmin")));
     setCurrentProfile((p.data ?? []).find((x:any) => x.id === sessionData.session?.user.id) ?? null);
   }
   useEffect(()=>{void load()},[]);
