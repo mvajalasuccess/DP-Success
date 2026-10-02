@@ -103,6 +103,7 @@ export function Kpis() {
   const [source, setSource] = useState("");
   const [bankBalance, setBankBalance] = useState(0);
   const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<Array<{ periodId: string; label: string; rate: number; expected: number; lost: number }>>([]);
+  const [monthlyOvertime, setMonthlyOvertime] = useState<Array<{ periodId: string; label: string; total: number; interjornada: number; employees: number }>>([]);
   const [showAbsenceCalculation, setShowAbsenceCalculation] = useState(false);
 
   useEffect(() => {
@@ -729,6 +730,78 @@ export function Kpis() {
       next.interjornada = comparisonRows.reduce((sum, row) => sum + row.interjornada, 0);
       setOvertimeEmployees(comparisonRows);
 
+      const formatPeriodMonth = (period: Period) =>
+        new Intl.DateTimeFormat("pt-BR", { month: "short" })
+          .format(new Date(period.end_date + "T00:00:00"))
+          .replace(".", "");
+
+      const overtimeByType = (type: string) => {
+        const normalized = type.toUpperCase();
+        if (normalized === "HE_60") return "he60";
+        if (normalized === "HE_60_NOTURNO") return "he60Night";
+        if (normalized === "HE_100") return "he100";
+        if (normalized === "HE_100_NOTURNO") return "he100Night";
+        if (normalized === "ADICIONAL_NOTURNO") return "he20";
+        if (normalized === "INTERJORNADA_50") return "interjornada";
+        return "";
+      };
+
+      const monthlyOvertimeResult = targetPeriods.map(period => {
+        let he60 = 0;
+        let he60Night = 0;
+        let he100 = 0;
+        let he100Night = 0;
+        let he20 = 0;
+        let interjornada = 0;
+        const employeeSet = new Set<string>();
+
+        for (const row of historical ?? []) {
+          if (String(row.period_id) !== String(period.id) || !isAllowedRow(row)) continue;
+          const employee = resolveEmployee(row);
+          const override = employee ? overrideByKey.get(String(row.period_id) + ":" + String(employee.id)) : undefined;
+          const sourceRow = override ? { ...row, ...override } : row;
+          const values = {
+            he60: Number(sourceRow.he_60_minutes || 0),
+            he60Night: Number(sourceRow.he_60_night_minutes || 0),
+            he100: Number(sourceRow.he_100_minutes || 0),
+            he100Night: Number(sourceRow.he_100_night_minutes || 0),
+            he20: Number(sourceRow.he_20_minutes || 0),
+            interjornada: Number(sourceRow.interjornada_minutes || 0),
+          };
+          he60 += values.he60;
+          he60Night += values.he60Night;
+          he100 += values.he100;
+          he100Night += values.he100Night;
+          he20 += values.he20;
+          interjornada += values.interjornada;
+          if (employee && Object.values(values).some(value => value > 0)) employeeSet.add(employee.id);
+        }
+
+        for (const row of overtime ?? []) {
+          if (String(row.period_id) !== String(period.id) || !row.employee_id || !allowedIds.has(row.employee_id)) continue;
+          const key = overtimeByType(String(row.launch_type ?? ""));
+          if (!key) continue;
+          const minutes = Number(row.minutes || 0);
+          if (key === "he60") he60 += minutes;
+          else if (key === "he60Night") he60Night += minutes;
+          else if (key === "he100") he100 += minutes;
+          else if (key === "he100Night") he100Night += minutes;
+          else if (key === "he20") he20 += minutes;
+          else if (key === "interjornada") interjornada += minutes;
+          if (minutes > 0) employeeSet.add(String(row.employee_id));
+        }
+
+        return {
+          periodId: period.id,
+          label: formatPeriodMonth(period),
+          total: he60 + he60Night + he100 + he100Night + he20,
+          interjornada,
+          employees: employeeSet.size,
+        };
+      });
+
+      setMonthlyOvertime(monthlyOvertimeResult);
+
       // Não bloquear a renderização dos KPIs com dezenas de consultas
       // individuais do Banco de Horas. O saldo é carregado em segundo plano.
       setMetrics(next);
@@ -1135,6 +1208,7 @@ export function Kpis() {
                 <p className="mt-1 text-3xl font-bold">{fmt(totalOvertime - metrics.interjornada)}</p>
               </div>
             </div>
+
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
               {[
                 ["HE 60%", metrics.he60],
@@ -1149,6 +1223,153 @@ export function Kpis() {
                   <p className="mt-2 text-2xl font-bold">{fmt(Number(value))}</p>
                 </Card>
               ))}
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Card className="p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold">Evolução das horas extras</h3>
+                    <p className="text-xs text-muted-foreground">Total de HE por competência.</p>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+                <div className="mt-6 flex h-56 items-end gap-2 overflow-x-auto pb-7">
+                  {monthlyOvertime.map(item => {
+                    const max = Math.max(...monthlyOvertime.map(x => x.total), 1);
+                    const height = Math.max(8, (item.total / max) * 140);
+                    return (
+                      <div key={item.periodId} className="flex min-w-14 flex-1 flex-col items-center justify-end gap-2">
+                        <span className="text-[10px] font-semibold">{fmt(item.total)}</span>
+                        <div className="w-full max-w-12 rounded-t-md bg-primary/70" style={{ height }} />
+                        <span className="text-[10px] text-muted-foreground">{item.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {!monthlyOvertime.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados para o período selecionado.</p>}
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-bold">Distribuição por tipo</h3>
+                <p className="text-xs text-muted-foreground">Composição das horas extras selecionadas.</p>
+                {(() => {
+                  const parts = [
+                    ["HE 60%", metrics.he60],
+                    ["HE 60% + 20%", metrics.he60Night],
+                    ["HE 100%", metrics.he100],
+                    ["HE 100% + 20%", metrics.he100Night],
+                    ["HE 20%", metrics.he20],
+                  ] as [string, number][];
+                  const total = parts.reduce((sum, [, value]) => sum + value, 0);
+                  let cursor = 0;
+                  const stops = parts.map(([, value]) => {
+                    const start = total ? (cursor / total) * 360 : 0;
+                    cursor += value;
+                    return `${start}deg ${total ? (cursor / total) * 360 : 0}deg`;
+                  }).join(", ");
+                  return (
+                    <div className="mt-5 flex items-center gap-6">
+                      <div className="relative h-36 w-36 shrink-0 rounded-full" style={{ background: total ? `conic-gradient(var(--primary) ${stops})` : "var(--muted)" }}>
+                        <div className="absolute inset-6 flex items-center justify-center rounded-full bg-card text-center">
+                          <div><p className="text-xs text-muted-foreground">Total</p><p className="text-sm font-bold">{fmt(total)}</p></div>
+                        </div>
+                      </div>
+                      <div className="min-w-0 space-y-2 text-xs">
+                        {parts.map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between gap-4">
+                            <span className="truncate">{label}</span>
+                            <strong>{fmt(value)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </Card>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Card className="p-5">
+                <h3 className="font-bold">Horas extras por departamento</h3>
+                <p className="text-xs text-muted-foreground">Distribuição do total de HE entre os setores.</p>
+                <div className="mt-5 space-y-4">
+                  {(() => {
+                    const departmentMap = new Map<string, number>();
+                    for (const item of overtimeEmployees) {
+                      const department = employees.find(e => e.id === item.employeeId)?.department || "Sem departamento";
+                      departmentMap.set(department, (departmentMap.get(department) ?? 0) + item.total - item.interjornada);
+                    }
+                    const rows = [...departmentMap.entries()].filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]);
+                    const max = Math.max(...rows.map(([, value]) => value), 1);
+                    return rows.length ? rows.map(([department, value]) => (
+                      <div key={department}>
+                        <div className="flex justify-between gap-3 text-sm"><span className="truncate">{department}</span><strong>{fmt(value)}</strong></div>
+                        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, value / max * 100)}%` }} /></div>
+                      </div>
+                    )) : <p className="py-8 text-center text-sm text-muted-foreground">Sem horas extras.</p>;
+                  })()}
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-bold">Funcionários com maior volume de HE</h3>
+                <p className="text-xs text-muted-foreground">Até 10 funcionários, considerando o período selecionado.</p>
+                <div className="mt-5 space-y-3">
+                  {overtimeEmployees.slice(0, 10).map((item, index) => (
+                    <div key={item.employeeId}>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate">{index + 1}. {item.name}</span>
+                        <strong>{fmt(item.total - item.interjornada)}</strong>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, (item.total - item.interjornada) / Math.max(overtimeEmployees[0]?.total - overtimeEmployees[0]?.interjornada, 1) * 100)}%` }} /></div>
+                    </div>
+                  ))}
+                  {!overtimeEmployees.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem horas extras.</p>}
+                </div>
+              </Card>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Card className="p-5">
+                <h3 className="font-bold">HE × funcionários</h3>
+                <p className="text-xs text-muted-foreground">Quantidade de funcionários com HE e média de horas por pessoa em cada competência.</p>
+                <div className="mt-5 space-y-3">
+                  {monthlyOvertime.map(item => {
+                    const average = item.employees ? item.total / item.employees : 0;
+                    const maxAverage = Math.max(...monthlyOvertime.map(x => x.employees ? x.total / x.employees : 0), 1);
+                    return (
+                      <div key={item.periodId} className="grid grid-cols-[42px_1fr_90px] items-center gap-3">
+                        <span className="text-xs text-muted-foreground">{item.label}</span>
+                        <div>
+                          <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, average / maxAverage * 100)}%` }} /></div>
+                          <p className="mt-1 text-[10px] text-muted-foreground">{item.employees} {item.employees === 1 ? "funcionário" : "funcionários"} · {fmt(average)} por pessoa</p>
+                        </div>
+                        <strong className="text-right text-xs">{fmt(item.total)}</strong>
+                      </div>
+                    );
+                  })}
+                  {!monthlyOvertime.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados.</p>}
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-bold">Interjornada por competência</h3>
+                <p className="text-xs text-muted-foreground">Acompanhamento separado das horas de interjornada.</p>
+                <div className="mt-5 space-y-3">
+                  {monthlyOvertime.map(item => {
+                    const max = Math.max(...monthlyOvertime.map(x => x.interjornada), 1);
+                    return (
+                      <div key={item.periodId} className="grid grid-cols-[42px_1fr_72px] items-center gap-3">
+                        <span className="text-xs text-muted-foreground">{item.label}</span>
+                        <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, item.interjornada / max * 100)}%` }} /></div>
+                        <strong className="text-right text-xs">{fmt(item.interjornada)}</strong>
+                      </div>
+                    );
+                  })}
+                  {!monthlyOvertime.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados.</p>}
+                </div>
+              </Card>
             </div>
           </section>
         )}
