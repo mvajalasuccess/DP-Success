@@ -214,9 +214,6 @@ export function ImportarCartaoPonto() {
                       <tr key={row.page}>
                         <td className="px-5 py-4 font-medium">
                           {row.employeeName}
-                          <div className="text-xs text-muted-foreground">
-                            Matrícula {row.registration ?? "—"}
-                          </div>
                         </td>
                         <td className="px-5 py-4">
                           {row.period ? periodRangeLabel(row.period) : (
