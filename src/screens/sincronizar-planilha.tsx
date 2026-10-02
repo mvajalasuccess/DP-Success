@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, RefreshCw, Upload, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ScreenShell, btnOutline, btnPrimary, inputCls } from "@/components/screen-shell";
@@ -33,6 +33,39 @@ type PreviewRow = {
 type Employee = { id: string; full_name: string; status?: string };
 
 const TARGET_END_DATES = new Set(["2026-08-20", "2026-09-20"]);
+const TEMPLATE_DB = "dp-success-planilha-sync";
+const TEMPLATE_STORE = "template";
+
+async function saveTemplateLocally(buffer: ArrayBuffer, name: string) {
+  if (typeof indexedDB === "undefined") return;
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open(TEMPLATE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(TEMPLATE_STORE);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const tx = request.result.transaction(TEMPLATE_STORE, "readwrite");
+      tx.objectStore(TEMPLATE_STORE).put({ buffer, name }, "current");
+      tx.oncomplete = () => { request.result.close(); resolve(); };
+      tx.onerror = () => { request.result.close(); reject(tx.error); };
+    };
+  });
+}
+
+async function loadTemplateLocally(): Promise<{ buffer: ArrayBuffer; name: string } | null> {
+  if (typeof indexedDB === "undefined") return null;
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(TEMPLATE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(TEMPLATE_STORE);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const tx = request.result.transaction(TEMPLATE_STORE, "readonly");
+      const get = tx.objectStore(TEMPLATE_STORE).get("current");
+      get.onsuccess = () => { request.result.close(); resolve(get.result ?? null); };
+      get.onerror = () => { request.result.close(); reject(get.error); };
+    };
+  });
+}
+
 
 function normalizeName(value: unknown) {
   return String(value ?? "")
@@ -203,6 +236,31 @@ export function SincronizarPlanilha() {
     missingPeriod: rows.filter(r => r.status === "competencia_nao_encontrada").length,
   }), [rows]);
 
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const saved = await loadTemplateLocally();
+        if (!saved || !active) return;
+        const { default: ExcelJS } = await import("exceljs");
+        const { employees: loadedEmployees, periods: loadedPeriods } = await ensureBase();
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(saved.buffer);
+        const parsed = await readWorkbookRows(workbook, loadedEmployees, loadedPeriods, aliases);
+        if (!active) return;
+        workbookRef.current = workbook;
+        fileNameRef.current = saved.name.replace(/\.xlsx$/i, "") + " - atualizada.xlsx";
+        setFileName(saved.name);
+        setRows(parsed);
+        setSelectedIds(parsed.filter(r => r.status === "ok").map(r => r.id));
+        setMessage("Modelo salvo neste navegador foi recuperado. Você pode importar, lançar manualmente e atualizar a planilha.");
+      } catch {
+        // Se não houver um modelo local válido, a tela continua normalmente.
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   async function ensureBase() {
     const [employeesResult, periodResult] = await Promise.all([
       supabase.from("employees").select("id,full_name,status").order("full_name"),
@@ -219,8 +277,10 @@ export function SincronizarPlanilha() {
     try {
       const { employees: loadedEmployees, periods: loadedPeriods } = await ensureBase();
       const { default: ExcelJS } = await import("exceljs");
+      const buffer = await file.arrayBuffer();
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(await file.arrayBuffer());
+      await workbook.xlsx.load(buffer);
+      await saveTemplateLocally(buffer, file.name);
       const parsed = await readWorkbookRows(workbook, loadedEmployees, loadedPeriods, aliases);
       if (!parsed.length) throw new Error("Não encontrei as competências 21/07/2026–20/08/2026 ou 21/08/2026–20/09/2026 na planilha.");
       workbookRef.current = workbook;
