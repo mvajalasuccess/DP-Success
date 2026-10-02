@@ -752,8 +752,20 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       }
 
       const exact = buildEmployeeIndex(employees);
+      const detectedNewEmployees = new Map<string, { changeIndex: number; exactName: boolean }>();
 
-      for (const [sheetEmployeeKey, employeeName] of employeeSheets) {
+      // Se o mesmo funcionário aparecer duas vezes no modelo (por exemplo,
+      // "MARI" e "MARIANA"), a mesma competência não pode ser criada duas vezes.
+      // Preferimos sempre o bloco cujo nome bate exatamente com o cadastro.
+      const employeeEntries = [...employeeSheets.entries()].sort((a, b) => {
+        const aName = a[1];
+        const bName = b[1];
+        const aExact = exact.has(normalizeName(aName)) ? 0 : 1;
+        const bExact = exact.has(normalizeName(bName)) ? 0 : 1;
+        return aExact - bExact;
+      });
+
+      for (const [sheetEmployeeKey, employeeName] of employeeEntries) {
         const separator = sheetEmployeeKey.indexOf("|");
         const sheetName = sheetEmployeeKey.slice(0, separator);
         const resolved = resolveEmployee(employeeName, employees, exact, aliases).employee;
@@ -776,17 +788,44 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
 
           if (!isNonZeroComposition(composition, debit)) continue;
 
-          changes.push({
-            id: `new|${sheetName}|${resolved.id}|${period.id}`,
-            kind: "nova_linha",
-            sheet: sheetName,
-            employeeName,
-            periodLabel: periodRangeLabel({
-              start_date: period.start_date,
-              end_date: period.end_date,
-            }),
-            details: compositionLabel(composition, debit),
-          });
+          const duplicateKey = `${resolved.id}|${period.id}`;
+          const exactName = normalizeName(employeeName) === normalizeName(resolved.full_name);
+          const previous = detectedNewEmployees.get(duplicateKey);
+
+          if (previous) {
+            // Já existe uma detecção para a mesma pessoa/competência.
+            // Se a nova detecção for o nome exato, substituímos a anterior.
+            if (exactName && !previous.exactName) {
+              changes.splice(previous.changeIndex, 1);
+              const changeIndex = changes.length;
+              changes.push({
+                id: `new|${sheetName}|${resolved.id}|${period.id}`,
+                kind: "nova_linha",
+                sheet: sheetName,
+                employeeName,
+                periodLabel: periodRangeLabel({
+                  start_date: period.start_date,
+                  end_date: period.end_date,
+                }),
+                details: compositionLabel(composition, debit),
+              });
+              detectedNewEmployees.set(duplicateKey, { changeIndex, exactName: true });
+            }
+          } else {
+            const changeIndex = changes.length;
+            changes.push({
+              id: `new|${sheetName}|${resolved.id}|${period.id}`,
+              kind: "nova_linha",
+              sheet: sheetName,
+              employeeName,
+              periodLabel: periodRangeLabel({
+                start_date: period.start_date,
+                end_date: period.end_date,
+              }),
+              details: compositionLabel(composition, debit),
+            });
+            detectedNewEmployees.set(duplicateKey, { changeIndex, exactName });
+          }
 
           existingStarts.add(period.start_date);
         }
