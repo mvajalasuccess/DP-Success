@@ -990,6 +990,7 @@ export function Kpis() {
           </div>
 
           {activeSection === "absenteismo" && (
+          <>
           <div className="mt-6 flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
@@ -1091,8 +1092,9 @@ export function Kpis() {
               <p className="mt-1 text-sm text-muted-foreground">{metrics.employees} ativos na competência/seleção.</p>
             </Card>
           </div>
-          </section>
+          </>
           )}
+        </section>
 
         {activeSection === "horas-extras" && (
           <section className="mt-6">
