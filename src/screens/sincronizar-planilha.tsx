@@ -575,7 +575,20 @@ export function SincronizarPlanilha() {
             <h2 className="text-lg font-bold">Fluxo de teste</h2>
             <p className="mt-1 text-sm text-muted-foreground">1) importe a planilha · 2) confira os nomes · 3) importe os lançamentos · 4) faça alterações manuais · 5) clique em Atualizar planilha.</p>
           </div>
-          {actionAllowed && <button className={btnPrimary} disabled={loading || !selectedIds.length} onClick={() => void importSelected()}><RefreshCw className="h-4 w-4" /> {loading ? "Importando..." : `Importar ${selectedIds.length} selecionada(s)`}</button>}
+          {actionAllowed && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className={btnOutline}
+                disabled={loading || !selectedIds.length}
+                onClick={() => setSelectedIds([])}
+              >
+                Desmarcar todas
+              </button>
+              <button className={btnPrimary} disabled={loading || !selectedIds.length} onClick={() => void importSelected()}>
+                <RefreshCw className="h-4 w-4" /> {loading ? "Importando..." : `Importar ${selectedIds.length} selecionada(s)`}
+              </button>
+            </div>
+          )}
         </div>
         {fileName && <p className="mt-3 text-xs text-muted-foreground">Arquivo: {fileName}</p>}
       </Card>
