@@ -409,47 +409,31 @@ export function SincronizarPlanilha() {
     }
   }
 
-  async function discardImported() {
-    if (!rows.length) return;
-    if (!window.confirm("Desconsiderar os lançamentos importados desta planilha? Isso removerá somente registros marcados como XLSX_IMPORT e não apagará lançamentos manuais.")) return;
-    setLoading(true); setError(""); setMessage("");
+  async function discardSpreadsheet() {
+    if (!window.confirm("Desconsiderar a planilha atual? Isso apenas remove a planilha carregada desta tela e do navegador. Nenhum dado já importado para o DP Success será excluído.")) return;
     try {
-      const db = supabase as any;
-      let removed = 0;
-      for (const row of rows) {
-        if (!row.employeeId || !row.periodId) continue;
-        const sourceToken = `[XLSX_IMPORT:${row.sheet}|${normalizeName(row.employeeName)}|${row.startDate}|${row.endDate}]`;
-
-        const credits = await db.from("overtime_records")
-          .select("id")
-          .eq("employee_id", row.employeeId)
-          .eq("period_id", row.periodId)
-          .ilike("notes", `%${sourceToken}%`);
-        if (credits.error) throw new Error(credits.error.message);
-        if (credits.data?.length) {
-          const del = await db.from("overtime_records").delete().in("id", credits.data.map((x: any) => x.id));
-          if (del.error) throw new Error(del.error.message);
-          removed += credits.data.length;
-        }
-
-        const debits = await db.from("bank_hours")
-          .select("id")
-          .eq("employee_id", row.employeeId)
-          .eq("period_id", row.periodId)
-          .eq("kind", "debito")
-          .ilike("justification", `%${sourceToken}%`);
-        if (debits.error) throw new Error(debits.error.message);
-        if (debits.data?.length) {
-          const del = await db.from("bank_hours").delete().in("id", debits.data.map((x: any) => x.id));
-          if (del.error) throw new Error(del.error.message);
-          removed += debits.data.length;
-        }
+      if (typeof indexedDB !== "undefined") {
+        await new Promise<void>((resolve, reject) => {
+          const request = indexedDB.open(TEMPLATE_DB, 1);
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            const db = request.result;
+            const tx = db.transaction(TEMPLATE_STORE, "readwrite");
+            tx.objectStore(TEMPLATE_STORE).delete("current");
+            tx.oncomplete = () => { db.close(); resolve(); };
+            tx.onerror = () => { db.close(); reject(tx.error); };
+          };
+        });
       }
-      setMessage(`Importação desconsiderada. ${removed} lançamento(s) importado(s) foram removidos. Lançamentos manuais foram preservados.`);
+      workbookRef.current = null;
+      fileNameRef.current = "planilha-atualizada.xlsx";
+      setFileName("");
+      setRows([]);
+      setSelectedIds([]);
+      setMessage("Planilha desconsiderada. Nenhum lançamento do DP Success foi excluído.");
+      setError("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao desconsiderar a importação.");
-    } finally {
-      setLoading(false);
+      setError(e instanceof Error ? e.message : "Não foi possível desconsiderar a planilha.");
     }
   }
 
@@ -546,7 +530,7 @@ export function SincronizarPlanilha() {
       actions={actionAllowed ? <>
         <button data-role-sensitive className={btnOutline} onClick={() => inputRef.current?.click()} disabled={loading}><Upload className="h-4 w-4" /> Importar planilha</button>
         <button data-role-sensitive className={btnPrimary} onClick={() => void exportUpdated()} disabled={!workbookRef.current || exporting}><Download className="h-4 w-4" /> {exporting ? "Atualizando..." : "Atualizar planilha"}</button>
-        <button data-role-sensitive className={btnOutline} onClick={() => void discardImported()} disabled={loading || !rows.length}><AlertTriangle className="h-4 w-4" /> Desconsiderar importação</button>
+        <button data-role-sensitive className={btnOutline} onClick={() => void discardSpreadsheet()} disabled={loading || !rows.length}><AlertTriangle className="h-4 w-4" /> Desconsiderar planilha</button>
       </> : undefined}
     >
       <input ref={inputRef} type="file" accept=".xlsx" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) void readFile(file); e.currentTarget.value = ""; }} />
