@@ -4,10 +4,15 @@ import { Eye, EyeOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/login")({ component: Login });
+export const Route = createFileRoute("/login")({
+  validateSearch: (s: Record<string, unknown>) => ({ next: typeof s["next"] === "string" && s["next"].startsWith("/") && !s["next"].startsWith("//") ? s["next"] : undefined }),
+  component: Login,
+});
 
 function Login() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
+  const goNext = async () => { if (next) { window.location.href = next; return; } await goNext(); };
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,13 +51,14 @@ function Login() {
       }
 
       setSaving(false);
-      await navigate({ to: "/" });
+      await goNext();
       return;
     }
 
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: { emailRedirectTo: window.location.origin + (next ?? "/") },
     });
 
     if (error) {
@@ -69,7 +75,7 @@ function Login() {
         setError(setupError.message);
         return;
       }
-      await navigate({ to: "/" });
+      await goNext();
     } else {
       setMessage("Cadastro criado. Verifique seu e-mail para confirmar a conta e depois entre no sistema.");
     }
