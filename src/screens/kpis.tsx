@@ -1051,10 +1051,10 @@ export function Kpis() {
                 <div><h3 className="font-bold">Evolução mensal</h3><p className="text-xs text-muted-foreground">Percentual de horas perdidas consideradas em cada competência.</p></div>
                 <span className="text-xs text-muted-foreground">{selectedYear}</span>
               </div>
-              <div className="mt-5 flex h-48 items-end gap-2 overflow-x-auto pb-7">
+              <div className="mt-5 flex h-48 items-end gap-2 overflow-x-auto pb-6">
                 {monthlyAbsenteeism.map(item => {
                   const max = Math.max(...monthlyAbsenteeism.map(x => x.rate), 1);
-                  const height = Math.max(8, (item.rate / max) * 150);
+                  const height = Math.max(8, (item.rate / max) * 118);
                   return (
                     <div key={item.periodId} className="flex min-w-14 flex-1 flex-col items-center justify-end gap-2">
                       <span className="text-[10px] font-semibold">{pct(item.rate)}</span>
