@@ -126,13 +126,13 @@ function AppShell({
 }) {
   const go = (key: ScreenKey) => onNavigate(key);
   const buttonClass = (key: ScreenKey) =>
-    `flex w-full items-center rounded-lg py-2.5 text-left text-sm transition-colors ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
+    `flex w-full items-center rounded-xl py-2.5 text-left text-[13px] transition-colors ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
 
   return (
     <div className="min-h-screen bg-background">
-      <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r bg-sidebar transition-[width] duration-200 lg:flex lg:flex-col ${collapsed ? "w-16" : "w-64"}`}>
-        <div className={`flex h-16 shrink-0 items-center border-b ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
-          {!collapsed && <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></div><div><div className="font-display text-base font-bold">DP Success</div><div className="text-[9px] uppercase tracking-widest text-muted-foreground">RH · DP · Gestão</div></div></div>}
+      <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r border-sidebar-border/60 bg-sidebar transition-[width] duration-200 lg:flex lg:flex-col ${collapsed ? "w-16" : "w-64"}`}>
+        <div className={`flex h-[72px] shrink-0 items-center border-b border-sidebar-border/60 ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+          {!collapsed && <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"><Clock3 className="h-5 w-5" /></div><div><div className="font-display text-[15px] font-semibold tracking-tight">DP Success</div><div className="text-[9px] uppercase tracking-[0.22em] text-sidebar-foreground/45">RH · DP · Gestão</div></div></div>}
           {collapsed && <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></div>}
           <button type="button" onClick={onToggleCollapsed} className="rounded-lg p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" title={collapsed ? "Expandir menu" : "Minimizar menu"} aria-label={collapsed ? "Expandir menu" : "Minimizar menu"}><ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : "rotate-90"}`} /></button>
         </div>
@@ -150,7 +150,7 @@ function AppShell({
             <button type="button" onClick={onToggleCompany} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent">
               <span className="flex items-center gap-2"><Building2 className="h-4 w-4" />Empresas</span><ChevronDown className={`h-4 w-4 transition-transform ${companyOpen ? "rotate-180" : ""}`} />
             </button>
-            {companyOpen && <div className="ml-3 mt-1 space-y-1 border-l pl-3">{companyNav.map(([label, key]) => <button key={key} type="button" onClick={() => go(key)} className={`block w-full rounded-lg px-3 py-2 text-left text-xs ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent"}`}>{label}</button>)}</div>}
+            {companyOpen && <div className="ml-3 mt-1 space-y-1 border-l pl-3">{companyNav.map(([label, key]) => <button key={key} type="button" onClick={() => go(key)} className={`block w-full rounded-lg px-3 py-2 text-left text-xs ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>{label}</button>)}</div>}
           </div>}
 
           {!collapsed && <div className="pt-2">
