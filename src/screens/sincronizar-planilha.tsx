@@ -32,6 +32,15 @@ type PreviewRow = {
 
 type Employee = { id: string; full_name: string; status?: string };
 
+type SyncChange = {
+  id: string;
+  kind: "nova_linha" | "atualizacao";
+  sheet: string;
+  employeeName: string;
+  periodLabel: string;
+  details: string;
+};
+
 const TARGET_PERIOD_START_DATES = new Set(["2026-07-21", "2026-08-21"]);
 const TEMPLATE_DB = "dp-success-planilha-sync";
 const TEMPLATE_STORE = "template";
@@ -248,7 +257,7 @@ async function readWorkbookRows(
 
 export function SincronizarPlanilha() {
   const inputRef = useRef<HTMLInputElement>(null);
-  const workbookRef = useRef<ExcelWorkbook | null>(null);
+  const workbookRef = useRef<ExcelWorkbook | null>(null);\n  const templateBufferRef = useRef<ArrayBuffer | null>(null);
   const fileNameRef = useRef("planilha-atualizada.xlsx");
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -256,7 +265,7 @@ export function SincronizarPlanilha() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState(false);\n  const [previewLoading, setPreviewLoading] = useState(false);\n  const [previewOpen, setPreviewOpen] = useState(false);\n  const [syncChanges, setSyncChanges] = useState<SyncChange[]>([]);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [aliases, setAliases] = useState<Record<string, string>>(() => {
@@ -283,6 +292,7 @@ export function SincronizarPlanilha() {
         const parsed = await readWorkbookRows(workbook, loadedEmployees, loadedPeriods, aliases);
         if (!active) return;
         workbookRef.current = workbook;
+        templateBufferRef.current = saved.buffer;
         fileNameRef.current = saved.name.replace(/\.xlsx$/i, "") + " - atualizada.xlsx";
         setFileName(saved.name);
         setRows(parsed);
@@ -318,6 +328,7 @@ export function SincronizarPlanilha() {
       const parsed = await readWorkbookRows(workbook, loadedEmployees, loadedPeriods, aliases);
       if (!parsed.length) throw new Error("Não encontrei as competências 21/07/2026–20/08/2026 ou 21/08/2026–20/09/2026 na planilha.");
       workbookRef.current = workbook;
+      templateBufferRef.current = buffer;
       fileNameRef.current = file.name.replace(/\.xlsx$/i, "") + " - atualizada.xlsx";
       setFileName(file.name);
       setRows(parsed);
@@ -630,138 +641,204 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
   }
 
 
-  async function exportUpdated() {
-    if (!workbookRef.current) return;
-    setExporting(true); setError(""); setMessage("");
+  async function getCurrentSyncData() {
+    const db = supabase as any;
+    const allPeriods = await fetchPeriods();
+    setPeriods(allPeriods);
+    const periodIds = allPeriods.map(p => p.id);
+
+    const [creditResult, debitResult] = await Promise.all([
+      periodIds.length
+        ? db.from("overtime_records").select("employee_id,reference_date,minutes,launch_type,period_id").in("period_id", periodIds)
+        : Promise.resolve({ data: [], error: null }),
+      periodIds.length
+        ? db.from("bank_hours").select("employee_id,entry_date,minutes,period_id,kind").eq("kind", "debito").in("period_id", periodIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (creditResult.error) throw new Error(creditResult.error.message);
+    if (debitResult.error) throw new Error(debitResult.error.message);
+
+    const creditMap = new Map<string, Record<string, number>>();
+    for (const row of creditResult.data ?? []) {
+      const key = `${row.employee_id}|${row.period_id ?? ""}`;
+      const item = creditMap.get(key) ?? {};
+      item[row.launch_type] = (item[row.launch_type] ?? 0) + Math.abs(Number(row.minutes) || 0);
+      creditMap.set(key, item);
+    }
+
+    const debitMap = new Map<string, number>();
+    for (const row of debitResult.data ?? []) {
+      const key = `${row.employee_id}|${row.period_id ?? ""}`;
+      debitMap.set(key, (debitMap.get(key) ?? 0) + Math.abs(Number(row.minutes) || 0));
+    }
+    return { allPeriods, creditMap, debitMap };
+  }
+
+  function compositionLabel(composition: Record<string, number>, debit: number) {
+    const parts: string[] = [];
+    if (debit > 0) parts.push(`Débito ${minutesToHours(debit)}`);
+    if ((composition.HE_60 ?? 0) > 0) parts.push(`HE 60% ${minutesToHours(composition.HE_60)}`);
+    if ((composition.HE_60_NOTURNO ?? 0) > 0) parts.push(`60%+20% ${minutesToHours(composition.HE_60_NOTURNO)}`);
+    if ((composition.HE_100 ?? 0) > 0) parts.push(`HE 100% ${minutesToHours(composition.HE_100)}`);
+    if ((composition.HE_100_NOTURNO ?? 0) > 0) parts.push(`100%+20% ${minutesToHours(composition.HE_100_NOTURNO)}`);
+    if ((composition.ADICIONAL_NOTURNO ?? 0) > 0) parts.push(`Noturno ${minutesToHours(composition.ADICIONAL_NOTURNO)}`);
+    if ((composition.INTERJORNADA_50 ?? 0) > 0) parts.push(`Interj. ${minutesToHours(composition.INTERJORNADA_50)}`);
+    return parts.join(" · ") || "Sem movimentação";
+  }
+
+  function sameComposition(row: PreviewRow, composition: Record<string, number>, debit: number) {
+    return row.debit === debit
+      && row.he60 === (composition.HE_60 ?? 0)
+      && row.he60Night === (composition.HE_60_NOTURNO ?? 0)
+      && row.he100 === (composition.HE_100 ?? 0)
+      && row.he100Night === (composition.HE_100_NOTURNO ?? 0)
+      && row.night === (composition.ADICIONAL_NOTURNO ?? 0)
+      && row.interjornada === (composition.INTERJORNADA_50 ?? 0);
+  }
+
+  async function buildSyncPreview() {
+    if (!workbookRef.current) {
+      setError("Importe uma planilha antes de pré-visualizar a atualização.");
+      return;
+    }
+    setPreviewLoading(true); setError(""); setMessage("");
     try {
-      const workbook = workbookRef.current;
-      const db = supabase as any;
-      const allPeriods = await fetchPeriods();
-      setPeriods(allPeriods);
-      const periodIds = allPeriods.map(p => p.id);
-
-      const [creditResult, debitResult] = await Promise.all([
-        periodIds.length
-          ? db.from("overtime_records")
-              .select("employee_id,reference_date,minutes,launch_type,period_id")
-              .in("period_id", periodIds)
-          : Promise.resolve({ data: [], error: null }),
-        periodIds.length
-          ? db.from("bank_hours")
-              .select("employee_id,entry_date,minutes,period_id,kind")
-              .eq("kind", "debito")
-              .in("period_id", periodIds)
-          : Promise.resolve({ data: [], error: null }),
-      ]);
-      if (creditResult.error) throw new Error(creditResult.error.message);
-      if (debitResult.error) throw new Error(debitResult.error.message);
-
-      const creditMap = new Map<string, Record<string, number>>();
-      for (const row of creditResult.data ?? []) {
-        const key = `${row.employee_id}|${row.period_id ?? ""}`;
-        const item = creditMap.get(key) ?? {};
-        item[row.launch_type] = (item[row.launch_type] ?? 0) + Math.abs(Number(row.minutes) || 0);
-        creditMap.set(key, item);
-      }
-
-      const debitMap = new Map<string, number>();
-      for (const row of debitResult.data ?? []) {
-        const key = `${row.employee_id}|${row.period_id ?? ""}`;
-        debitMap.set(key, (debitMap.get(key) ?? 0) + Math.abs(Number(row.minutes) || 0));
-      }
-
+      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData();
       const exact = buildEmployeeIndex(employees);
-      const aliasesCurrent = aliases;
-      let updated = 0;
-      let inserted = 0;
+      const changes: SyncChange[] = [];
 
-      // Primeiro atualiza todas as linhas de competências que já existem no modelo.
       for (const row of rows) {
-        const worksheet = workbook.getWorksheet(row.sheet);
-        if (!worksheet) continue;
-        const excelRow = worksheet.getRow(row.rowNumber);
-        const resolved = row.employeeId
-          ? employees.find(e => e.id === row.employeeId) ?? null
-          : resolveEmployee(row.employeeName, employees, exact, aliasesCurrent).employee;
-        const period = allPeriods.find(p => p.start_date === row.startDate);
-        if (!resolved || !period) continue;
-
-        const key = `${resolved.id}|${period.id}`;
-        const comp = creditMap.get(key) ?? {};
-        writeExcelComposition(excelRow, comp, debitMap.get(key) ?? 0, row.sheet);
-        updated += 1;
+        if (row.status !== "ok" || !row.employeeId || !row.periodId) continue;
+        const period = allPeriods.find(p => p.id === row.periodId);
+        if (!period) continue;
+        const composition = creditMap.get(`${row.employeeId}|${period.id}`) ?? {};
+        const debit = debitMap.get(`${row.employeeId}|${period.id}`) ?? 0;
+        if (!sameComposition(row, composition, debit)) {
+          changes.push({
+            id: `update|${row.id}`,
+            kind: "atualizacao",
+            sheet: row.sheet,
+            employeeName: row.employeeName,
+            periodLabel: periodRangeLabel({ start_date: period.start_date, end_date: period.end_date }),
+            details: `Planilha: ${compositionLabel({ HE_60: row.he60, HE_60_NOTURNO: row.he60Night, HE_100: row.he100, HE_100_NOTURNO: row.he100Night, ADICIONAL_NOTURNO: row.night, INTERJORNADA_50: row.interjornada }, row.debit)} → DP Success: ${compositionLabel(composition, debit)}`,
+          });
+        }
       }
 
-      // Depois procura competências novas que já tenham movimentação no DP Success.
-      // Elas são inseridas somente para funcionários que já possuem um bloco na planilha,
-      // antes da linha de TOTAL, mantendo a ordem cronológica.
-      const blocks = findEmployeeBlocks(workbook);
+      const blocks = findEmployeeBlocks(workbookRef.current);
       for (const block of blocks) {
-        const resolved = resolveEmployee(block.employeeName, employees, exact, aliasesCurrent).employee;
+        const resolved = resolveEmployee(block.employeeName, employees, exact, aliases).employee;
         if (!resolved) continue;
-
         const existingStarts = new Set<string>();
         for (let r = block.startRow; r <= block.endRow; r += 1) {
           const range = parseRange(excelCellText(block.worksheet.getRow(r).getCell(2)));
           if (range) existingStarts.add(range.startDate);
         }
         const maxExistingStart = [...existingStarts].sort().at(-1) ?? "";
-
         const candidates = allPeriods
           .filter(period => period.start_date > maxExistingStart)
-          .filter(period => isNonZeroComposition(
-            creditMap.get(`${resolved.id}|${period.id}`) ?? {},
-            debitMap.get(`${resolved.id}|${period.id}`) ?? 0,
-          ))
+          .filter(period => isNonZeroComposition(creditMap.get(`${resolved.id}|${period.id}`) ?? {}, debitMap.get(`${resolved.id}|${period.id}`) ?? 0))
           .sort((a, b) => a.start_date.localeCompare(b.start_date));
 
         for (const period of candidates) {
           if (existingStarts.has(period.start_date)) continue;
+          const composition = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
+          const debit = debitMap.get(`${resolved.id}|${period.id}`) ?? 0;
+          changes.push({
+            id: `new|${block.worksheet.name}|${resolved.id}|${period.id}`,
+            kind: "nova_linha",
+            sheet: block.worksheet.name,
+            employeeName: block.employeeName,
+            periodLabel: periodRangeLabel({ start_date: period.start_date, end_date: period.end_date }),
+            details: `Nova linha será criada com: ${compositionLabel(composition, debit)}`,
+          });
+          existingStarts.add(period.start_date);
+        }
+      }
 
-          const insertAt = block.totalRow;
-          const insertedRow = insertDataRowWithoutSplice(
-            block.worksheet,
-            insertAt,
-            Math.max(block.startRow, insertAt - 1),
-          );
+      setSyncChanges(changes);
+      setPreviewOpen(true);
+      if (!changes.length) setMessage("Nenhuma alteração foi identificada. A planilha já está sincronizada com os lançamentos atuais do DP Success.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível calcular a pré-visualização.");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
 
+  async function exportUpdated() {
+    if (!templateBufferRef.current) {
+      setError("Importe novamente a planilha para gerar a cópia atualizada.");
+      return;
+    }
+    setExporting(true); setError(""); setMessage("");
+    try {
+      const { default: ExcelJS } = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(templateBufferRef.current);
+      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData();
+      const exact = buildEmployeeIndex(employees);
+      let updated = 0;
+      let inserted = 0;
+
+      for (const row of rows) {
+        const worksheet = workbook.getWorksheet(row.sheet);
+        if (!worksheet || row.status !== "ok" || !row.employeeId || !row.periodId) continue;
+        const period = allPeriods.find(p => p.id === row.periodId);
+        if (!period) continue;
+        writeExcelComposition(worksheet.getRow(row.rowNumber), creditMap.get(`${row.employeeId}|${period.id}`) ?? {}, debitMap.get(`${row.employeeId}|${period.id}`) ?? 0, row.sheet);
+        updated += 1;
+      }
+
+      const blocks = findEmployeeBlocks(workbook);
+      for (const block of blocks) {
+        const resolved = resolveEmployee(block.employeeName, employees, exact, aliases).employee;
+        if (!resolved) continue;
+        const existingStarts = new Set<string>();
+        for (let r = block.startRow; r <= block.endRow; r += 1) {
+          const range = parseRange(excelCellText(block.worksheet.getRow(r).getCell(2)));
+          if (range) existingStarts.add(range.startDate);
+        }
+        const maxExistingStart = [...existingStarts].sort().at(-1) ?? "";
+        const candidates = allPeriods
+          .filter(period => period.start_date > maxExistingStart)
+          .filter(period => isNonZeroComposition(creditMap.get(`${resolved.id}|${period.id}`) ?? {}, debitMap.get(`${resolved.id}|${period.id}`) ?? 0))
+          .sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+        for (const period of candidates) {
+          if (existingStarts.has(period.start_date)) continue;
+          block.worksheet.spliceRows(block.totalRow, 0, Array(19).fill(null));
+          const insertedRow = block.worksheet.getRow(block.totalRow);
+          const templateRow = block.worksheet.getRow(Math.max(block.startRow, block.totalRow - 1));
+          copyInsertedRowStyle(templateRow, insertedRow, 19);
           insertedRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
           const comp = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
           writeExcelComposition(insertedRow, comp, debitMap.get(`${resolved.id}|${period.id}`) ?? 0, block.worksheet.name);
-
           existingStarts.add(period.start_date);
-          block.endRow += 1;
-          block.totalRow += 1;
-          inserted += 1;
+          block.endRow += 1; block.totalRow += 1; inserted += 1;
         }
-
         updateEmployeeTotalFormulas(block.worksheet, block.startRow, block.endRow, block.totalRow);
       }
 
       const calc: any = (workbook as any).calcProperties;
-      if (calc) {
-        calc.fullCalcOnLoad = true;
-        calc.forceFullCalc = true;
-        calc.calcMode = "auto";
-      }
+      if (calc) { calc.fullCalcOnLoad = true; calc.forceFullCalc = true; calc.calcMode = "auto"; }
 
+      setMessage("Gerando o arquivo Excel atualizado…");
+      await new Promise(resolve => setTimeout(resolve, 50));
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = fileNameRef.current;
+      anchor.download = fileNameRef.current || "planilha-atualizada.xlsx";
+      anchor.rel = "noopener";
       anchor.style.display = "none";
       document.body.appendChild(anchor);
       anchor.click();
-      setTimeout(() => {
-        anchor.remove();
-        URL.revokeObjectURL(url);
-      }, 1000);
-
-      setMessage(`Planilha atualizada: ${updated} linha(s) existentes e ${inserted} nova(s) competência(s) inserida(s). Os saldos permanecem como fórmulas da planilha.`);
+      setTimeout(() => { anchor.remove(); URL.revokeObjectURL(url); }, 1500);
+      setMessage(`Download iniciado. ${updated} linha(s) existente(s) atualizada(s) e ${inserted} nova(s) linha(s) criada(s).`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao atualizar a planilha.");
+      setError(e instanceof Error ? e.message : "Falha ao gerar/baixar a planilha.");
     } finally {
       setExporting(false);
     }
@@ -778,7 +855,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       error={error}
       actions={actionAllowed ? <>
         <button data-role-sensitive className={btnOutline} onClick={() => inputRef.current?.click()} disabled={loading}><Upload className="h-4 w-4" /> Importar planilha</button>
-        <button data-role-sensitive className={btnPrimary} onClick={() => void exportUpdated()} disabled={!workbookRef.current || exporting}><Download className="h-4 w-4" /> {exporting ? "Atualizando..." : "Atualizar planilha"}</button>
+        <button data-role-sensitive className={btnPrimary} onClick={() => void buildSyncPreview()} disabled={!workbookRef.current || loading || previewLoading || exporting}><RefreshCw className="h-4 w-4" /> {previewLoading ? "Analisando..." : "Pré-visualizar atualização"}</button>
         <button data-role-sensitive className={btnOutline} onClick={() => void discardSpreadsheet()} disabled={loading || !rows.length}><AlertTriangle className="h-4 w-4" /> Desconsiderar planilha</button>
       </> : undefined}
     >
@@ -794,7 +871,7 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-bold">Fluxo de teste</h2>
-            <p className="mt-1 text-sm text-muted-foreground">1) importe a planilha · 2) confira os nomes · 3) importe os lançamentos · 4) faça alterações manuais · 5) clique em Atualizar planilha.</p>
+            <p className="mt-1 text-sm text-muted-foreground">1) importe a planilha · 2) confira os nomes · 3) importe os lançamentos · 4) faça alterações manuais · 5) pré-visualize as alterações · 6) baixe a planilha atualizada.</p>
           </div>
           {actionAllowed && (
             <div className="flex flex-wrap items-center gap-2">
@@ -815,6 +892,48 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       </Card>
 
       {message && <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary">{message}</div>}
+
+      {previewOpen && (
+        <Card className="mt-6 overflow-hidden border-primary/20">
+          <div className="border-b bg-primary/5 p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-lg font-bold">Pré-visualização da atualização</h2>
+                <p className="mt-1 text-sm text-muted-foreground">O sistema comparou os lançamentos atuais do DP Success com a planilha salva neste navegador.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <div className="rounded-lg border bg-background px-4 py-2 text-center"><p className="text-xs text-muted-foreground">Novas linhas</p><p className="text-xl font-bold text-primary">{syncChanges.filter(c => c.kind === "nova_linha").length}</p></div>
+                <div className="rounded-lg border bg-background px-4 py-2 text-center"><p className="text-xs text-muted-foreground">Atualizações</p><p className="text-xl font-bold">{syncChanges.filter(c => c.kind === "atualizacao").length}</p></div>
+                <div className="rounded-lg border bg-background px-4 py-2 text-center"><p className="text-xs text-muted-foreground">Total de alterações</p><p className="text-xl font-bold">{syncChanges.length}</p></div>
+              </div>
+            </div>
+            <p className="mt-4 text-sm font-semibold">
+              {syncChanges.filter(c => c.kind === "nova_linha").length === 0 ? "Nenhuma linha nova foi identificada." : `${syncChanges.filter(c => c.kind === "nova_linha").length} nova(s) linha(s) identificada(s) para adicionar à planilha.`}
+            </p>
+          </div>
+          {syncChanges.length > 0 ? (
+            <>
+              <div className="max-h-[420px] overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-background text-left text-xs"><tr><th className="px-4 py-3">Status</th><th className="px-4 py-3">Funcionário</th><th className="px-4 py-3">Competência</th><th className="px-4 py-3">Detalhes</th></tr></thead>
+                  <tbody>{syncChanges.map(change => (
+                    <tr key={change.id} className="border-t align-top">
+                      <td className="px-4 py-3 font-semibold whitespace-nowrap">{change.kind === "nova_linha" ? <span className="text-primary">Nova linha</span> : <span>Atualização</span>}</td>
+                      <td className="px-4 py-3 font-medium">{change.employeeName}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{change.periodLabel}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{change.details}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              <div className="flex flex-col gap-3 border-t p-5 md:flex-row md:items-center md:justify-between">
+                <p className="text-sm text-muted-foreground">A planilha original não será sobrescrita. Será baixada uma nova cópia com as alterações.</p>
+                <button data-role-sensitive className={btnPrimary} onClick={() => void exportUpdated()} disabled={exporting || loading}><Download className="h-4 w-4" /> {exporting ? "Gerando Excel..." : "Baixar planilha atualizada"}</button>
+              </div>
+            </>
+          ) : <div className="p-5"><p className="text-sm text-muted-foreground">Não há alterações para exportar.</p></div>}
+        </Card>
+      )}
 
       {rows.length > 0 && (
         <Card className="mt-6 overflow-hidden">
