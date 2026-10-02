@@ -184,7 +184,9 @@ async function readWorkbookRows(
       const he100 = cellMinutes(row.getCell(6));
       const he100Night = cellMinutes(row.getCell(7));
       const night = cellMinutes(row.getCell(8));
-      const saldo = he60 + he60Night + he100 + he100Night + night - debit;
+      // O saldo oficial é o TOTAL SALDO da própria linha da planilha (coluna I).
+      // Não recalcular, não incluir NOT e não misturar valores de outras linhas.
+      const saldo = cellMinutes(row.getCell(9));
       const interjornadaColumn = worksheet.name === "SEV.EXC.EMP" ? 14 : 19;
       const interjornada = cellMinutes(row.getCell(interjornadaColumn));
 
