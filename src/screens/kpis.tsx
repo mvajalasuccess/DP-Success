@@ -682,14 +682,30 @@ export function Kpis() {
         if (activeInSelection) distinctEmployeesInSelection.add(employee.id);
       }
 
+      // Para uma competência isolada, usamos o quadro ativo daquela competência.
+      // Para "Todos" os meses, o denominador do turnover deve ser a MÉDIA do
+      // quadro ativo de cada competência, e não a quantidade distinta de pessoas
+      // que passaram pela empresa ao longo do ano. Ex.: 39 pessoas diferentes no
+      // ano não significa 39 funcionários simultaneamente ativos em todos os meses.
+      const activeHeadcountByPeriod = targetPeriods.map(period => {
+        const key = period.reference_year + "-" + period.reference_month;
+        if (period.end_date <= HISTORICAL_CUTOFF) {
+          return historicalHeadcountByPeriod.get(key) ?? 0;
+        }
+
+        return allowedEmployees.filter(employee =>
+          (!employee.hireDate || employee.hireDate <= period.end_date) &&
+          (!employee.terminationDate || employee.terminationDate >= period.start_date)
+        ).length;
+      });
+
+      const averageActiveHeadcount = activeHeadcountByPeriod.length
+        ? activeHeadcountByPeriod.reduce((sum, value) => sum + value, 0) / activeHeadcountByPeriod.length
+        : 0;
+
       const activeHeadcount = selectedMonth === "todos"
-        ? distinctEmployeesInSelection.size
-        : isHistoricalOnly
-          ? targetPeriods.reduce((sum, period) => {
-              const key = period.reference_year + "-" + period.reference_month;
-              return sum + (historicalHeadcountByPeriod.get(key) ?? 0);
-            }, 0) / targetPeriods.length
-          : distinctEmployeesInSelection.size;
+        ? averageActiveHeadcount
+        : (activeHeadcountByPeriod[0] ?? 0);
 
       next.employees = activeHeadcount;
       next.admissions = admissionEmployees.length;
