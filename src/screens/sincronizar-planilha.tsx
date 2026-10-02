@@ -107,17 +107,14 @@ function excelValueText(value: any): string {
 }
 
 function cellMinutes(cell: ExcelCell) {
-  // Para a prévia, priorizamos o texto formatado pelo próprio ExcelJS.
-  // Isso evita que datas/horários sejam reinterpretados pelo fuso do navegador
-  // e mantém valores negativos como "-5:20" exatamente como aparecem na planilha.
-  const formatted = String((cell as any).text ?? "").trim();
-  if (formatted) {
-    const parsed = cellMinutesFromText(formatted);
-    if (parsed !== null) return parsed;
-  }
-
+  // Para números de duração, o valor bruto do Excel é a fonte de verdade.
+  // cell.text do ExcelJS pode aplicar formatos de data/hora da célula e
+  // reinterpretar o mesmo número como um horário diferente (especialmente em
+  // planilhas com formatos personalizados). A prévia deve reproduzir a célula.
   const value: any = cell.value;
-  if (value && typeof value === "object" && "result" in value) return cellMinutesFromValue(value.result);
+  if (value && typeof value === "object" && "result" in value) {
+    return cellMinutesFromValue(value.result);
+  }
   return cellMinutesFromValue(value);
 }
 
