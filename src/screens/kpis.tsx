@@ -853,7 +853,7 @@ export function Kpis() {
 
         return {
           periodId: period.id,
-          label: periodRangeLabel(period),
+          label: new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(new Date(period.end_date + "T00:00:00")).replace(".", ""),
           rate: expected > 0 ? (lost / expected) * 100 : 0,
           expected,
           lost,
@@ -973,6 +973,7 @@ export function Kpis() {
             </Card>
           </div>
 
+          {activeSection === "absenteismo" && (
           <div className="mt-6 flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
@@ -1074,7 +1075,8 @@ export function Kpis() {
               <p className="mt-1 text-sm text-muted-foreground">{metrics.employees} ativos na competência/seleção.</p>
             </Card>
           </div>
-        </section>
+          </section>
+          )}
 
         {activeSection === "horas-extras" && (
             <div className="mb-5 flex items-end justify-between gap-4">
