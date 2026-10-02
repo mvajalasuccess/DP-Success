@@ -465,23 +465,144 @@ export function SincronizarPlanilha() {
     }
   }
 
+
+  function formatExcelDate(date: string) {
+    const [year, month, day] = date.split("-");
+    return `${day}/${month}/${year.slice(-2)}`;
+  }
+
+  function formatExcelPeriod(startDate: string, endDate: string) {
+    return `${formatExcelDate(startDate)} - ${formatExcelDate(endDate)}`;
+  }
+
+  function translateFormulaRows(formula: string, sourceRow: number, targetRow: number) {
+    return formula.replace(/(\$?[A-Z]{1,3})(\$?)(\d+)/g, (_match, col, absRow, rowNumber) => {
+      if (absRow === "$") return `${col}${absRow}${rowNumber}`;
+      return `${col}${targetRow}`;
+    });
+  }
+
+  function copyInsertedRowStyle(sourceRow: any, targetRow: any, maxColumn = 19) {
+    targetRow.height = sourceRow.height;
+    targetRow.hidden = sourceRow.hidden;
+    targetRow.outlineLevel = sourceRow.outlineLevel;
+    for (let col = 1; col <= maxColumn; col += 1) {
+      const sourceCell = sourceRow.getCell(col);
+      const targetCell = targetRow.getCell(col);
+      targetCell.style = sourceCell.style;
+      targetCell.numFmt = sourceCell.numFmt;
+      targetCell.alignment = sourceCell.alignment;
+      targetCell.border = sourceCell.border;
+      targetCell.fill = sourceCell.fill;
+      targetCell.font = sourceCell.font;
+      targetCell.protection = sourceCell.protection;
+      if (typeof sourceCell.value === "string" && sourceCell.value.startsWith("=")) {
+        targetCell.value = { formula: translateFormulaRows(sourceCell.value.slice(1), sourceRow.number, targetRow.number) };
+      } else if (sourceCell.value !== null && sourceCell.value !== undefined) {
+        targetCell.value = sourceCell.value;
+      }
+    }
+  }
+
+  function setFormulaCell(cell: ExcelCell, formula: string) {
+    cell.value = { formula };
+  }
+
+  function writeExcelComposition(
+    excelRow: any,
+    composition: Record<string, number>,
+    debit: number,
+    sheetName: string,
+  ) {
+    setTimeCell(excelRow.getCell(3), debit);
+    setTimeCell(excelRow.getCell(4), composition.HE_60 ?? 0);
+    setTimeCell(excelRow.getCell(5), composition.HE_60_NOTURNO ?? 0);
+    setTimeCell(excelRow.getCell(6), composition.HE_100 ?? 0);
+    setTimeCell(excelRow.getCell(7), composition.HE_100_NOTURNO ?? 0);
+    setTimeCell(excelRow.getCell(8), composition.ADICIONAL_NOTURNO ?? 0);
+    setFormulaCell(excelRow.getCell(9), `SUM(D${excelRow.number}:H${excelRow.number})-C${excelRow.number}`);
+    setTimeCell(excelRow.getCell(sheetName === "SEV.EXC.EMP" ? 14 : 19), composition.INTERJORNADA_50 ?? 0);
+  }
+
+  function isNonZeroComposition(composition: Record<string, number>, debit: number) {
+    return debit > 0 || Object.values(composition).some(value => Number(value) > 0);
+  }
+
+  function updateEmployeeTotalFormulas(worksheet: any, firstDataRow: number, lastDataRow: number, totalRowNumber: number) {
+    if (lastDataRow < firstDataRow) return;
+    setFormulaCell(worksheet.getRow(totalRowNumber).getCell(9), `SUM(I${firstDataRow}:I${lastDataRow})`);
+    setFormulaCell(worksheet.getRow(totalRowNumber).getCell(14), `SUM(N${firstDataRow}:N${lastDataRow})`);
+    const kFormula = worksheet.getRow(totalRowNumber).getCell(11).value;
+    if (typeof kFormula === "string" && kFormula.startsWith("=")) {
+      setFormulaCell(worksheet.getRow(totalRowNumber).getCell(11), translateFormulaRows(kFormula.slice(1), totalRowNumber, totalRowNumber));
+    }
+  }
+
+  function findEmployeeBlocks(workbook: ExcelWorkbook) {
+    const blocks: Array<{ worksheet: any; employeeName: string; startRow: number; endRow: number; totalRow: number; }> = [];
+    for (const worksheet of workbook.worksheets) {
+      let current: { employeeName: string; startRow: number; lastPeriodRow: number } | null = null;
+      for (let r = 1; r <= worksheet.rowCount + 1; r += 1) {
+        const row = worksheet.getRow(r);
+        const b = excelCellText(row.getCell(2));
+        const c = excelCellText(row.getCell(3));
+        const isHeader = b.toUpperCase() === "EMPRESA" && c.toUpperCase() === "FUNCIONÁRIO";
+
+        if (isHeader) {
+          if (current) {
+            const totalRow = current.lastPeriodRow + 1;
+            blocks.push({
+              worksheet,
+              employeeName: current.employeeName,
+              startRow: current.startRow,
+              endRow: current.lastPeriodRow,
+              totalRow,
+            });
+          }
+          const employeeName = excelCellText(worksheet.getRow(r + 1).getCell(3));
+          current = employeeName ? { employeeName, startRow: r + 2, lastPeriodRow: r + 1 } : null;
+          continue;
+        }
+
+        if (!current) continue;
+        const range = parseRange(b);
+        if (range) current.lastPeriodRow = r;
+      }
+      if (current) {
+        blocks.push({
+          worksheet,
+          employeeName: current.employeeName,
+          startRow: current.startRow,
+          endRow: current.lastPeriodRow,
+          totalRow: current.lastPeriodRow + 1,
+        });
+      }
+    }
+    return blocks;
+  }
+
+
   async function exportUpdated() {
     if (!workbookRef.current) return;
     setExporting(true); setError(""); setMessage("");
     try {
       const workbook = workbookRef.current;
       const db = supabase as any;
-      const start = rows.reduce((min, r) => r.startDate < min ? r.startDate : min, rows[0]?.startDate ?? "9999-12-31");
-      const end = rows.reduce((max, r) => r.endDate > max ? r.endDate : max, rows[0]?.endDate ?? "0000-00-00");
+      const allPeriods = periods.length ? periods : await fetchPeriods();
+      const periodIds = allPeriods.map(p => p.id);
 
       const [creditResult, debitResult] = await Promise.all([
-        db.from("overtime_records")
-          .select("employee_id,reference_date,minutes,launch_type,period_id")
-          .gte("reference_date", start).lte("reference_date", end),
-        db.from("bank_hours")
-          .select("employee_id,entry_date,minutes,period_id,kind")
-          .eq("kind", "debito")
-          .gte("entry_date", start).lte("entry_date", end),
+        periodIds.length
+          ? db.from("overtime_records")
+              .select("employee_id,reference_date,minutes,launch_type,period_id")
+              .in("period_id", periodIds)
+          : Promise.resolve({ data: [], error: null }),
+        periodIds.length
+          ? db.from("bank_hours")
+              .select("employee_id,entry_date,minutes,period_id,kind")
+              .eq("kind", "debito")
+              .in("period_id", periodIds)
+          : Promise.resolve({ data: [], error: null }),
       ]);
       if (creditResult.error) throw new Error(creditResult.error.message);
       if (debitResult.error) throw new Error(debitResult.error.message);
@@ -493,6 +614,7 @@ export function SincronizarPlanilha() {
         item[row.launch_type] = (item[row.launch_type] ?? 0) + Math.abs(Number(row.minutes) || 0);
         creditMap.set(key, item);
       }
+
       const debitMap = new Map<string, number>();
       for (const row of debitResult.data ?? []) {
         const key = `${row.employee_id}|${row.period_id ?? ""}`;
@@ -502,6 +624,9 @@ export function SincronizarPlanilha() {
       const exact = buildEmployeeIndex(employees);
       const aliasesCurrent = aliases;
       let updated = 0;
+      let inserted = 0;
+
+      // Primeiro atualiza todas as linhas de competências que já existem no modelo.
       for (const row of rows) {
         const worksheet = workbook.getWorksheet(row.sheet);
         if (!worksheet) continue;
@@ -509,19 +634,58 @@ export function SincronizarPlanilha() {
         const resolved = row.employeeId
           ? employees.find(e => e.id === row.employeeId) ?? null
           : resolveEmployee(row.employeeName, employees, exact, aliasesCurrent).employee;
-        const period = periods.find(p => p.start_date === row.startDate);
+        const period = allPeriods.find(p => p.start_date === row.startDate);
         if (!resolved || !period) continue;
 
         const key = `${resolved.id}|${period.id}`;
         const comp = creditMap.get(key) ?? {};
-        setTimeCell(excelRow.getCell(3), debitMap.get(key) ?? 0);
-        setTimeCell(excelRow.getCell(4), comp.HE_60 ?? 0);
-        setTimeCell(excelRow.getCell(5), comp.HE_60_NOTURNO ?? 0);
-        setTimeCell(excelRow.getCell(6), comp.HE_100 ?? 0);
-        setTimeCell(excelRow.getCell(7), comp.HE_100_NOTURNO ?? 0);
-        setTimeCell(excelRow.getCell(8), comp.ADICIONAL_NOTURNO ?? 0);
-        setTimeCell(excelRow.getCell(row.sheet === "SEV.EXC.EMP" ? 14 : 19), comp.INTERJORNADA_50 ?? 0);
+        writeExcelComposition(excelRow, comp, debitMap.get(key) ?? 0, row.sheet);
         updated += 1;
+      }
+
+      // Depois procura competências novas que já tenham movimentação no DP Success.
+      // Elas são inseridas somente para funcionários que já possuem um bloco na planilha,
+      // antes da linha de TOTAL, mantendo a ordem cronológica.
+      const blocks = findEmployeeBlocks(workbook);
+      for (const block of blocks) {
+        const resolved = resolveEmployee(block.employeeName, employees, exact, aliasesCurrent).employee;
+        if (!resolved) continue;
+
+        const existingStarts = new Set<string>();
+        for (let r = block.startRow; r <= block.endRow; r += 1) {
+          const range = parseRange(excelCellText(block.worksheet.getRow(r).getCell(2)));
+          if (range) existingStarts.add(range.startDate);
+        }
+        const maxExistingStart = [...existingStarts].sort().at(-1) ?? "";
+
+        const candidates = allPeriods
+          .filter(period => period.start_date > maxExistingStart)
+          .filter(period => isNonZeroComposition(
+            creditMap.get(`${resolved.id}|${period.id}`) ?? {},
+            debitMap.get(`${resolved.id}|${period.id}`) ?? 0,
+          ))
+          .sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+        for (const period of candidates) {
+          if (existingStarts.has(period.start_date)) continue;
+
+          const insertAt = block.totalRow;
+          block.worksheet.insertRow(insertAt, [], "i+");
+          const insertedRow = block.worksheet.getRow(insertAt);
+          const templateRow = block.worksheet.getRow(Math.max(block.startRow, insertAt - 1));
+          copyInsertedRowStyle(templateRow, insertedRow, 19);
+
+          insertedRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
+          const comp = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
+          writeExcelComposition(insertedRow, comp, debitMap.get(`${resolved.id}|${period.id}`) ?? 0, block.worksheet.name);
+
+          existingStarts.add(period.start_date);
+          block.endRow += 1;
+          block.totalRow += 1;
+          inserted += 1;
+        }
+
+        updateEmployeeTotalFormulas(block.worksheet, block.startRow, block.endRow, block.totalRow);
       }
 
       const calc: any = (workbook as any).calcProperties;
@@ -530,6 +694,7 @@ export function SincronizarPlanilha() {
         calc.forceFullCalc = true;
         calc.calcMode = "auto";
       }
+
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
@@ -538,7 +703,8 @@ export function SincronizarPlanilha() {
       anchor.download = fileNameRef.current;
       anchor.click();
       URL.revokeObjectURL(url);
-      setMessage(`Planilha atualizada com ${updated} linha(s). Os campos de saldo permanecem como fórmulas da planilha.`);
+
+      setMessage(`Planilha atualizada: ${updated} linha(s) existentes e ${inserted} nova(s) competência(s) inserida(s). Os saldos permanecem como fórmulas da planilha.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao atualizar a planilha.");
     } finally {
