@@ -551,9 +551,6 @@ const isJoseLuciano = employeeNameNormalized.includes("JOSE LUCIANO") || employe
   });
 }
 
-
-}
-
 /** Calcula os saldos de vários funcionários em lote, evitando consultas repetidas por funcionário. */
 export async function balancesByEmployees(employeeIds: string[]): Promise<Record<string, PeriodBalance[]>> {
   const ids = [...new Set(employeeIds.filter(Boolean))];
