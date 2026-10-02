@@ -64,11 +64,47 @@ Deno.serve(async (req) => {
       });
     }
 
+    const { data: targetProfile, error: targetProfileError } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (targetProfileError) {
+      return new Response(JSON.stringify({ error: targetProfileError.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!targetProfile) {
+      return new Response(JSON.stringify({ error: "Usuário não encontrado." }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Remove primeiro da autenticação. Depois removemos o perfil explicitamente
+    // para não depender de uma FK com ON DELETE CASCADE.
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId);
 
     if (deleteError) {
       return new Response(JSON.stringify({ error: deleteError.message }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { error: profileDeleteError } = await adminClient
+      .from("profiles")
+      .delete()
+      .eq("id", userId);
+
+    if (profileDeleteError) {
+      return new Response(JSON.stringify({
+        error: "O acesso foi removido, mas não foi possível remover o perfil: " + profileDeleteError.message,
+      }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
