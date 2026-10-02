@@ -97,7 +97,15 @@ export function ImportarCartaoPonto() {
     setMessage("");
 
     try {
-      const duplicateCheck = await supabase.from("overtime_records").select("id").like("launch_group_id", `pdf:${document.fingerprint}:%`).limit(1);
+      // launch_group_id é UUID no banco; não podemos usar LIKE nem gravar
+      // o identificador textual "pdf:..." nessa coluna. Usamos a fingerprint
+      // no campo de observação para detectar uma mesma importação.
+      const importFingerprint = `[PDF_IMPORT:${document.fingerprint}]`;
+      const duplicateCheck = await supabase
+        .from("overtime_records")
+        .select("id")
+        .ilike("notes", `%${importFingerprint}%`)
+        .limit(1);
       if (duplicateCheck.error) throw new Error(duplicateCheck.error.message);
       if (duplicateCheck.data?.length) throw new Error("Este PDF já foi importado anteriormente. Não vou duplicar os lançamentos.");
 
@@ -113,7 +121,7 @@ export function ImportarCartaoPonto() {
           const result = await supabase.from("overtime_records").insert({
             employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
             minutes: row.creditMinutes, launch_type: "HE_60", rate_percent: 60,
-            launch_group_id: groupPrefix + ":credito", notes: "Importado do Cartão Ponto — Crédito total do período",
+            notes: `${importFingerprint} Importado do Cartão Ponto — Crédito total do período`,
           });
           if (result.error) throw new Error(row.employeeName + ": " + result.error.message);
           insertedCredits++;
@@ -123,23 +131,23 @@ export function ImportarCartaoPonto() {
           const result = await supabase.from("bank_hours").insert({
             employee_id: row.employeeId!, entry_date: row.period!.end_date, period_id: row.period!.id,
             kind: "debito", minutes: row.debitMinutes, previous_balance_minutes: 0, balance_minutes: row.monthBalanceMinutes,
-            justification: "Importado do Cartão Ponto — Débito total do período",
-            launch_group_id: groupPrefix + ":debito", created_by: auth.user?.id ?? null,
+            justification: `${importFingerprint} Importado do Cartão Ponto — Débito total do período`,
+            created_by: auth.user?.id ?? null,
           });
           if (result.error) throw new Error(row.employeeName + ": " + result.error.message);
           insertedDebits++;
         }
 
-        const summaryRows: Array<{ employee_id: string; reference_date: string; period_id: string; minutes: number; launch_type: "INTERJORNADA_50" | "ADICIONAL_NOTURNO"; rate_percent: number; launch_group_id: string; notes: string }> = [];
+        const summaryRows: Array<{ employee_id: string; reference_date: string; period_id: string; minutes: number; launch_type: "INTERJORNADA_50" | "ADICIONAL_NOTURNO"; rate_percent: number; notes: string }> = [];
         if (row.interjornadaMinutes > 0) summaryRows.push({
           employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
           minutes: row.interjornadaMinutes, launch_type: "INTERJORNADA_50", rate_percent: 50,
-          launch_group_id: groupPrefix + ":interjornada", notes: "Importado do Cartão Ponto — Interjornada",
+          notes: `${importFingerprint} Importado do Cartão Ponto — Interjornada`,
         });
         if (row.additionalNightMinutes > 0) summaryRows.push({
           employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
           minutes: row.additionalNightMinutes, launch_type: "ADICIONAL_NOTURNO", rate_percent: 20,
-          launch_group_id: groupPrefix + ":adicional-noturno", notes: "Importado do Cartão Ponto — Adicional noturno",
+          notes: `${importFingerprint} Importado do Cartão Ponto — Adicional noturno`,
         });
         if (summaryRows.length) {
           const result = await supabase.from("overtime_records").insert(summaryRows);
