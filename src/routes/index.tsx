@@ -112,21 +112,24 @@ function Dashboard() {
 }
 
 function AppShell({
-  screen, collapsed, companyOpen, closingOpen, onNavigate, onToggleCollapsed, onToggleCompany, onToggleClosing, children,
+  screen, collapsed, onNavigate, onToggleCollapsed, children,
 }: {
   screen: ScreenKey;
   collapsed: boolean;
-  companyOpen: boolean;
-  closingOpen: boolean;
   onNavigate: (screen: ScreenKey) => void;
   onToggleCollapsed: () => void;
-  onToggleCompany: () => void;
-  onToggleClosing: () => void;
   children: ReactNode;
 }) {
   const go = (key: ScreenKey) => onNavigate(key);
+  const [managementOpen, setManagementOpen] = useState(true);
+  const [closingMenuOpen, setClosingMenuOpen] = useState(true);
+  const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+
   const buttonClass = (key: ScreenKey) =>
     `flex w-full items-center rounded-lg py-2.5 text-left text-sm transition-colors ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
+
+  const sectionButtonClass = "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground";
 
   return (
     <div className="min-h-screen bg-background">
@@ -137,27 +140,66 @@ function AppShell({
           <button type="button" onClick={onToggleCollapsed} className="rounded-lg p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" title={collapsed ? "Expandir menu" : "Minimizar menu"} aria-label={collapsed ? "Expandir menu" : "Minimizar menu"}><ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : "rotate-90"}`} /></button>
         </div>
 
-        <nav className={`flex-1 overflow-y-auto p-3 ${collapsed ? "space-y-2" : "space-y-4"}`}>
-          {!collapsed && <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Funcionários</div>}
-          <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")} title={collapsed ? "Funcionários" : undefined}><Users className="h-4 w-4 shrink-0" />{!collapsed && <span>Funcionários</span>}</button>
+        <nav className={`flex-1 overflow-y-auto p-3 ${collapsed ? "space-y-2" : "space-y-2"}`}>
+          {!collapsed ? (
+            <>
+              <div>
+                <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Funcionários</div>
+                <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")}><Users className="h-4 w-4 shrink-0" /><span>Funcionários</span></button>
+              </div>
 
-          {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Gestão</div>}
-          {[
-            ["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText],
-          ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={collapsed ? String(label) : undefined}><Icon className="h-4 w-4 shrink-0" />{!collapsed && <span>{label as string}</span>}</button>)}
+              <div>
+                <button type="button" onClick={() => setManagementOpen(v => !v)} className={sectionButtonClass} aria-expanded={managementOpen}>
+                  <span>Gestão</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${managementOpen ? "rotate-0" : "-rotate-90"}`} />
+                </button>
+                {managementOpen && <div className="mt-1 space-y-0.5">
+                  {[
+                    ["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText],
+                  ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label as string}</span></button>)}
+                </div>}
+              </div>
 
-          {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Fechamento de Ponto</div>}
-          {[
-            ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Faltas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText],
-          ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={collapsed ? String(label) : undefined}><Icon className="h-4 w-4 shrink-0" />{!collapsed && <span>{label as string}</span>}</button>)}
+              <div>
+                <button type="button" onClick={() => setClosingMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={closingMenuOpen}>
+                  <span>Fechamento de Ponto</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${closingMenuOpen ? "rotate-0" : "-rotate-90"}`} />
+                </button>
+                {closingMenuOpen && <div className="mt-1 space-y-0.5">
+                  {[
+                    ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Faltas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText],
+                  ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label as string}</span></button>)}
+                </div>}
+              </div>
 
-          {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Empresa</div>}
-          {[
-            ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
-          ].map(([label, key]) => <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={collapsed ? String(label) : undefined}><Building2 className="h-4 w-4 shrink-0" />{!collapsed && <span>{label}</span>}</button>)}
+              <div>
+                <button type="button" onClick={() => setCompanyMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={companyMenuOpen}>
+                  <span>Empresa</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${companyMenuOpen ? "rotate-0" : "-rotate-90"}`} />
+                </button>
+                {companyMenuOpen && <div className="mt-1 space-y-0.5">
+                  {[
+                    ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
+                  ].map(([label, key]) => <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Building2 className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
+                </div>}
+              </div>
 
-          {!collapsed && <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Tarefas</div>}
-          <button type="button" onClick={() => go("tarefas")} className={buttonClass("tarefas")} title={collapsed ? "Tarefas" : undefined}><FileText className="h-4 w-4 shrink-0" />{!collapsed && <span>Tarefas</span>}</button>
+              <div>
+                <button type="button" onClick={() => setTasksOpen(v => !v)} className={sectionButtonClass} aria-expanded={tasksOpen}>
+                  <span>Tarefas</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${tasksOpen ? "rotate-0" : "-rotate-90"}`} />
+                </button>
+                {tasksOpen && <div className="mt-1 space-y-0.5">
+                  <button type="button" onClick={() => go("tarefas")} className={buttonClass("tarefas")}><FileText className="h-4 w-4 shrink-0" /><span>Tarefas</span></button>
+                </div>}
+              </div>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")} title="Funcionários"><Users className="h-4 w-4 shrink-0" /></button>
+              {[
+                ["dashboard", Gauge, "Dashboard"], ["kpis", Gauge, "KPIs"], ["comparativos", Users, "Comparativos"], ["relatorios", FileText, "Relatórios"],
+                ["fechamento-ponto", Clock3, "Fechamento"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["ocorrencias", AlertTriangle, "Faltas"], ["atestados", FileText, "Declarações e Atestados"],
+                ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
+              ].map(([key, Icon, label]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={label as string}><Icon className="h-4 w-4 shrink-0" /></button>)}
+            </>
+          )}
         </nav>
         <SidebarProfile collapsed={collapsed} onNavigate={go} />
       </aside>
