@@ -31,18 +31,18 @@ export type PointImportDocument = {
   employees: PointImportEmployee[];
 };
 
-function normalizeText(value: string) {
-  return value.replace(/\u00a0/g, " ").replace(/\r/g, "").replace(/[ \t]+/g, " ").trim();
+function normalizeText(value: string | undefined) {
+  return (value ?? "").replace(/\u00a0/g, " ").replace(/\r/g, "").replace(/[ \t]+/g, " ").trim();
 }
 
-function toISODate(value: string) {
-  const [day, month, year] = value.split("/");
+function toISODate(value: string | undefined) {
+  const [day = "", month = "", year = ""] = (value ?? "").split("/");
   const fullYear = year.length === 2 ? `20${year}` : year;
   return `${fullYear}-${month}-${day}`;
 }
 
-function hhmmToMinutes(value: string) {
-  const [hours, minutes] = value.split(":").map(Number);
+function hhmmToMinutes(value: string | undefined) {
+  const [hours = NaN, minutes = NaN] = (value ?? "").split(":").map(Number);
   if (!Number.isFinite(hours) || !Number.isFinite(minutes) || minutes >= 60) return 0;
   return hours * 60 + minutes;
 }
@@ -67,17 +67,19 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
   const afastamentos: string[] = [];
 
   for (let i = 0; i < dates.length; i++) {
-    const start = dates[i].index ?? 0;
-    const end = i + 1 < dates.length ? (dates[i + 1].index ?? table.length) : table.length;
+    const current = dates[i];
+    if (!current) continue;
+    const start = current.index ?? 0;
+    const end = dates[i + 1]?.index ?? table.length;
     const segment = table.slice(start, end);
-    const date = toISODate(dates[i][1]);
+    const date = toISODate(current[1]);
 
     const event = segment.match(/(\d{3}:\d{2})\s*-\s*(Crédito|Débito)\s+no\s+BH/i);
     if (event) {
       entries.push({
         date,
         minutes: hhmmToMinutes(event[1]),
-        kind: event[2].toLowerCase().startsWith("cr") ? "credito" : "debito",
+        kind: (event[2] ?? "").toLowerCase().startsWith("cr") ? "credito" : "debito",
       });
     }
 
