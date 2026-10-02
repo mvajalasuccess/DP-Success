@@ -49,6 +49,27 @@ export function Parametros(){
     setCurrentProfile((p.data ?? []).find((x:any) => x.id === sessionData.session?.user.id) ?? null);
   }
   useEffect(()=>{void load()},[]);
+
+  // Mantém a lista de usuários sincronizada com o banco mesmo quando um
+  // usuário é excluído diretamente pelo Supabase/SQL ou por outra sessão.
+  useEffect(() => {
+    const refreshProfiles = async () => {
+      const { data } = await (supabase as any)
+        .from("profiles")
+        .select("id,email,full_name,role,active,permissions")
+        .order("full_name");
+      if (data) setProfiles(data);
+    };
+
+    const onFocus = () => { void refreshProfiles(); };
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(() => { void refreshProfiles(); }, 5000);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(timer);
+    };
+  }, []);
   const settingMap=useMemo(()=>new Map(settings.map(x=>[x.setting_key,x])),[settings]);
   function setSetting(key:string,value:string){setSettings(old=>old.map(x=>x.setting_key===key?{...x,setting_value:value}:x))}
   async function saveSetting(s:Setting){const {error:e}=await(supabase as any).from("system_settings").update({setting_value:s.setting_value}).eq("id",s.id);if(e)setError(e.message);else{setSaved("Configuração salva.");setTimeout(()=>setSaved(""),1800)}}
