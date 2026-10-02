@@ -1,24 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { Employees } from "@/screens/funcionarios";
-import { Positions } from "@/screens/cargos";
-import { Departments } from "@/screens/departamentos";
-import { Schedules } from "@/screens/jornadas-escalas";
-import { PointClosing } from "@/screens/fechamento-ponto";
-import { Launches } from "@/screens/lancamentos";
-import { BankHours } from "@/screens/banco-horas";
-import { Atestados } from "@/screens/atestados";
-import { Ocorrencias } from "@/screens/ocorrencias";
-import { Comparativos } from "@/screens/comparativos";
-import { Kpis } from "@/screens/kpis";
-import { Relatorios } from "@/screens/relatorios";
-import { Parametros } from "@/screens/parametros";
-import { Tarefas } from "@/screens/tarefas";
-import { ImportacaoHistorico } from "@/screens/importacao-historico";
-import { ImportarCartaoPonto } from "@/screens/importar-cartao-ponto";
+const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
+const Positions = lazy(() => import("@/screens/cargos").then(m => ({ default: m.Positions })));
+const Departments = lazy(() => import("@/screens/departamentos").then(m => ({ default: m.Departments })));
+const Schedules = lazy(() => import("@/screens/jornadas-escalas").then(m => ({ default: m.Schedules })));
+const PointClosing = lazy(() => import("@/screens/fechamento-ponto").then(m => ({ default: m.PointClosing })));
+const Launches = lazy(() => import("@/screens/lancamentos").then(m => ({ default: m.Launches })));
+const BankHours = lazy(() => import("@/screens/banco-horas").then(m => ({ default: m.BankHours })));
+const Atestados = lazy(() => import("@/screens/atestados").then(m => ({ default: m.Atestados })));
+const Ocorrencias = lazy(() => import("@/screens/ocorrencias").then(m => ({ default: m.Ocorrencias })));
+const Comparativos = lazy(() => import("@/screens/comparativos").then(m => ({ default: m.Comparativos })));
+const Kpis = lazy(() => import("@/screens/kpis").then(m => ({ default: m.Kpis })));
+const Relatorios = lazy(() => import("@/screens/relatorios").then(m => ({ default: m.Relatorios })));
+const Parametros = lazy(() => import("@/screens/parametros").then(m => ({ default: m.Parametros })));
+const Tarefas = lazy(() => import("@/screens/tarefas").then(m => ({ default: m.Tarefas })));
+const ImportacaoHistorico = lazy(() => import("@/screens/importacao-historico").then(m => ({ default: m.ImportacaoHistorico })));
+const ImportarCartaoPonto = lazy(() => import("@/screens/importar-cartao-ponto").then(m => ({ default: m.ImportarCartaoPonto })));
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployee } from "@/lib/dp-model";
 
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/")({ component: Dashboard });
 
 type ScreenKey = "dashboard" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "importacao-historico" | "importar-cartao-ponto";
 
-const screenComponents: Record<string, ComponentType> = {
+const screenComponents = {
   funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
@@ -106,7 +106,11 @@ function Dashboard() {
       onToggleCompany={() => setCompanyOpen(value => !value)}
       onToggleClosing={() => setClosingOpen(value => !value)}
     >
-      {Screen ? <Screen /> : <DashboardHome />}
+      {Screen ? (
+          <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Carregando tela...</div>}>
+            <Screen />
+          </Suspense>
+        ) : <DashboardHome />}
     </AppShell>
   );
 }
