@@ -371,7 +371,7 @@ export function ImportacaoHistorico() {
         </div>
       </header>
       <main className="mx-auto max-w-[1200px] px-6 py-7">
-        <p className="text-sm text-primary">Configurações</p>
+        <p className="text-sm text-primary">Importação</p>
         <h1 className="text-3xl font-bold">Importar histórico</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
           Importe a aba BASE do Power BI para continuar os KPIs de 2026 sem transformar o histórico consolidado em lançamentos fictícios.
@@ -408,7 +408,7 @@ export function ImportacaoHistorico() {
                   <p className="text-xs text-muted-foreground">Janeiro/2026 será gravado como 21/12/2025 até 20/01/2026. A BASE será importada somente até julho/2026. Janeiro corresponde a 21/12/2025 → 20/01/2026. Os valores de horas da BASE são horas decimais (ex.: 0,93 = 0h55m48s), e o sistema converte esses valores para minutos.</p>
                 </div>
                 <button type="button" disabled={loading} onClick={() => void importData()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-                  {loading ? "Importando..." : "Importar BASE"}
+                  {loading ? "Importando..." : "Importar histórico"}
                 </button>
               </div>
             </>
