@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -67,6 +67,7 @@ function getScreenFromUrl(): ScreenKey {
 }
 
 function Dashboard() {
+  const navigate = useNavigate();
   const [screen, setScreen] = useState<ScreenKey>(getScreenFromUrl);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(true);
@@ -328,7 +329,7 @@ function DashboardHome() {
     void (async () => {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) {
-        window.location.href = "/login";
+        await navigate({ to: "/login", replace: true });
         return;
       }
       setUserEmail(sessionData.session.user.email || "Usuário RH");
