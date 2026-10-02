@@ -383,7 +383,7 @@ export function Kpis() {
         next.declaracoesMinutes += declaracoes;
         next.abonosMinutes += abonos;
         // Absenteísmo: considerar somente faltas + abonos + débitos.
-        // Atestados e declarações NÃO entram no cálculo do indicador.
+        // Atestados e declarações não entram no cálculo do indicador.
         const debitos = Number(sourceRow.debit_minutes || 0);
         next.absenceMinutes += faltas + debitos + abonos;
 
@@ -467,13 +467,9 @@ export function Kpis() {
           // Atestados atuais têm como fonte oficial medical_certificates.
           // Evita duplicar o mesmo atestado se houver uma ocorrência legada.
         } else if (code === "declaracao_horas" || code === "declaracao") {
-          // A declaração registra as horas realmente abonadas. Ela continua
-          // demonstrada separadamente, mas suas horas abonadas compõem o
-          // indicador como ABONO, conforme a regra do KPI.
+          // Declarações são exibidas separadamente. Como já representam horas
+          // abonadas, não entram novamente no indicador de absenteísmo.
           next.declaracoesMinutes += minutes;
-          next.abonosMinutes += minutes;
-          next.absenceMinutes += minutes;
-          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
         } else if (code === "abono") {
           next.abonosMinutes += minutes;
           next.absenceMinutes += minutes;
@@ -885,7 +881,7 @@ export function Kpis() {
             const quantity = Number(row.quantity || 0);
             const unit = String(row.unit ?? "dias").toLowerCase();
             const minutes = unit.startsWith("dia") ? quantity * 528 : unit.startsWith("hor") ? quantity * 60 : quantity;
-            if (["falta","folga_abonada","folga_descontada","falta_justificada","falta_injustificada","abono","declaracao_horas","declaracao"].includes(code)) {
+            if (["falta","folga_abonada","folga_descontada","falta_justificada","falta_injustificada","abono"].includes(code)) {
               lost += Math.round(minutes);
             }
           }
@@ -1109,7 +1105,7 @@ export function Kpis() {
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p></Card>
             <Card className="p-5"><FileText className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p><p className="mt-1 text-xs text-muted-foreground">fora do cálculo atual</p></Card>
-            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p><p className="mt-1 text-xs text-muted-foreground">consideradas no cálculo atual</p></Card>
+            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p><p className="mt-1 text-xs text-muted-foreground">fora do cálculo do absenteísmo</p></Card>
             <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
           </div>
 
