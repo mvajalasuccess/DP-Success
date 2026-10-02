@@ -588,7 +588,8 @@ export function SincronizarPlanilha() {
     try {
       const workbook = workbookRef.current;
       const db = supabase as any;
-      const allPeriods = periods.length ? periods : await fetchPeriods();
+      const allPeriods = await fetchPeriods();
+      setPeriods(allPeriods);
       const periodIds = allPeriods.map(p => p.id);
 
       const [creditResult, debitResult] = await Promise.all([
