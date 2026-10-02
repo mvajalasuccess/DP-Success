@@ -84,7 +84,7 @@ function cellMinutesFromValue(value: any): number {
   return Number.isFinite(decimal) ? Math.round(decimal * 60) : 0;
 }
 
-function setTimeCell(cell: ExcelJS.Cell, minutes: number) {
+function setTimeCell(cell: ExcelCell, minutes: number) {
   cell.value = Math.max(0, Math.round(minutes)) / 1440;
 }
 
