@@ -316,17 +316,19 @@ export function PointClosing() {
       const he20 = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "ADICIONAL_NOTURNO" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
       const interjornada = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "INTERJORNADA_50" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
       const debit = liveDebits.reduce((sum: number, item: any) => sum + Math.abs(Number(item.minutes || 0)), 0);
-      const override = overrideByEmployee.get(String(row.employee_id));
-      const merged = override ? { ...row, ...override, has_manual_override: true } : row;
-
+      // Nas competências atuais, os dados operacionais são sempre lidos da
+      // origem viva (ocorrências, atestados, banco de horas e lançamentos).
+      // Um override antigo não pode manter, por exemplo, uma declaração
+      // excluída aparecendo no Fechamento.
       return {
-        ...merged,
+        ...row,
         debit_minutes: debit,
         he_60_minutes: he60,
         he_60_night_minutes: he60Night,
         he_100_minutes: he100,
         he_20_minutes: he20,
         interjornada_minutes: interjornada,
+        has_manual_override: false,
       };
     });
 
