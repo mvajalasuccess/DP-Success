@@ -172,6 +172,7 @@ function AppShell({
 function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: (screen: ScreenKey) => void }) {
   const [name, setName] = useState("Mariana Ajala");
   const [role, setRole] = useState("Usuário RH");
+
   useEffect(() => { void (async () => {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user.id;
@@ -180,7 +181,45 @@ function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavig
     if (profile?.full_name) setName(profile.full_name);
     setRole(profile?.role === "consulta" ? "Consulta" : "Usuário RH");
   })(); }, []);
-  return <div className="border-t border-sidebar-border/60 p-3"><button type="button" onClick={() => onNavigate("parametros")} className={`flex w-full items-center rounded-xl p-2 text-left hover:bg-sidebar-accent ${collapsed ? "justify-center" : "gap-3"}`} title={collapsed ? "Configurações" : undefined}><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-accent text-sidebar-foreground/75"><Settings className="h-4 w-4" /></div>{!collapsed && <div className="min-w-0"><p className="truncate text-xs font-semibold text-sidebar-foreground">{name}</p><p className="truncate text-[10px] text-sidebar-foreground/45">{role}</p></div>}</button></div>;
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
+
+  return (
+    <div className="border-t border-sidebar-border/60 p-3">
+      <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2"}`}>
+        <button
+          type="button"
+          onClick={() => onNavigate("parametros")}
+          className={`flex min-w-0 flex-1 items-center rounded-xl p-2 text-left hover:bg-sidebar-accent ${collapsed ? "justify-center" : "gap-3"}`}
+          title={collapsed ? "Configurações" : undefined}
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-accent text-sidebar-foreground/75">
+            <Settings className="h-4 w-4" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-sidebar-foreground">{name}</p>
+              <p className="truncate text-[10px] text-sidebar-foreground/45">{role}</p>
+            </div>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          className={`flex shrink-0 items-center rounded-xl p-2 text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground ${collapsed ? "" : "px-2"}`}
+          title="Sair do sistema"
+          aria-label="Sair do sistema"
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span className="ml-1 text-[11px] font-medium">Sair</span>}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function DashboardHome() {
