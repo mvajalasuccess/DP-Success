@@ -533,20 +533,18 @@ export function SincronizarPlanilha() {
 }
 
 function insertDataRowWithoutSplice(worksheet: any, totalRowNumber: number, templateRowNumber: number) {
-  // Desloca apenas as linhas do bloco que estão abaixo do ponto de inserção.
-  // Isso evita o insertRow/spliceRows do ExcelJS, que pode congelar o navegador
-  // ao reindexar uma planilha grande.
-  const sourceTotal = worksheet.getRow(totalRowNumber);
-  const targetTotal = worksheet.getRow(totalRowNumber + 1);
-  cloneRowContent(sourceTotal, targetTotal, 19);
+  // Desloca as linhas da planilha de baixo para cima, evitando worksheet.insertRow(),
+  // que pode congelar o navegador ao reindexar um arquivo grande.
+  const lastRow = worksheet.rowCount;
+  for (let r = lastRow; r >= totalRowNumber; r -= 1) {
+    cloneRowContent(worksheet.getRow(r), worksheet.getRow(r + 1), 19);
+  }
 
-  const templateRow = worksheet.getRow(templateRowNumber);
   const insertedRow = worksheet.getRow(totalRowNumber);
+  const templateRow = worksheet.getRow(templateRowNumber);
   cloneRowContent(templateRow, insertedRow, 19);
-
   return insertedRow;
 }
-
 function setFormulaCell(cell: ExcelCell, formula: string) {
     cell.value = { formula };
   }
