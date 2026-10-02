@@ -181,7 +181,7 @@ export function ImportarCartaoPonto() {
           <div>
             <p className="text-sm font-medium text-primary">Fechamento de Ponto</p>
             <h1 className="text-2xl font-bold">Importar Cartão Ponto</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Envie o PDF do período 21 → 20 e transforme os eventos do relatório em lançamentos.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Envie o PDF do cartão ponto e importe somente Crédito, Débito, Saldo do mês, Ad. Noturno e Interjornada.</p>
           </div>
           {document && <button type="button" onClick={clear} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw className="h-4 w-4" />Novo PDF</button>}
         </div>
@@ -192,7 +192,7 @@ export function ImportarCartaoPonto() {
           <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 text-center hover:bg-muted/30">
             {loading ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <FileUp className="h-10 w-10 text-primary" />}
             <div>
-              <p className="font-semibold">{loading ? "Lendo o PDF..." : "Clique para selecionar o Cartão Ponto em PDF"}</p>
+              <p className="font-semibold">{loading ? "Lendo o PDF..." : "Clique para selecionar o cartão ponto em PDF"}</p>
               <p className="mt-1 text-sm text-muted-foreground">O arquivo é processado no navegador e não é enviado para outro serviço.</p>
             </div>
             <input className="hidden" type="file" accept="application/pdf,.pdf" disabled={loading || saving} onChange={e => { const file = e.target.files?.[0]; if (file) void handleFile(file); e.currentTarget.value = ""; }} />
