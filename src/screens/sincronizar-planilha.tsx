@@ -859,18 +859,8 @@ function setFormulaCell(cell: ExcelCell, formula: string) {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(templateBufferRef.current);
 
-      const periodIds = [...new Set([
-        ...rows.map(r => r.periodId).filter((id): id is string => Boolean(id)),
-        ...syncChanges
-          .filter(change => change.kind === "nova_linha")
-          .map(change => currentPeriods.find(period => periodRangeLabel({
-            start_date: period.start_date,
-            end_date: period.end_date,
-          }) === change.periodLabel)?.id)
-          .filter((id): id is string => Boolean(id)),
-      ])];
-
-      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData(periodIds);
+      // A exportação precisa de todas as competências atuais, inclusive a nova.
+      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData();
       let updated = 0;
       let inserted = 0;
 
