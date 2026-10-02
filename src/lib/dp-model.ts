@@ -386,7 +386,7 @@ function calculateEmployeeBalancesFromData(
   employeeName: string,
 ): PeriodBalance[] {
   const overridesByPeriod = new Map(overrides.map(row => [row.period_id, row]));
-  const employeeNameNormalized = String(employeeNameNormalized ?? "").trim().toUpperCase();
+  const employeeNameNormalized = String(employeeName ?? "").trim().toUpperCase();
   const isDyan = employeeNameNormalized === "DYAN" || employeeNameNormalized.startsWith("DYAN ");
   const isGlecio = employeeNameNormalized.includes("GLECIO JOSE DE CARVALHO JUNIOR") || employeeNameNormalized.includes("GLÉCIO JOSÉ DE CARVALHO JUNIOR");
   const glecioManualBalances: Record<string, number> = {
