@@ -160,8 +160,14 @@ function AppShell({
             {closingOpen && <div className="ml-3 mt-1 space-y-1 border-l pl-3">{closingNav.map(([label, key]) => <button key={key} type="button" onClick={() => go(key)} className={`block w-full rounded-lg px-3 py-2 text-left text-xs ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent"}`}>{label}</button>)}</div>}
           </div>}
 
-          {mainNav.map(([label, key]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
-            {key === "banco-horas" ? <WalletCards className="h-4 w-4 shrink-0" /> : key === "relatorios" ? <FileText className="h-4 w-4 shrink-0" /> : key === "comparativos" ? <Users className="h-4 w-4 shrink-0" /> : key === "kpis" ? <Gauge className="h-4 w-4 shrink-0" /> : key === "parametros" ? <Building2 className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}
+          {!collapsed && <p className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45">Gestão</p>}
+          {mainNav.filter(([_, key]) => ["tarefas", "banco-horas", "relatorios", "comparativos", "kpis"].includes(key)).map(([label, key]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
+            {key === "banco-horas" ? <WalletCards className="h-4 w-4 shrink-0" /> : key === "comparativos" ? <Users className="h-4 w-4 shrink-0" /> : key === "kpis" ? <Gauge className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}
+            {!collapsed && <span>{label}</span>}
+          </button>)}
+          {!collapsed && <p className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/45">Administração</p>}
+          {mainNav.filter(([_, key]) => ["parametros", "importacao-historico"].includes(key)).map(([label, key]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={collapsed ? label : undefined}>
+            {key === "parametros" ? <Building2 className="h-4 w-4 shrink-0" /> : <FileText className="h-4 w-4 shrink-0" />}
             {!collapsed && <span>{label}</span>}
           </button>)}
         </nav>
@@ -305,12 +311,15 @@ function DashboardHome() {
           !overrideByEmployee.has(String(x.employee_id))
         )
         .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
-      // Absenteísmo segue exatamente a mesma regra da tela de KPIs:
-      // (faltas + débitos + abonos) / horas previstas.
-      // Atestados e declarações são exibidos separadamente e não entram no indicador.
+      // Absenteísmo segue a mesma regra da tela de KPIs:
+      // (faltas + débitos + abonos + horas de declarações) / horas previstas.
+      // Atestados continuam separados e não entram no indicador.
       const allowanceRows = (occ.data ?? []).filter((x: any) => {
         const code = String(x.occurrence_types?.code ?? "").toLowerCase();
-        return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && code === "abono";
+        return periodId &&
+          x.period_id === periodId &&
+          activeEmployeeIds.has(x.employee_id) &&
+          (code === "abono" || code === "declaracao_horas" || code === "declaracao");
       });
       const allowanceMinutes = allowanceRows.reduce(
         (sum: number, x: any) => sum + (String(x.unit ?? "dias").toLowerCase().startsWith("dia")
@@ -457,7 +466,7 @@ function DashboardHome() {
 
   return (
     <div className="min-h-screen bg-background">
-        <header className="flex h-16 items-center justify-between border-b bg-background/90 px-6">
+        <header className="flex h-16 items-center justify-between border-b bg-background/95 px-6 backdrop-blur">
           <span className="text-xs text-muted-foreground">RH / Visão geral</span>
           <div className="flex items-center gap-2 rounded-xl border bg-card px-2 py-1.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">RH</div>
@@ -465,14 +474,14 @@ function DashboardHome() {
             <button type="button" onClick={() => void signOut()} className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Sair"><LogOut className="h-4 w-4" /></button>
           </div>
         </header>
-        <div className="mx-auto max-w-[1500px] px-6 py-7">
+        <div className="mx-auto max-w-[1500px] px-6 py-8">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
               <p className="text-sm font-medium text-primary">Gestão</p>
               <h1 className="mt-1 text-3xl font-bold tracking-tight">Dashboard</h1>
               <p className="mt-1 text-sm text-muted-foreground">Resumo executivo de RH e DP da competência atual.</p>
             </div>
-            <div className="rounded-2xl border bg-card px-5 py-3 text-sm shadow-sm">
+            <div className="rounded-xl border bg-card px-5 py-3 text-sm shadow-sm">
               <p className="text-xs text-muted-foreground">Competência atual</p>
               <strong>{metrics.period}</strong>
             </div>
@@ -480,10 +489,10 @@ function DashboardHome() {
           <section className="mt-6">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {cards.map(([label, value, Icon, description]) => (
-                <Card key={label} className="p-5">
-                  <Icon className="h-5 w-5 text-primary" />
+                <Card key={label} className="group relative overflow-hidden p-5 transition-shadow hover:shadow-md">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10"><Icon className="h-5 w-5 text-primary" /></div>
                   <p className="mt-4 text-sm text-muted-foreground">{label}</p>
-                  <p className="mt-1 text-3xl font-bold">{value}</p>
+                  <p className="mt-1 font-display text-3xl font-bold tracking-tight">{value}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{description}</p>
                 </Card>
               ))}
@@ -517,7 +526,7 @@ function DashboardHome() {
               <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">As pendências ficam vinculadas à competência atual.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
             </Card>
           </div>
-          <section className="mt-6">
+          <section className="mt-8">
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Resumo da competência</p>
               <h2 className="mt-1 text-xl font-bold">O que merece atenção agora</h2>
