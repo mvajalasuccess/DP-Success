@@ -57,8 +57,15 @@ function fmt(minutes: number) {
   return sign + Math.floor(value / 60) + "h " + String(value % 60).padStart(2, "0") + "m";
 }
 
+function getScreenFromUrl(): ScreenKey {
+  if (typeof window === "undefined") return "dashboard";
+  const value = new URLSearchParams(window.location.search).get("tela") as ScreenKey | null;
+  const validScreens: ScreenKey[] = ["dashboard", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "importacao-historico", "importar-cartao-ponto"];
+  return value && validScreens.includes(value) ? value : "dashboard";
+}
+
 function Dashboard() {
-  const [screen, setScreen] = useState<ScreenKey>("dashboard");
+  const [screen, setScreen] = useState<ScreenKey>(getScreenFromUrl);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(true);
   const [closingOpen, setClosingOpen] = useState(true);
@@ -84,13 +91,26 @@ function Dashboard() {
     return () => document.body.classList.remove("role-consulta");
   }, [isConsulta]);
 
+  const navigateToScreen = (target: ScreenKey) => {
+    setScreen(target);
+    const url = new URL(window.location.href);
+    if (target === "dashboard") url.searchParams.delete("tela");
+    else url.searchParams.set("tela", target);
+    window.history.pushState({ screen: target }, "", url);
+  };
+
   useEffect(() => {
     const onNavigate = (event: Event) => {
       const target = (event as CustomEvent<ScreenKey>).detail;
-      if (target) setScreen(target);
+      if (target) navigateToScreen(target);
     };
+    const onPopState = () => setScreen(getScreenFromUrl());
     window.addEventListener("dp-success:navigate", onNavigate);
-    return () => window.removeEventListener("dp-success:navigate", onNavigate);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("dp-success:navigate", onNavigate);
+      window.removeEventListener("popstate", onPopState);
+    };
   }, []);
 
   const Screen = screen === "dashboard" ? null : screenComponents[screen];
@@ -101,7 +121,7 @@ function Dashboard() {
       collapsed={sidebarCollapsed}
       companyOpen={companyOpen}
       closingOpen={closingOpen}
-      onNavigate={setScreen}
+      onNavigate={navigateToScreen}
       onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
       onToggleCompany={() => setCompanyOpen(value => !value)}
       onToggleClosing={() => setClosingOpen(value => !value)}
