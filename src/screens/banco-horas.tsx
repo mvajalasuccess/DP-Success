@@ -11,6 +11,7 @@
     const nextIndex = currentIndex < 0 || currentIndex >= visibleEmployees.length - 1 ? 0 : currentIndex + 1;
     setEmployeeId(visibleEmployees[nextIndex].id);
   }
+
   const accumulated = rows[0]?.accumulated ?? 0;
   const firstPeriod = rows[rows.length - 1]?.period;
   const cls = (n: number) => n < 0 ? "text-destructive" : "text-primary";
