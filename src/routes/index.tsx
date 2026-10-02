@@ -311,15 +311,15 @@ function DashboardHome() {
           !overrideByEmployee.has(String(x.employee_id))
         )
         .reduce((sum: number, x: any) => sum + Math.abs(Number(x.minutes || 0)), 0);
-      // Absenteísmo segue a mesma regra da tela de KPIs:
-      // (faltas + débitos + abonos + horas de declarações) / horas previstas.
-      // Atestados continuam separados e não entram no indicador.
+      // Absenteísmo: (faltas + débitos + abonos) / horas previstas.
+      // Declarações já são registradas como abonos e, portanto,
+      // não podem ser somadas novamente ao indicador.
       const allowanceRows = (occ.data ?? []).filter((x: any) => {
         const code = String(x.occurrence_types?.code ?? "").toLowerCase();
         return periodId &&
           x.period_id === periodId &&
           activeEmployeeIds.has(x.employee_id) &&
-          (code === "abono" || code === "declaracao_horas" || code === "declaracao");
+          code === "abono";
       });
       const allowanceMinutes = allowanceRows.reduce(
         (sum: number, x: any) => sum + (String(x.unit ?? "dias").toLowerCase().startsWith("dia")
