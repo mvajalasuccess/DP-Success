@@ -718,7 +718,7 @@ export function Kpis() {
         : 0;
 
       for (const item of comparison.values()) {
-        item.total = item.he60 + item.he100 + item.he100Night + item.he20 + item.interjornada;
+        item.total = item.he60 + item.he60Night + item.he100 + item.he100Night + item.he20 + item.interjornada;
       }
 
       const comparisonRows = [...comparison.values()].filter(item => item.total > 0).sort((a, b) => b.total - a.total);
