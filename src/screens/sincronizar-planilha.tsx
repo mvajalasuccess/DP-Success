@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileSpreadsheet, RefreshCw, Upload, CheckCircle2, AlertTriangle } from "lucide-react";
+import { FileSpreadsheet, RefreshCw, Upload, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ScreenShell, btnOutline, btnPrimary, inputCls } from "@/components/screen-shell";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,7 @@ type PreviewRow = {
   interjornada: number;
   saldo: number;
   status: "ok" | "nao_encontrado" | "competencia_nao_encontrada";
+  employeeStatus: string;
   message: string;
 };
 
@@ -39,9 +40,9 @@ type SyncChange = {
   employeeName: string;
   periodLabel: string;
   details: string;
+  employeeStatus: string;
 };
 
-const TARGET_PERIOD_START_DATES = new Set(["2026-07-21", "2026-08-21"]);
 const TEMPLATE_DB = "dp-success-planilha-sync";
 const TEMPLATE_STORE = "template";
 
@@ -208,10 +209,8 @@ async function readWorkbookRows(
 
       if (!currentEmployee) continue;
       const range = parseRange(b);
-      // A planilha possui períodos parciais para desligamentos (ex.: 21/07–22/08).
-      // A competência correta é determinada pela data de início; linhas de férias e outras
-      // linhas auxiliares não entram na sincronização.
-      if (!range || !TARGET_PERIOD_START_DATES.has(range.startDate)) continue;
+      // Considera todas as competências encontradas na planilha. Isso é importante
+      // para recuperar históricos de funcionários que já foram desligados.
 
       const resolved = resolveEmployee(currentEmployee, employees, exact, aliases);
       const period = periods.find(p => p.start_date === range.startDate);
@@ -249,6 +248,7 @@ async function readWorkbookRows(
         endDate: range.endDate,
         debit, he60, he60Night, he100, he100Night, night, interjornada, saldo,
         status, message,
+        employeeStatus: resolved.employee?.status ?? "",
       });
     }
   }
@@ -330,7 +330,7 @@ export function SincronizarPlanilha() {
       await workbook.xlsx.load(buffer);
       await saveTemplateLocally(buffer, file.name);
       const parsed = await readWorkbookRows(workbook, loadedEmployees, loadedPeriods, aliases);
-      if (!parsed.length) throw new Error("Não encontrei as competências 21/07/2026–20/08/2026 ou 21/08/2026–20/09/2026 na planilha.");
+      if (!parsed.length) throw new Error("Não encontrei linhas de competências na planilha.");
       workbookRef.current = workbook;
       templateBufferRef.current = buffer;
       fileNameRef.current = file.name.replace(/\.xlsx$/i, "") + " - atualizada.xlsx";
@@ -568,7 +568,7 @@ export function SincronizarPlanilha() {
 
   async function buildSyncPreview() {
     if (!workbookRef.current) {
-      setError("Importe uma planilha antes de pré-visualizar a atualização.");
+      setError("Importe uma planilha antes de verificar as competências pendentes.");
       return;
     }
 
@@ -577,10 +577,6 @@ export function SincronizarPlanilha() {
     setMessage("");
 
     try {
-      // A pré-visualização não depende das fórmulas do Excel nem tenta alterar o arquivo.
-      // Ela compara somente os lançamentos salvos no DP Success com as competências
-      // existentes no modelo e também identifica competências novas para funcionários
-      // que já aparecem no modelo.
       const { data: periodData, error: periodError } = await supabase
         .from("time_periods")
         .select("id,reference_year,reference_month,start_date,end_date,status")
@@ -589,131 +585,100 @@ export function SincronizarPlanilha() {
       if (periodError) throw new Error(`Competências: ${periodError.message}`);
 
       const currentPeriods = (periodData ?? []) as Period[];
-      if (!currentPeriods.length) {
-        throw new Error("Nenhuma competência foi encontrada no DP Success.");
-      }
+      if (!currentPeriods.length) throw new Error("Nenhuma competência foi encontrada no DP Success.");
 
       const periodIds = currentPeriods.map(period => period.id);
-      const { creditMap, debitMap } = await getCurrentSyncData(periodIds);
-      const changes: SyncChange[] = [];
+      const employeeIds = employees.map(employee => employee.id);
+      const db = supabase as any;
 
-      // A pré-visualização deve mostrar somente competências novas.
-      // Alterações em linhas que já existem não entram nesta etapa.
-      const employeeSheets = new Map<string, string>();
+      const [creditResult, debitResult] = await Promise.all([
+        periodIds.length && employeeIds.length
+          ? db.from("overtime_records").select("employee_id,period_id").in("period_id", periodIds).in("employee_id", employeeIds)
+          : Promise.resolve({ data: [], error: null }),
+        periodIds.length && employeeIds.length
+          ? db.from("bank_hours").select("employee_id,period_id,kind").eq("kind", "debito").in("period_id", periodIds).in("employee_id", employeeIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
-      for (const worksheet of workbookRef.current.worksheets) {
-        for (let r = 1; r <= worksheet.rowCount; r += 1) {
-          const row = worksheet.getRow(r);
-          const b = excelCellText(row.getCell(2));
-          const c = excelCellText(row.getCell(3));
-          if (b.toUpperCase() !== "EMPRESA" || c.toUpperCase() !== "FUNCIONÁRIO") continue;
+      if (creditResult.error) throw new Error(creditResult.error.message);
+      if (debitResult.error) throw new Error(debitResult.error.message);
 
-          const nextRow = worksheet.getRow(r + 1);
-          const employeeName = excelCellText(nextRow.getCell(3));
-          if (employeeName) {
-            employeeSheets.set(`${worksheet.name}|${normalizeName(employeeName)}`, employeeName);
-          }
-        }
+      // Uma competência é considerada salva quando já existe pelo menos um
+      // lançamento dela no DP Success (crédito ou débito).
+      const savedKeys = new Set<string>();
+      for (const item of creditResult.data ?? []) {
+        savedKeys.add(`${item.employee_id}|${item.period_id}`);
+      }
+      for (const item of debitResult.data ?? []) {
+        savedKeys.add(`${item.employee_id}|${item.period_id}`);
       }
 
       const exact = buildEmployeeIndex(employees);
-      const detectedNewEmployees = new Map<string, { changeIndex: number; exactName: boolean }>();
+      const pending = new Map<string, { row: PreviewRow; period: Period }>();
 
-      // Se o mesmo funcionário aparecer duas vezes no modelo (por exemplo,
-      // "MARI" e "MARIANA"), a mesma competência não pode ser criada duas vezes.
-      // Preferimos sempre o bloco cujo nome bate exatamente com o cadastro.
-      const employeeEntries = [...employeeSheets.entries()].sort((a, b) => {
-        const aName = a[1];
-        const bName = b[1];
-        const aExact = exact.has(normalizeName(aName)) ? 0 : 1;
-        const bExact = exact.has(normalizeName(bName)) ? 0 : 1;
-        return aExact - bExact;
-      });
+      for (const row of rows) {
+        if (row.status !== "ok" || !row.employeeId || !row.periodId) continue;
 
-      for (const [sheetEmployeeKey, employeeName] of employeeEntries) {
-        const separator = sheetEmployeeKey.indexOf("|");
-        const sheetName = sheetEmployeeKey.slice(0, separator);
-        // Para sincronização, somente nome exato ou alias cadastrado.
-        // Evita que "MARI" seja interpretado como "MARIANA".
-        const normalizedEmployeeName = normalizeName(employeeName);
-        const resolved = exact.get(normalizedEmployeeName)
-          ?? (aliases[normalizedEmployeeName] ? employees.find(e => e.id === aliases[normalizedEmployeeName]) : undefined);
-        if (!resolved) continue;
+        const employee = employees.find(item => item.id === row.employeeId);
+        if (!employee) continue;
 
-        const existingRowsForEmployee = rows
-          .filter(item => item.employeeId === resolved.id && item.sheet === sheetName)
-          .sort((a, b) => a.startDate.localeCompare(b.startDate));
+        const normalizedStatus = String(employee.status ?? "").toLowerCase();
+        const isInactive = ["inativo", "inactive", "desligado"].includes(normalizedStatus);
+        if (!isInactive) continue;
 
-        if (!existingRowsForEmployee.length) continue;
+        if (!isNonZeroComposition({
+          HE_60: row.he60,
+          HE_60_NOTURNO: row.he60Night,
+          HE_100: row.he100,
+          HE_100_NOTURNO: row.he100Night,
+          ADICIONAL_NOTURNO: row.night,
+          INTERJORNADA_50: row.interjornada,
+        }, row.debit)) continue;
 
-        const existingStarts = new Set(existingRowsForEmployee.map(item => item.startDate));
-        const maxExistingStart = existingRowsForEmployee[existingRowsForEmployee.length - 1].startDate;
+        const key = `${row.employeeId}|${row.periodId}`;
+        if (savedKeys.has(key) || pending.has(key)) continue;
 
-        for (const period of currentPeriods) {
-          if (period.start_date <= maxExistingStart || existingStarts.has(period.start_date)) continue;
+        const period = currentPeriods.find(item => item.id === row.periodId);
+        if (!period) continue;
 
-          const composition = creditMap.get(`${resolved.id}|${period.id}`) ?? {};
-          const debit = debitMap.get(`${resolved.id}|${period.id}`) ?? 0;
-
-          if (!isNonZeroComposition(composition, debit)) continue;
-
-          const duplicateKey = `${resolved.id}|${period.id}`;
-          const exactName = normalizeName(employeeName) === normalizeName(resolved.full_name);
-          const previous = detectedNewEmployees.get(duplicateKey);
-
-          if (previous) {
-            // Já existe uma detecção para a mesma pessoa/competência.
-            // Se a nova detecção for o nome exato, substituímos a anterior.
-            if (exactName && !previous.exactName) {
-              changes.splice(previous.changeIndex, 1);
-              const changeIndex = changes.length;
-              changes.push({
-                id: `new|${sheetName}|${resolved.id}|${period.id}`,
-                kind: "nova_linha",
-                sheet: sheetName,
-                employeeName,
-                periodLabel: periodRangeLabel({
-                  start_date: period.start_date,
-                  end_date: period.end_date,
-                }),
-                details: compositionLabel(composition, debit),
-              });
-              detectedNewEmployees.set(duplicateKey, { changeIndex, exactName: true });
-            }
-          } else {
-            const changeIndex = changes.length;
-            changes.push({
-              id: `new|${sheetName}|${resolved.id}|${period.id}`,
-              kind: "nova_linha",
-              sheet: sheetName,
-              employeeName,
-              periodLabel: periodRangeLabel({
-                start_date: period.start_date,
-                end_date: period.end_date,
-              }),
-              details: compositionLabel(composition, debit),
-            });
-            detectedNewEmployees.set(duplicateKey, { changeIndex, exactName });
-          }
-
-          existingStarts.add(period.start_date);
-        }
+        pending.set(key, { row, period });
       }
 
+      const changes: SyncChange[] = [...pending.values()].map(({ row, period }) => ({
+        id: `pendente|${row.employeeId}|${period.id}`,
+        kind: "nova_linha",
+        sheet: row.sheet,
+        employeeName: row.employeeName,
+        periodLabel: periodRangeLabel({
+          start_date: period.start_date,
+          end_date: period.end_date,
+        }),
+        details: compositionLabel(
+          {
+            HE_60: row.he60,
+            HE_60_NOTURNO: row.he60Night,
+            HE_100: row.he100,
+            HE_100_NOTURNO: row.he100Night,
+            ADICIONAL_NOTURNO: row.night,
+            INTERJORNADA_50: row.interjornada,
+          },
+          row.debit,
+        ),
+        employeeStatus: row.employeeStatus || "inativo",
+      }));
+
       setPeriods(currentPeriods);
+      setSelectedIds([...pending.values()].map(({ row }) => row.id));
       setSyncChanges(changes);
       setPreviewOpen(true);
 
-      const novas = changes.filter(change => change.kind === "nova_linha").length;
-      const atualizacoes = changes.filter(change => change.kind === "atualizacao").length;
-
       if (!changes.length) {
-        setMessage("Nenhuma alteração foi identificada.");
+        setMessage("Nenhuma competência pendente de funcionário inativo foi encontrada.");
       } else {
-        setMessage(`Pré-visualização concluída: ${novas} nova(s) competência(s) e ${atualizacoes} atualização(ões).`);
+        setMessage(`Encontrei ${changes.length} competência(s) de funcionário(s) inativo(s) que ainda não estão salvas no DP Success.`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível calcular a pré-visualização.");
+      setError(e instanceof Error ? e.message : "Não foi possível verificar as competências pendentes.");
     } finally {
       setPreviewLoading(false);
     }
@@ -752,162 +717,6 @@ export function SincronizarPlanilha() {
     return null;
   }
 
-  async function exportUpdated() {
-    if (!templateBufferRef.current) {
-      setError("Importe novamente a planilha para gerar a cópia atualizada.");
-      return;
-    }
-
-    setExporting(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const { default: ExcelJS } = await import("exceljs");
-      const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(templateBufferRef.current);
-
-      // A exportação precisa de todas as competências atuais, inclusive a nova.
-      const { allPeriods, creditMap, debitMap } = await getCurrentSyncData();
-      let updated = 0;
-      let inserted = 0;
-
-      // Atualiza somente as linhas que já existem.
-      for (const row of rows) {
-        const worksheet = workbook.getWorksheet(row.sheet);
-        if (!worksheet || row.status !== "ok" || !row.employeeId || !row.periodId) continue;
-
-        const period = allPeriods.find(p => p.id === row.periodId);
-        if (!period) continue;
-
-        writeExcelComposition(
-          worksheet.getRow(row.rowNumber),
-          creditMap.get(`${row.employeeId}|${period.id}`) ?? {},
-          debitMap.get(`${row.employeeId}|${period.id}`) ?? 0,
-          row.sheet,
-        );
-        updated += 1;
-      }
-
-      // Insere cada competência nova exatamente no bloco do funcionário indicado
-      // pela pré-visualização. Ex.: Mariana -> aba CSC -> antes do TOTAL.
-      const newChanges = syncChanges.filter(change => change.kind === "nova_linha");
-
-      for (const change of newChanges) {
-        const worksheet = workbook.getWorksheet(change.sheet);
-        if (!worksheet) continue;
-
-        const employee = employees.find(item => normalizeName(item.full_name) === normalizeName(change.employeeName))
-          ?? resolveEmployee(change.employeeName, employees, buildEmployeeIndex(employees), aliases).employee;
-        if (!employee) continue;
-
-        const period = allPeriods.find(item =>
-          periodRangeLabel({ start_date: item.start_date, end_date: item.end_date }) === change.periodLabel
-        );
-        if (!period) continue;
-
-        const block = findEmployeeBlockForExport(worksheet, change.employeeName);
-        if (!block) continue;
-
-        // Não inserir duas vezes se a competência já estiver presente no bloco.
-        let alreadyExists = false;
-        for (let r = block.firstPeriodRow; r <= block.lastPeriodRow; r += 1) {
-          const range = parseRange(excelCellText(worksheet.getRow(r).getCell(2)));
-          if (range?.startDate === period.start_date) {
-            alreadyExists = true;
-            break;
-          }
-        }
-        if (alreadyExists) continue;
-
-        const insertAt = block.totalRow;
-        const templateRowNumber = Math.max(block.firstPeriodRow, block.lastPeriodRow);
-        const templateRow = worksheet.getRow(templateRowNumber);
-        const oldTotalRow = worksheet.getRow(insertAt);
-
-        // A nova competência é uma linha física completa da planilha.
-        // Criamos a linha a partir da coluna A, deslocando o TOTAL para baixo.
-        // Para evitar o problema de Shared Formula do ExcelJS, a linha nova
-        // recebe apenas valores/formatação; nenhuma fórmula compartilhada é clonada.
-        worksheet.spliceRows(insertAt, 0, new Array(19).fill(null));
-
-        const insertedRow = worksheet.getRow(insertAt);
-        const shiftedTotalRow = worksheet.getRow(insertAt + 1);
-
-        insertedRow.height = templateRow.height;
-        insertedRow.hidden = templateRow.hidden;
-        insertedRow.outlineLevel = templateRow.outlineLevel;
-
-        for (let col = 1; col <= 19; col += 1) {
-          const sourceCell = templateRow.getCell(col);
-          const targetCell = insertedRow.getCell(col);
-          targetCell.style = sourceCell.style;
-          targetCell.numFmt = sourceCell.numFmt;
-          targetCell.alignment = sourceCell.alignment;
-          targetCell.border = sourceCell.border;
-          targetCell.fill = sourceCell.fill;
-          targetCell.font = sourceCell.font;
-          targetCell.protection = sourceCell.protection;
-          targetCell.value = null;
-        }
-
-        insertedRow.getCell(1).value = periodShortLabel(period.start_date, period.end_date);
-        insertedRow.getCell(2).value = formatExcelPeriod(period.start_date, period.end_date);
-
-        writeExcelComposition(
-          insertedRow,
-          creditMap.get(`${employee.id}|${period.id}`) ?? {},
-          debitMap.get(`${employee.id}|${period.id}`) ?? 0,
-          worksheet.name,
-        );
-
-        // Regrava o TOTAL deslocado como valores/fórmulas comuns, sem depender
-        // de Shared Formula master.
-        for (let col = 1; col <= 19; col += 1) {
-          const sourceCell = oldTotalRow.getCell(col);
-          const targetCell = shiftedTotalRow.getCell(col);
-          if (sourceCell.style) targetCell.style = sourceCell.style;
-          targetCell.numFmt = sourceCell.numFmt;
-          targetCell.alignment = sourceCell.alignment;
-          targetCell.border = sourceCell.border;
-          targetCell.fill = sourceCell.fill;
-          targetCell.font = sourceCell.font;
-          targetCell.protection = sourceCell.protection;
-        }
-
-        inserted += 1;
-        inserted += 1;
-        inserted += 1;
-      }
-
-      setMessage("Gerando o arquivo Excel atualizado…");
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = fileNameRef.current || "planilha-atualizada.xlsx";
-      anchor.rel = "noopener";
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      setTimeout(() => {
-        anchor.remove();
-        URL.revokeObjectURL(url);
-      }, 1500);
-
-      setMessage(`Download iniciado. ${inserted} nova(s) competência(s) adicionada(s) e ${updated} linha(s) existente(s) atualizada(s). Mariana, por exemplo, será inserida no bloco dela na aba CSC.`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Falha ao gerar/baixar a planilha.");
-    } finally {
-      setExporting(false);
-    }
-  }
-
   const actionAllowed = typeof document === "undefined" || !document.body.classList.contains("role-consulta");
 
   return (
@@ -915,11 +724,11 @@ export function SincronizarPlanilha() {
       section="Fechamento de Ponto"
       title="Sincronizar planilha"
       name="Sincronizar Planilha"
-      subtitle="Leia as competências de agosto e setembro, importe os lançamentos e depois gere uma cópia atualizada a partir dos lançamentos atuais do DP Success."
+      subtitle="Identifique competências ainda não salvas no DP Success, inclusive de funcionários já inativos, e importe somente o que estiver faltando."
       error={error}
       actions={actionAllowed ? <>
         <button data-role-sensitive className={btnOutline} onClick={() => inputRef.current?.click()} disabled={loading}><Upload className="h-4 w-4" /> Importar planilha</button>
-        <button data-role-sensitive className={btnPrimary} onClick={() => void buildSyncPreview()} disabled={!workbookRef.current || loading || previewLoading || exporting}><RefreshCw className="h-4 w-4" /> {previewLoading ? "Analisando..." : "Pré-visualizar atualização"}</button>
+        <button data-role-sensitive className={btnPrimary} onClick={() => void buildSyncPreview()} disabled={!workbookRef.current || loading || previewLoading}><RefreshCw className="h-4 w-4" /> {previewLoading ? "Verificando..." : "Ver competências pendentes"}</button>
         <button data-role-sensitive className={btnOutline} onClick={() => void discardSpreadsheet()} disabled={loading || !rows.length}><AlertTriangle className="h-4 w-4" /> Desconsiderar planilha</button>
       </> : undefined}
     >
@@ -935,7 +744,7 @@ export function SincronizarPlanilha() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-bold">Fluxo de teste</h2>
-            <p className="mt-1 text-sm text-muted-foreground">1) importe a planilha · 2) confira os nomes · 3) importe os lançamentos · 4) faça alterações manuais · 5) pré-visualize as alterações · 6) baixe a planilha atualizada; saldo e totais continuam por conta do Excel.</p>
+            <p className="mt-1 text-sm text-muted-foreground">1) importe a planilha · 2) o sistema identifica os funcionários inativos · 3) verifica quais competências já estão salvas · 4) selecione as pendentes e importe para o DP Success.</p>
           </div>
           {actionAllowed && (
             <div className="flex flex-wrap items-center gap-2">
@@ -967,12 +776,12 @@ export function SincronizarPlanilha() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <div className="rounded-lg border bg-background px-4 py-2 text-center"><p className="text-xs text-muted-foreground">Novas linhas</p><p className="text-xl font-bold text-primary">{syncChanges.filter(c => c.kind === "nova_linha").length}</p></div>
-                <div className="rounded-lg border bg-background px-4 py-2 text-center"><p className="text-xs text-muted-foreground">Atualizações</p><p className="text-xl font-bold">{syncChanges.filter(c => c.kind === "atualizacao").length}</p></div>
-                <div className="rounded-lg border bg-background px-4 py-2 text-center"><p className="text-xs text-muted-foreground">Total de alterações</p><p className="text-xl font-bold">{syncChanges.length}</p></div>
+                
+                
               </div>
             </div>
             <p className="mt-4 text-sm font-semibold">
-              {syncChanges.filter(c => c.kind === "nova_linha").length === 0 ? "Nenhuma linha nova foi identificada." : `${syncChanges.filter(c => c.kind === "nova_linha").length} nova(s) linha(s) identificada(s) para adicionar à planilha.`}
+              {syncChanges.length === 0 ? "Nenhuma competência pendente foi identificada." : `${syncChanges.length} competência(s) pendente(s) encontrada(s) para importação.`}
             </p>
           </div>
           {syncChanges.length > 0 ? (
@@ -982,8 +791,8 @@ export function SincronizarPlanilha() {
                   <thead className="sticky top-0 bg-background text-left text-xs"><tr><th className="px-4 py-3">Status</th><th className="px-4 py-3">Funcionário</th><th className="px-4 py-3">Competência</th><th className="px-4 py-3">Detalhes</th></tr></thead>
                   <tbody>{syncChanges.map(change => (
                     <tr key={change.id} className="border-t align-top">
-                      <td className="px-4 py-3 font-semibold whitespace-nowrap">{change.kind === "nova_linha" ? <span className="text-primary">Nova linha</span> : <span>Atualização</span>}</td>
-                      <td className="px-4 py-3 font-medium">{change.employeeName}</td>
+                      <td className="px-4 py-3 font-semibold whitespace-nowrap"><span className="text-primary">Pendente</span></td>
+                      <td className="px-4 py-3 font-medium">{change.employeeName}<div className="text-xs font-normal text-warning">Inativo</div></td>
                       <td className="px-4 py-3 whitespace-nowrap">{change.periodLabel}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{change.details}</td>
                     </tr>
@@ -1038,7 +847,7 @@ export function SincronizarPlanilha() {
         </Card>
       )}
 
-      {!rows.length && !loading && <Card className="mt-6 p-8 text-center text-sm text-muted-foreground">Envie a planilha de horas para começar. A leitura considera as linhas AGO-SET e JUL-AGO de 2026 e não altera nada até você confirmar a importação.</Card>}
+      {!rows.length && !loading && <Card className="mt-6 p-8 text-center text-sm text-muted-foreground">Envie a planilha de horas para começar. O sistema lê todas as competências encontradas, identifica funcionários inativos e mostra quais competências ainda não estão salvas antes da importação.</Card>}
     </ScreenShell>
   );
 }
