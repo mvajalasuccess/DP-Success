@@ -269,7 +269,7 @@ export function BankHours() {
               <option value="todos">Todos</option>
             </select>
           </label>
-          <div className="grid min-w-0 w-full max-w-[440px] gap-1.5 text-sm font-medium">
+          <div className="grid min-w-0 w-full max-w-[760px] flex-1 mx-auto gap-1.5 text-sm font-medium">
             <span>Funcionário</span>
             <div className="flex items-center gap-2">
               <button type="button" onClick={goToPreviousEmployee} disabled={visibleEmployees.length < 2} title="Funcionário anterior" aria-label="Funcionário anterior" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
