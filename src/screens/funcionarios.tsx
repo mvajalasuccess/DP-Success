@@ -195,14 +195,14 @@ export function Employees() {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background px-6 py-4">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between">
-          <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar ao dashboard</a>
+          <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a>
           <div className="text-sm font-semibold">DP Success · Cadastros</div>
         </div>
       </header>
 
       <main className="mx-auto max-w-[1500px] px-6 py-7">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div><p className="text-sm font-medium text-primary">Cadastro base</p><h1 className="mt-1 text-3xl font-bold">Funcionários</h1><p className="mt-1 text-sm text-muted-foreground">Cadastro conectado ao Supabase.</p></div>
+          <div><p className="text-sm font-medium text-primary">Cadastro base</p><h1 className="mt-1 text-3xl font-bold">Funcionários</h1><p className="mt-1 text-sm text-muted-foreground">Gerencie os colaboradores, vínculos e status do quadro de funcionários.</p></div>
           <button type="button" onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" /> Novo funcionário</button>
         </div>
 
@@ -220,7 +220,7 @@ export function Employees() {
 
         <Card className="mt-6 overflow-hidden">
           <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
-            <div><h2 className="font-display font-bold">Lista de funcionários</h2><p className="text-xs text-muted-foreground">Dados vindos do banco</p></div>
+            <div><h2 className="font-display font-bold">Lista de funcionários</h2><p className="text-xs text-muted-foreground">Funcionários cadastrados</p></div>
             <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><div className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 sm:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "todos" | "ativo" | "inativo")} className="rounded-lg border bg-background px-3 py-2 text-sm outline-none"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select></div>
           </div>
           <div className="overflow-x-auto">
