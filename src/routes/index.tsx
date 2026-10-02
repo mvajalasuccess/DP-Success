@@ -531,23 +531,16 @@ function DashboardHome() {
 
       // O saldo positivo detalhado é calculado depois, sem bloquear os cards principais.
       const targetPeriodId = competence?.id ?? null;
-      // Calcula todos os saldos em lote, preservando a mesma regra central do Banco de Horas.
       const balancesByEmployee = await balancesByEmployees(employees.map((employee: any) => String(employee.id)));
       const positiveResults = employees.map((employee: any) => {
         const balances = balancesByEmployee[String(employee.id)] ?? [];
         const monthly = balances.find((item: any) => item.period.id === targetPeriodId);
         if (!monthly) return null;
         const payableMinutes = Number(monthly.dashboardBalance || 0);
-        return payableMinutes > 0
-          ? { name: employee.full_name, minutes: payableMinutes }
-          : null;
+        return payableMinutes > 0 ? { name: employee.full_name, minutes: payableMinutes } : null;
       });
       const bankBalance = positiveResults.reduce((sum, item) => sum + (item?.minutes ?? 0), 0);
-      setPositiveBalances(
-        positiveResults
-          .filter((item): item is { name: string; minutes: number } => Boolean(item))
-          .sort((a, b) => b.minutes - a.minutes),
-      );
+      setPositiveBalances(positiveResults.filter((item): item is { name: string; minutes: number } => Boolean(item)).sort((a, b) => b.minutes - a.minutes));
       setMetrics(current => ({ ...current, bankBalance }));
     })();
   }, []);
@@ -559,3 +552,187 @@ function DashboardHome() {
     const { data: competence } = await supabase
       .from("time_periods")
       .select("id")
+      .order("reference_year", { ascending: false })
+      .order("reference_month", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!competence?.id) {
+      setSavingNote(false);
+      return;
+    }
+    const { error } = await supabase
+      .from("dashboard_competence_notes")
+      .upsert({
+        period_id: competence.id,
+        note: competenceNote,
+        items: noteItems,
+        updated_by: sessionData.session?.user.id ?? null,
+      }, { onConflict: "period_id" });
+    if (error) {
+      window.alert("Não foi possível salvar as pendências: " + error.message);
+      setSavingNote(false);
+      return;
+    }
+    setNoteSaved(true);
+    setSavingNote(false);
+  }
+
+  function addNoteItem() {
+    const text = newNoteItem.trim();
+    if (!text) return;
+    setNoteItems(items => [...items, { id: crypto.randomUUID(), text, done: false }]);
+    setNewNoteItem("");
+    setNoteSaved(false);
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  }
+
+  const cards = [
+    ["Funcionários ativos", String(metrics.employees), Users, "ativos na competência"],
+    ["Absenteísmo", metrics.absenteeism.toFixed(1) + "%", Gauge, "horas perdidas ÷ previstas"],
+    ["Turnover", metrics.turnover.toFixed(1) + "%", TrendingUp, metrics.admissions + " admissões · " + metrics.terminations + " desligamentos"],
+    ["Banco de horas", fmt(metrics.bankBalance), WalletCards, "saldo positivo disponível"],
+  ] as const;
+
+  return (
+    <div className="min-h-screen bg-background">
+        <header className="flex h-16 items-center border-b bg-background/90 px-6">
+          <span className="text-xs text-muted-foreground">RH / Visão geral</span>
+        </header>
+        <div className="mx-auto max-w-[1500px] px-6 py-7">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="text-sm font-medium text-primary">Gestão</p>
+              <h1 className="mt-1 text-3xl font-bold tracking-tight">Dashboard</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Resumo executivo de RH e DP da competência atual.</p>
+            </div>
+            <div className="rounded-2xl border bg-card px-5 py-3 text-sm shadow-sm">
+              <p className="text-xs text-muted-foreground">Competência atual</p>
+              <strong>{metrics.period}</strong>
+            </div>
+          </div>
+          <section className="mt-6">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {cards.map(([label, value, Icon, description]) => (
+                <Card key={label} className="p-5">
+                  <Icon className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-3xl font-bold">{value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+                </Card>
+              ))}
+            </div>
+          </section>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <Card className="p-5">
+              <div className="flex items-end justify-between gap-3">
+                <div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Banco de horas</p><h2 className="mt-1 text-xl font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Crédito disponível nesta competência.</p></div>
+                <span className="text-2xl font-bold text-primary">{fmt(metrics.bankBalance)}</span>
+              </div>
+              <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com crédito disponível nesta competência.</p>}</div>
+            </Card>
+            <Card className="p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Acompanhamento</p><h2 className="mt-1 text-xl font-bold">Pendências da competência</h2><p className="text-xs text-muted-foreground">Organize aqui o que precisa ser resolvido nesta competência.</p></div>
+                <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5"/>{savingNote ? "Salvando..." : "Salvar"}</button>
+              </div>
+              <div className="mt-4 space-y-2">
+                {noteItems.map(item => <div key={item.id} className="flex items-center gap-3 rounded-xl border bg-muted/20 p-3">
+                  <input type="checkbox" checked={item.done} onChange={e => { setNoteItems(items => items.map(x => x.id === item.id ? { ...x, done: e.target.checked } : x)); setNoteSaved(false); }} className="h-4 w-4" />
+                  <span className={item.done ? "flex-1 text-sm text-muted-foreground line-through" : "flex-1 text-sm"}>{item.text}</span>
+                  <button type="button" onClick={() => { setNoteItems(items => items.filter(x => x.id !== item.id)); setNoteSaved(false); }} className="text-xs text-muted-foreground hover:text-destructive">Excluir</button>
+                </div>)}
+                {!noteItems.length && <p className="rounded-xl border border-dashed p-5 text-center text-xs text-muted-foreground">Nenhuma pendência adicionada.</p>}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <input value={newNoteItem} onChange={e => setNewNoteItem(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addNoteItem(); } }} placeholder="Digite uma pendência..." className="flex-1 rounded-xl border bg-muted/20 px-3 py-2 text-sm outline-none focus:border-primary" />
+                <button type="button" onClick={addNoteItem} className="rounded-xl border px-3 py-2 text-sm font-medium">Adicionar</button>
+              </div>
+              <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">As pendências ficam vinculadas à competência atual.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
+            </Card>
+          </div>
+          <section className="mt-6">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Resumo da competência</p>
+              <h2 className="mt-1 text-xl font-bold">O que merece atenção agora</h2>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Card className="p-5">
+                <Clock3 className="h-5 w-5 text-primary" />
+                <p className="mt-4 text-sm text-muted-foreground">Horas extras</p>
+                <p className="mt-1 text-2xl font-bold">{fmt(metrics.overtime)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">registradas na competência</p>
+              </Card>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
+                <Card className="h-full p-5 transition-shadow hover:shadow-md">
+                  <AlertTriangle className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">Faltas</p>
+                  <p className="mt-1 text-2xl font-bold">{Math.round(metrics.absenceDays)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">dias registrados · clique para ver</p>
+                  {absencePeople.length > 0 && <div className="mt-3 border-t pt-3">
+                    {absencePeople.slice(0, 3).map(name => <p key={name} className="truncate text-xs font-medium">{name}</p>)}
+                    {absencePeople.length > 3 && <p className="mt-1 text-[11px] text-muted-foreground">+ {absencePeople.length - 3} funcionário(s)</p>}
+                  </div>}
+                </Card>
+              </button>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "atestados" }))} className="text-left">
+                <Card className="h-full p-5 transition-shadow hover:shadow-md">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">Atestados</p>
+                  <p className="mt-1 text-2xl font-bold">{metrics.certificates}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">registros na competência · clique para ver</p>
+                  {certificatePeople.length > 0 && <div className="mt-3 border-t pt-3">
+                    {certificatePeople.slice(0, 3).map(name => <p key={name} className="truncate text-xs font-medium">{name}</p>)}
+                    {certificatePeople.length > 3 && <p className="mt-1 text-[11px] text-muted-foreground">+ {certificatePeople.length - 3} funcionário(s)</p>}
+                  </div>}
+                </Card>
+              </button>
+              <Card className="p-5">
+                <Users className="h-5 w-5 text-primary" />
+                <p className="mt-4 text-sm text-muted-foreground">Movimentações</p>
+                <p className="mt-1 text-2xl font-bold">{metrics.admissions + metrics.terminations}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p>
+              </Card>
+            </div>
+          </section>
+
+          <section className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <Card className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Visão rápida</p>
+              <h2 className="mt-1 text-xl font-bold">Horas extras por departamento</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Onde estão concentradas as horas extras da competência.</p>
+              <div className="mt-5 space-y-3">
+                {departments.map(d => {
+                  const total = Math.max(metrics.overtime, 1);
+                  const width = Math.min(100, (d.minutes / total) * 100);
+                  return (
+                    <div key={d.name}>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate font-medium">{d.name}</span>
+                        <span className="font-semibold">{fmt(d.minutes)}</span>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary/70" style={{ width: width + "%" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {!departments.length && <p className="py-6 text-sm text-muted-foreground">Nenhum departamento com horas extras registradas.</p>}
+              </div>
+            </Card>
+            <Card className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Próximo passo</p>
+              <h2 className="mt-1 text-xl font-bold">Análise detalhada</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Use a tela de KPIs quando precisar investigar a origem dos indicadores, comparar competências, setores ou funcionários.</p>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "kpis" }))} className="mt-5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground">
+                Abrir KPIs
+              </button>
+            </Card>
+          </section>
+        </div>
+    </div>
+  );
+}
