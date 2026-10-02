@@ -25,7 +25,7 @@ import { balancesByEmployees } from "@/lib/dp-model";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
-type ScreenKey = "dashboard" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "importacao-historico" | "importar-cartao-ponto" | "sincronizar-planilha";
+type ScreenKey = "dashboard" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "importacao-historico" | "importar-cartao-ponto";
 
 const screenComponents = {
   funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
@@ -44,7 +44,6 @@ const closingNav: Array<[string, ScreenKey]> = [
   ["Atestados", "atestados"],
   ["Faltas e Ocorrências", "ocorrencias"],
   ["Importar Cartão Ponto", "importar-cartao-ponto"],
-  ["Sincronizar Planilha", "sincronizar-planilha"],
 ];
 
 const mainNav: Array<[string, ScreenKey]> = [
@@ -62,7 +61,7 @@ function fmt(minutes: number) {
 function getScreenFromUrl(): ScreenKey {
   if (typeof window === "undefined") return "dashboard";
   const value = new URLSearchParams(window.location.search).get("tela") as ScreenKey | null;
-  const validScreens: ScreenKey[] = ["dashboard", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "importacao-historico", "importar-cartao-ponto", "sincronizar-planilha"];
+  const validScreens: ScreenKey[] = ["dashboard", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "importacao-historico", "importar-cartao-ponto"];
   return value && validScreens.includes(value) ? value : "dashboard";
 }
 
@@ -241,7 +240,7 @@ function AppShell({
               <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")} title="Funcionários"><Users className="h-4 w-4 shrink-0" /></button>
               {[
                 ["dashboard", Gauge, "Dashboard"], ["kpis", Gauge, "KPIs"], ["comparativos", Users, "Comparativos"], ["relatorios", FileText, "Relatórios"],
-                ["fechamento-ponto", Clock3, "Fechamento"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["ocorrencias", AlertTriangle, "Faltas"], ["atestados", FileText, "Declarações e Atestados"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"], ["sincronizar-planilha", FileText, "Sincronizar Planilha"],
+                ["fechamento-ponto", Clock3, "Fechamento"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["ocorrencias", AlertTriangle, "Faltas"], ["atestados", FileText, "Declarações e Atestados"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"],
                 ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
               ].map(([key, Icon, label]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={label as string}><Icon className="h-4 w-4 shrink-0" /></button>)}
             </>
