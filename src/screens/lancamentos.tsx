@@ -10,7 +10,7 @@ import {
 } from "@/lib/dp-model";
 
 type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null };
-type Group = { key: string; employee_id: string; date: string; credits: CreditRow[]; debits: DebitRow[] };
+type Group = { key: string; groupId: string | null; employee_id: string; date: string; credits: CreditRow[]; debits: DebitRow[] };
 type Line = { type: CreditType; hours: string };
 
 export function Launches() {
@@ -74,13 +74,26 @@ export function Launches() {
 
   const groups = useMemo(() => {
     const map = new Map<string, Group>();
-    const add = (key: string, employee_id: string, d: string) => {
+    const importedToken = (value?: string | null) => value?.match(/\[PDF_IMPORT:[^\]]+\]/)?.[0] ?? null;
+    const add = (key: string, groupId: string | null, employee_id: string, d: string) => {
       let g = map.get(key);
-      if (!g) { g = { key, employee_id, date: d, credits: [], debits: [] }; map.set(key, g); }
+      if (!g) { g = { key, groupId, employee_id, date: d, credits: [], debits: [] }; map.set(key, g); }
       return g;
     };
-    credits.forEach(c => add(c.launch_group_id ?? c.id, c.employee_id, c.reference_date).credits.push(c));
-    debits.forEach(d => add(d.launch_group_id ?? d.id, d.employee_id, d.entry_date).debits.push(d));
+
+    // Importações antigas não tinham launch_group_id porque a coluna é UUID.
+    // Para elas usamos a fingerprint gravada nas observações/justificativa para
+    // reconstruir o lançamento completo (crédito + débito + resumos) como um único grupo.
+    credits.forEach(c => {
+      const token = importedToken(c.notes);
+      const key = c.launch_group_id ?? (token ? `import:${token}:${c.employee_id}:${c.reference_date}` : c.id);
+      add(key, c.launch_group_id ?? null, c.employee_id, c.reference_date).credits.push(c);
+    });
+    debits.forEach(d => {
+      const token = importedToken(d.justification);
+      const key = d.launch_group_id ?? (token ? `import:${token}:${d.employee_id}:${d.entry_date}` : d.id);
+      add(key, d.launch_group_id ?? null, d.employee_id, d.entry_date).debits.push(d);
+    });
     return [...map.values()].sort((a, b) => b.date.localeCompare(a.date));
   }, [credits, debits]);
   const names = new Map(employees.map(e => [e.id, e.full_name]));
@@ -130,7 +143,9 @@ export function Launches() {
     setSaving(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      const groupId = editing?.key ?? crypto.randomUUID();
+      // Grupos importados antigos podem ter uma chave textual derivada da
+      // fingerprint. Ao editar, criamos um UUID novo para o grupo persistido.
+      const groupId = editing?.groupId ?? crypto.randomUUID();
       if (editing) await removeGroup(editing);
       if (valid.length) {
         const r = await supabase.from("overtime_records").insert(valid.map(l => ({
