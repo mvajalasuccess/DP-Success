@@ -115,7 +115,6 @@ export function ImportarCartaoPonto() {
       let insertedSummary = 0;
 
       for (const row of matches) {
-        const groupPrefix = "pdf:" + document.fingerprint + ":" + row.page;
 
         if (row.creditMinutes > 0) {
           const result = await supabase.from("overtime_records").insert({
