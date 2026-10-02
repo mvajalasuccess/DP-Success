@@ -60,7 +60,6 @@ function fmt(minutes: number) {
 function Dashboard() {
   const [screen, setScreen] = useState<ScreenKey>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [companyOpen, setCompanyOpen] = useState(true);
   const [closingOpen, setClosingOpen] = useState(true);
   const [isConsulta, setIsConsulta] = useState(false);
 
@@ -503,10 +502,72 @@ function DashboardHome() {
               <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">As pendências ficam vinculadas à competência atual.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
             </Card>
           </div>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Card className="p-5"><h2 className="font-display font-bold">Visão por departamento</h2><p className="text-xs text-muted-foreground">Dados reais de funcionários e horas extras</p><div className="mt-4 grid grid-cols-2 gap-3">{departments.map(d => <div key={d.name} className="rounded-xl border p-4"><p className="text-xs font-semibold">{d.name}</p><div className="mt-3 grid grid-cols-2 gap-2 text-[10px]"><span>{d.employees}<br /><em className="text-muted-foreground not-italic">func.</em></span><span>{fmt(d.minutes)}<br /><em className="text-muted-foreground not-italic">HE</em></span></div></div>)}{!departments.length && <p className="text-sm text-muted-foreground">Nenhum departamento com dados cadastrados.</p>}</div></Card>
+          <section className="mt-6">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Resumo da competência</p>
+              <h2 className="mt-1 text-xl font-bold">O que merece atenção agora</h2>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Card className="p-5">
+                <Clock3 className="h-5 w-5 text-primary" />
+                <p className="mt-4 text-sm text-muted-foreground">Horas extras</p>
+                <p className="mt-1 text-2xl font-bold">{fmt(metrics.overtime)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">registradas na competência</p>
+              </Card>
+              <Card className="p-5">
+                <AlertTriangle className="h-5 w-5 text-primary" />
+                <p className="mt-4 text-sm text-muted-foreground">Faltas</p>
+                <p className="mt-1 text-2xl font-bold">{Math.round(metrics.absenceDays)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">dias registrados</p>
+              </Card>
+              <Card className="p-5">
+                <FileText className="h-5 w-5 text-primary" />
+                <p className="mt-4 text-sm text-muted-foreground">Atestados</p>
+                <p className="mt-1 text-2xl font-bold">{metrics.certificates}</p>
+                <p className="mt-1 text-xs text-muted-foreground">registros na competência</p>
+              </Card>
+              <Card className="p-5">
+                <Users className="h-5 w-5 text-primary" />
+                <p className="mt-4 text-sm text-muted-foreground">Movimentações</p>
+                <p className="mt-1 text-2xl font-bold">{metrics.admissions + metrics.terminations}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p>
+              </Card>
+            </div>
+          </section>
 
-          </div>
+          <section className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <Card className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Visão rápida</p>
+              <h2 className="mt-1 text-xl font-bold">Horas extras por departamento</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Onde estão concentradas as horas extras da competência.</p>
+              <div className="mt-5 space-y-3">
+                {departments.map(d => {
+                  const total = Math.max(metrics.overtime, 1);
+                  const width = Math.min(100, (d.minutes / total) * 100);
+                  return (
+                    <div key={d.name}>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate font-medium">{d.name}</span>
+                        <span className="font-semibold">{fmt(d.minutes)}</span>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary/70" style={{ width: width + "%" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {!departments.length && <p className="py-6 text-sm text-muted-foreground">Nenhum departamento com horas extras registradas.</p>}
+              </div>
+            </Card>
+            <Card className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Próximo passo</p>
+              <h2 className="mt-1 text-xl font-bold">Análise detalhada</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Use a tela de KPIs quando precisar investigar a origem dos indicadores, comparar competências, setores ou funcionários.</p>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "kpis" }))} className="mt-5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground">
+                Abrir KPIs
+              </button>
+            </Card>
+          </section>
         </div>
     </div>
   );
