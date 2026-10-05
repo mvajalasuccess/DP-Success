@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Settings, Menu } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -295,7 +295,6 @@ function DashboardHome() {
   const [newNoteItem, setNewNoteItem] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
-  const [companyOpen, setCompanyOpen] = useState(true);
   const [userEmail, setUserEmail] = useState("Usuário RH");
   const [userRoleLabel, setUserRoleLabel] = useState("Usuário RH");
 
