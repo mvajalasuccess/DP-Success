@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -154,10 +154,39 @@ function AppShell({
         </div>
       )}
       <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r bg-sidebar transition-[transform,width] duration-200 lg:flex lg:flex-col ${collapsed ? "-translate-x-full w-64" : "translate-x-0 w-64"}`}>
-        <div className={`flex h-16 shrink-0 items-center border-b ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
-          {!collapsed && <div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></div><div><div className="font-display text-base font-bold">DP Success</div><div className="text-[9px] uppercase tracking-widest text-muted-foreground">RH · DP · Gestão</div></div></div>}
-          {collapsed && <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></div>}
-          <button type="button" onClick={onToggleCollapsed} className="rounded-lg p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" title={collapsed ? "Expandir menu" : "Minimizar menu"} aria-label={collapsed ? "Expandir menu" : "Minimizar menu"}><ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? "-rotate-90" : "rotate-90"}`} /></button>
+        <div className={`relative flex h-[82px] shrink-0 items-center border-b border-sidebar-border/70 bg-gradient-to-r from-sidebar-primary/10 via-sidebar to-sidebar ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-sidebar-primary/80" />
+          {!collapsed && (
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_0_22px_rgba(6,202,160,0.24)]">
+                <div className="absolute inset-1 rounded-xl border border-white/20" />
+                <Clock3 className="relative h-5 w-5" strokeWidth={2.2} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1.5 leading-none">
+                  <span className="font-display text-[20px] font-extrabold tracking-[-0.04em] text-sidebar-foreground">DP</span>
+                  <span className="font-display text-[20px] font-extrabold tracking-[-0.04em] text-sidebar-primary">SUCCESS</span>
+                </div>
+                <div className="mt-2 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">
+                  <span>RH</span><span className="text-sidebar-primary/70">•</span><span>DP</span><span className="text-sidebar-primary/70">•</span><span>GESTÃO</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {collapsed && (
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_0_18px_rgba(6,202,160,0.22)]">
+              <Clock3 className="h-5 w-5" />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sidebar-foreground/55 transition-all hover:bg-sidebar-primary/10 hover:text-sidebar-primary"
+            title={collapsed ? "Expandir menu" : "Minimizar menu"}
+            aria-label={collapsed ? "Expandir menu" : "Minimizar menu"}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
         </div>
 
         <nav className={`flex-1 overflow-y-auto sidebar-scrollbar-hidden p-3 ${collapsed ? "space-y-2" : "space-y-2"}`}>
