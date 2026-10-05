@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Settings, Menu } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -19,7 +19,6 @@ const Parametros = lazy(() => import("@/screens/parametros").then(m => ({ defaul
 const Tarefas = lazy(() => import("@/screens/tarefas").then(m => ({ default: m.Tarefas })));
 const ImportacaoHistorico = lazy(() => import("@/screens/importacao-historico").then(m => ({ default: m.ImportacaoHistorico })));
 const ImportarCartaoPonto = lazy(() => import("@/screens/importar-cartao-ponto").then(m => ({ default: m.ImportarCartaoPonto })));
-const SincronizarPlanilha = lazy(() => import("@/screens/sincronizar-planilha").then(m => ({ default: m.SincronizarPlanilha })));
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees } from "@/lib/dp-model";
 
@@ -31,26 +30,9 @@ const screenComponents = {
   funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
-  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto, "sincronizar-planilha": SincronizarPlanilha,
+  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto,
 };
 
-const companyNav: Array<[string, ScreenKey]> = [
-  ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas / Escalas", "jornadas-escalas"],
-];
-
-const closingNav: Array<[string, ScreenKey]> = [
-  ["Fechamento", "fechamento-ponto"],
-  ["Lançamentos", "lancamentos"],
-  ["Atestados", "atestados"],
-  ["Faltas e Ocorrências", "ocorrencias"],
-  ["Importar Cartão Ponto", "importar-cartao-ponto"],
-];
-
-const mainNav: Array<[string, ScreenKey]> = [
-  ["Tarefas & Agenda", "tarefas"],
-  ["Banco de Horas", "banco-horas"],
-  ["Relatórios", "relatorios"], ["Comparativos", "comparativos"], ["KPIs", "kpis"], ["Configurações", "parametros"], ["Importar histórico", "importacao-historico"],
-];
 
 function fmt(minutes: number) {
   const sign = minutes < 0 ? "-" : "+";
@@ -66,7 +48,6 @@ function getScreenFromUrl(): ScreenKey {
 }
 
 function Dashboard() {
-  const navigate = useNavigate();
   const [screen, setScreen] = useState<ScreenKey>(getScreenFromUrl);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(true);
@@ -121,12 +102,8 @@ function Dashboard() {
     <AppShell
       screen={screen}
       collapsed={sidebarCollapsed}
-      companyOpen={companyOpen}
-      closingOpen={closingOpen}
       onNavigate={navigateToScreen}
       onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
-      onToggleCompany={() => setCompanyOpen(value => !value)}
-      onToggleClosing={() => setClosingOpen(value => !value)}
     >
       {Screen ? (
           <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Carregando tela...</div>}>
@@ -210,7 +187,7 @@ function AppShell({
                 </button>
                 {closingMenuOpen && <div className="mt-1 space-y-0.5">
                   {[
-                    ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Faltas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText], ["Sincronizar Planilha", "sincronizar-planilha", FileText],
+                    ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Faltas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText],
                   ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label as string}</span></button>)}
                 </div>}
               </div>
