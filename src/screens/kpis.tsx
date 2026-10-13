@@ -119,16 +119,28 @@ export function Kpis() {
         return;
       }
 
-      const parsedEmployees: Employee[] = (employeeRows ?? []).map((e: any) => ({
-        id: e.id,
-        name: e.full_name,
-        registration: String(e.registration ?? "").trim(),
-        department: String(e.departments?.name ?? "").trim(),
-        hireDate: e.hire_date ?? null,
-        terminationDate: e.termination_date ?? null,
-        status: e.status ?? "ativo",
-        workScheduleId: e.work_schedule_id ?? null,
-      }));
+      // Datas de desligamento confirmadas pelo RH para corrigir cadastros antigos
+      // em que o funcionário foi inativado, mas a data não ficou gravada no campo.
+      const confirmedTerminationDates: Record<string, string> = {
+        "ANILEI APARECIDO ALVES": "2026-05-22",
+        "ANTONIO LUIS LIMA JUNIOR": "2026-07-30",
+        "EDINILSON DE ALMEIDA SILVA": "2026-05-29",
+        "EMILIO PICOLI FRACAROLLI": "2026-06-05",
+        "FELIPE HILMANN": "2026-07-30",
+      };
+      const parsedEmployees: Employee[] = (employeeRows ?? []).map((e: any) => {
+        const normalizedName = String(e.full_name ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toUpperCase();
+        return {
+          id: e.id,
+          name: e.full_name,
+          registration: String(e.registration ?? "").trim(),
+          department: String(e.departments?.name ?? "").trim(),
+          hireDate: e.hire_date ?? null,
+          terminationDate: e.termination_date ?? confirmedTerminationDates[normalizedName] ?? null,
+          status: e.status ?? "ativo",
+          workScheduleId: e.work_schedule_id ?? null,
+        };
+      });
 
       const parsedPeriods = (periodRows ?? []) as Period[];
       setEmployees(parsedEmployees);
