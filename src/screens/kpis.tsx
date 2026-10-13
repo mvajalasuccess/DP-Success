@@ -193,7 +193,7 @@ export function Kpis() {
       const rangeStart = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, firstTarget.start_date);
       const rangeEnd = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, firstTarget.end_date);
 
-      setPeriodLabel(selectedMonth === "todos" ? `Ano {selectedYear}` : periodRangeLabel(firstTarget));
+      setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(firstTarget));
 
       const selectedEmployeeSet = new Set(selectedEmployees);
       const allowedEmployees = employees.filter(e => employeeMatches(e, [], selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
