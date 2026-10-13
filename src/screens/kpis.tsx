@@ -721,7 +721,8 @@ export function Kpis() {
         ? averageActiveHeadcount
         : (activeHeadcountByPeriod[0] ?? 0);
 
-      next.employees = activeHeadcount;
+      // Para "Todos os meses", mostrar a quantidade distinta de funcionários que participaram de pelo menos uma competência selecionada. A média mensal continua sendo usada apenas no cálculo do turnover.
+      next.employees = selectedMonth === "todos" ? distinctEmployeesInSelection.size : activeHeadcount;
       next.admissions = admissionEmployees.length;
       next.terminations = terminationEmployees.length;
       next.activeHeadcount = activeHeadcount;
