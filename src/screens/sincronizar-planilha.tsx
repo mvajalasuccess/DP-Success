@@ -90,16 +90,18 @@ function normalizeName(value: unknown) {
 function parseIsoDate(value: string) {
   const m = value.trim().match(/^(\d{2})\/(\d{2})\/(\d{2,4})$/);
   if (!m) return null;
-  const year = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
-  return `${year}-${m[2]}-${m[1]}`;
+  const [day, month, rawYear] = m.slice(1) as [string, string, string];
+  const year = rawYear.length === 2 ? 2000 + Number(rawYear) : Number(rawYear);
+  return `${year}-${month}-${day}`;
 }
 
 function parseRange(value: unknown) {
   const text = String(value ?? "").trim();
   const m = text.match(/(\d{2}\/\d{2}\/\d{2,4})\s*-\s*(\d{2}\/\d{2}\/\d{2,4})/);
   if (!m) return null;
-  const startDate = parseIsoDate(m[1]);
-  const endDate = parseIsoDate(m[2]);
+  const [firstDate, secondDate] = m.slice(1) as [string, string];
+  const startDate = parseIsoDate(firstDate);
+  const endDate = parseIsoDate(secondDate);
   return startDate && endDate ? { startDate, endDate } : null;
 }
 
