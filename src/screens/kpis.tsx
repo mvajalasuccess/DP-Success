@@ -1077,7 +1077,7 @@ export function Kpis() {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <Card className="p-5">
               <Users className="h-5 w-5 text-primary" />
-              <p className="mt-4 text-sm text-muted-foreground">Funcionários ativos</p>
+              <p className="mt-4 text-sm text-muted-foreground">Funcionários no período</p>
               <p className="mt-1 text-3xl font-bold">{Math.round(metrics.employees)}</p>
               <p className="mt-1 text-xs text-muted-foreground">ativos na competência selecionada</p>
             </Card>
@@ -1373,7 +1373,7 @@ export function Kpis() {
             <div className="grid gap-4 md:grid-cols-4">
               <Card className="p-6"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Admissões</p><p className="mt-1 text-3xl font-bold">{metrics.admissions}</p></Card>
               <Card className="p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Desligamentos</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
-              <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Funcionários ativos</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.activeHeadcount).toLocaleString("pt-BR")}</p></Card>
+              <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários ativos</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.activeHeadcount).toLocaleString("pt-BR")}</p></Card>
               <Card className="p-6"><Percent className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Índice de Turnover</p><p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p></Card>
             </div>
             <Card className="mt-4 border-primary/20 bg-primary/5 p-5">
