@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -202,9 +202,9 @@ function AppShell({
                   <span>Gestão</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${managementOpen ? "rotate-0" : "-rotate-90"}`} />
                 </button>
                 {managementOpen && <div className="mt-1 space-y-0.5">
-                  {[
+                  {([
                     ["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText],
-                  ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label as string}</span></button>)}
+                  ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
                 </div>}
               </div>
 
@@ -213,9 +213,9 @@ function AppShell({
                   <span>Fechamento de Ponto</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${closingMenuOpen ? "rotate-0" : "-rotate-90"}`} />
                 </button>
                 {closingMenuOpen && <div className="mt-1 space-y-0.5">
-                  {[
+                  {([
                     ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Faltas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText],
-                  ].map(([label, key, Icon]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label as string}</span></button>)}
+                  ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
                 </div>}
               </div>
 
@@ -242,11 +242,11 @@ function AppShell({
           ) : (
             <>
               <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")} title="Funcionários"><Users className="h-4 w-4 shrink-0" /></button>
-              {[
+              {([
                 ["dashboard", Gauge, "Dashboard"], ["kpis", Gauge, "KPIs"], ["comparativos", Users, "Comparativos"], ["relatorios", FileText, "Relatórios"],
                 ["fechamento-ponto", Clock3, "Fechamento"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["ocorrencias", AlertTriangle, "Faltas"], ["atestados", FileText, "Declarações e Atestados"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"],
                 ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
-              ].map(([key, Icon, label]) => <button key={key as string} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)} title={label as string}><Icon className="h-4 w-4 shrink-0" /></button>)}
+              ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label}><Icon className="h-4 w-4 shrink-0" /></button>)}
             </>
           )}
         </nav>
@@ -314,6 +314,7 @@ function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavig
 }
 
 function DashboardHome() {
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, turnover: 0, admissions: 0, terminations: 0, bankBalance: 0, period: "Nenhuma competência" });
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
