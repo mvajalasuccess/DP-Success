@@ -347,7 +347,7 @@ function DashboardHome() {
       // Os dados operacionais são buscados depois, já filtrados pela competência.
       const [emps, comp] = await Promise.all([
         db.from("employees").select("id,full_name,department_id,work_schedule_id,hire_date,termination_date,status,departments(name)"),
-        db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
+        db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("end_date", { ascending: false }).order("start_date", { ascending: false }).limit(1),
       ]);
 
       const allEmployees = emps.data ?? [];
@@ -558,8 +558,8 @@ function DashboardHome() {
     const { data: competence } = await supabase
       .from("time_periods")
       .select("id")
-      .order("reference_year", { ascending: false })
-      .order("reference_month", { ascending: false })
+      .order("end_date", { ascending: false })
+      .order("start_date", { ascending: false })
       .limit(1)
       .maybeSingle();
     if (!competence?.id) {
