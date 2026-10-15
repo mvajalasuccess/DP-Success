@@ -1321,7 +1321,7 @@ export function Kpis() {
                         <span className="truncate">{index + 1}. {item.name}</span>
                         <strong>{fmt(item.total - item.interjornada)}</strong>
                       </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, (item.total - item.interjornada) / Math.max(overtimeEmployees[0]?.total - overtimeEmployees[0]?.interjornada, 1) * 100)}%` }} /></div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, (item.total - item.interjornada) / Math.max((overtimeEmployees[0]?.total ?? 0) - (overtimeEmployees[0]?.interjornada ?? 0), 1) * 100)}%` }} /></div>
                     </div>
                   ))}
                   {!overtimeEmployees.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem horas extras.</p>}

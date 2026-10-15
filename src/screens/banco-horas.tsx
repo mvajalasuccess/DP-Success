@@ -79,14 +79,16 @@ export function BankHours() {
     if (!visibleEmployees.length) return;
     const currentIndex = visibleEmployees.findIndex(e => e.id === employeeId);
     const previousIndex = currentIndex <= 0 ? visibleEmployees.length - 1 : currentIndex - 1;
-    setEmployeeId(visibleEmployees[previousIndex].id);
+    const previous = visibleEmployees[previousIndex];
+    if (previous) setEmployeeId(previous.id);
   }
 
   function goToNextEmployee() {
     if (!visibleEmployees.length) return;
     const currentIndex = visibleEmployees.findIndex(e => e.id === employeeId);
     const nextIndex = currentIndex < 0 || currentIndex >= visibleEmployees.length - 1 ? 0 : currentIndex + 1;
-    setEmployeeId(visibleEmployees[nextIndex].id);
+    const next = visibleEmployees[nextIndex];
+    if (next) setEmployeeId(next.id);
   }
 
   const accumulated = rows[0]?.accumulated ?? 0;
