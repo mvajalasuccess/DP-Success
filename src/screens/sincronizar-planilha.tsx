@@ -521,26 +521,28 @@ export function SincronizarPlanilha() {
     return { allPeriods, creditMap, debitMap };
   }
 
+  const minutesOf = (composition: Record<string, number>, key: string) => composition[key] ?? 0;
+
   function compositionLabel(composition: Record<string, number>, debit: number) {
     const parts: string[] = [];
     if (debit > 0) parts.push(`Débito ${minutesToHours(debit)}`);
-    if ((composition.HE_60 ?? 0) > 0) parts.push(`HE 60% ${minutesToHours(composition.HE_60)}`);
-    if ((composition.HE_60_NOTURNO ?? 0) > 0) parts.push(`60%+20% ${minutesToHours(composition.HE_60_NOTURNO)}`);
-    if ((composition.HE_100 ?? 0) > 0) parts.push(`HE 100% ${minutesToHours(composition.HE_100)}`);
-    if ((composition.HE_100_NOTURNO ?? 0) > 0) parts.push(`100%+20% ${minutesToHours(composition.HE_100_NOTURNO)}`);
-    if ((composition.ADICIONAL_NOTURNO ?? 0) > 0) parts.push(`Noturno ${minutesToHours(composition.ADICIONAL_NOTURNO)}`);
-    if ((composition.INTERJORNADA_50 ?? 0) > 0) parts.push(`Interj. ${minutesToHours(composition.INTERJORNADA_50)}`);
+    if (minutesOf(composition, "HE_60") > 0) parts.push(`HE 60% ${minutesToHours(minutesOf(composition, "HE_60"))}`);
+    if (minutesOf(composition, "HE_60_NOTURNO") > 0) parts.push(`60%+20% ${minutesToHours(minutesOf(composition, "HE_60_NOTURNO"))}`);
+    if (minutesOf(composition, "HE_100") > 0) parts.push(`HE 100% ${minutesToHours(minutesOf(composition, "HE_100"))}`);
+    if (minutesOf(composition, "HE_100_NOTURNO") > 0) parts.push(`100%+20% ${minutesToHours(minutesOf(composition, "HE_100_NOTURNO"))}`);
+    if (minutesOf(composition, "ADICIONAL_NOTURNO") > 0) parts.push(`Noturno ${minutesToHours(minutesOf(composition, "ADICIONAL_NOTURNO"))}`);
+    if (minutesOf(composition, "INTERJORNADA_50") > 0) parts.push(`Interj. ${minutesToHours(minutesOf(composition, "INTERJORNADA_50"))}`);
     return parts.join(" · ") || "Sem movimentação";
   }
 
   function sameComposition(row: PreviewRow, composition: Record<string, number>, debit: number) {
     return row.debit === debit
-      && row.he60 === (composition.HE_60 ?? 0)
-      && row.he60Night === (composition.HE_60_NOTURNO ?? 0)
-      && row.he100 === (composition.HE_100 ?? 0)
-      && row.he100Night === (composition.HE_100_NOTURNO ?? 0)
-      && row.night === (composition.ADICIONAL_NOTURNO ?? 0)
-      && row.interjornada === (composition.INTERJORNADA_50 ?? 0);
+      && row.he60 === minutesOf(composition, "HE_60")
+      && row.he60Night === minutesOf(composition, "HE_60_NOTURNO")
+      && row.he100 === minutesOf(composition, "HE_100")
+      && row.he100Night === minutesOf(composition, "HE_100_NOTURNO")
+      && row.night === minutesOf(composition, "ADICIONAL_NOTURNO")
+      && row.interjornada === minutesOf(composition, "INTERJORNADA_50");
   }
 
   async function buildSyncPreview() {

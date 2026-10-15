@@ -67,6 +67,44 @@ export function Parametros(){
     };
   }, []);
   const isAdmin = currentProfile?.role === "administrador" || currentProfile?.role === "rh";
+
+  async function addHoliday() {
+    if (!holidayForm.date || !holidayForm.name.trim()) { setError("Informe a data e o nome do feriado."); return; }
+    setError(""); setSaved("");
+    const { error } = await (supabase as any).from("holidays")
+      .insert({ holiday_date: holidayForm.date, name: holidayForm.name.trim(), scope: holidayForm.scope, is_demo: false });
+    if (error) { setError(error.message); return; }
+    setHolidayForm({ date: "", name: "", scope: "nacional" });
+    setSaved("Feriado adicionado.");
+    void load();
+  }
+
+  async function deleteHoliday(id: string) {
+    if (!window.confirm("Excluir este feriado?")) return;
+    setError(""); setSaved("");
+    const { error } = await (supabase as any).from("holidays").delete().eq("id", id);
+    if (error) { setError(error.message); return; }
+    setSaved("Feriado removido.");
+    void load();
+  }
+
+  async function updateProfile(id: string, patch: { role?: string; active?: boolean }) {
+    setError(""); setSaved("");
+    const { error } = await (supabase as any).from("profiles").update(patch).eq("id", id);
+    if (error) { setError(error.message); return; }
+    setSaved("Acesso atualizado.");
+    void load();
+  }
+
+  async function deleteProfile(id: string, email: string) {
+    if (!window.confirm(`Excluir o acesso de ${email}? Esta ação não pode ser desfeita.`)) return;
+    setError(""); setSaved("");
+    const { data, error } = await supabase.functions.invoke("delete-user", { body: { user_id: id } });
+    const message = error?.message ?? (data && typeof data === "object" && "error" in data ? String((data as { error: unknown }).error) : "");
+    if (message) { setError(message); return; }
+    setSaved("Acesso excluído.");
+    void load();
+  }
   return <div className="min-h-screen bg-background">
     <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1180px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4"/>Voltar</a><b>DP Success · Configurações</b></div></header>
     <main className="mx-auto max-w-[1180px] px-6 py-7 space-y-6">
