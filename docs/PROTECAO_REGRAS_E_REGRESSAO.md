@@ -85,3 +85,12 @@ Antes de alterações que afetem persistência ou estrutura de dados:
 ## Próxima etapa segura
 
 Com esta documentação registrada em uma branch isolada, revisar o código de leitura/escrita e montar casos de teste com valores de referência reais antes de implementar rastreabilidade de alterações. A auditoria deve ser aditiva e não pode modificar cálculos, saldos ou registros existentes.
+
+
+## Situação inicial dos testes automatizados
+
+Na revisão inicial do `package.json` da branch `main`, os scripts disponíveis incluem `build` e `lint`, mas não há script dedicado de testes automatizados (por exemplo, `test`, Vitest ou Jest) declarado no arquivo consultado.
+
+Isso não prova que não existam verificações manuais ou outras validações; apenas registra que não foi identificado um comando de testes automatizados no `package.json`. Não foi executado build, lint ou teste funcional nesta etapa.
+
+Antes de introduzir testes automatizados, mapear funções de cálculo e fixtures de referência sem alterar a lógica de produção. Os testes devem começar como verificações de leitura/comparação e não devem escrever no banco real.
