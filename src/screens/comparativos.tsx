@@ -53,26 +53,37 @@ export function Comparativos() {
     try {
       const db = supabase as any;
       const periodsSelected = periods.filter(p => periodIds.includes(p.id));
-      const historicalQuery = db.from("historical_kpi_data")
+      const fetchAll = async (build: (from: number, to: number) => any) => {
+        const rows: any[] = [];
+        for (let from = 0; ; from += 1000) {
+          const { data, error } = await build(from, from + 999);
+          if (error) throw error;
+          const batch = data ?? [];
+          rows.push(...batch);
+          if (batch.length < 1000) break;
+        }
+        return rows;
+      };
+      const historicalQuery = (from: number, to: number) => db.from("historical_kpi_data")
         .select("employee_id,period_id,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-        .in("employee_id", employeeIds).in("period_id", periodIds);
-      const overtimeQuery = db.from("overtime_records")
+        .in("employee_id", employeeIds).in("period_id", periodIds).range(from, to);
+      const overtimeQuery = (from: number, to: number) => db.from("overtime_records")
         .select("employee_id,minutes,launch_type,period_id,reference_date")
-        .in("employee_id", employeeIds).in("period_id", periodIds);
-      const debitQuery = db.from("bank_hours")
+        .in("employee_id", employeeIds).in("period_id", periodIds).range(from, to);
+      const debitQuery = (from: number, to: number) => db.from("bank_hours")
         .select("employee_id,minutes,kind,period_id,entry_date")
-        .in("employee_id", employeeIds).in("period_id", periodIds).eq("kind", "debito");
-      const absenceQuery = db.from("occurrences")
+        .in("employee_id", employeeIds).in("period_id", periodIds).eq("kind", "debito").range(from, to);
+      const absenceQuery = (from: number, to: number) => db.from("occurrences")
         .select("employee_id,quantity,occurrence_date,end_date,occurrence_types!inner(code)")
-        .in("employee_id", employeeIds).in("occurrence_types.code", ABSENCE_CODES);
-      const certificateQuery = db.from("medical_certificates")
+        .in("employee_id", employeeIds).in("occurrence_types.code", ABSENCE_CODES).range(from, to);
+      const certificateQuery = (from: number, to: number) => db.from("medical_certificates")
         .select("employee_id,days,start_date,end_date")
-        .in("employee_id", employeeIds);
+        .in("employee_id", employeeIds).range(from, to);
 
       const [historical, overtime, debits, absences, certificates] = await Promise.all([
-        historicalQuery, overtimeQuery, debitQuery, absenceQuery, certificateQuery
+        fetchAll(historicalQuery), fetchAll(overtimeQuery), fetchAll(debitQuery),
+        fetchAll(absenceQuery), fetchAll(certificateQuery)
       ]);
-      for (const result of [historical, overtime, debits, absences, certificates]) if (result.error) throw result.error;
 
       const selectedRanges = periodsSelected.map(p => ({ start: p.start_date, end: p.end_date }));
       const overlapDays = (startDate: string, endDate?: string | null) => {
@@ -93,7 +104,7 @@ export function Comparativos() {
       const next: Record<string, Totals> = {};
       employeeIds.forEach(id => { next[id] = { ...EMPTY }; });
 
-      for (const row of historical.data ?? []) {
+      for (const row of historical) {
         const t = next[row.employee_id]; if (!t) continue;
         t.he60 += Number(row.he_60_minutes || 0);
         t.he60_20 += Number(row.he_60_night_minutes || 0);
@@ -101,7 +112,7 @@ export function Comparativos() {
         t.he20 += Number(row.he_20_minutes || 0);
         t.interjornada += Number(row.interjornada_minutes || 0);
       }
-      for (const row of overtime.data ?? []) {
+      for (const row of overtime) {
         const t = next[row.employee_id]; if (!t) continue;
         const type = String(row.launch_type || "").toUpperCase();
         const minutes = Math.abs(Number(row.minutes) || 0);
@@ -111,11 +122,11 @@ export function Comparativos() {
         else if (type.includes("20")) t.he20 += minutes;
         else t.he60 += minutes;
       }
-      for (const row of debits.data ?? []) {
+      for (const row of debits) {
         const total = next[row.employee_id];
         if (total) total.debitos += Math.abs(Number(row.minutes) || 0);
       }
-      for (const row of absences.data ?? []) {
+      for (const row of absences) {
         const t = next[row.employee_id];
         if (!t) continue;
         const totalDays = Math.max(1, overlapDays(row.occurrence_date, row.end_date));
@@ -125,7 +136,7 @@ export function Comparativos() {
           : Number(row.quantity || 0);
         if (selectedDays > 0) t.faltas += selectedDays;
       }
-      for (const row of certificates.data ?? []) {
+      for (const row of certificates) {
         const t = next[row.employee_id];
         if (!t) continue;
         const overlap = overlapDays(row.start_date, row.end_date);
