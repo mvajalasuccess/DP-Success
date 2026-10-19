@@ -181,7 +181,7 @@ export function ImportarCartaoPonto() {
       const insertedTotal = insertedCredits + insertedDebits + insertedSummary;
       setError(
         insertedTotal > 0
-          ? `${reason} A importação foi interrompida após gravar `NaN` créditos, `NaN` débitos e `NaN` lançamentos de resumo. Não tente importar o mesmo PDF novamente; confira os registros já gravados em Lançamentos e Banco de Horas.`
+          ? reason + " A importação foi interrompida após gravar " + formatCount(insertedCredits) + " créditos, " + formatCount(insertedDebits) + " débitos e " + formatCount(insertedSummary) + " lançamentos de resumo. Não tente importar o mesmo PDF novamente; confira os registros já gravados em Lançamentos e Banco de Horas."
           : reason,
       );
     } finally {
