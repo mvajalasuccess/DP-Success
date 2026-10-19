@@ -29,3 +29,12 @@
 
 - Branch de trabalho: `melhorias/estabilidade-auditoria-2026-10`
 - Estado inicial: documentação e investigação; nenhuma fórmula, dado de produção, tabela ou política de acesso foi alterada por este plano.
+
+## Alertas de segurança identificados para revisão
+
+1. **Atualização do próprio perfil (profiles):** alerta anterior indicou que uma política pode permitir autoatualização de campos sensíveis, incluindo role e active. É necessário localizar a política efetivamente aplicada e confirmar quais colunas o usuário pode alterar antes de propor uma correção. Não alterar a política sem essa confirmação.
+2. **Edge Function delete-user:** supabase/config.toml declara verify_jwt = false. O código de supabase/functions/delete-user/index.ts valida o token com auth.getUser(token) e exige perfil ativo com papel administrador ou rh antes de excluir usuário. Não mudar a configuração isoladamente sem testar o fluxo real de chamada/autenticação; o comportamento deve ser revisto como conjunto.
+
+### Limitação da investigação atual
+
+O código da função de exclusão foi lido, mas não foi possível confirmar via acesso ao repositório qual política SQL de profiles está implantada no projeto conectado nem inspecionar o estado real das políticas RLS. Portanto, nenhum ajuste de permissões foi aplicado. A correção deve partir da migration/política implantada, não de suposição.
