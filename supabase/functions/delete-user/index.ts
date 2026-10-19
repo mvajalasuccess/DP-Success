@@ -128,14 +128,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { error: profileDeleteError } = await adminClient
-      .from("profiles")
-      .delete()
-      .eq("id", userId);
+    // Limpa o papel de autorização e o perfil após remover o usuário do Auth.
+    // Isso evita deixar permissões órfãs em user_roles.
+    const [rolesDeleteResult, profileDeleteResult] = await Promise.all([
+      adminClient.from("user_roles").delete().eq("user_id", userId),
+      adminClient.from("profiles").delete().eq("id", userId),
+    ]);
 
-    if (profileDeleteError) {
+    if (rolesDeleteResult.error || profileDeleteResult.error) {
+      const details = [
+        rolesDeleteResult.error
+          ? "permissões: " + rolesDeleteResult.error.message
+          : null,
+        profileDeleteResult.error
+          ? "perfil: " + profileDeleteResult.error.message
+          : null,
+      ].filter(Boolean).join("; ");
+
       return new Response(JSON.stringify({
-        error: "O acesso foi removido, mas não foi possível remover o perfil: " + profileDeleteError.message,
+        error: "O usuário foi removido da autenticação, mas a limpeza dos registros auxiliares ficou incompleta (" + details + ").",
       }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
