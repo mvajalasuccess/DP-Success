@@ -30,7 +30,15 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const tokenMatch = authHeader.match(/^Bearer\\s+(.+)$/i);\n    if (!tokenMatch) {\n      return new Response(JSON.stringify({ error: "Formato de autenticação inválido." }), {\n        status: 401,\n        headers: { ...corsHeaders, "Content-Type": "application/json" },\n      });\n    }\n    const token = tokenMatch[1].trim();
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!tokenMatch) {
+      return new Response(JSON.stringify({ error: "Formato de autenticação inválido." }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const token = tokenMatch[1].trim();
+    
     const { data: { user: requester }, error: requesterError } =
       await adminClient.auth.getUser(token);
 
