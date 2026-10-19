@@ -229,6 +229,7 @@ export function ImportarCartaoPonto() {
                       <tr key={row.page}>
                         <td className="px-5 py-4 font-medium">
                           {row.employeeName}
+                          {!row.employeeId && <p className="mt-1 text-xs font-normal text-destructive">Cadastro não identificado por nome exato</p>}
                         </td>
                         <td className="px-5 py-4">
                           {row.period ? periodRangeLabel(row.period) : (
@@ -247,7 +248,13 @@ export function ImportarCartaoPonto() {
                               Pronto
                             </span>
                           ) : (
-                            <span className="text-destructive">Revisar cadastro</span>
+                            <span className="text-destructive">
+                              {!row.employeeId && !row.period
+                                ? "Funcionário e competência não identificados"
+                                : !row.employeeId
+                                  ? "Funcionário não identificado"
+                                  : "Competência não identificada"}
+                            </span>
                           )}
                         </td>
                       </tr>
