@@ -90,12 +90,16 @@ export function Parametros(){
 
   async function updateProfile(id: string, patch: { role?: string; active?: boolean }) {
     setError(""); setSaved("");
-    const { error } = await (supabase as any).from("profiles").update(patch).eq("id", id);
-    if (error) { setError(error.message); return; }
+    const { data, error } = await supabase.functions.invoke("update-user-access", {
+      body: { user_id: id, ...patch },
+    });
+    const message = error?.message ?? (data && typeof data === "object" && "error" in data
+      ? String((data as { error: unknown }).error)
+      : "");
+    if (message) { setError(message); return; }
     setSaved("Acesso atualizado.");
     void load();
   }
-
   async function deleteProfile(id: string, email: string) {
     if (!window.confirm(`Excluir o acesso de ${email}? Esta ação não pode ser desfeita.`)) return;
     setError(""); setSaved("");
