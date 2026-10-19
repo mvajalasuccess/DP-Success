@@ -146,18 +146,26 @@ export function Launches() {
       // Grupos importados antigos podem ter uma chave textual derivada da
       // fingerprint. Ao editar, criamos um UUID novo para o grupo persistido.
       const groupId = editing?.groupId ?? crypto.randomUUID();
+      const importToken = editing
+        ? [...editing.credits.map(c => c.notes), ...editing.debits.map(d => d.justification)]
+            .map(value => value?.match(/\\[(?:PDF_IMPORT|XLSX_IMPORT):[^\\]]+\\]/)?.[0])
+            .find(Boolean) ?? null
+        : null;
       if (editing) await removeGroup(editing);
       if (valid.length) {
         const r = await supabase.from("overtime_records").insert(valid.map(l => ({
           employee_id: employeeId, reference_date: date, period_id: target.id, minutes: l.minutes,
-          launch_type: l.type, rate_percent: CREDIT_TYPES[l.type].ratePercent, launch_group_id: groupId, notes: CREDIT_TYPES[l.type].label,
+          launch_type: l.type, rate_percent: CREDIT_TYPES[l.type].ratePercent, launch_group_id: groupId,
+          notes: `${importToken ? importToken + " " : ""}${CREDIT_TYPES[l.type].label}`,
         })));
         if (r.error) throw new Error(r.error.message);
       }
       if (debit > 0) {
         const r = await supabase.from("bank_hours").insert({
           employee_id: employeeId, entry_date: date, period_id: target.id, kind: "debito", minutes: debit,
-          previous_balance_minutes: 0, balance_minutes: 0, justification: "Débito / atraso", launch_group_id: groupId, created_by: auth.user?.id ?? null,
+          previous_balance_minutes: 0, balance_minutes: 0,
+          justification: `${importToken ? importToken + " " : ""}Débito / atraso`,
+          launch_group_id: groupId, created_by: auth.user?.id ?? null,
         });
         if (r.error) throw new Error(r.error.message);
       }
