@@ -104,13 +104,23 @@ export function ImportarCartaoPonto() {
       // o identificador textual "pdf:..." nessa coluna. Usamos a fingerprint
       // no campo de observação para detectar uma mesma importação.
       const importFingerprint = `[PDF_IMPORT:${document.fingerprint}]`;
-      const duplicateCheck = await supabase
+      const overtimeDuplicateCheck = await supabase
         .from("overtime_records")
         .select("id")
         .ilike("notes", `%${importFingerprint}%`)
         .limit(1);
-      if (duplicateCheck.error) throw new Error(duplicateCheck.error.message);
-      if (duplicateCheck.data?.length) throw new Error("Este PDF já foi importado anteriormente. Não vou duplicar os lançamentos.");
+      if (overtimeDuplicateCheck.error) throw new Error(overtimeDuplicateCheck.error.message);
+
+      const bankDuplicateCheck = await supabase
+        .from("bank_hours")
+        .select("id")
+        .ilike("justification", `%${importFingerprint}%`)
+        .limit(1);
+      if (bankDuplicateCheck.error) throw new Error(bankDuplicateCheck.error.message);
+
+      if (overtimeDuplicateCheck.data?.length || bankDuplicateCheck.data?.length) {
+        throw new Error("Este PDF já possui lançamentos gravados, total ou parcialmente. Confira Lançamentos e Banco de Horas antes de tentar importar novamente.");
+      }
 
       const { data: auth } = await supabase.auth.getUser();
       let insertedCredits = 0;
