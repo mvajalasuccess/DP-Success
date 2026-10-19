@@ -49,18 +49,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Os papéis ficam em user_roles; profiles não contém role/active.
-    const { data: requesterRoles, error: rolesError } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", requester.id);
+    // A tela de Configurações e as políticas atuais usam profiles.role/active.
+    // Validamos a autorização pela mesma fonte de verdade antes de excluir.
+    const { data: requesterProfile, error: profileError } = await adminClient
+      .from("profiles")
+      .select("role, active")
+      .eq("id", requester.id)
+      .maybeSingle();
 
-    const canDeleteUsers = (requesterRoles ?? []).some(
-      (item) => item.role === "administrador" || item.role === "rh",
-    );
+    const canDeleteUsers =
+      !profileError &&
+      requesterProfile?.active === true &&
+      (requesterProfile.role === "administrador" || requesterProfile.role === "rh");
 
-    if (rolesError || !canDeleteUsers) {
-      return new Response(JSON.stringify({ error: "Apenas Administrador e RH podem excluir usuários." }), {
+    if (!canDeleteUsers) {
+      return new Response(JSON.stringify({ error: "Apenas Administrador e RH ativos podem excluir usuários." }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
