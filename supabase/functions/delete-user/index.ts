@@ -10,6 +10,13 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  if (req.method !== "POST" && req.method !== "OPTIONS") {
+    return new Response(JSON.stringify({ error: "Método não permitido." }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Allow": "POST, OPTIONS" },
+    });
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -23,7 +30,7 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
-    const token = authHeader.replace("Bearer ", "");
+    const tokenMatch = authHeader.match(/^Bearer\\s+(.+)$/i);\n    if (!tokenMatch) {\n      return new Response(JSON.stringify({ error: "Formato de autenticação inválido." }), {\n        status: 401,\n        headers: { ...corsHeaders, "Content-Type": "application/json" },\n      });\n    }\n    const token = tokenMatch[1].trim();
     const { data: { user: requester }, error: requesterError } =
       await adminClient.auth.getUser(token);
 
@@ -34,13 +41,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: profile, error: profileError } = await adminClient
-      .from("profiles")
-      .select("id, role, active")
-      .eq("id", requester.id)
-      .maybeSingle();
+    // Os papéis ficam em user_roles; profiles não contém role/active.
+    const { data: requesterRoles, error: rolesError } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", requester.id);
 
-    if (profileError || !profile || !profile.active || !["administrador", "rh"].includes(profile.role)) {
+    const canDeleteUsers = (requesterRoles ?? []).some(
+      (item) => item.role === "administrador" || item.role === "rh",
+    );
+
+    if (rolesError || !canDeleteUsers) {
       return new Response(JSON.stringify({ error: "Apenas Administrador e RH podem excluir usuários." }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
