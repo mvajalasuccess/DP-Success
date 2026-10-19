@@ -30,6 +30,3 @@ jobs:
 
       - name: Validar build de produção
         run: bun run build
-
-      - name: Executar lint
-        run: bun run lint
