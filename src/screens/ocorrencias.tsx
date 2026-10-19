@@ -137,8 +137,12 @@ export function Ocorrencias() {
       return;
     }
 
-    if (isFalta && Number(form.quantity) <= 0) {
-      setError("Informe a quantidade de dias.");
+    if (isFalta && (!Number.isInteger(Number(form.quantity)) || Number(form.quantity) <= 0)) {
+      setError("Informe uma quantidade de dias inteira e maior que zero.");
+      return;
+    }
+    if (form.end_date && form.end_date < form.occurrence_date) {
+      setError("A data final não pode ser anterior à data inicial.");
       return;
     }
 
