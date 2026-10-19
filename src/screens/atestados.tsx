@@ -134,15 +134,19 @@ export function Atestados() {
       setError("A data final não pode ser anterior à data inicial.");
       return;
     }
+    if (form.days.trim() && (!Number.isInteger(Number(form.days)) || Number(form.days) <= 0)) {
+      setError("A quantidade de dias deve ser um número inteiro positivo.");
+      return;
+    }
     setSaving(true);
     const payload = {
       employee_id: form.employee_id,
       start_date: form.start_date,
       end_date: form.end_date,
-      days: Number(form.days) > 0 ? Number(form.days) : countDays(form.start_date, form.end_date),
+      days: form.days.trim() ? Number(form.days) : countDays(form.start_date, form.end_date),
       certificate_type: form.certificate_type,
       notes: form.notes.trim() || null,
-      ...(form.cid.trim() ? { cid: form.cid.trim() } : {}),
+      cid: form.cid.trim() || null,
     };
     const result = editing
       ? await supabase.from("medical_certificates").update(payload).eq("id", editing.id)
@@ -193,7 +197,7 @@ export function Atestados() {
         <select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>
         <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="rounded-lg border px-3 py-2" />
         <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" />
-        <input type="number" min="1" placeholder={`Quantidade de dias (automático: ${countDays(form.start_date, form.end_date) || "—"})`} value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} className="rounded-lg border px-3 py-2" />
+        <input type="number" min="1" step="1" placeholder={`Quantidade de dias (automático: ${countDays(form.start_date, form.end_date) || "—"})`} value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} className="rounded-lg border px-3 py-2" />
         <select value={form.certificate_type} onChange={e => setForm({ ...form, certificate_type: e.target.value })} className="rounded-lg border px-3 py-2"><option value="medico">Médico</option><option value="odontologico">Odontológico</option><option value="acompanhamento">Acompanhamento</option><option value="outro">Outro</option></select>
         <input placeholder="CID" value={form.cid} onChange={e => setForm({ ...form, cid: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2" />
         <textarea placeholder="Observações" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2" />
