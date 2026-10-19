@@ -1,0 +1,35 @@
+name: Validar aplicação
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, "melhorias/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Instalar dependências pelo lockfile
+        run: bun install --frozen-lockfile
+
+      - name: Validar build de produção
+        run: bun run build
+
+      - name: Executar lint
+        run: bun run lint
