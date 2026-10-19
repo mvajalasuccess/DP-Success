@@ -21,8 +21,8 @@ export function Schedules() {
   async function save() {
     const name = form.name.trim();
     const weeklyHours = Number(form.weekly.replace(",", "."));
-    if (!name || weeklyHours <= 0) {
-      setError("Informe nome e carga semanal válidos.");
+    if (!name || !Number.isFinite(weeklyHours) || weeklyHours <= 0 || weeklyHours > 168) {
+      setError("Informe nome e uma carga semanal válida de até 168 horas.");
       return;
     }
     setSaving(true); setError("");
