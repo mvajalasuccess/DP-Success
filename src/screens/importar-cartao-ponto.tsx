@@ -101,6 +101,10 @@ export function ImportarCartaoPonto() {
     setError("");
     setMessage("");
 
+    let insertedCredits = 0;
+    let insertedDebits = 0;
+    let insertedSummary = 0;
+
     try {
       // launch_group_id é UUID no banco; não podemos usar LIKE nem gravar
       // o identificador textual "pdf:..." nessa coluna. Usamos a fingerprint
@@ -125,10 +129,6 @@ export function ImportarCartaoPonto() {
       }
 
       const { data: auth } = await supabase.auth.getUser();
-      let insertedCredits = 0;
-      let insertedDebits = 0;
-      let insertedSummary = 0;
-
       for (const row of matches) {
         // Cada funcionário do PDF recebe um único grupo UUID. Assim, Crédito,
         // Débito, Interjornada e Ad. Noturno permanecem vinculados e podem ser
@@ -177,7 +177,13 @@ export function ImportarCartaoPonto() {
 
       setMessage(`Importação concluída: ${formatCount(insertedCredits)} créditos, ${formatCount(insertedDebits)} débitos e ${formatCount(insertedSummary)} lançamentos de resumo.`);
     } catch (e) {
-      setError((e as Error).message || "Não foi possível concluir a importação.");
+      const reason = (e as Error).message || "Não foi possível concluir a importação.";
+      const insertedTotal = insertedCredits + insertedDebits + insertedSummary;
+      setError(
+        insertedTotal > 0
+          ? `${reason} A importação foi interrompida após gravar `NaN` créditos, `NaN` débitos e `NaN` lançamentos de resumo. Não tente importar o mesmo PDF novamente; confira os registros já gravados em Lançamentos e Banco de Horas.`
+          : reason,
+      );
     } finally {
       savingRef.current = false;
       setSaving(false);
