@@ -65,20 +65,20 @@ export function Comparativos() {
         return rows;
       };
       const historicalQuery = (from: number, to: number) => db.from("historical_kpi_data")
-        .select("employee_id,period_id,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-        .in("employee_id", employeeIds).in("period_id", periodIds).range(from, to);
+        .select("id,employee_id,period_id,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+        .in("employee_id", employeeIds).in("period_id", periodIds).order("id").range(from, to);
       const overtimeQuery = (from: number, to: number) => db.from("overtime_records")
-        .select("employee_id,minutes,launch_type,period_id,reference_date")
-        .in("employee_id", employeeIds).in("period_id", periodIds).range(from, to);
+        .select("id,employee_id,minutes,launch_type,period_id,reference_date")
+        .in("employee_id", employeeIds).in("period_id", periodIds).order("id").range(from, to);
       const debitQuery = (from: number, to: number) => db.from("bank_hours")
-        .select("employee_id,minutes,kind,period_id,entry_date")
-        .in("employee_id", employeeIds).in("period_id", periodIds).eq("kind", "debito").range(from, to);
+        .select("id,employee_id,minutes,kind,period_id,entry_date")
+        .in("employee_id", employeeIds).in("period_id", periodIds).eq("kind", "debito").order("id").range(from, to);
       const absenceQuery = (from: number, to: number) => db.from("occurrences")
-        .select("employee_id,quantity,occurrence_date,end_date,occurrence_types!inner(code)")
-        .in("employee_id", employeeIds).in("occurrence_types.code", ABSENCE_CODES).range(from, to);
+        .select("id,employee_id,quantity,occurrence_date,end_date,occurrence_types!inner(code)")
+        .in("employee_id", employeeIds).in("occurrence_types.code", ABSENCE_CODES).order("id").range(from, to);
       const certificateQuery = (from: number, to: number) => db.from("medical_certificates")
-        .select("employee_id,days,start_date,end_date")
-        .in("employee_id", employeeIds).range(from, to);
+        .select("id,employee_id,days,start_date,end_date")
+        .in("employee_id", employeeIds).order("id").range(from, to);
 
       const [historical, overtime, debits, absences, certificates] = await Promise.all([
         fetchAll(historicalQuery), fetchAll(overtimeQuery), fetchAll(debitQuery),
