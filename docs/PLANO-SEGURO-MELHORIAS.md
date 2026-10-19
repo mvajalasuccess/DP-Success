@@ -1,0 +1,31 @@
+# Plano seguro de melhorias — DP SUCCESS
+
+## Regra inegociável: preservar resultados históricos
+
+- Não alterar fórmulas de cálculo, critérios de seleção de registros, saldos, horas extras, competências ou resultados históricos já validados.
+- Não executar recálculo em massa nem migrações de banco nesta etapa.
+- Não modificar dados de produção para “corrigir” diferenças sem autorização explícita e evidência da origem.
+- Qualquer nova regra de negócio exige aprovação explícita e data de início; nunca deve reescrever competências anteriores.
+- Correções pontuais previamente validadas devem permanecer intactas.
+
+## Ordem de trabalho
+
+1. **Ponto seguro e isolamento:** manter melhorias em branch separada; revisar o diff antes de qualquer integração.
+2. **Segurança sem mudança de permissões às cegas:** mapear autenticação, autorização por perfil e políticas RLS; investigar os alertas existentes antes de alterar políticas.
+3. **Regressão e integridade:** identificar as fontes de dados e os resultados de referência; adicionar testes que confirmem que as funções de cálculo existentes continuam produzindo os mesmos resultados.
+4. **Auditoria/rastreabilidade:** planejar histórico de alterações em lançamentos (autor, data/hora, valor anterior e novo valor) sem substituir nem recalcular os registros atuais.
+5. **Importações seguras:** avaliar prévia, validação, duplicidades e confirmação antes de persistir; não mudar a regra de correspondência nem importar dados automaticamente.
+6. **Desempenho e usabilidade:** otimizar consultas, filtros e navegação sem alterar a população de registros nem o significado dos indicadores.
+
+## Critérios obrigatórios antes de integrar
+
+- Build e lint executados quando o ambiente permitir.
+- Diff revisado e limitado ao escopo aprovado.
+- Nenhuma migration, alteração de política/permissão ou atualização de dados sem revisão específica.
+- Comparação de resultados antes/depois em casos de referência, incluindo competências históricas.
+- Preview do Lovable conferido antes de considerar a melhoria validada.
+
+## Registro de execução
+
+- Branch de trabalho: `melhorias/estabilidade-auditoria-2026-10`
+- Estado inicial: documentação e investigação; nenhuma fórmula, dado de produção, tabela ou política de acesso foi alterada por este plano.
