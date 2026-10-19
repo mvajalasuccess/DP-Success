@@ -148,7 +148,7 @@ export function Launches() {
       const groupId = editing?.groupId ?? crypto.randomUUID();
       const importToken = editing
         ? [...editing.credits.map(c => c.notes), ...editing.debits.map(d => d.justification)]
-            .map(value => value?.match(/\\[(?:PDF_IMPORT|XLSX_IMPORT):[^\\]]+\\]/)?.[0])
+            .map(value => value?.match(/\[(?:PDF_IMPORT|XLSX_IMPORT):[^\]]+\]/)?.[0])
             .find(Boolean) ?? null
         : null;
       if (editing) await removeGroup(editing);
