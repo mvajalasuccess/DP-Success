@@ -124,12 +124,68 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Sincroniza o papel nas duas estruturas usadas pelo sistema:
+    // profiles controla a interface; user_roles controla políticas de acesso aos dados.
+    let previousRoles: { role: string }[] = [];
+    if (patch.role) {
+      const { data: rolesBefore, error: rolesBeforeError } = await adminClient
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      if (rolesBeforeError) {
+        return new Response(JSON.stringify({ error: "Não foi possível consultar as permissões atuais." }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      previousRoles = rolesBefore ?? [];
+
+      const { error: clearRolesError } = await adminClient
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId);
+
+      if (clearRolesError) {
+        return new Response(JSON.stringify({ error: "Não foi possível atualizar o papel de acesso." }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { error: insertRoleError } = await adminClient
+        .from("user_roles")
+        .insert({ user_id: userId, role: patch.role });
+
+      if (insertRoleError) {
+        if (previousRoles.length) {
+          await adminClient.from("user_roles").insert(previousRoles.map((item) => ({
+            user_id: userId,
+            role: item.role,
+          })));
+        }
+        return new Response(JSON.stringify({ error: "Não foi possível gravar o novo papel de acesso." }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const { error: updateError } = await adminClient
       .from("profiles")
       .update(patch)
       .eq("id", userId);
 
     if (updateError) {
+      if (patch.role) {
+        await adminClient.from("user_roles").delete().eq("user_id", userId);
+        if (previousRoles.length) {
+          await adminClient.from("user_roles").insert(previousRoles.map((item) => ({
+            user_id: userId,
+            role: item.role,
+          })));
+        }
+      }
       return new Response(JSON.stringify({ error: updateError.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
