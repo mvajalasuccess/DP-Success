@@ -1,5 +1,5 @@
 import { CheckCircle2, FileUp, Loader2, RotateCcw, Upload, AlertTriangle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchPeriods, minutesToHours, periodRangeLabel, type Period } from "@/lib/dp-model";
@@ -32,6 +32,7 @@ export function ImportarCartaoPonto() {
   const [document, setDocument] = useState<PointImportDocument | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -89,12 +90,13 @@ export function ImportarCartaoPonto() {
   const unmatched = matches.filter(m => !m.employeeId || !m.period);
 
   async function importRows() {
-    if (!document) return;
+    if (!document || savingRef.current) return;
     if (unmatched.length) {
       setError("Corrija os funcionários/competência sem correspondência antes de importar.");
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
     setError("");
     setMessage("");
@@ -177,6 +179,7 @@ export function ImportarCartaoPonto() {
     } catch (e) {
       setError((e as Error).message || "Não foi possível concluir a importação.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
