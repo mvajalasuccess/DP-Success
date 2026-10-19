@@ -14,9 +14,12 @@ function normalize(value: string) {
 
 function findEmployee(name: string, employees: Employee[]) {
   const target = normalize(name);
-  const exact = employees.find(e => normalize(e.full_name) === target);
-  if (exact) return exact;
-  return employees.find(e => normalize(e.full_name).includes(target) || target.includes(normalize(e.full_name))) ?? null;
+  if (!target) return null;
+
+  // Importação de ponto não deve atribuir lançamentos por semelhança parcial:
+  // nomes como "MARI" e "MARIANA" podem apontar para pessoas diferentes.
+  const exactMatches = employees.filter(e => normalize(e.full_name) === target);
+  return exactMatches.length === 1 ? exactMatches[0] : null;
 }
 
 function formatCount(n: number) {
