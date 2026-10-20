@@ -123,14 +123,31 @@ export function Launches() {
 
   const preview = composeMinutes(lines.map(l => ({ launch_type: l.type, minutes: hoursToMinutes(l.hours) })), [{ minutes: hoursToMinutes(debitHours) }]);
 
-  async function removeGroup(g: Group) {
-    const cIds = g.credits.map(c => c.id), dIds = g.debits.map(d => d.id);
-    if (cIds.length) { const r = await supabase.from("overtime_records").delete().in("id", cIds); if (r.error) throw new Error(r.error.message); }
-    if (dIds.length) { const r = await supabase.from("bank_hours").delete().in("id", dIds); if (r.error) throw new Error(r.error.message); }
+  // Identificação do grupo existente, verificada no banco antes de qualquer alteração.
+  function groupRef(g: Group) {
+    const legacyToken = g.groupId ? null : importTokenOf(g);
+    return {
+      _group_id: g.groupId as string,
+      _legacy_token: legacyToken as string,
+      _employee_id: g.employee_id,
+      _date: g.date,
+      _credit_ids: g.credits.map(c => c.id),
+      _debit_ids: g.debits.map(d => d.id),
+    };
+  }
+  function importTokenOf(g: Group) {
+    return [...g.credits.map(c => c.notes), ...g.debits.map(d => d.justification)]
+      .map(value => value?.match(/\[(?:PDF_IMPORT|XLSX_IMPORT):[^\]]+\]/)?.[0])
+      .find(Boolean) ?? null;
+  }
+  function friendly(message: string) {
+    if (/row-level security|permission denied/i.test(message)) return "Você não tem permissão para alterar lançamentos. Nenhum registro foi alterado.";
+    return message;
   }
   function isClosed(d: string) { return periodForDate(periods, d)?.status === "fechado"; }
 
   async function save() {
+    if (savingRef.current) return;
     setError("");
     if (!employeeId || !date) return setError("Selecione o funcionário e a data.");
     const target = periodForDate(periods, date);
@@ -140,38 +157,42 @@ export function Launches() {
     const debit = hoursToMinutes(debitHours);
     if (!valid.length && debit <= 0) return setError("Informe ao menos um crédito ou débito.");
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
-      // Grupos importados antigos podem ter uma chave textual derivada da
-      // fingerprint. Ao editar, criamos um UUID novo para o grupo persistido.
+      // Grupos importados antigos não têm UUID; ao editar recebem um novo,
+      // mantendo a fingerprint de importação nas observações.
       const groupId = editing?.groupId ?? crypto.randomUUID();
-      const importToken = editing
-        ? [...editing.credits.map(c => c.notes), ...editing.debits.map(d => d.justification)]
-            .map(value => value?.match(/\[(?:PDF_IMPORT|XLSX_IMPORT):[^\]]+\]/)?.[0])
-            .find(Boolean) ?? null
-        : null;
-      if (editing) await removeGroup(editing);
-      if (valid.length) {
-        const r = await supabase.from("overtime_records").insert(valid.map(l => ({
-          employee_id: employeeId, reference_date: date, period_id: target.id, minutes: l.minutes,
-          launch_type: l.type, rate_percent: CREDIT_TYPES[l.type].ratePercent, launch_group_id: groupId,
-          notes: `${importToken ? importToken + " " : ""}${CREDIT_TYPES[l.type].label}`,
-        })));
-        if (r.error) throw new Error(r.error.message);
-      }
-      if (debit > 0) {
-        const r = await supabase.from("bank_hours").insert({
-          employee_id: employeeId, entry_date: date, period_id: target.id, kind: "debito", minutes: debit,
-          previous_balance_minutes: 0, balance_minutes: 0,
-          justification: `${importToken ? importToken + " " : ""}Débito / atraso`,
-          launch_group_id: groupId, created_by: auth.user?.id ?? null,
-        });
-        if (r.error) throw new Error(r.error.message);
-      }
+      const importToken = editing ? importTokenOf(editing) : null;
+      const prefix = importToken ? importToken + " " : "";
+      const ref = editing ? groupRef(editing) : { _group_id: null as unknown as string, _legacy_token: null as unknown as string, _employee_id: employeeId, _date: date, _credit_ids: [], _debit_ids: [] };
+      const { error: rpcError } = await supabase.rpc("save_launch_group", {
+        ...ref,
+        _new: {
+          group_id: groupId, employee_id: employeeId, date, period_id: target.id,
+          credits: valid.map(l => ({ launch_type: l.type, minutes: l.minutes, rate_percent: CREDIT_TYPES[l.type].ratePercent, notes: `${prefix}${CREDIT_TYPES[l.type].label}` })),
+          debit: debit > 0 ? { minutes: debit, justification: `${prefix}Débito / atraso`, created_by: auth.user?.id ?? null } : null,
+        },
+      });
+      if (rpcError) throw new Error(friendly(rpcError.message));
       setOpen(false);
       await loadLaunches();
-    } catch (e) { setError((e as Error).message); }
+    } catch (e) { setError(`Não foi possível salvar: ${(e as Error).message} Os dados anteriores foram mantidos.`); }
+    savingRef.current = false;
+    setSaving(false);
+  }
+
+  async function doDelete(g: Group) {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true); setError("");
+    try {
+      const { error: rpcError } = await supabase.rpc("delete_launch_group", groupRef(g));
+      if (rpcError) throw new Error(friendly(rpcError.message));
+      setConfirmDelete(null); await loadLaunches();
+    } catch (e) { setError(`Não foi possível excluir: ${(e as Error).message}`); }
+    savingRef.current = false;
     setSaving(false);
   }
 
