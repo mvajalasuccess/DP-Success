@@ -8,6 +8,13 @@
       "when": 1792094047842,
       "tag": "0000_harden_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792519406880,
+      "tag": "0001_atomic_launch_group",
+      "breakpoints": true
     }
   ]
 }

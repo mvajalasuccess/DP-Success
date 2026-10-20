@@ -1409,6 +1409,21 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"][]
       }
+      delete_launch_group: {
+        Args: {
+          _credit_ids: string[]
+          _date: string
+          _debit_ids: string[]
+          _employee_id: string
+          _group_id: string
+          _legacy_token: string
+        }
+        Returns: undefined
+      }
+      delete_launch_group_rows: {
+        Args: { _credit_ids: string[]; _debit_ids: string[] }
+        Returns: undefined
+      }
       ensure_user_setup: {
         Args: { _email?: string; _full_name?: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -1424,6 +1439,29 @@ export type Database = {
       is_profile_admin: { Args: { _user_id: string }; Returns: boolean }
       is_profile_manager: { Args: { _user_id: string }; Returns: boolean }
       is_rh_user: { Args: never; Returns: boolean }
+      lock_launch_group: {
+        Args: {
+          _credit_ids: string[]
+          _date: string
+          _debit_ids: string[]
+          _employee_id: string
+          _group_id: string
+          _legacy_token: string
+        }
+        Returns: undefined
+      }
+      save_launch_group: {
+        Args: {
+          _credit_ids: string[]
+          _date: string
+          _debit_ids: string[]
+          _employee_id: string
+          _group_id: string
+          _legacy_token: string
+          _new: Json
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "administrador" | "rh" | "gestor" | "consulta"
