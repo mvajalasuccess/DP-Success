@@ -1,5 +1,5 @@
 import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { ScreenShell, Modal, inputCls, btnPrimary, btnOutline, btnDanger } from "@/components/screen-shell";
@@ -22,6 +22,7 @@ export function Launches() {
   const [debits, setDebits] = useState<DebitRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Group | null>(null);
@@ -196,11 +197,6 @@ export function Launches() {
     setSaving(false);
   }
 
-  async function doDelete(g: Group) {
-    setSaving(true);
-    try { await removeGroup(g); setConfirmDelete(null); await loadLaunches(); } catch (e) { setError((e as Error).message); }
-    setSaving(false);
-  }
 
   return (
     <ScreenShell section="Operação" title="Lançamentos" name="Lançamentos" subtitle="Registre créditos, débitos e adicionais do banco de horas por funcionário e data."
