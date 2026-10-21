@@ -73,7 +73,7 @@ export function Payments() {
     }
   }, [periodId, employeeId]);
 
-  useEffect(() => { void loadBase(); }, []);
+  useEffect(() => { void loadBase(); }, [loadBase]);
 
   const loadDetails = useCallback(async () => {
     if (!period || !employeeId) {
@@ -250,7 +250,7 @@ export function Payments() {
             <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground"><BadgeCheck className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Histórico de pagamentos</h2><p className="text-xs text-muted-foreground">{period ? periodLabel(period) : "Selecione uma competência"}</p></div></div>
             <div className="mt-4 space-y-3">
               {!history.length ? <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhum pagamento registrado nesta competência.</p> : history.map(payment => <div key={payment.id} className="rounded-xl border p-3">
-                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{employees.find(e => e.id === payment.employee_id)?.full_name ?? "Funcionário"}</p><p className="mt-1 text-xs text-muted-foreground">{dateBR(payment.entry_date)} · {hhmm(payment.minutes)}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${isReversed(payment) ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>{isReversed(payment) ? "Estornado" : "Pago"}</span></div>
+                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{employees.find(e => e.id === payment.employee_id)?.full_name ?? "Funcionário"}</p><p className="mt-1 text-xs text-muted-foreground">{dateBR(payment.entry_date)} · {hhmm(payment.minutes)}</p><p className="mt-1 text-sm font-semibold tabular-nums">{payment.justification?.match(/Valor: (R\$\s*[\d.,]+)/)?.[1] ?? "Valor não informado"}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${isReversed(payment) ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>{isReversed(payment) ? "Estornado" : "Pago"}</span></div>
                 {payment.employee_id === employeeId && !isReversed(payment) && <button type="button" onClick={() => setConfirmReversal(payment)} disabled={saving || isConsultaOnly()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Estornar pagamento</button>}
               </div>)}
             </div>
