@@ -46,6 +46,7 @@ export function Payments() {
   const hourlyRate = Number(employee?.salary || 0) / divisor;
   const totalValue = details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0);
   const balanceForPeriod = balances.find(b => b.period.id === periodId);
+  const hasPositiveGeneralBalance = balances.length > 0 && Number(balances[balances.length - 1].accumulated ?? 0) > 0;
 
   const loadBase = useCallback(async () => {
     setLoading(true);
@@ -253,8 +254,8 @@ export function Payments() {
           </div>
           <div className="mt-3 overflow-hidden rounded-xl border">
             <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] gap-2 bg-muted/50 px-3 py-3 text-xs font-semibold text-muted-foreground sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span>Tipo de hora</span><span className="text-right">Horas</span><span className="text-right">Valor</span></div>
-            {loadingDetails ? <div className="p-6 text-center text-sm text-muted-foreground">Carregando composição...</div> : details.map(item => <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t px-3 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span className="font-medium">{item.label}</span><span className="text-right font-mono tabular-nums">{hhmm(item.minutes)}</span><span className="text-right font-semibold tabular-nums">{money((item.minutes / 60) * hourlyRate * item.multiplier)}</span></div>)}
-            <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t bg-muted/40 px-3 py-4 text-sm font-bold sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span>Total do pagamento</span><span className="text-right font-mono tabular-nums">{hhmm(totalMinutes)}</span><span className="text-right tabular-nums">{money(totalValue)}</span></div>
+            {loadingDetails ? <div className="p-6 text-center text-sm text-muted-foreground">Carregando composição...</div> : !hasPositiveGeneralBalance ? <div className="p-6 text-center text-sm text-muted-foreground">Sem cálculo: o saldo geral do Banco de Horas não está positivo.</div> : details.map(item => <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t px-3 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span className="font-medium">{item.label}</span><span className="text-right font-mono tabular-nums">{hhmm(item.minutes)}</span><span className="text-right font-semibold tabular-nums">{money((item.minutes / 60) * hourlyRate * item.multiplier)}</span></div>)}
+            {hasPositiveGeneralBalance && <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t bg-muted/40 px-3 py-4 text-sm font-bold sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span>Total do pagamento</span><span className="text-right font-mono tabular-nums">{hhmm(totalMinutes)}</span><span className="text-right tabular-nums">{money(totalValue)}</span></div>}
           </div>
           {employee && balances.length > 0 && balances[balances.length - 1].accumulated <= 0 && <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p className="font-semibold">Pagamento indisponível</p><p className="mt-1 text-muted-foreground">O funcionário não possui saldo positivo no Banco de Horas geral. Nenhuma hora ou valor será calculado para pagamento.</p></div>}
           {employee && balanceForPeriod && balances.length > 0 && balances[balances.length - 1].accumulated > 0 && <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><span className="font-semibold">Saldo do mês (líquido):</span> <span className="font-mono">{hhmm(balanceForPeriod.monthBalance)}</span><p className="mt-1 text-xs text-muted-foreground">O cálculo usa o saldo mensal como base de HE 60%, descontando a categoria especial aplicável sem duplicar horas.</p></div></div>}
@@ -269,8 +270,8 @@ export function Payments() {
           <Card className="p-5">
             <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Resumo</h2><p className="text-xs text-muted-foreground">Visão consolidada deste pagamento</p></div></div>
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Total de horas</p><p className="mt-2 text-2xl font-bold tabular-nums">{hhmm(totalMinutes)}</p></div>
-              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Valor total</p><p className="mt-2 text-xl font-bold tabular-nums">{money(totalValue)}</p></div>
+              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Total de horas</p><p className="mt-2 text-2xl font-bold tabular-nums">{hasPositiveGeneralBalance ? hhmm(totalMinutes) : "—"}</p></div>
+              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Valor total</p><p className="mt-2 text-xl font-bold tabular-nums">{hasPositiveGeneralBalance ? money(totalValue) : "—"}</p></div>
             </div>
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">O sistema mantém o detalhamento por tipo de hora, mas lança apenas um débito equivalente ao total pago no Banco de Horas.</p>
           </Card>
