@@ -88,7 +88,7 @@ export function Payments() {
       const [historicalResult, overrideResult, paymentResult, balanceResult, launchResult] = await Promise.all([
         supabase.from("historical_kpi_data").select("employee_id,period_id,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes").eq("employee_id", employeeId).eq("period_id", period.id).maybeSingle(),
         (supabase as any).from("point_closing_overrides").select("employee_id,period_id,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes").eq("employee_id", employeeId).eq("period_id", period.id).maybeSingle(),
-        supabase.from("bank_hours").select("id,employee_id,period_id,entry_date,minutes,justification,created_at").eq("employee_id", employeeId).eq("kind", "pagamento_he").order("created_at", { ascending: false }),
+        supabase.from("bank_hours").select("id,employee_id,period_id,entry_date,minutes,justification,created_at").eq("period_id", period.id).eq("kind", "pagamento_he").order("created_at", { ascending: false }),
         balancesByEmployee(employeeId),
         fetchLaunches({ employeeId, start: period.start_date, end: period.end_date }),
       ]);
