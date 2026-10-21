@@ -190,7 +190,7 @@ export function ImportarCartaoPonto() {
         });
         if (row.he60NightMinutes > 0) summaryRows.push({
           employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
-          minutes: row.he60NightMinutes, launch_type: "ADICIONAL_NOTURNO", rate_percent: 20, launch_group_id: groupId,
+          minutes: row.he60NightMinutes, launch_type: "HE_60_NOTURNO", rate_percent: 80, launch_group_id: groupId,
           notes: `${importFingerprint} Importado do Cartão Ponto — HE 60% + 20% noturno`,
         });
         if (summaryRows.length) {
