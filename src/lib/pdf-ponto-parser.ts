@@ -18,6 +18,7 @@ export type PointImportEmployee = {
   periodStart: string;
   periodEnd: string;
   entries: PointImportEntry[];
+  pdfCreditMinutes: number;
   creditMinutes: number;
   debitMinutes: number;
   monthBalanceMinutes: number;
@@ -101,15 +102,18 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
     /Saldo Atual:\s*\d{2,3}:\d{2}\s*(?:Cr[eé]dito|D[eé]bito)\s*\|\s*(\d{2,3}:\d{2})\s+(\d{2,3}:\d{2})/i,
   );
 
-  const creditMinutes = currentBalanceMatch ? hhmmToMinutes(currentBalanceMatch[1]) : 0;
+  const pdfCreditMinutes = currentBalanceMatch ? hhmmToMinutes(currentBalanceMatch[1]) : 0;
   const debitMinutes = currentBalanceMatch ? hhmmToMinutes(currentBalanceMatch[2]) : 0;
-
-  const rawMonthBalance = monthBalanceMatch ? hhmmToMinutes(monthBalanceMatch[1]) : 0;
-  const monthBalanceMinutes =
-    monthBalanceMatch?.[2]?.toLowerCase().startsWith("d") ? -rawMonthBalance : rawMonthBalance;
 
   const interjornada = summary.match(/Interjornada\s+(\d{2,3}:\d{2})/i);
   const adNot = summary.match(/Ad\.Not\.\s*(?:\d+\s+)?(\d{2,3}:\d{2})/i);
+  const he60NightMinutes = adNot ? hhmmToMinutes(adNot[1]) : 0;
+
+  // Regra da empresa: o adicional noturno informado no PDF já está dentro do
+  // crédito total, mas deve ser separado para classificação como HE 60% + 20%.
+  // Retiramos esses minutos do crédito-base antes de calcular o saldo.
+  const creditMinutes = Math.max(0, pdfCreditMinutes - he60NightMinutes);
+  const monthBalanceMinutes = creditMinutes - debitMinutes;
 
   return {
     page,
@@ -118,11 +122,12 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
     periodStart: toISODate(period[1]),
     periodEnd: toISODate(period[2]),
     entries,
+    pdfCreditMinutes,
     creditMinutes,
     debitMinutes,
     monthBalanceMinutes,
     interjornadaMinutes: interjornada ? hhmmToMinutes(interjornada[1]) : 0,
-    he60NightMinutes: adNot ? hhmmToMinutes(adNot[1]) : 0,
+    he60NightMinutes,
   };
 }
 
