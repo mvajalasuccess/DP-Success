@@ -115,7 +115,12 @@ export function Launches() {
   // atuais (ago/2026 em diante), mas não no histórico importado de jan-jul.
   function launchCreditTotal(comp: ReturnType<typeof composeMinutes>, launchDate?: string) {
     const includeHe60Night = Boolean(launchDate && launchDate > "2026-07-20");
-    return creditTotal(comp) + (includeHe60Night ? comp.HE_60_NOTURNO : 0);
+    // Desde a competência encerrada em 20/10/2026, adicional noturno é visual
+    // e não deve compor o crédito/saldo. Preserva o comportamento histórico.
+    const additionalNightInformational = Boolean(launchDate && launchDate >= "2026-10-20");
+    return creditTotal(comp)
+      + (includeHe60Night ? comp.HE_60_NOTURNO : 0)
+      - (additionalNightInformational ? comp.ADICIONAL_NOTURNO : 0);
   }
 
   function launchBalance(comp: ReturnType<typeof composeMinutes>, launchDate?: string) {
