@@ -13,6 +13,7 @@ type Detail = { key: string; label: string; minutes: number; multiplier: number 
 
 const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateBR = (value?: string | null) => value ? value.slice(0, 10).split("-").reverse().join("/") : "—";
+const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const hhmm = (value: number) => minutesToHours(Math.abs(Math.round(value)));
 const isReversed = (row: PaymentRow) => String(row.justification ?? "").startsWith("[ESTORNADO]");
 
@@ -131,7 +132,7 @@ export function Payments() {
     setError("");
     try {
       const { data: session } = await supabase.auth.getSession();
-      const date = new Date().toLocaleDateString("en-CA");
+      const date = todayLocal();
       const breakdown = details.filter(d => d.minutes > 0).map(d => `${d.label}: ${hhmm(d.minutes)} / ${money((d.minutes / 60) * hourlyRate * d.multiplier)}`).join(" | ");
       const result = await supabase.from("bank_hours").insert({
         employee_id: employee.id,
@@ -161,7 +162,7 @@ export function Payments() {
     try {
       const { data: session } = await supabase.auth.getSession();
       const paymentMinutes = Math.abs(Number(payment.minutes) || 0);
-      const reversalDate = new Date().toLocaleDateString("en-CA");
+      const reversalDate = todayLocal();
       const marker = `[ESTORNO DO PAGAMENTO ${payment.id}]`;
       const creditResult = await supabase.from("bank_hours").insert({
         employee_id: payment.employee_id,
