@@ -116,7 +116,6 @@ export function Payments() {
       // desconta essa categoria; caso contrário, desconta o adicional noturno de 20%.
       // HE 100% também fica separado, para não misturar categorias nem duplicar horas.
       const has60Night = gross60Night > 0;
-      const specialMinutes = has60Night ? gross60Night : nightMinutes;
       const payable60Night = has60Night ? Math.min(gross60Night, targetPayable) : 0;
       const payable100 = Math.min(gross100, Math.max(0, targetPayable - payable60Night - (has60Night ? 0 : Math.min(nightMinutes, targetPayable))));
       const payableNight = has60Night ? 0 : Math.min(nightMinutes, Math.max(0, targetPayable - payable100));
