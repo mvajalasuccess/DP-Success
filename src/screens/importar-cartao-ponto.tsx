@@ -84,9 +84,9 @@ export function ImportarCartaoPonto() {
     acc.debitMinutes += row.debitMinutes;
     acc.monthBalanceMinutes += row.monthBalanceMinutes;
     acc.interjornada += row.interjornadaMinutes;
-    acc.additionalNight += row.additionalNightMinutes;
+    acc.he60Night += row.he60NightMinutes;
     return acc;
-  }, { creditMinutes: 0, debitMinutes: 0, monthBalanceMinutes: 0, interjornada: 0, additionalNight: 0 }), [matches]);
+  }, { creditMinutes: 0, debitMinutes: 0, monthBalanceMinutes: 0, interjornada: 0, he60Night: 0 }), [matches]);
   const unmatched = matches.filter(m => !m.employeeId || !m.period);
 
   async function importRows() {
@@ -125,13 +125,38 @@ export function ImportarCartaoPonto() {
       if (bankDuplicateCheck.error) throw new Error(bankDuplicateCheck.error.message);
 
       if (overtimeDuplicateCheck.data?.length || bankDuplicateCheck.data?.length) {
-        throw new Error("Este PDF já possui lançamentos gravados, total ou parcialmente. Confira Lançamentos e Banco de Horas antes de tentar importar novamente.");
+        // Reenviar o mesmo PDF corrige a categoria da importação anterior sem duplicar lançamentos.
+        const wronglyClassified = await supabase
+          .from("overtime_records")
+          .select("id")
+          .eq("launch_type", "ADICIONAL_NOTURNO")
+          .ilike("notes", `%${importFingerprint}%`)
+          .ilike("notes", "%Importado do Cartão Ponto — Adicional noturno%");
+        if (wronglyClassified.error) throw new Error(wronglyClassified.error.message);
+
+        if (wronglyClassified.data?.length) {
+          const repaired = await supabase
+            .from("overtime_records")
+            .update({
+              launch_type: "HE_60_NOTURNO",
+              rate_percent: 80,
+              notes: `${importFingerprint} Importado do Cartão Ponto — HE 60% + 20% noturno`,
+            })
+            .eq("launch_type", "ADICIONAL_NOTURNO")
+            .ilike("notes", `%${importFingerprint}%`)
+            .ilike("notes", "%Importado do Cartão Ponto — Adicional noturno%");
+          if (repaired.error) throw new Error(repaired.error.message);
+          setMessage(`Correção concluída: ${formatCount(wronglyClassified.data.length)} lançamento(s) foram reclassificados para HE 60% + 20% noturno. Nenhum crédito ou débito foi duplicado.`);
+          return;
+        }
+
+        throw new Error("Este PDF já foi importado e não há lançamentos pendentes dessa correção. Nenhum registro foi duplicado.");
       }
 
       const { data: auth } = await supabase.auth.getUser();
       for (const row of matches) {
         // Cada funcionário do PDF recebe um único grupo UUID. Assim, Crédito,
-        // Débito, Interjornada e Ad. Noturno permanecem vinculados e podem ser
+        // Débito, Interjornada e HE 60% + 20% noturno permanecem vinculados e podem ser
         // editados/excluídos juntos na tela de Lançamentos.
         const groupId = crypto.randomUUID();
 
@@ -157,16 +182,16 @@ export function ImportarCartaoPonto() {
           insertedDebits++;
         }
 
-        const summaryRows: Array<{ employee_id: string; reference_date: string; period_id: string; minutes: number; launch_type: "INTERJORNADA_50" | "ADICIONAL_NOTURNO"; rate_percent: number; launch_group_id: string; notes: string }> = [];
+        const summaryRows: Array<{ employee_id: string; reference_date: string; period_id: string; minutes: number; launch_type: "INTERJORNADA_50" | "HE_60_NOTURNO"; rate_percent: number; launch_group_id: string; notes: string }> = [];
         if (row.interjornadaMinutes > 0) summaryRows.push({
           employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
           minutes: row.interjornadaMinutes, launch_type: "INTERJORNADA_50", rate_percent: 50, launch_group_id: groupId,
           notes: `${importFingerprint} Importado do Cartão Ponto — Interjornada`,
         });
-        if (row.additionalNightMinutes > 0) summaryRows.push({
+        if (row.he60NightMinutes > 0) summaryRows.push({
           employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
-          minutes: row.additionalNightMinutes, launch_type: "ADICIONAL_NOTURNO", rate_percent: 20, launch_group_id: groupId,
-          notes: `${importFingerprint} Importado do Cartão Ponto — Adicional noturno`,
+          minutes: row.he60NightMinutes, launch_type: "ADICIONAL_NOTURNO", rate_percent: 20, launch_group_id: groupId,
+          notes: `${importFingerprint} Importado do Cartão Ponto — HE 60% + 20% noturno`,
         });
         if (summaryRows.length) {
           const result = await supabase.from("overtime_records").insert(summaryRows);
@@ -203,7 +228,7 @@ export function ImportarCartaoPonto() {
           <div>
             <p className="text-sm font-medium text-primary">Fechamento de Ponto</p>
             <h1 className="text-2xl font-bold">Importar Cartão Ponto</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Envie o PDF do cartão ponto e importe somente Crédito, Débito, Saldo do mês, Ad. Noturno e Interjornada.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Envie o PDF do cartão ponto e importe somente Crédito, Débito, Saldo do mês, HE 60% + 20% noturno e Interjornada.</p>
           </div>
           {document && <button type="button" onClick={clear} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw className="h-4 w-4" />Novo PDF</button>}
         </div>
@@ -231,7 +256,7 @@ export function ImportarCartaoPonto() {
                 <div><p className="text-xs text-muted-foreground">Arquivo</p><p className="truncate font-semibold">{document.fileName}</p></div>
                 <div><p className="text-xs text-muted-foreground">Funcionários</p><p className="font-semibold">{formatCount(matches.length)}</p></div>
                 <div><p className="text-xs text-muted-foreground">Crédito</p><p className="font-semibold">{minutesToHours(totals.creditMinutes)}</p></div><div><p className="text-xs text-muted-foreground">Débito</p><p className="font-semibold">{minutesToHours(totals.debitMinutes)}</p></div><div><p className="text-xs text-muted-foreground">Saldo do mês</p><p className="font-semibold">{minutesToHours(totals.monthBalanceMinutes)}</p></div>
-                <div><p className="text-xs text-muted-foreground">Ad. Noturno</p><p className="font-semibold">{minutesToHours(totals.additionalNight)}</p></div><div><p className="text-xs text-muted-foreground">Interjornada</p><p className="font-semibold">{minutesToHours(totals.interjornada)}</p></div>
+                <div><p className="text-xs text-muted-foreground">HE 60% + 20% noturno</p><p className="font-semibold">{minutesToHours(totals.he60Night)}</p></div><div><p className="text-xs text-muted-foreground">Interjornada</p><p className="font-semibold">{minutesToHours(totals.interjornada)}</p></div>
               </div>
             </Card>
 
@@ -242,7 +267,7 @@ export function ImportarCartaoPonto() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Competência</th><th className="px-5 py-3">Crédito</th><th className="px-5 py-3">Débito</th><th className="px-5 py-3">Saldo do mês</th><th className="px-5 py-3">Ad. Noturno</th><th className="px-5 py-3">Interjornada</th><th className="px-5 py-3">Status</th></tr></thead>
+                  <thead className="bg-muted/40 text-xs text-muted-foreground"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Competência</th><th className="px-5 py-3">Crédito</th><th className="px-5 py-3">Débito</th><th className="px-5 py-3">Saldo do mês</th><th className="px-5 py-3">HE 60% + 20% noturno</th><th className="px-5 py-3">Interjornada</th><th className="px-5 py-3">Status</th></tr></thead>
                   <tbody className="divide-y">
                     {matches.map((row) => (
                       <tr key={row.page}>
@@ -258,7 +283,7 @@ export function ImportarCartaoPonto() {
                         <td className="px-5 py-4">{minutesToHours(row.creditMinutes)}</td>
                         <td className="px-5 py-4">{minutesToHours(row.debitMinutes)}</td>
                         <td className="px-5 py-4">{minutesToHours(row.monthBalanceMinutes)}</td>
-                        <td className="px-5 py-4">{minutesToHours(row.additionalNightMinutes)}</td>
+                        <td className="px-5 py-4">{minutesToHours(row.he60NightMinutes)}</td>
                         <td className="px-5 py-4">{minutesToHours(row.interjornadaMinutes)}</td>
                         <td className="px-5 py-4">
                           {row.employeeId && row.period ? (
@@ -282,7 +307,7 @@ export function ImportarCartaoPonto() {
                 </table>
               </div>
               <div className="flex flex-col gap-3 border-t bg-muted/20 p-5 md:flex-row md:items-center md:justify-between">
-                <div className="text-xs text-muted-foreground"><strong>Importação:</strong> somente Crédito, Débito, Saldo do mês, Ad. Noturno e Interjornada. Os demais dados do relatório são ignorados.</div>
+                <div className="text-xs text-muted-foreground"><strong>Importação:</strong> somente Crédito, Débito, Saldo do mês, HE 60% + 20% noturno e Interjornada. Os demais dados do relatório são ignorados.</div>
                 <button type="button" disabled={saving || unmatched.length > 0} onClick={() => void importRows()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                   {saving ? "Importando..." : "Importar lançamentos"}
