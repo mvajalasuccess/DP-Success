@@ -132,7 +132,7 @@ export function Payments() {
       const payable60 = Math.max(0, targetPayable - payable60Night - payable100 - payableNight);
       const nextDetails: Detail[] = [
         { key: "he60", label: "Hora extra 60%", minutes: payable60, multiplier: 1.6 },
-        { key: "he60night", label: "Hora extra 60% + 20% noturno", minutes: payable60Night, multiplier: 1.8 },
+        { key: "he60night", label: "Hora extra 60% + 20% noturno", minutes: payable60Night, multiplier: 1.92 },
         { key: "he100", label: "Hora extra 100%", minutes: payable100, multiplier: 2 },
         { key: "night", label: "Adicional noturno 20%", minutes: payableNight, multiplier: 0.2 },
       ];
@@ -161,7 +161,7 @@ export function Payments() {
     try {
       const { data: session } = await supabase.auth.getSession();
       const date = todayLocal();
-      const breakdown = details.filter(d => d.minutes > 0).map(d => `${d.label}: ${hhmm(d.minutes)} / ${money((d.minutes / 60) * hourlyRate * d.multiplier)}`).join(" | ");
+      const breakdown = details.filter(d => d.minutes > 0).map(d => `${d.label}: ${hhmm(d.minutes)} × ${money(hourlyRate)}/h × fator ${d.multiplier.toLocaleString("pt-BR")} = ${money((d.minutes / 60) * hourlyRate * d.multiplier)}`).join(" | ");
       const result = await supabase.from("bank_hours").insert({
         employee_id: employee.id,
         period_id: period.id,
@@ -257,6 +257,7 @@ export function Payments() {
             {loadingDetails ? <div className="p-6 text-center text-sm text-muted-foreground">Carregando composição...</div> : !hasPositiveGeneralBalance ? <div className="p-6 text-center text-sm text-muted-foreground">Sem cálculo: o saldo geral do Banco de Horas não está positivo.</div> : details.map(item => <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t px-3 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span className="font-medium">{item.label}</span><span className="text-right font-mono tabular-nums">{hhmm(item.minutes)}</span><span className="text-right font-semibold tabular-nums">{money((item.minutes / 60) * hourlyRate * item.multiplier)}</span></div>)}
             {hasPositiveGeneralBalance && <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t bg-muted/40 px-3 py-4 text-sm font-bold sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span>Total do pagamento</span><span className="text-right font-mono tabular-nums">{hhmm(totalMinutes)}</span><span className="text-right tabular-nums">{money(totalValue)}</span></div>}
           </div>
+          {employee && hasPositiveGeneralBalance && <div className="mt-4 rounded-lg border p-3 text-sm"><p className="font-semibold">Memória de cálculo</p><p className="mt-1 text-muted-foreground">Hora normal: {money(hourlyRate)} ({money(Number(employee.salary || 0))} ÷ {divisor}h). HE 60%: hora normal × 1,60. HE 60% + 20% noturno: hora normal × 1,60 × 1,20 = fator 1,92. Os valores são calculados com precisão decimal e exibidos em reais com duas casas decimais.</p><p className="mt-1 text-xs text-muted-foreground">A categoria noturna deve ser usada somente para horas elegíveis conforme a jornada e a convenção coletiva aplicável.</p></div>}
           {employee && balances.length > 0 && balances[balances.length - 1].accumulated <= 0 && <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p className="font-semibold">Pagamento indisponível</p><p className="mt-1 text-muted-foreground">O funcionário não possui saldo positivo no Banco de Horas geral. Nenhuma hora ou valor será calculado para pagamento.</p></div>}
           {employee && balanceForPeriod && balances.length > 0 && balances[balances.length - 1].accumulated > 0 && <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><span className="font-semibold">Saldo do mês (líquido):</span> <span className="font-mono">{hhmm(balanceForPeriod.monthBalance)}</span><p className="mt-1 text-xs text-muted-foreground">O cálculo usa o saldo mensal como base de HE 60%, descontando a categoria especial aplicável sem duplicar horas.</p></div></div>}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
