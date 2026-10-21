@@ -39,7 +39,9 @@ export function Payments() {
   const period = periods.find(p => p.id === periodId) ?? null;
   const employee = employees.find(e => e.id === employeeId) ?? null;
   const activePayment = payments.find(p => p.employee_id === employeeId && p.period_id === periodId && !isReversed(p));
-  const totalMinutes = details.reduce((sum, item) => sum + item.minutes, 0);
+  // O total de horas pagáveis vem do saldo líquido da competência, não da soma bruta dos créditos.
+  // O adicional noturno é exibido e valorizado à parte, mas não compõe o saldo nem o total de horas do banco.
+  const totalMinutes = details.filter(item => item.key !== "night").reduce((sum, item) => sum + item.minutes, 0);
   const divisor = employee?.work_schedules?.weekly_minutes ? (Number(employee.work_schedules.weekly_minutes) / 60) * 5 : 220;
   const hourlyRate = Number(employee?.salary || 0) / divisor;
   const totalValue = details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0);
@@ -102,11 +104,32 @@ export function Payments() {
       const credits = launchResult.credits.filter(row => row.reference_date >= period.start_date && row.reference_date <= period.end_date);
       const sumType = (type: string) => credits.filter(row => row.launch_type === type).reduce((sum, row) => sum + Math.abs(Number(row.minutes) || 0), 0);
       const hasHistorical = Boolean(source);
+      const periodBalance = balanceResult.find(b => b.period.id === period.id);
+      const composition = periodBalance?.composition;
+      const grossPayable = [
+        hasHistorical ? Number(source.he_60_minutes || 0) : (composition?.HE_60 ?? sumType("HE_60")),
+        hasHistorical ? Number(source.he_60_night_minutes || 0) : (composition?.HE_60_NOTURNO ?? sumType("HE_60_NOTURNO")),
+        hasHistorical ? Number(source.he_100_minutes || 0) : (composition?.HE_100 ?? sumType("HE_100")),
+      ].map(value => Math.max(0, value));
+      // Distribui o saldo líquido pelas categorias de HE, descontando débitos primeiro da HE 60%.
+      // Se houver saldo manual/ajuste que não esteja detalhado por tipo, a diferença fica na HE 60%.
+      const targetPayable = Math.max(0, Number(periodBalance?.monthBalance ?? 0));
+      const grossTotal = grossPayable.reduce((sum, value) => sum + value, 0);
+      let reduction = Math.max(0, grossTotal - targetPayable);
+      const netPayable = [...grossPayable];
+      for (const index of [0, 1, 2]) {
+        const deducted = Math.min(netPayable[index], reduction);
+        netPayable[index] -= deducted;
+        reduction -= deducted;
+      }
+      const remaining = Math.max(0, targetPayable - netPayable.reduce((sum, value) => sum + value, 0));
+      netPayable[0] += remaining;
+      const nightMinutes = hasHistorical ? Number(source.he_20_minutes || 0) : (composition?.ADICIONAL_NOTURNO ?? sumType("ADICIONAL_NOTURNO"));
       const nextDetails: Detail[] = [
-        { key: "he60", label: "Hora extra 60%", minutes: hasHistorical ? Number(source.he_60_minutes || 0) : sumType("HE_60"), multiplier: 1.6 },
-        { key: "he60night", label: "Hora extra 60% + 20% noturno", minutes: hasHistorical ? Number(source.he_60_night_minutes || 0) : sumType("HE_60_NOTURNO"), multiplier: 1.8 },
-        { key: "he100", label: "Hora extra 100%", minutes: hasHistorical ? Number(source.he_100_minutes || 0) : sumType("HE_100"), multiplier: 2 },
-        { key: "night", label: "Adicional noturno 20%", minutes: hasHistorical ? Number(source.he_20_minutes || 0) : sumType("ADICIONAL_NOTURNO"), multiplier: 0.2 },
+        { key: "he60", label: "Hora extra 60%", minutes: netPayable[0], multiplier: 1.6 },
+        { key: "he60night", label: "Hora extra 60% + 20% noturno", minutes: netPayable[1], multiplier: 1.8 },
+        { key: "he100", label: "Hora extra 100%", minutes: netPayable[2], multiplier: 2 },
+        { key: "night", label: "Adicional noturno 20% (informativo)", minutes: Math.max(0, nightMinutes), multiplier: 0.2 },
       ];
       setDetails(nextDetails);
       setPayments((paymentResult.data ?? []) as PaymentRow[]);
@@ -229,7 +252,7 @@ export function Payments() {
             {loadingDetails ? <div className="p-6 text-center text-sm text-muted-foreground">Carregando composição...</div> : details.map(item => <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t px-3 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span className="font-medium">{item.label}</span><span className="text-right font-mono tabular-nums">{hhmm(item.minutes)}</span><span className="text-right font-semibold tabular-nums">{money((item.minutes / 60) * hourlyRate * item.multiplier)}</span></div>)}
             <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t bg-muted/40 px-3 py-4 text-sm font-bold sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span>Total do pagamento</span><span className="text-right font-mono tabular-nums">{hhmm(totalMinutes)}</span><span className="text-right tabular-nums">{money(totalValue)}</span></div>
           </div>
-          {employee && balanceForPeriod && <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><span className="font-semibold">Saldo acumulado na competência:</span> <span className="font-mono">{hhmm(balanceMinutes)}</span>{totalMinutes > balanceMinutes && <p className="mt-1 text-xs text-amber-700">Atenção: o total a pagar é maior que o saldo acumulado atual. Confirme se deseja prosseguir.</p>}</div></div>}
+          {employee && balanceForPeriod && <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><span className="font-semibold">Saldo do mês (líquido):</span> <span className="font-mono">{hhmm(balanceForPeriod.monthBalance)}</span><p className="mt-1 text-xs text-muted-foreground">O saldo já considera os débitos da competência. O adicional noturno é exibido à parte e não aumenta as horas a pagar.</p></div></div>}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4 text-primary" />O histórico será mantido; o saldo será debitado pelo total de horas.</div>
             <button type="button" onClick={() => setConfirmPayment(true)} disabled={!period || !employee || totalMinutes <= 0 || loadingDetails || saving || Boolean(activePayment) || isConsultaOnly()} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><CircleDollarSign className="h-4 w-4" />{activePayment ? "Pagamento já registrado" : "Confirmar pagamento"}</button>
