@@ -46,7 +46,6 @@ export function Payments() {
   const hourlyRate = Number(employee?.salary || 0) / divisor;
   const totalValue = details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0);
   const balanceForPeriod = balances.find(b => b.period.id === periodId);
-  const balanceMinutes = balanceForPeriod?.accumulated ?? 0;
 
   const loadBase = useCallback(async () => {
     setLoading(true);
