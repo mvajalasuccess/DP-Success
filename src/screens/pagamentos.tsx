@@ -105,14 +105,18 @@ export function Payments() {
       const hasHistorical = Boolean(source);
       const periodBalance = balanceResult.find(b => b.period.id === period.id);
       const composition = periodBalance?.composition;
-      const grossPayable = [
-        hasHistorical ? Number(source.he_60_minutes || 0) : (composition?.HE_60 ?? sumType("HE_60")),
-        hasHistorical ? Number(source.he_60_night_minutes || 0) : (composition?.HE_60_NOTURNO ?? sumType("HE_60_NOTURNO")),
-        hasHistorical ? Number(source.he_100_minutes || 0) : (composition?.HE_100 ?? sumType("HE_100")),
-      ].map(value => Math.max(0, value));
+      const nightMinutes = Math.max(0, hasHistorical
+        ? Number(source.he_20_minutes || 0)
+        : (composition?.ADICIONAL_NOTURNO ?? sumType("ADICIONAL_NOTURNO")));
+      const gross60 = Math.max(0, hasHistorical ? Number(source.he_60_minutes || 0) : (composition?.HE_60 ?? sumType("HE_60")));
+      const gross60Night = Math.max(0, hasHistorical ? Number(source.he_60_night_minutes || 0) : (composition?.HE_60_NOTURNO ?? sumType("HE_60_NOTURNO")));
+      const gross100 = Math.max(0, hasHistorical ? Number(source.he_100_minutes || 0) : (composition?.HE_100 ?? sumType("HE_100")));
+      // Quando HE 60% + noturno não vier separada, aproveita as horas noturnas já identificadas
+      // para compor essa categoria, sem contá-las duas vezes como adicional noturno informativo.
+      const allocated60Night = gross60Night > 0 ? gross60Night : nightMinutes;
+      const grossPayable = [gross60, allocated60Night, gross100];
       // O total de horas pagáveis deve ser exatamente o saldo líquido do mês.
-      // Preserva primeiro HE 60% + 20% noturno e HE 100%; a HE 60% recebe o saldo restante.
-      // Exemplo: saldo 15:19 e HE 60%+20% de 02:07 => HE 60% = 13:12 e total = 15:19.
+      // Primeiro reserva HE 60% + 20% noturno; HE 100% em seguida; o restante fica em HE 60%.
       const targetPayable = Math.max(0, Number(periodBalance?.monthBalance ?? 0));
       const netPayable = [0, 0, 0];
       netPayable[1] = Math.min(grossPayable[1], targetPayable);
@@ -120,14 +124,13 @@ export function Payments() {
       netPayable[2] = Math.min(grossPayable[2], afterNightPremium);
       const afterHundredPercent = Math.max(0, afterNightPremium - netPayable[2]);
       netPayable[0] = Math.min(grossPayable[0], afterHundredPercent);
-      // Se o saldo mensal tiver ajuste sem detalhamento por tipo, incorpora a diferença à HE 60%.
       netPayable[0] += Math.max(0, targetPayable - netPayable.reduce((sum, value) => sum + value, 0));
-      const nightMinutes = hasHistorical ? Number(source.he_20_minutes || 0) : (composition?.ADICIONAL_NOTURNO ?? sumType("ADICIONAL_NOTURNO"));
+      const nightInformationalMinutes = gross60Night > 0 ? nightMinutes : 0;
       const nextDetails: Detail[] = [
         { key: "he60", label: "Hora extra 60%", minutes: netPayable[0], multiplier: 1.6 },
         { key: "he60night", label: "Hora extra 60% + 20% noturno", minutes: netPayable[1], multiplier: 1.8 },
         { key: "he100", label: "Hora extra 100%", minutes: netPayable[2], multiplier: 2 },
-        { key: "night", label: "Adicional noturno 20% (informativo)", minutes: Math.max(0, nightMinutes), multiplier: 0.2 },
+        { key: "night", label: "Adicional noturno 20% (informativo)", minutes: nightInformationalMinutes, multiplier: 0.2 },
       ];
       setDetails(nextDetails);
       setPayments((paymentResult.data ?? []) as PaymentRow[]);
