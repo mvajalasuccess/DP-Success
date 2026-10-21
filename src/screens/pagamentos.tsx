@@ -43,7 +43,7 @@ export function Payments() {
   // O adicional noturno compõe as horas pagáveis quando ele é a categoria usada para abater o saldo.
   const totalMinutes = details.reduce((sum, item) => sum + item.minutes, 0);
   const divisor = employee?.work_schedules?.weekly_minutes ? (Number(employee.work_schedules.weekly_minutes) / 60) * 5 : 220;
-  const hourlyRate = Number(employee?.salary || 0) / divisor;
+  const hourlyRate = Number((Number(employee?.salary || 0) / divisor).toFixed(4));
   const totalValue = details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0);
   const balanceForPeriod = balances.find(b => b.period.id === periodId);
   const hasPositiveGeneralBalance = balances.length > 0 && Number(balances[balances.length - 1].accumulated ?? 0) > 0;
