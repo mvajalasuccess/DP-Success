@@ -242,7 +242,8 @@ export async function balancesByEmployee(employeeId: string): Promise<PeriodBala
   };
   const isMiguel = employeeName.includes("MIGUEL");
   const miguelManualBalances: Record<string, number> = {
-    "2026-06-20": 34 * 60 + 30,
+    // 21/06/2026–20/07/2026: 36:58 + 00:37 − 21:01 = 16:34.
+    "2026-06-20": 16 * 60 + 34,
     // Correção pontual validada: competência 21/08/2026–20/09/2026.
     "2026-09-20": 49 * 60 + 59,
   };
@@ -437,7 +438,8 @@ function calculateEmployeeBalancesFromData(
   };
   const isMiguel = employeeNameNormalized.includes("MIGUEL");
   const miguelManualBalances: Record<string, number> = {
-    "2026-06-20": 34 * 60 + 30,
+    // 21/06/2026–20/07/2026: 36:58 + 00:37 − 21:01 = 16:34.
+    "2026-06-20": 16 * 60 + 34,
     // Correção pontual validada: competência 21/08/2026–20/09/2026.
     "2026-09-20": 49 * 60 + 59,
   };
