@@ -111,9 +111,11 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
 
   // Regra da empresa: o adicional noturno informado no PDF já está dentro do
   // crédito total, mas deve ser separado para classificação como HE 60% + 20%.
-  // Retiramos esses minutos do crédito-base antes de calcular o saldo.
+  // Retiramos esses minutos do crédito-base, sem substituir o saldo oficial do PDF.
   const creditMinutes = Math.max(0, pdfCreditMinutes - he60NightMinutes);
-  const monthBalanceMinutes = creditMinutes - debitMinutes;
+  const rawMonthBalance = monthBalanceMatch ? hhmmToMinutes(monthBalanceMatch[1]) : 0;
+  const monthBalanceMinutes =
+    monthBalanceMatch?.[2]?.toLowerCase().startsWith("d") ? -rawMonthBalance : rawMonthBalance;
 
   return {
     page,
