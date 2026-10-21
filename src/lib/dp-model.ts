@@ -337,9 +337,13 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
     // A competência de agosto/2026 é 21/07/2026 a 20/08/2026.
     // O HE 60% + 20% só passa a compor o saldo a partir dela.
     const he60NightAffectsBalance = period.end_date >= "2026-08-20";
+    // A partir da competência encerrada em 20/10/2026, adicional noturno é
+    // somente informativo e não aumenta o saldo. Competências anteriores
+    // mantêm a regra histórica para evitar recálculo retroativo.
+    const additionalNightInformational = period.end_date >= "2026-10-20" ? comp.ADICIONAL_NOTURNO : 0;
     const calculatedBalance = employeeName.includes("FELIPE HILMANN") && period.end_date === "2026-07-20"
       ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.ADICIONAL_NOTURNO - comp.debit + adjustment
-      : balanceOf(comp) + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
+      : balanceOf(comp) - additionalNightInformational + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
     const monthBalance = isGlecio && Object.prototype.hasOwnProperty.call(glecioManualBalances, period.end_date)
       ? glecioManualBalances[period.end_date] ?? calculatedBalance
       : isFelipeHilmann && Object.prototype.hasOwnProperty.call(felipeHilmannManualBalances, period.end_date)
@@ -523,9 +527,13 @@ const isJoseLuciano = employeeNameNormalized.includes("JOSE LUCIANO") || employe
     // A competência de agosto/2026 é 21/07/2026 a 20/08/2026.
     // O HE 60% + 20% só passa a compor o saldo a partir dela.
     const he60NightAffectsBalance = period.end_date >= "2026-08-20";
+    // A partir da competência encerrada em 20/10/2026, adicional noturno é
+    // somente informativo e não aumenta o saldo. Competências anteriores
+    // mantêm a regra histórica para evitar recálculo retroativo.
+    const additionalNightInformational = period.end_date >= "2026-10-20" ? comp.ADICIONAL_NOTURNO : 0;
     const calculatedBalance = employeeNameNormalized.includes("FELIPE HILMANN") && period.end_date === "2026-07-20"
       ? comp.HE_60 + comp.HE_60_NOTURNO + comp.HE_100 + comp.HE_100_NOTURNO + comp.ADICIONAL_NOTURNO - comp.debit + adjustment
-      : balanceOf(comp) + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
+      : balanceOf(comp) - additionalNightInformational + (he60NightAffectsBalance ? comp.HE_60_NOTURNO : 0) + adjustment;
     const monthBalance = isGlecio && Object.prototype.hasOwnProperty.call(glecioManualBalances, period.end_date)
       ? glecioManualBalances[period.end_date] ?? calculatedBalance
       : isFelipeHilmann && Object.prototype.hasOwnProperty.call(felipeHilmannManualBalances, period.end_date)
