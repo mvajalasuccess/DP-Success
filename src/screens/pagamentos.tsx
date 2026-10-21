@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { balancesByEmployee, fetchLaunches, minutesToHours, type PeriodBalance } from "@/lib/dp-model";
 
 type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string; status: string };
-type Employee = { id: string; full_name: string; salary: number | null; work_schedule_id: string | null; status: string; hire_date: string | null; termination_date: string | null; work_schedules?: { divisor: number | null } | null };
+type Employee = { id: string; full_name: string; salary: number | null; work_schedule_id: string | null; status: string; hire_date: string | null; termination_date: string | null; work_schedules?: { weekly_minutes: number | null } | null };
 type PaymentRow = { id: string; employee_id: string; period_id: string | null; entry_date: string; minutes: number; justification: string | null; created_at?: string };
 type Detail = { key: string; label: string; minutes: number; multiplier: number };
 
@@ -40,7 +40,7 @@ export function Payments() {
   const employee = employees.find(e => e.id === employeeId) ?? null;
   const activePayment = payments.find(p => p.employee_id === employeeId && p.period_id === periodId && !isReversed(p));
   const totalMinutes = details.reduce((sum, item) => sum + item.minutes, 0);
-  const divisor = Number(employee?.work_schedules?.divisor || 220);
+  const divisor = employee?.work_schedules?.weekly_minutes ? (Number(employee.work_schedules.weekly_minutes) / 60) * 5 : 220;
   const hourlyRate = Number(employee?.salary || 0) / divisor;
   const totalValue = details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0);
   const balanceForPeriod = balances.find(b => b.period.id === periodId);
@@ -52,7 +52,7 @@ export function Payments() {
     try {
       const [periodResult, employeeResult] = await Promise.all([
         supabase.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
-        supabase.from("employees").select("id,full_name,salary,work_schedule_id,status,hire_date,termination_date,work_schedules(divisor)").order("full_name"),
+        supabase.from("employees").select("id,full_name,salary,work_schedule_id,status,hire_date,termination_date,work_schedules(weekly_minutes)").order("full_name"),
       ]);
       if (periodResult.error) throw new Error(periodResult.error.message);
       if (employeeResult.error) throw new Error(employeeResult.error.message);
