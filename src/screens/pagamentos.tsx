@@ -110,19 +110,18 @@ export function Payments() {
         hasHistorical ? Number(source.he_60_night_minutes || 0) : (composition?.HE_60_NOTURNO ?? sumType("HE_60_NOTURNO")),
         hasHistorical ? Number(source.he_100_minutes || 0) : (composition?.HE_100 ?? sumType("HE_100")),
       ].map(value => Math.max(0, value));
-      // Distribui o saldo líquido pelas categorias de HE, descontando débitos primeiro da HE 60%.
-      // Se houver saldo manual/ajuste que não esteja detalhado por tipo, a diferença fica na HE 60%.
+      // O total de horas pagáveis deve ser exatamente o saldo líquido do mês.
+      // Preserva primeiro HE 60% + 20% noturno e HE 100%; a HE 60% recebe o saldo restante.
+      // Exemplo: saldo 15:19 e HE 60%+20% de 02:07 => HE 60% = 13:12 e total = 15:19.
       const targetPayable = Math.max(0, Number(periodBalance?.monthBalance ?? 0));
-      const grossTotal = grossPayable.reduce((sum, value) => sum + value, 0);
-      let reduction = Math.max(0, grossTotal - targetPayable);
-      const netPayable = [...grossPayable];
-      for (const index of [0, 1, 2]) {
-        const deducted = Math.min(netPayable[index], reduction);
-        netPayable[index] -= deducted;
-        reduction -= deducted;
-      }
-      const remaining = Math.max(0, targetPayable - netPayable.reduce((sum, value) => sum + value, 0));
-      netPayable[0] += remaining;
+      const netPayable = [0, 0, 0];
+      netPayable[1] = Math.min(grossPayable[1], targetPayable);
+      const afterNightPremium = Math.max(0, targetPayable - netPayable[1]);
+      netPayable[2] = Math.min(grossPayable[2], afterNightPremium);
+      const afterHundredPercent = Math.max(0, afterNightPremium - netPayable[2]);
+      netPayable[0] = Math.min(grossPayable[0], afterHundredPercent);
+      // Se o saldo mensal tiver ajuste sem detalhamento por tipo, incorpora a diferença à HE 60%.
+      netPayable[0] += Math.max(0, targetPayable - netPayable.reduce((sum, value) => sum + value, 0));
       const nightMinutes = hasHistorical ? Number(source.he_20_minutes || 0) : (composition?.ADICIONAL_NOTURNO ?? sumType("ADICIONAL_NOTURNO"));
       const nextDetails: Detail[] = [
         { key: "he60", label: "Hora extra 60%", minutes: netPayable[0], multiplier: 1.6 },
