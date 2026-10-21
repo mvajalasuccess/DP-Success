@@ -39,9 +39,9 @@ export function Payments() {
   const period = periods.find(p => p.id === periodId) ?? null;
   const employee = employees.find(e => e.id === employeeId) ?? null;
   const activePayment = payments.find(p => p.employee_id === employeeId && p.period_id === periodId && !isReversed(p));
-  // O total de horas pagáveis vem do saldo líquido da competência, não da soma bruta dos créditos.
-  // O adicional noturno é exibido e valorizado à parte, mas não compõe o saldo nem o total de horas do banco.
-  const totalMinutes = details.filter(item => item.key !== "night").reduce((sum, item) => sum + item.minutes, 0);
+  // O total de horas do pagamento deve refletir o saldo mensal distribuído entre as categorias.
+  // O adicional noturno compõe as horas pagáveis quando ele é a categoria usada para abater o saldo.
+  const totalMinutes = details.reduce((sum, item) => sum + item.minutes, 0);
   const divisor = employee?.work_schedules?.weekly_minutes ? (Number(employee.work_schedules.weekly_minutes) / 60) * 5 : 220;
   const hourlyRate = Number(employee?.salary || 0) / divisor;
   const totalValue = details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0);
@@ -111,26 +111,21 @@ export function Payments() {
       const gross60 = Math.max(0, hasHistorical ? Number(source.he_60_minutes || 0) : (composition?.HE_60 ?? sumType("HE_60")));
       const gross60Night = Math.max(0, hasHistorical ? Number(source.he_60_night_minutes || 0) : (composition?.HE_60_NOTURNO ?? sumType("HE_60_NOTURNO")));
       const gross100 = Math.max(0, hasHistorical ? Number(source.he_100_minutes || 0) : (composition?.HE_100 ?? sumType("HE_100")));
-      // Quando HE 60% + noturno não vier separada, aproveita as horas noturnas já identificadas
-      // para compor essa categoria, sem contá-las duas vezes como adicional noturno informativo.
-      const allocated60Night = gross60Night > 0 ? gross60Night : nightMinutes;
-      const grossPayable = [gross60, allocated60Night, gross100];
-      // O total de horas pagáveis deve ser exatamente o saldo líquido do mês.
-      // Primeiro reserva HE 60% + 20% noturno; HE 100% em seguida; o restante fica em HE 60%.
       const targetPayable = Math.max(0, Number(periodBalance?.monthBalance ?? 0));
-      const netPayable = [0, 0, 0];
-      netPayable[1] = Math.min(grossPayable[1], targetPayable);
-      const afterNightPremium = Math.max(0, targetPayable - netPayable[1]);
-      netPayable[2] = Math.min(grossPayable[2], afterNightPremium);
-      const afterHundredPercent = Math.max(0, afterNightPremium - netPayable[2]);
-      netPayable[0] = Math.min(grossPayable[0], afterHundredPercent);
-      netPayable[0] += Math.max(0, targetPayable - netPayable.reduce((sum, value) => sum + value, 0));
-      const nightInformationalMinutes = gross60Night > 0 ? nightMinutes : 0;
+      // Regra da tela: HE 60% parte do saldo mensal. Se houver HE 60% + 20%,
+      // desconta essa categoria; caso contrário, desconta o adicional noturno de 20%.
+      // HE 100% também fica separado, para não misturar categorias nem duplicar horas.
+      const has60Night = gross60Night > 0;
+      const specialMinutes = has60Night ? gross60Night : nightMinutes;
+      const payable60Night = has60Night ? Math.min(gross60Night, targetPayable) : 0;
+      const payable100 = Math.min(gross100, Math.max(0, targetPayable - payable60Night - (has60Night ? 0 : Math.min(nightMinutes, targetPayable))));
+      const payableNight = has60Night ? 0 : Math.min(nightMinutes, Math.max(0, targetPayable - payable100));
+      const payable60 = Math.max(0, targetPayable - payable60Night - payable100 - payableNight);
       const nextDetails: Detail[] = [
-        { key: "he60", label: "Hora extra 60%", minutes: netPayable[0], multiplier: 1.6 },
-        { key: "he60night", label: "Hora extra 60% + 20% noturno", minutes: netPayable[1], multiplier: 1.8 },
-        { key: "he100", label: "Hora extra 100%", minutes: netPayable[2], multiplier: 2 },
-        { key: "night", label: "Adicional noturno 20% (informativo)", minutes: nightInformationalMinutes, multiplier: 0.2 },
+        { key: "he60", label: "Hora extra 60%", minutes: payable60, multiplier: 1.6 },
+        { key: "he60night", label: "Hora extra 60% + 20% noturno", minutes: payable60Night, multiplier: 1.8 },
+        { key: "he100", label: "Hora extra 100%", minutes: payable100, multiplier: 2 },
+        { key: "night", label: "Adicional noturno 20%", minutes: payableNight, multiplier: 0.2 },
       ];
       setDetails(nextDetails);
       setPayments((paymentResult.data ?? []) as PaymentRow[]);
