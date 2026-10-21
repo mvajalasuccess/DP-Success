@@ -22,7 +22,7 @@ export type PointImportEmployee = {
   debitMinutes: number;
   monthBalanceMinutes: number;
   interjornadaMinutes: number;
-  additionalNightMinutes: number;
+  he60NightMinutes: number;
 };
 
 export type PointImportDocument = {
@@ -122,7 +122,7 @@ function parsePage(text: string, page: number): PointImportEmployee | null {
     debitMinutes,
     monthBalanceMinutes,
     interjornadaMinutes: interjornada ? hhmmToMinutes(interjornada[1]) : 0,
-    additionalNightMinutes: adNot ? hhmmToMinutes(adNot[1]) : 0,
+    he60NightMinutes: adNot ? hhmmToMinutes(adNot[1]) : 0,
   };
 }
 
