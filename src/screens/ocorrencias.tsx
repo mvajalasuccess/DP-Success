@@ -99,6 +99,7 @@ export function Ocorrencias() {
   }, []);
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
+  const employeesForFilter = employees.filter(e => !selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date)));
   const filteredRows = rows.filter(row =>
     (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
     (!selectedPeriod || (row.occurrence_date <= selectedPeriod.end_date && (row.end_date ?? row.occurrence_date) >= selectedPeriod.start_date))
@@ -257,7 +258,7 @@ export function Ocorrencias() {
           <div className="mb-3 text-sm font-medium">Filtros</div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
-            <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+            <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
           </div>
         </Card>
 
