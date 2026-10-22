@@ -469,7 +469,7 @@ export function Kpis() {
         const dailyMinutes = employee ? dailyMinutesFromSchedule(employee) : 8.8 * 60;
         const isDayBased = unit.startsWith("dia");
         const minutes = isDayBased ? Math.round(quantity * dailyMinutes) : unit.startsWith("hor") ? Math.round(quantity * 60) : Math.round(quantity);
-        const faltaCodes = new Set(["falta", "folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"]);
+        const faltaCodes = new Set(["falta", "falta_justificada", "falta_injustificada"]);
         const key = String(row.employee_id) + ":" + String(row.period_id);
         if (faltaCodes.has(code)) {
           next.faltasDays += quantity;
@@ -483,7 +483,8 @@ export function Kpis() {
           // Declarações são exibidas separadamente. Como já representam horas
           // abonadas, não entram novamente no indicador de absenteísmo.
           next.declaracoesMinutes += minutes;
-        } else if (code === "abono") {
+        } else if (code === "abono" || code === "folga_abonada") {
+          // Folga abonada entra em abonos, sem ser contabilizada como falta.
           next.abonosMinutes += minutes;
           next.absenceMinutes += minutes;
         }
@@ -967,7 +968,7 @@ export function Kpis() {
             const quantity = Number(row.quantity || 0);
             const unit = String(row.unit ?? "dias").toLowerCase();
             const minutes = unit.startsWith("dia") ? quantity * 528 : unit.startsWith("hor") ? quantity * 60 : quantity;
-            if (["falta","folga_abonada","folga_descontada","falta_justificada","falta_injustificada","abono"].includes(code)) {
+            if (["falta","folga_abonada","falta_justificada","falta_injustificada","abono"].includes(code)) {
               lost += Math.round(minutes);
             }
           }
