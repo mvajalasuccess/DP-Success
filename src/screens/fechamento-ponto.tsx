@@ -282,7 +282,13 @@ export function PointClosing() {
             ? Math.round(quantity * 60)
             : Math.round(quantity);
 
-        if (["falta", "folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code)) {
+        // Folga descontada é somente informativa: não pode afetar faltas,
+        // horas trabalhadas, abonos ou saldo. Folga abonada entra em abonos.
+        if (code === "folga_descontada") {
+          continue;
+        } else if (code === "folga_abonada") {
+          allowanceMinutes += minutes;
+        } else if (["falta", "falta_justificada", "falta_injustificada"].includes(code)) {
           faltasDays += quantity;
         } else if (code === "declaracao_horas" || code === "declaracao") {
           declarationMinutes += minutes;
