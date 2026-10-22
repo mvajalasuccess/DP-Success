@@ -216,7 +216,7 @@ export function Ocorrencias() {
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </a>
-          <b>DP Success · Faltas</b>
+          <b>DP Success · Faltas e Folgas</b>
         </div>
       </header>
 
@@ -224,9 +224,9 @@ export function Ocorrencias() {
         <div className="flex items-end justify-between gap-4">
           <div>
             <p className="text-sm text-primary">Ponto</p>
-            <h1 className="text-3xl font-bold">Faltas</h1>
+            <h1 className="text-3xl font-bold">Faltas e Folgas</h1>
             <p className="text-sm text-muted-foreground">
-              Registre faltas e folgas em dias.
+              Registre faltas e folgas em dias. Folga descontada é apenas informativa; folga abonada entra em abonos.
             </p>
           </div>
           <button onClick={startNew} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground">
