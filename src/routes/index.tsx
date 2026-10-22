@@ -215,7 +215,7 @@ function AppShell({
                 </button>
                 {closingMenuOpen && <div className="mt-1 space-y-0.5">
                   {([
-                    ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText],
+                    ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText],
                   ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
                 </div>}
               </div>
