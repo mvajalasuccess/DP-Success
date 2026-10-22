@@ -899,7 +899,7 @@ export function Kpis() {
         { data: overrideRows },
       ] = await Promise.all([
         historicalIds.length
-          ? db.from("historical_kpi_data").select("period_id,reference_year,reference_month,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").eq("reference_year", selectedYear)
+          ? db.from("historical_kpi_data").select("period_id,employee_id,reference_year,reference_month,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").eq("reference_year", selectedYear)
           : Promise.resolve({ data: [] }),
         currentIds.length
           ? db.from("time_records").select("employee_id,period_id,expected_minutes").in("period_id", currentIds)
@@ -911,9 +911,16 @@ export function Kpis() {
           ? db.from("bank_hours").select("employee_id,period_id,minutes,kind").eq("kind","debito").in("period_id", currentIds)
           : Promise.resolve({ data: [] }),
         currentIds.length
-          ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").in("period_id", currentIds)
+          ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
           : Promise.resolve({ data: [] }),
       ]);
+
+      // Correções manuais substituem a BASE também nas competências históricas.
+      // A chave inclui competência e funcionário para nunca aplicar uma correção
+      // de um mês a outro mês do mesmo colaborador.
+      const overrideByPeriodEmployee = new Map(
+        (overrideRows ?? []).map((row: any) => [`${row.period_id}:${row.employee_id}`, row]),
+      );
 
       const employeeIncludedForPeriod = (employee: Employee, period: Period) => {
         const active = (!employee.hireDate || employee.hireDate <= period.end_date)
@@ -928,10 +935,12 @@ export function Kpis() {
         let lost = 0;
 
         for (const row of (historicalRows ?? []).filter((x: any) => x.period_id === period.id)) {
-          expected += Number(row.expected_minutes || 0);
-          lost += Math.round(Number(row.absence_quantity || 0) * 528)
-            + Number(row.allowance_minutes || 0)
-            + Number(row.debit_minutes || 0);
+          const override = overrideByPeriodEmployee.get(`${row.period_id}:${row.employee_id}`);
+          const sourceRow = override ? { ...row, ...override } : row;
+          expected += Number(sourceRow.expected_minutes || 0);
+          lost += Math.round(Number(sourceRow.absence_quantity || 0) * 528)
+            + Number(sourceRow.allowance_minutes || 0)
+            + Number(sourceRow.debit_minutes || 0);
         }
 
         if (period.end_date > HISTORICAL_CUTOFF) {
