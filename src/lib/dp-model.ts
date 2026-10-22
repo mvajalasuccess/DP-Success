@@ -649,7 +649,7 @@ export async function fetchIndicators(start: string, end: string) {
     fetchLaunches({ end }),
   ]);
   const occRows = check(occ) as Array<{ employee_id: string; occurrence_date: string; end_date: string | null; quantity: number | null; unit: string; occurrence_types: { code: string } | null }>;
-  const certRows = check(certs) as Array<{ employee_id: string; days: number }>;
+  const certRows = check(certs) as Array<{ employee_id: string; start_date: string; end_date: string; days: number }>;
   const map = new Map<string, { overtime: number; composition: Composition; late: number; absence: number; certificates: number; certificateDays: number; accumulated: number }>();
   const get = (id: string) => {
     let v = map.get(id);
@@ -673,7 +673,20 @@ export async function fetchIndicators(start: string, end: string) {
     // Folgas são tratadas separadamente: a abonada pertence a abonos e a descontada é apenas informativa.
     if (["falta", "falta_justificada", "falta_injustificada"].includes(code)) get(o.employee_id).absence += min;
   }
-  for (const c of certRows) { const v = get(c.employee_id); v.certificates += 1; v.certificateDays += Number(c.days || 0); }
+  for (const c of certRows) {
+    const v = get(c.employee_id);
+    const overlapStart = c.start_date > start ? c.start_date : start;
+    const overlapEnd = c.end_date < end ? c.end_date : end;
+    if (overlapEnd < overlapStart) continue;
+    const overlapDays = Math.max(0, Math.floor(
+      (new Date(overlapEnd + "T00:00:00").getTime() - new Date(overlapStart + "T00:00:00").getTime()) / 86400000
+    ) + 1);
+    const calendarDays = Math.max(0, Math.floor(
+      (new Date(c.end_date + "T00:00:00").getTime() - new Date(c.start_date + "T00:00:00").getTime()) / 86400000
+    ) + 1);
+    v.certificates += 1;
+    v.certificateDays += Math.min(Number(c.days || 0), calendarDays, overlapDays);
+  }
   return map;
 }
 
