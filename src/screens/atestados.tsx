@@ -210,8 +210,7 @@ export function Atestados() {
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
       <Card className="mt-6 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Atestados</h2><p className="text-xs text-muted-foreground">{filteredRows.length} registro(s)</p></div><button type="button" onClick={() => setShowCertificates(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showCertificates ? "Ocultar atestados" : "Mostrar atestados"} aria-label={showCertificates ? "Ocultar atestados" : "Mostrar atestados"}>{showCertificates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
-        {showCertificates && <div className="max-h-[calc(100vh-300px)] overflow-auto">
-        <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
+        {showCertificates && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
           <th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Início</th><th className="px-5 py-3">Fim</th><th className="px-5 py-3">Dias</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">CID</th><th className="px-5 py-3 text-right">Ações</th>
         </tr></thead><tbody className="divide-y">
           {filteredRows.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Nenhum atestado encontrado para os filtros selecionados.</td></tr>}
