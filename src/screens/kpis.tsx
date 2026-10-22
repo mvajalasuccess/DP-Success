@@ -492,10 +492,9 @@ export function Kpis() {
 
       for (const row of currentCertificates ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
-        if (currentPeriodIds.some(id => hasOverride(row.employee_id, id))) {
-          const overlappingOverride = currentPeriodIds.find(id => hasOverride(row.employee_id, id));
-          if (overlappingOverride) continue;
-        }
+        // Um ajuste manual substitui o atestado operacional somente na competência
+        // que ele cobre. Não devemos descartar todos os atestados do funcionário
+        // porque existe um ajuste em outro mês.
         const employee = employees.find(e => e.id === row.employee_id);
         if (!employee) continue;
         const calendarDays = Math.max(0, Math.floor(
@@ -510,7 +509,8 @@ export function Kpis() {
         for (const period of targetPeriods.filter(p =>
           p.end_date > HISTORICAL_CUTOFF &&
           row.start_date <= p.end_date &&
-          row.end_date >= p.start_date
+          row.end_date >= p.start_date &&
+          !hasOverride(row.employee_id, p.id)
         )) {
           const overlapStart = row.start_date > period.start_date ? row.start_date : period.start_date;
           const overlapEnd = row.end_date < period.end_date ? row.end_date : period.end_date;
@@ -910,7 +910,7 @@ export function Kpis() {
         currentIds.length
           ? db.from("bank_hours").select("employee_id,period_id,minutes,kind").eq("kind","debito").in("period_id", currentIds)
           : Promise.resolve({ data: [] }),
-        currentIds.length
+        yearPeriods.length
           ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
           : Promise.resolve({ data: [] }),
       ]);
