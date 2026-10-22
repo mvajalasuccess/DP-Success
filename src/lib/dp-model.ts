@@ -670,7 +670,8 @@ export async function fetchIndicators(start: string, end: string) {
     const code = o.occurrence_types?.code ?? "";
     const min = occurrenceMinutes(o.quantity, o.unit);
     if (code === "atraso" || code === "saida_antecipada") get(o.employee_id).late += min;
-    if (["falta", "folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code)) get(o.employee_id).absence += min;
+    // Folgas são tratadas separadamente: a abonada pertence a abonos e a descontada é apenas informativa.
+    if (["falta", "falta_justificada", "falta_injustificada"].includes(code)) get(o.employee_id).absence += min;
   }
   for (const c of certRows) { const v = get(c.employee_id); v.certificates += 1; v.certificateDays += Number(c.days || 0); }
   return map;
