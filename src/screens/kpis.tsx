@@ -498,14 +498,14 @@ export function Kpis() {
         }
         const employee = employees.find(e => e.id === row.employee_id);
         if (!employee) continue;
-        const selectedDays = Math.max(0, Math.min(
-          Number(row.days || 0),
-          Math.floor((new Date(row.end_date + "T00:00:00").getTime() - new Date(row.start_date + "T00:00:00").getTime()) / 86400000) + 1,
-        ));
+        const calendarDays = Math.max(0, Math.floor(
+          (new Date(row.end_date + "T00:00:00").getTime() - new Date(row.start_date + "T00:00:00").getTime()) / 86400000
+        ) + 1);
+        const recordedDays = Math.max(0, Math.min(Number(row.days || 0), calendarDays));
         const dailyMinutes = 528;
-        const minutes = Math.round(selectedDays * dailyMinutes);
-        next.atestadosDays += selectedDays;
-        next.atestadosMinutes += minutes;
+        // Distribui os dias do atestado entre as competências pelo intervalo real,
+        // em vez de atribuir todos os dias à competência em que o atestado começa.
+        let selectedDays = 0;
         // Atestados não entram no absenteísmo, mas reduzem as horas trabalhadas.
         for (const period of targetPeriods.filter(p =>
           p.end_date > HISTORICAL_CUTOFF &&
@@ -517,10 +517,14 @@ export function Kpis() {
           const overlapDays = Math.max(0, Math.floor(
             (new Date(overlapEnd + "T00:00:00").getTime() - new Date(overlapStart + "T00:00:00").getTime()) / 86400000
           ) + 1);
-          const periodMinutes = Math.min(selectedDays, overlapDays) * dailyMinutes;
+          const periodDays = Math.min(recordedDays, overlapDays);
+          selectedDays += periodDays;
+          const periodMinutes = periodDays * dailyMinutes;
           const key = String(row.employee_id) + ":" + String(period.id);
           currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + Math.round(periodMinutes));
         }
+        next.atestadosDays += selectedDays;
+        next.atestadosMinutes += Math.round(selectedDays * dailyMinutes);
       }
 
       for (const row of currentDebits ?? []) {
