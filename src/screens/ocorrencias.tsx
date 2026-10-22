@@ -1,4 +1,4 @@
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,10 @@ export function Ocorrencias() {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [filterEmployee, setFilterEmployee] = useState("todos");
+  const [filterPeriod, setFilterPeriod] = useState("todos");
+  const [showAbsences, setShowAbsences] = useState(true);
+  const [showDaysOff, setShowDaysOff] = useState(true);
 
   const visibleTypes = useMemo(
     () => types.filter(t => ALLOWED_CODES.has(t.code)),
@@ -93,6 +97,17 @@ export function Ocorrencias() {
     void load();
     void loadOptions();
   }, []);
+
+  const selectedPeriod = periods.find(p => p.id === filterPeriod);
+  const filteredRows = rows.filter(row =>
+    (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
+    (!selectedPeriod || (row.occurrence_date <= selectedPeriod.end_date && (row.end_date ?? row.occurrence_date) >= selectedPeriod.start_date))
+  );
+  const absenceRows = filteredRows.filter(row => ["falta_justificada", "falta_injustificada"].includes(String(row.occurrence_types?.code ?? "")));
+  const daysOffRows = filteredRows.filter(row => ["folga_abonada", "folga_descontada"].includes(String(row.occurrence_types?.code ?? "")));
+  function periodLabel(period: { id: string; start_date: string; end_date: string }) {
+    return `${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
+  }
 
   function startNew() {
     setEditing(null);
@@ -235,47 +250,31 @@ export function Ocorrencias() {
           </button>
         </div>
 
+
         {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-        <Card className="mt-6 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur">
-                <tr>
-                  <th className="px-5 py-3">Funcionário</th>
-                  <th className="px-5 py-3">Data</th>
-                  <th className="px-5 py-3">Tipo</th>
-                  <th className="px-5 py-3">Quantidade</th>
-                  <th className="px-5 py-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">
-                      Nenhuma ocorrência cadastrada.
-                    </td>
-                  </tr>
-                )}
-                {rows.map(row => (
-                  <tr key={row.id}>
-                    <td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td>
-                    <td className="px-5 py-4">{formatDate(row.occurrence_date)}{row.end_date ? ` → ${formatDate(row.end_date)}` : ""}</td>
-                    <td className="px-5 py-4">{row.occurrence_types?.name ?? "—"}</td>
-                    <td className="px-5 py-4">{displayQuantity(row)}</td>
-                    <td className="px-5 py-4 text-right">
-                      <button onClick={() => startEdit(row)} className="mr-2 rounded-md border p-2" title="Editar">
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => void remove(row)} className="rounded-md border p-2 text-destructive" title="Excluir">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <Card className="mt-6 p-4">
+          <div className="mb-3 text-sm font-medium">Filtros</div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
+            <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
           </div>
+        </Card>
+
+        <Card className="mt-6 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Faltas</h2><p className="text-xs text-muted-foreground">{absenceRows.length} registro(s)</p></div><button type="button" onClick={() => setShowAbsences(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showAbsences ? "Ocultar faltas" : "Mostrar faltas"} aria-label={showAbsences ? "Ocultar faltas" : "Mostrar faltas"}>{showAbsences ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
+          {showAbsences && <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Quantidade</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">
+            {absenceRows.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma falta encontrada para os filtros selecionados.</td></tr>}
+            {absenceRows.map(row => <tr key={row.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(row.occurrence_date)}{row.end_date ? " → " + formatDate(row.end_date) : ""}</td><td className="px-5 py-4">{row.occurrence_types?.name ?? "—"}</td><td className="px-5 py-4">{displayQuantity(row)}</td><td className="px-5 py-4 text-right"><button onClick={() => startEdit(row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(row)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
+          </tbody></table></div>}
+        </Card>
+
+        <Card className="mt-6 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Folgas</h2><p className="text-xs text-muted-foreground">{daysOffRows.length} registro(s)</p></div><button type="button" onClick={() => setShowDaysOff(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDaysOff ? "Ocultar folgas" : "Mostrar folgas"} aria-label={showDaysOff ? "Ocultar folgas" : "Mostrar folgas"}>{showDaysOff ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
+          {showDaysOff && <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Quantidade</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">
+            {daysOffRows.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma folga encontrada para os filtros selecionados.</td></tr>}
+            {daysOffRows.map(row => <tr key={row.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(row.occurrence_date)}{row.end_date ? " → " + formatDate(row.end_date) : ""}</td><td className="px-5 py-4">{row.occurrence_types?.name ?? "—"}</td><td className="px-5 py-4">{displayQuantity(row)}</td><td className="px-5 py-4 text-right"><button onClick={() => startEdit(row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(row)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
+          </tbody></table></div>}
         </Card>
       </main>
 
