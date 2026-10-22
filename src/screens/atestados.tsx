@@ -1,4 +1,4 @@
-import { ArrowLeft, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +25,7 @@ function countDays(start: string, end: string) {
 }
 
 type Declaration = { id: string; employee_id: string; occurrence_date: string; quantity: number; notes: string | null; employees?: { full_name: string } | null };
+type Period = { id: string; start_date: string; end_date: string };
 
 const declarationReasons = ["Acompanhante", "Consulta", "Exame", "Outros"];
 
@@ -32,6 +33,11 @@ export function Atestados() {
   const [rows, setRows] = useState<Certificate[]>([]);
   const [declarations, setDeclarations] = useState<Declaration[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [periods, setPeriods] = useState<Period[]>([]);
+  const [filterEmployee, setFilterEmployee] = useState("todos");
+  const [filterPeriod, setFilterPeriod] = useState("todos");
+  const [showCertificates, setShowCertificates] = useState(true);
+  const [showDeclarations, setShowDeclarations] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Certificate | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -54,6 +60,8 @@ export function Atestados() {
     else setRows((data ?? []) as Certificate[]);
     const decl = await supabase.from("occurrences").select("id,employee_id,occurrence_date,quantity,notes,employees(full_name),occurrence_types!inner(code)").eq("occurrence_types.code", "declaracao_horas").order("occurrence_date", { ascending: false });
     if (!decl.error) setDeclarations((decl.data ?? []) as unknown as Declaration[]);
+    const { data: periodData } = await supabase.from("time_periods").select("id,start_date,end_date").order("start_date", { ascending: false });
+    setPeriods((periodData ?? []) as Period[]);
   }
 
   async function loadEmployees() {
@@ -62,6 +70,19 @@ export function Atestados() {
   }
 
   useEffect(() => { void load(); void loadEmployees(); }, []);
+
+  const selectedPeriod = periods.find(p => p.id === filterPeriod);
+  const filteredRows = rows.filter(row =>
+    (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
+    (!selectedPeriod || (row.start_date <= selectedPeriod.end_date && row.end_date >= selectedPeriod.start_date))
+  );
+  const filteredDeclarations = declarations.filter(row =>
+    (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
+    (!selectedPeriod || (row.occurrence_date >= selectedPeriod.start_date && row.occurrence_date <= selectedPeriod.end_date))
+  );
+  function periodLabel(period: Period) {
+    return `${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
+  }
 
   function startNew() {
     setMode("atestado");
@@ -179,17 +200,25 @@ export function Atestados() {
       <div className="flex items-end justify-between gap-4"><div><p className="text-sm text-primary">Ponto</p><h1 className="text-3xl font-bold">Declarações e Atestados</h1><p className="text-sm text-muted-foreground">Registre atestados e declarações com as horas efetivamente abonadas.</p></div>
         <div className="flex gap-2"><button onClick={() => { startNew(); setMode("atestado"); }} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="mr-2 inline h-4 w-4" />Novo atestado</button><button onClick={() => { setMode("declaracao"); setEditing(null); setEditingDeclaration(null); setError(""); setDeclarationForm({ employee_id: "", occurrence_date: "", quantity: "", reason: "Acompanhante", notes: "" }); setOpen(true); }} className="rounded-lg border px-4 py-2.5 text-sm"><Plus className="mr-2 inline h-4 w-4" />Nova declaração</button></div>
       </div>
+      <Card className="mt-6 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm font-medium"><span>Filtros</span><span className="text-xs font-normal text-muted-foreground">Aplicados às duas listas</span></div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
+          <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+        </div>
+      </Card>
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
       <Card className="mt-6 overflow-hidden">
-        <div className="border-b p-4"><p className="text-xs text-muted-foreground">Atestados e declarações ficam organizados nesta tela.</p></div>
+        <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Atestados</h2><p className="text-xs text-muted-foreground">{filteredRows.length} registro(s)</p></div><button type="button" onClick={() => setShowCertificates(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showCertificates ? "Ocultar atestados" : "Mostrar atestados"} aria-label={showCertificates ? "Ocultar atestados" : "Mostrar atestados"}>{showCertificates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
+        {showCertificates && <div className="max-h-[calc(100vh-300px)] overflow-auto">
         <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
           <th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Início</th><th className="px-5 py-3">Fim</th><th className="px-5 py-3">Dias</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">CID</th><th className="px-5 py-3 text-right">Ações</th>
         </tr></thead><tbody className="divide-y">
-          {rows.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Nenhum atestado registrado.</td></tr>}
-          {rows.map(r => <tr key={r.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{r.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(r.start_date)}</td><td className="px-5 py-4">{formatDate(r.end_date)}</td><td className="px-5 py-4">{r.days}</td><td className="px-5 py-4">{r.certificate_type}</td><td className="px-5 py-4">{r.cid ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => void startEdit(r)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(r)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
-        </tbody></table></div>
+          {filteredRows.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Nenhum atestado encontrado para os filtros selecionados.</td></tr>}
+          {filteredRows.map(r => <tr key={r.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{r.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(r.start_date)}</td><td className="px-5 py-4">{formatDate(r.end_date)}</td><td className="px-5 py-4">{r.days}</td><td className="px-5 py-4">{r.certificate_type}</td><td className="px-5 py-4">{r.cid ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => void startEdit(r)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(r)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
+        </tbody></table></div>}
       </Card>
-      <Card className="mt-6 overflow-hidden"><div className="border-b p-4"><h2 className="font-semibold">Declarações</h2><p className="text-xs text-muted-foreground">Horas realmente abonadas, por motivo.</p></div><div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Horas abonadas</th><th className="px-5 py-3">Observação</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{declarations.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">Nenhuma declaração registrada.</td></tr>}{declarations.map(d => <tr key={d.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{d.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(d.occurrence_date)}</td><td className="px-5 py-4">{String(Math.floor(Number(d.quantity) || 0)).padStart(2,"0")}:{String(Math.round(((Number(d.quantity)||0)%1)*60)).padStart(2,"0")}</td><td className="px-5 py-4">{d.notes ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditDeclaration(d)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void removeDeclaration(d)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody></table></div></Card>
+      <Card className="mt-6 overflow-hidden"><div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Declarações</h2><p className="text-xs text-muted-foreground">Horas realmente abonadas, por motivo. {filteredDeclarations.length} registro(s)</p></div><button type="button" onClick={() => setShowDeclarations(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"} aria-label={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"}>{showDeclarations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>{showDeclarations && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Horas abonadas</th><th className="px-5 py-3">Observação</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filteredDeclarations.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">Nenhuma declaração encontrada para os filtros selecionados.</td></tr>}{filteredDeclarations.map(d => <tr key={d.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{d.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(d.occurrence_date)}</td><td className="px-5 py-4">{String(Math.floor(Number(d.quantity) || 0)).padStart(2,"0")}:{String(Math.round(((Number(d.quantity)||0)%1)*60)).padStart(2,"0")}</td><td className="px-5 py-4">{d.notes ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditDeclaration(d)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void removeDeclaration(d)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>}</Card>
     </main>
     {open && mode === "atestado" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-6">
       <h2 className="text-xl font-bold">{editing ? "Editar atestado" : "Novo atestado"}</h2>
