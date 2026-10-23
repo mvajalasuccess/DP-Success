@@ -425,11 +425,10 @@ export function Kpis() {
         next.atestadosDays += atestadoDays;
         next.atestadosMinutes += atestados;
         next.declaracoesMinutes += declaracoes;
-        // Declarações abonadas integram Abonos e o absenteísmo.
-        // O campo declaration_minutes é separado de allowance_minutes na BASE.
-        next.abonosMinutes += abonos + declaracoes;
+        // Preserva os valores históricos validados da BASE sem recalcular a composição.
+        next.abonosMinutes += abonos;
         const debitos = Number(sourceRow.debit_minutes || 0);
-        next.absenceMinutes += faltas + debitos + abonos + declaracoes;
+        next.absenceMinutes += faltas + debitos + abonos;
 
         next.he60 += Number(sourceRow.he_60_minutes || 0);
         next.he60Night += Number(sourceRow.he_60_night_minutes || 0);
@@ -1106,7 +1105,7 @@ export function Kpis() {
             expected += Number(row.expected_minutes || 0);
             lost += Math.round(Number(row.absence_quantity || 0) * dailyMinutesFromSchedule(employee))
               + Number(row.allowance_minutes || 0)
-              + Number(row.declaration_minutes || 0)
+              + (period.end_date > HISTORICAL_CUTOFF ? Number(row.declaration_minutes || 0) : 0)
               + Number(row.debit_minutes || 0);
           }
 
