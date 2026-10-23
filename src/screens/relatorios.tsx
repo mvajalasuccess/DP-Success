@@ -1,7 +1,6 @@
 import { ArrowLeft, Download, FileBarChart } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
-import * as ExcelJS from "exceljs";
 import { supabase } from "@/integrations/supabase/client";
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees, minutesToHours } from "@/lib/dp-model";
@@ -24,7 +23,7 @@ const reports = [
   ["extras", "Horas extras por funcionário"],
   ["absenteismo", "Absenteísmo por departamento"],
   ["atestados", "Declarações e atestados"],
-  ["ocorrencias", "Faltas"],
+  ["ocorrencias", "Faltas e Folgas"],
 ] as const;
 
 type ClosingColumn = { header: string; key: string; width: number; duration?: boolean };
@@ -271,6 +270,7 @@ async function loadClosingRows(db: any, period: Period) {
 }
 
 async function downloadClosingExcel(period: Period, rows: any[]) {
+  const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "DP SUCCESS";
   workbook.subject = "Fechamento de Ponto";
@@ -372,6 +372,7 @@ const bankColumns: BankColumn[] = [
 ];
 
 async function downloadBankHoursExcel(period: Period, rows: any[]) {
+  const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "DP SUCCESS";
   workbook.subject = "Banco de Horas";
@@ -448,6 +449,205 @@ async function downloadBankHoursExcel(period: Period, rows: any[]) {
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+
+type StandardReportColumn = {
+  header: string;
+  key: string;
+  width: number;
+  format?: "date" | "duration" | "currency" | "number";
+};
+
+const standardReportColumns: Record<string, StandardReportColumn[]> = {
+  extras: [
+    { header: "Funcionário", key: "employee", width: 32 },
+    { header: "Data", key: "date", width: 14, format: "date" },
+    { header: "Tipo de hora extra", key: "type", width: 27 },
+    { header: "Duração", key: "minutes", width: 14, format: "duration" },
+    { header: "Adicional (%)", key: "rate_percent", width: 16, format: "number" },
+    { header: "Valor estimado (R$)", key: "estimated_value", width: 21, format: "currency" },
+    { header: "Observações", key: "description", width: 42 },
+  ],
+  absenteismo: [
+    { header: "Departamento", key: "department", width: 24 },
+    { header: "Funcionário", key: "employee", width: 32 },
+    { header: "Data inicial", key: "date", width: 15, format: "date" },
+    { header: "Data final", key: "end_date", width: 15, format: "date" },
+    { header: "Ocorrência", key: "type", width: 27 },
+    { header: "Quantidade", key: "quantity", width: 15, format: "number" },
+    { header: "Unidade", key: "unit", width: 15 },
+    { header: "Observações", key: "description", width: 42 },
+  ],
+  atestados: [
+    { header: "Tipo de registro", key: "tipo", width: 23 },
+    { header: "Funcionário", key: "employee", width: 32 },
+    { header: "Data inicial", key: "start_date", width: 15, format: "date" },
+    { header: "Data final", key: "end_date", width: 15, format: "date" },
+    { header: "Dias", key: "days", width: 12, format: "number" },
+    { header: "Horas abonadas", key: "horas_abonadas", width: 17, format: "duration" },
+    { header: "Motivo", key: "motivo", width: 20 },
+    { header: "Tipo de atestado", key: "certificate_type", width: 21 },
+    { header: "CID", key: "cid", width: 14 },
+    { header: "Observações", key: "notes", width: 42 },
+  ],
+  ocorrencias: [
+    { header: "Funcionário", key: "employee", width: 32 },
+    { header: "Data inicial", key: "date", width: 15, format: "date" },
+    { header: "Data final", key: "end_date", width: 15, format: "date" },
+    { header: "Ocorrência", key: "type", width: 28 },
+    { header: "Quantidade", key: "quantity", width: 15, format: "number" },
+    { header: "Unidade", key: "unit", width: 15 },
+    { header: "Observações", key: "description", width: 42 },
+  ],
+};
+
+const standardReportTitles: Record<string, { title: string; subject: string; sheet: string; filename: string }> = {
+  extras: {
+    title: "DP SUCCESS | HORAS EXTRAS POR FUNCIONÁRIO",
+    subject: "Horas extras por funcionário",
+    sheet: "Horas Extras",
+    filename: "dp-success-horas-extras.xlsx",
+  },
+  absenteismo: {
+    title: "DP SUCCESS | ABSENTEÍSMO POR DEPARTAMENTO",
+    subject: "Absenteísmo por departamento",
+    sheet: "Absenteísmo",
+    filename: "dp-success-absenteismo.xlsx",
+  },
+  atestados: {
+    title: "DP SUCCESS | DECLARAÇÕES E ATESTADOS",
+    subject: "Declarações e atestados",
+    sheet: "Declarações e Atestados",
+    filename: "dp-success-declaracoes-e-atestados.xlsx",
+  },
+  ocorrencias: {
+    title: "DP SUCCESS | FALTAS E FOLGAS",
+    subject: "Faltas e folgas",
+    sheet: "Faltas e Folgas",
+    filename: "dp-success-faltas-e-folgas.xlsx",
+  },
+};
+
+function dateToExcelValue(value: unknown) {
+  const raw = String(value ?? "");
+  const parts = raw.split("-");
+  if (parts.length !== 3 || !parts.every(part => /^\d+$/.test(part))) return raw;
+  const [year, month, day] = parts.map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function durationToExcelValue(value: unknown) {
+  if (typeof value === "string" && value.includes(":")) {
+    const trimmed = value.trim();
+    const negative = trimmed.startsWith("-");
+    const parts = trimmed.replace(/^-/, "").split(":");
+    if (parts.length === 2 && parts.every(part => /^\d+$/.test(part))) {
+      const minutes = Number(parts[0]) * 60 + Number(parts[1]);
+      return (negative ? -minutes : minutes) / 1440;
+    }
+  }
+  return Math.round(Number(value || 0)) / 1440;
+}
+
+async function downloadStandardReportExcel(kind: string, rows: any[]) {
+  const ExcelJS = await import("exceljs");
+  const definition = standardReportTitles[kind];
+  const columns = standardReportColumns[kind];
+  if (!definition || !columns) throw new Error("Tipo de relatório não reconhecido.");
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "DP SUCCESS";
+  workbook.subject = definition.subject;
+  workbook.title = definition.subject;
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet(definition.sheet, {
+    views: [{ state: "frozen", ySplit: 5, xSplit: 2 }],
+  });
+  const lastColumn = columns.length;
+
+  sheet.mergeCells(1, 1, 1, lastColumn);
+  const titleCell = sheet.getCell(1, 1);
+  titleCell.value = definition.title;
+  titleCell.font = { name: "Aptos Display", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF123B3A" } };
+  titleCell.alignment = { vertical: "middle", horizontal: "left" };
+  sheet.getRow(1).height = 30;
+
+  sheet.mergeCells(2, 1, 2, lastColumn);
+  sheet.getCell(2, 1).value =
+    "Registros: todos os registros disponíveis  |  Exportado em: " + new Date().toLocaleDateString("pt-BR");
+  sheet.getCell(2, 1).font = { size: 11, bold: true, color: { argb: "FF123B3A" } };
+  sheet.getCell(2, 1).alignment = { vertical: "middle" };
+  sheet.getRow(2).height = 23;
+
+  sheet.addRow([]);
+  sheet.addRow([]);
+  const headerRow = sheet.addRow(columns.map(column => column.header));
+  headerRow.height = 34;
+  headerRow.eachCell(cell => {
+    cell.font = { bold: true, color: { argb: "FF123B3A" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDF7F0" } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = { bottom: { style: "thin", color: { argb: "FF06CAA0" } } };
+  });
+
+  for (const source of rows) {
+    const values = columns.map(column => {
+      const value = source[column.key];
+      if (value == null || value === "") return "";
+      if (column.format === "date") return dateToExcelValue(value);
+      if (column.format === "duration") return durationToExcelValue(value);
+      if (column.format === "currency" || column.format === "number") {
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : "";
+      }
+      return value;
+    });
+
+    const row = sheet.addRow(values);
+    row.eachCell((cell, columnNumber) => {
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: columnNumber >= 3 ? "center" : "left",
+        wrapText: columnNumber === lastColumn,
+      };
+      if (row.number % 2 === 0) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5FAF8" } };
+      }
+    });
+
+    columns.forEach((column, index) => {
+      const cell = row.getCell(index + 1);
+      if (column.format === "date") cell.numFmt = "dd/mm/yyyy";
+      else if (column.format === "duration") cell.numFmt = "[h]:mm;-[h]:mm";
+      else if (column.format === "currency") cell.numFmt = '"R$" #,##0.00';
+      else if (column.format === "number") cell.numFmt = "0.##";
+    });
+  }
+
+  columns.forEach((column, index) => {
+    sheet.getColumn(index + 1).width = column.width;
+  });
+  sheet.autoFilter = {
+    from: { row: 5, column: 1 },
+    to: { row: Math.max(5, sheet.rowCount), column: lastColumn },
+  };
+  sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  sheet.properties.defaultRowHeight = 20;
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer as BlobPart], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = definition.filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 
 export function Relatorios() {
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -603,7 +803,8 @@ export function Relatorios() {
         }));
       }
 
-      downloadCsv("dp-success-" + kind + ".csv", rows);
+      if (!rows.length) throw new Error("Não há dados para exportar nesse relatório.");
+      await downloadStandardReportExcel(kind, rows);
     } catch (e: any) {
       setError(e.message ?? "Não foi possível gerar o relatório.");
     } finally {
@@ -648,7 +849,7 @@ export function Relatorios() {
             ))}
           </select>
           <p className="mt-1 text-xs text-muted-foreground">
-            Os relatórios de Fechamento de Ponto e Banco de Horas usam a competência selecionada; o banco mostra o saldo mensal e o saldo acumulado por funcionário.
+            A competência selecionada se aplica ao Fechamento de Ponto e Banco de Horas. Os demais relatórios incluem todos os registros disponíveis.
           </p>
         </div>
 
@@ -664,7 +865,13 @@ export function Relatorios() {
                   ? "Excel com funcionários, horas previstas e trabalhadas, faltas, atestados, declarações, abonos, débitos e horas extras."
                   : key === "banco"
                     ? "Excel com nome do funcionário, saldo do mês, saldo acumulado, débitos, ajustes, pagamentos e composição das horas extras."
-                    : "Exporte os dados desse relatório em formato CSV."}
+                    : key === "extras"
+                      ? "Excel com funcionário, data, tipo de hora extra, duração, adicional, valor estimado e observações."
+                      : key === "absenteismo"
+                        ? "Excel por departamento com funcionário, ocorrência, período, quantidade, unidade e observações."
+                        : key === "atestados"
+                          ? "Excel com declarações e atestados, período, dias, horas abonadas, motivo, CID e observações."
+                          : "Excel de faltas e folgas com funcionário, período, tipo, quantidade e observações."}
               </p>
               <button
                 onClick={() => void exportReport(key)}
@@ -672,7 +879,7 @@ export function Relatorios() {
                 className="mt-4 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
               >
                 <Download className="h-4 w-4" />
-                {busy === key ? "Gerando…" : key === "fechamento" || key === "banco" ? "Exportar Excel" : "Exportar CSV"}
+                {busy === key ? "Gerando…" : "Exportar Excel"}
               </button>
             </Card>
           ))}
