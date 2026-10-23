@@ -396,10 +396,6 @@ export function PointClosing() {
       const he20 = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "ADICIONAL_NOTURNO" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
       const interjornada = liveOvertime.reduce((sum: number, item: any) => String(item.launch_type ?? "").toUpperCase() === "INTERJORNADA_50" ? sum + Math.abs(Number(item.minutes || 0)) : sum, 0);
       const debit = liveDebits.reduce((sum: number, item: any) => sum + Math.abs(Number(item.minutes || 0)), 0);
-      // Nas competências atuais, os dados operacionais são sempre lidos da
-      // origem viva (ocorrências, atestados, banco de horas e lançamentos).
-      // Um override antigo não pode manter, por exemplo, uma declaração
-      // excluída aparecendo no Fechamento.
       return {
         ...row,
         debit_minutes: debit,
@@ -412,8 +408,25 @@ export function PointClosing() {
       };
     });
 
+    // As competências atuais também precisam reaplicar a correção persistida.
+    // O KPI já trata point_closing_overrides como o valor oficial e substitui
+    // os lançamentos operacionais dessa pessoa/competência. Sem esta etapa, o
+    // Fechamento gravava o ajuste, mas voltava a mostrar os dados operacionais
+    // após atualizar a página. A BASE e as tabelas de origem não são alteradas.
+    const rowsWithOverrides = syncedRows.map((row: any) => {
+      const override = overrideByEmployee.get(String(row.employee_id));
+      if (!override) return row;
+      return {
+        ...row,
+        ...override,
+        id: row.id,
+        employee_id: row.employee_id,
+        has_manual_override: true,
+      };
+    });
+
     setRowsSource("manual");
-    setHistoricalRows(syncedRows);
+    setHistoricalRows(rowsWithOverrides);
     setLoadingRows(false);
   }
 
