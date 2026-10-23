@@ -67,7 +67,7 @@ export function Atestados() {
   }
 
   async function loadEmployees() {
-    const { data } = await supabase.from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name");
+    const { data } = await (supabase as any).from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name");
     setEmployees((data ?? []) as Employee[]);
   }
 
