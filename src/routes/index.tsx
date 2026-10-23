@@ -676,7 +676,7 @@ function DashboardHome() {
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
                 <Card className="h-full p-5 transition-shadow hover:shadow-md">
                   <AlertTriangle className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">Faltas</p>
+                  <p className="mt-4 text-sm text-muted-foreground">Faltas e Folgas</p>
                   <p className="mt-1 text-2xl font-bold">{Math.round(metrics.absenceDays)}</p>
                   <p className="mt-1 text-xs text-muted-foreground">dias registrados · clique para ver</p>
                   {absencePeople.length > 0 && <div className="mt-3 border-t pt-3">
@@ -688,7 +688,7 @@ function DashboardHome() {
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "atestados" }))} className="text-left">
                 <Card className="h-full p-5 transition-shadow hover:shadow-md">
                   <FileText className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">Atestados</p>
+                  <p className="mt-4 text-sm text-muted-foreground">Declarações e Atestados</p>
                   <p className="mt-1 text-2xl font-bold">{metrics.certificates}</p>
                   <p className="mt-1 text-xs text-muted-foreground">registros na competência · clique para ver</p>
                   {certificatePeople.length > 0 && <div className="mt-3 border-t pt-3">
