@@ -131,7 +131,7 @@ async function loadClosingRows(db: any, period: Period) {
     { data: certificateRows, error: certificateError },
   ] = await Promise.all([
     db.from("employees")
-      .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,departments(name),positions(name)")
+      .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,work_schedules(weekly_minutes),departments(name),positions(name)")
       .order("full_name"),
     db.from("overtime_records")
       .select("employee_id,period_id,minutes,launch_type")
@@ -177,7 +177,9 @@ async function loadClosingRows(db: any, period: Period) {
     const id = employee.id;
     const effectiveStart = employee.hire_date && employee.hire_date > period.start_date ? employee.hire_date : period.start_date;
     const effectiveEnd = employee.termination_date && employee.termination_date < period.end_date ? employee.termination_date : period.end_date;
-    const expected = effectiveStart > effectiveEnd ? 0 : countWorkingWeekdays(effectiveStart, effectiveEnd) * 528;
+    const weeklyMinutes = Number(employee.work_schedules?.weekly_minutes || 0);
+    const dailyMinutes = weeklyMinutes > 0 ? weeklyMinutes / 5 : 528;
+    const expected = effectiveStart > effectiveEnd ? 0 : Math.round(countWorkingWeekdays(effectiveStart, effectiveEnd) * dailyMinutes);
     let absenceQuantity = 0;
     let certificateMinutes = 0;
     let declarationMinutes = 0;
@@ -195,7 +197,7 @@ async function loadClosingRows(db: any, period: Period) {
       const quantity = Number(occurrence.quantity || 0);
       const unit = String(occurrence.unit ?? "dias").toLowerCase();
       const minutes = unit.startsWith("dia")
-        ? Math.round(quantity * 528)
+        ? Math.round(quantity * dailyMinutes)
         : unit.startsWith("hor")
           ? Math.round(quantity * 60)
           : Math.round(quantity);
@@ -216,7 +218,7 @@ async function loadClosingRows(db: any, period: Period) {
         (new Date(overlapEnd + "T00:00:00").getTime() - new Date(overlapStart + "T00:00:00").getTime()) / 86400000
       ) + 1;
       const days = Math.max(0, Math.min(Number(certificate.days || 0), overlapDays));
-      certificateMinutes += Math.round(days * 528);
+      certificateMinutes += Math.round(days * dailyMinutes);
     }
 
     for (const debit of debitsByEmployee.get(String(id)) ?? []) {
@@ -237,7 +239,7 @@ async function loadClosingRows(db: any, period: Period) {
     // Abonos refletem as ocorrências folga_abonada/abono; atestados e declarações
     // permanecem em campos próprios. A folga descontada segue somente informativa.
     const allowanceTotal = extraAllowanceMinutes;
-    const lostMinutes = Math.round(absenceQuantity * 528)
+    const lostMinutes = Math.round(absenceQuantity * dailyMinutes)
       + certificateMinutes + declarationMinutes + allowanceTotal + debitMinutes;
     return {
       employee_id: id,
