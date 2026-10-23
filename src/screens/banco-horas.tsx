@@ -304,7 +304,7 @@ export function BankHours() {
           </div>
           <div className="ml-auto text-right"><p className="text-xs text-muted-foreground">Saldo disponível atual</p><p className={"text-2xl font-bold " + cls(accumulated)}>{minutesToHours(accumulated, true)}</p></div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={openAdjustmentNew className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Novo ajuste</button>
+            <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Novo ajuste</button>
             <button type="button" onClick={openPaymentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Registrar pagamento de HE</button>
           </div>
         </div>
