@@ -21,7 +21,7 @@ const reports = [
   ["fechamento", "Fechamento de ponto"],
   ["banco", "Banco de horas"],
   ["interjornada", "Interjornada por funcionário"],
-  ["absenteismo", "Absenteísmo por departamento"],
+  ["horas_pagar", "Horas a Pagar"],
   ["atestados", "Declarações e atestados"],
   ["ocorrencias", "Faltas e Folgas"],
 ] as const;
@@ -467,15 +467,11 @@ const standardReportColumns: Record<string, StandardReportColumn[]> = {
     { header: "Interjornada", key: "minutes", width: 16, format: "duration" },
     { header: "Observações", key: "description", width: 42 },
   ],
-  absenteismo: [
-    { header: "Departamento", key: "department", width: 24 },
-    { header: "Funcionário", key: "employee", width: 32 },
-    { header: "Data inicial", key: "date", width: 15, format: "date" },
-    { header: "Data final", key: "end_date", width: 15, format: "date" },
-    { header: "Ocorrência", key: "type", width: 27 },
-    { header: "Quantidade", key: "quantity", width: 15, format: "number" },
-    { header: "Unidade", key: "unit", width: 15 },
-    { header: "Observações", key: "description", width: 42 },
+  horas_pagar: [
+    { header: "Nome do funcionário", key: "employee", width: 34 },
+    { header: "Tipo de hora", key: "hour_type", width: 34 },
+    { header: "Quantidade de horas", key: "quantity_minutes", width: 22, format: "duration" },
+    { header: "Valor da hora", key: "hourly_rate", width: 20, format: "currency" },
   ],
   atestados: [
     { header: "Tipo de registro", key: "tipo", width: 23 },
@@ -507,11 +503,11 @@ const standardReportTitles: Record<string, { title: string; subject: string; she
     sheet: "Resumo por funcionário",
     filename: "dp-success-interjornada-por-funcionario.xlsx",
   },
-  absenteismo: {
-    title: "DP SUCCESS | ABSENTEÍSMO POR DEPARTAMENTO",
-    subject: "Absenteísmo por departamento",
-    sheet: "Absenteísmo",
-    filename: "dp-success-absenteismo.xlsx",
+  horas_pagar: {
+    title: "DP SUCCESS | HORAS A PAGAR",
+    subject: "Horas a pagar",
+    sheet: "Horas a Pagar",
+    filename: "dp-success-horas-a-pagar.xlsx",
   },
   atestados: {
     title: "DP SUCCESS | DECLARAÇÕES E ATESTADOS",
@@ -548,7 +544,7 @@ function durationToExcelValue(value: unknown) {
   return Math.round(Number(value || 0)) / 1440;
 }
 
-async function downloadStandardReportExcel(kind: string, rows: any[]) {
+async function downloadStandardReportExcel(kind: string, rows: any[], subtitle?: string) {
   const ExcelJS = await import("exceljs");
   const definition = standardReportTitles[kind];
   const detailColumns = standardReportColumns[kind];
@@ -694,7 +690,7 @@ async function downloadStandardReportExcel(kind: string, rows: any[]) {
     writeStyledSheet(
       definition.sheet,
       definition.title,
-      "Registros disponíveis: " + rows.length + "  |  Exportado em: " + exportDate,
+      subtitle ?? ("Registros disponíveis: " + rows.length + "  |  Exportado em: " + exportDate),
       detailColumns,
       rows,
     );
@@ -794,6 +790,98 @@ export function Relatorios() {
         return;
       }
 
+      if (kind === "horas_pagar") {
+        if (!competence) throw new Error("Selecione uma competência para exportar.");
+
+        const { data: employeeRows, error: employeeError } = await db
+          .from("employees")
+          .select("id,full_name,salary,registration,status,hire_date,termination_date,work_schedules(weekly_minutes)")
+          .order("full_name");
+        if (employeeError) throw employeeError;
+
+        // Considera os mesmos funcionários elegíveis à competência que a tela Pagamentos.
+        const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
+          (!employee.hire_date || employee.hire_date <= competence.end_date) &&
+          (!employee.termination_date || employee.termination_date >= competence.start_date)
+        );
+        if (!employeesInPeriod.length) {
+          throw new Error("Não há funcionários vinculados a essa competência.");
+        }
+
+        // Usa o cálculo central do Banco de Horas para preservar BASE, overrides,
+        // ajustes, pagamentos já registrados e saldos manuais validados.
+        const balancesById = await balancesByEmployees(
+          employeesInPeriod.map((employee: any) => String(employee.id))
+        );
+        const payableRows: any[] = [];
+
+        for (const employee of employeesInPeriod) {
+          const employeeBalances = balancesById[String(employee.id)] ?? [];
+          const periodBalance = employeeBalances.find((item: any) => item.period.id === competence.id);
+          const generalBalance = employeeBalances.length
+            ? Number(employeeBalances[employeeBalances.length - 1].accumulated ?? 0)
+            : 0;
+
+          // A tela Pagamentos só gera composição quando o saldo geral acumulado é positivo.
+          if (!periodBalance || generalBalance <= 0) continue;
+
+          const composition = periodBalance.composition;
+          const nightMinutes = Math.max(0, Number(composition?.ADICIONAL_NOTURNO ?? 0));
+          const gross60 = Math.max(0, Number(composition?.HE_60 ?? 0));
+          const gross60Night = Math.max(0, Number(composition?.HE_60_NOTURNO ?? 0));
+          const gross100 = Math.max(0, Number(composition?.HE_100 ?? 0));
+          const targetPayable = Math.max(0, Number(periodBalance.monthBalance ?? 0));
+
+          // Mesma distribuição usada na tela Pagamentos; não recalcula nem grava saldos.
+          const has60Night = gross60Night > 0;
+          const payable60Night = has60Night ? Math.min(gross60Night, targetPayable) : 0;
+          const payable100 = Math.min(
+            gross100,
+            Math.max(0, targetPayable - payable60Night - (has60Night ? 0 : Math.min(nightMinutes, targetPayable)))
+          );
+          const payableNight = has60Night
+            ? 0
+            : Math.min(nightMinutes, Math.max(0, targetPayable - payable100));
+          const payable60 = Math.max(0, targetPayable - payable60Night - payable100 - payableNight);
+
+          const weeklyMinutes = Number(employee.work_schedules?.weekly_minutes || 0);
+          const divisor = weeklyMinutes ? (weeklyMinutes / 60) * 5 : 220;
+          // A tela Pagamentos arredonda a hora normal para 4 casas antes dos adicionais.
+          const normalHourlyRate = Number((Number(employee.salary || 0) / divisor).toFixed(4));
+          const details = [
+            { label: "Hora extra 60%", minutes: payable60, multiplier: 1.6 },
+            { label: "Hora extra 60% + 20% noturno", minutes: payable60Night, multiplier: 1.92 },
+            { label: "Hora extra 100%", minutes: payable100, multiplier: 2 },
+            { label: "Adicional noturno 20%", minutes: payableNight, multiplier: 0.2 },
+          ];
+
+          for (const detail of details) {
+            if (detail.minutes <= 0) continue;
+            payableRows.push({
+              employee: employee.full_name ?? "",
+              hour_type: detail.label,
+              quantity_minutes: Math.round(detail.minutes),
+              hourly_rate: normalHourlyRate * detail.multiplier,
+            });
+          }
+        }
+
+        if (!payableRows.length) {
+          throw new Error("Não há horas elegíveis para pagamento na competência selecionada.");
+        }
+
+        payableRows.sort((a, b) =>
+          String(a.employee).localeCompare(String(b.employee), "pt-BR") ||
+          String(a.hour_type).localeCompare(String(b.hour_type), "pt-BR")
+        );
+        const subtitle = "Competência: " + formatDate(competence.start_date) + " a " +
+          formatDate(competence.end_date) + "  |  Referência: " +
+          String(competence.reference_month).padStart(2, "0") + "/" + competence.reference_year +
+          "  |  Valor por hora já considera o adicional da categoria.";
+        await downloadStandardReportExcel("horas_pagar", payableRows, subtitle);
+        return;
+      }
+
       let rows: any[] = [];
 
       if (kind === "interjornada") {
@@ -810,20 +898,6 @@ export function Relatorios() {
           department: x.employees?.departments?.name ?? "",
           date: x.reference_date,
           minutes: Math.abs(Number(x.minutes || 0)),
-          description: x.notes ?? "",
-        }));
-      }
-
-      if (kind === "absenteismo") {
-        const data = await fetchAll((from, to) => db.from("occurrences").select("occurrence_date,end_date,quantity,unit,notes,employees(full_name,departments(name)),occurrence_types!inner(code,name)").in("occurrence_types.code", ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"]).order("occurrence_date", { ascending: false }).range(from, to));
-        rows = data.map((x: any) => ({
-          date: x.occurrence_date,
-          end_date: x.end_date ?? "",
-          type: x.occurrence_types?.name ?? "",
-          quantity: x.quantity,
-          unit: x.unit,
-          employee: x.employees?.full_name ?? "",
-          department: x.employees?.departments?.name ?? "",
           description: x.notes ?? "",
         }));
       }
@@ -902,7 +976,7 @@ export function Relatorios() {
         </p>
 
         <div className="mt-5 max-w-xl">
-          <label htmlFor="report-period" className="mb-1.5 block text-sm font-medium">Competência do Fechamento de Ponto e Banco de Horas</label>
+          <label htmlFor="report-period" className="mb-1.5 block text-sm font-medium">Competência dos relatórios de Fechamento, Banco de Horas e Horas a Pagar</label>
           <select
             id="report-period"
             value={competence?.id ?? ""}
@@ -917,7 +991,7 @@ export function Relatorios() {
             ))}
           </select>
           <p className="mt-1 text-xs text-muted-foreground">
-            A competência selecionada se aplica ao Fechamento de Ponto e Banco de Horas. Os demais relatórios incluem todos os registros disponíveis.
+            A competência selecionada também é aplicada ao relatório Horas a Pagar. Interjornada, Declarações e Atestados e Faltas e Folgas incluem todos os registros disponíveis.
           </p>
         </div>
 
@@ -935,15 +1009,15 @@ export function Relatorios() {
                     ? "Excel com nome do funcionário, saldo do mês, saldo acumulado, débitos, ajustes, pagamentos e composição das horas extras."
                     : key === "interjornada"
                       ? "Excel com resumo por funcionário e aba de detalhamento, totalizando as horas de interjornada sem alterar o saldo do banco."
-                      : key === "absenteismo"
-                        ? "Excel por departamento com funcionário, ocorrência, período, quantidade, unidade e observações."
+                      : key === "horas_pagar"
+                        ? "Excel por competência com funcionário, tipo de hora, quantidade de horas e valor por hora já considerando o adicional."
                         : key === "atestados"
                           ? "Excel com declarações e atestados, período, dias, horas abonadas, motivo, CID e observações."
                           : "Excel de faltas e folgas com funcionário, período, tipo, quantidade e observações."}
               </p>
               <button
                 onClick={() => void exportReport(key)}
-                disabled={!!busy || loading || ((key === "fechamento" || key === "banco") && !competence)}
+                disabled={!!busy || loading || ((key === "fechamento" || key === "banco" || key === "horas_pagar") && !competence)}
                 className="mt-4 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
               >
                 <Download className="h-4 w-4" />
