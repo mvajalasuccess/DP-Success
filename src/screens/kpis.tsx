@@ -511,8 +511,13 @@ export function Kpis() {
           // Atestados atuais têm como fonte oficial medical_certificates.
           // Evita duplicar o mesmo atestado se houver uma ocorrência legada.
         } else if (code === "declaracao_horas" || code === "declaracao") {
-          // Declarações reduzem horas trabalhadas, mas não entram no absenteísmo.
+          // As horas efetivamente abonadas pela declaração entram em Abonos
+          // e no absenteísmo, conforme a regra do DP: faltas + débitos + abonos.
+          // Mantemos também o total de declarações separado para exibição,
+          // sem duplicar a contagem em horas perdidas.
           next.declaracoesMinutes += minutes;
+          next.abonosMinutes += minutes;
+          next.absenceMinutes += minutes;
           currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
         } else if (code === "abono" || code === "folga_abonada") {
           // Abono entra nas horas perdidas e também reduz as horas trabalhadas.
@@ -1257,7 +1262,7 @@ export function Kpis() {
               <p className="font-semibold">Cálculo do indicador</p>
               <p className="mt-2 text-sm text-muted-foreground">
                 (Débitos + Faltas + Abonos) ÷ Horas previstas × 100.
-                Atestados e declarações ficam demonstrados separadamente e não entram no indicador configurado para o DP-Success.
+                Atestados ficam demonstrados separadamente e não entram no indicador. As horas efetivamente abonadas de declarações são contabilizadas em Abonos e no absenteísmo.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-4">
                 <div><p className="text-xs text-muted-foreground">Débitos</p><p className="font-semibold">{fmt(Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes))}</p></div>
