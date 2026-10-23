@@ -1039,6 +1039,8 @@ export function Kpis() {
           }
 
           for (const row of overrides.values() as Iterable<any>) {
+            const employee = employees.find(e => e.id === String(row.employee_id));
+            if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
             expected += Number(row.expected_minutes || 0);
             lost += Math.round(Number(row.absence_quantity || 0) * 528)
               + Number(row.allowance_minutes || 0)
