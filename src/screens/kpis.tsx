@@ -224,7 +224,13 @@ export function Kpis() {
       setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(firstTarget));
 
       const selectedEmployeeSet = new Set(selectedEmployees);
-      const allowedEmployees = employees.filter(e => employeeMatches(e, [], selectedDepartment) && (!selectedEmployees.length || selectedEmployeeSet.has(e.id)));
+      // O filtro de empresa restringe os funcionários considerados nos indicadores,
+      // sem alterar as fontes ou as regras de cálculo históricas.
+      const allowedEmployees = employees.filter(e =>
+        (!companyFilter || e.companyId === companyFilter) &&
+        employeeMatches(e, [], selectedDepartment) &&
+        (!selectedEmployees.length || selectedEmployeeSet.has(e.id))
+      );
       const allowedIds = new Set(allowedEmployees.map(e => e.id));
 
       // A BASE histórica foi importada somente até a competência de julho/2026
@@ -328,16 +334,16 @@ export function Kpis() {
       };
 
       const isAllowedRow = (row: any) => {
-        // Quando "Todos os funcionários" e "Todos os setores" estão selecionados,
-        // o histórico deve considerar todos os funcionários que existem na BASE
-        // de cada competência, mesmo que hoje não estejam no cadastro ativo.
-        // Isso é necessário para que o absenteísmo de janeiro em diante não
-        // desapareça por alterações cadastrais posteriores.
-        if (!selectedEmployees.length && selectedDepartment === "todos") return true;
+        // Sem filtro de empresa, preservar a regra histórica que inclui pessoas
+        // que constavam na BASE da competência, mesmo que hoje não estejam cadastradas.
+        if (!companyFilter && !selectedEmployees.length && selectedDepartment === "todos") return true;
 
         const employee = resolveEmployee(row);
         if (employee) return allowedIds.has(employee.id);
-        if (selectedEmployees.length) return false;
+
+        // Não atribuir históricos sem correspondência cadastral a uma empresa,
+        // pois isso poderia misturar indicadores de empresas diferentes.
+        if (companyFilter || selectedEmployees.length) return false;
         return selectedDepartment === "todos" || String(row.department_name ?? "").trim() === selectedDepartment;
       };
 
@@ -1222,7 +1228,7 @@ export function Kpis() {
 
           <div className="grid gap-4 p-5 md:grid-cols-3 lg:grid-cols-5">
             <label className="grid gap-1.5 text-sm font-medium">Empresa
-              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setSelectedEmployees(employees.filter(e => !value || e.companyId === value).map(e => e.id)); setSelectedDepartment("todos"); }} className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" />
+              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setSelectedEmployees([]); setSelectedDepartment("todos"); }} className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Ano
               <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
