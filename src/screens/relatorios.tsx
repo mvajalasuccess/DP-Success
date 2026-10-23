@@ -469,9 +469,16 @@ const standardReportColumns: Record<string, StandardReportColumn[]> = {
   ],
   horas_pagar: [
     { header: "Nome do funcionário", key: "employee", width: 34 },
-    { header: "Tipo de hora", key: "hour_type", width: 34 },
-    { header: "Quantidade de horas", key: "quantity_minutes", width: 22, format: "duration" },
-    { header: "Valor da hora", key: "hourly_rate", width: 20, format: "currency" },
+    { header: "HE 60% — Quantidade", key: "he60_minutes", width: 20, format: "duration" },
+    { header: "HE 60% — Valor", key: "he60_value", width: 18, format: "currency" },
+    { header: "HE 60% + 20% noturno — Quantidade", key: "he60night_minutes", width: 29, format: "duration" },
+    { header: "HE 60% + 20% noturno — Valor", key: "he60night_value", width: 27, format: "currency" },
+    { header: "HE 100% — Quantidade", key: "he100_minutes", width: 20, format: "duration" },
+    { header: "HE 100% — Valor", key: "he100_value", width: 18, format: "currency" },
+    { header: "Adicional noturno 20% — Quantidade", key: "night20_minutes", width: 29, format: "duration" },
+    { header: "Adicional noturno 20% — Valor", key: "night20_value", width: 27, format: "currency" },
+    { header: "Total de horas", key: "total_minutes", width: 17, format: "duration" },
+    { header: "Total a pagar", key: "total_value", width: 19, format: "currency" },
   ],
   atestados: [
     { header: "Tipo de registro", key: "tipo", width: 23 },
@@ -799,7 +806,6 @@ export function Relatorios() {
           .order("full_name");
         if (employeeError) throw employeeError;
 
-        // Considera os mesmos funcionários elegíveis à competência que a tela Pagamentos.
         const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
           (!employee.hire_date || employee.hire_date <= competence.end_date) &&
           (!employee.termination_date || employee.termination_date >= competence.start_date)
@@ -808,8 +814,8 @@ export function Relatorios() {
           throw new Error("Não há funcionários vinculados a essa competência.");
         }
 
-        // Usa o cálculo central do Banco de Horas para preservar BASE, overrides,
-        // ajustes, pagamentos já registrados e saldos manuais validados.
+        // O saldo continua vindo do cálculo central, preservando BASE, overrides,
+        // ajustes, pagamentos existentes e saldos manuais já validados.
         const balancesById = await balancesByEmployees(
           employeesInPeriod.map((employee: any) => String(employee.id))
         );
@@ -822,17 +828,16 @@ export function Relatorios() {
             ? Number(employeeBalances[employeeBalances.length - 1].accumulated ?? 0)
             : 0;
 
-          // A tela Pagamentos só gera composição quando o saldo geral acumulado é positivo.
+          // A tela Pagamentos não cria composição quando o saldo geral acumulado não é positivo.
           if (!periodBalance || generalBalance <= 0) continue;
 
           const composition = periodBalance.composition;
           const nightMinutes = Math.max(0, Number(composition?.ADICIONAL_NOTURNO ?? 0));
-          const gross60 = Math.max(0, Number(composition?.HE_60 ?? 0));
           const gross60Night = Math.max(0, Number(composition?.HE_60_NOTURNO ?? 0));
           const gross100 = Math.max(0, Number(composition?.HE_100 ?? 0));
           const targetPayable = Math.max(0, Number(periodBalance.monthBalance ?? 0));
 
-          // Mesma distribuição usada na tela Pagamentos; não recalcula nem grava saldos.
+          // Mesma distribuição de categorias e precedência da tela Pagamentos.
           const has60Night = gross60Night > 0;
           const payable60Night = has60Night ? Math.min(gross60Night, targetPayable) : 0;
           const payable100 = Math.min(
@@ -846,24 +851,31 @@ export function Relatorios() {
 
           const weeklyMinutes = Number(employee.work_schedules?.weekly_minutes || 0);
           const divisor = weeklyMinutes ? (weeklyMinutes / 60) * 5 : 220;
-          // A tela Pagamentos arredonda a hora normal para 4 casas antes dos adicionais.
+          // Arredonda a hora normal a quatro casas antes de aplicar os adicionais.
           const normalHourlyRate = Number((Number(employee.salary || 0) / divisor).toFixed(4));
-          const details = [
-            { label: "Hora extra 60%", minutes: payable60, multiplier: 1.6 },
-            { label: "Hora extra 60% + 20% noturno", minutes: payable60Night, multiplier: 1.92 },
-            { label: "Hora extra 100%", minutes: payable100, multiplier: 2 },
-            { label: "Adicional noturno 20%", minutes: payableNight, multiplier: 0.2 },
-          ];
+          const he60Value = (payable60 / 60) * normalHourlyRate * 1.6;
+          const he60NightValue = (payable60Night / 60) * normalHourlyRate * 1.92;
+          const he100Value = (payable100 / 60) * normalHourlyRate * 2;
+          const night20Value = (payableNight / 60) * normalHourlyRate * 0.2;
+          const totalMinutes = payable60 + payable60Night + payable100 + payableNight;
+          // Soma valores sem arredondar cada parcela em centavos, igual à tela Pagamentos.
+          const totalValue = he60Value + he60NightValue + he100Value + night20Value;
 
-          for (const detail of details) {
-            if (detail.minutes <= 0) continue;
-            payableRows.push({
-              employee: employee.full_name ?? "",
-              hour_type: detail.label,
-              quantity_minutes: Math.round(detail.minutes),
-              hourly_rate: normalHourlyRate * detail.multiplier,
-            });
-          }
+          if (totalMinutes <= 0) continue;
+
+          payableRows.push({
+            employee: employee.full_name ?? "",
+            he60_minutes: Math.round(payable60),
+            he60_value: he60Value,
+            he60night_minutes: Math.round(payable60Night),
+            he60night_value: he60NightValue,
+            he100_minutes: Math.round(payable100),
+            he100_value: he100Value,
+            night20_minutes: Math.round(payableNight),
+            night20_value: night20Value,
+            total_minutes: Math.round(totalMinutes),
+            total_value: totalValue,
+          });
         }
 
         if (!payableRows.length) {
@@ -871,13 +883,12 @@ export function Relatorios() {
         }
 
         payableRows.sort((a, b) =>
-          String(a.employee).localeCompare(String(b.employee), "pt-BR") ||
-          String(a.hour_type).localeCompare(String(b.hour_type), "pt-BR")
+          String(a.employee).localeCompare(String(b.employee), "pt-BR")
         );
         const subtitle = "Competência: " + formatDate(competence.start_date) + " a " +
           formatDate(competence.end_date) + "  |  Referência: " +
           String(competence.reference_month).padStart(2, "0") + "/" + competence.reference_year +
-          "  |  Valor por hora já considera o adicional da categoria.";
+          "  |  Valores por categoria e total a pagar seguem a composição da tela Pagamentos.";
         await downloadStandardReportExcel("horas_pagar", payableRows, subtitle);
         return;
       }
@@ -1010,7 +1021,7 @@ export function Relatorios() {
                     : key === "interjornada"
                       ? "Excel com resumo por funcionário e aba de detalhamento, totalizando as horas de interjornada sem alterar o saldo do banco."
                       : key === "horas_pagar"
-                        ? "Excel por competência com funcionário, tipo de hora, quantidade de horas e valor por hora já considerando o adicional."
+                        ? "Excel com uma linha por funcionário, horas e valores separados por categoria e total a pagar da competência."
                         : key === "atestados"
                           ? "Excel com declarações e atestados, período, dias, horas abonadas, motivo, CID e observações."
                           : "Excel de faltas e folgas com funcionário, período, tipo, quantidade e observações."}
