@@ -270,8 +270,15 @@ export function Comparativos() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 8), [selectedEmployeeRows]);
   const fmtNumber = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
-  const sumHours = (key: "he60" | "he60_20" | "he100" | "he20") =>
+  const sumHours = (key: "he60" | "he60_20" | "he100" | "he20" | "debitos") =>
     selectedEmployeeRows.reduce((sum, row) => sum + row.totals[key], 0);
+  const sumDays = (key: "faltas" | "atestados") =>
+    selectedEmployeeRows.reduce((sum, row) => sum + row.totals[key], 0);
+  const occurrenceChart = [
+    { name: "Débitos", quantidade: sumHours("debitos") / 60 },
+    { name: "Faltas", quantidade: sumDays("faltas") },
+    { name: "Atestados", quantidade: sumDays("atestados") },
+  ];
   const hasChartData = selectedEmployeeRows.length > 0 && selectedPeriods.length > 0;
 
   return <div className="min-h-screen bg-background">
@@ -333,12 +340,15 @@ export function Comparativos() {
         <div><h2 className="text-xl font-semibold tracking-tight">Resumo da seleção</h2><p className="mt-1 text-sm text-muted-foreground">Totais agregados do recorte selecionado, sem incluir dados inventados.</p></div>
         <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><Clock3 className="h-3.5 w-3.5" />Horas em HH:MM na tabela</span>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {[
           {label:"HE 60%",value:fmt(sumHours("he60")),icon:<Clock3 className="h-4 w-4" />},
           {label:"HE 60% + noturno",value:fmt(sumHours("he60_20")),icon:<Clock3 className="h-4 w-4" />},
           {label:"HE 100%",value:fmt(sumHours("he100")),icon:<TrendingUp className="h-4 w-4" />},
           {label:"HE 20%",value:fmt(sumHours("he20")),icon:<Clock3 className="h-4 w-4" />},
+          {label:"Débitos",value:fmt(sumHours("debitos")),icon:<Clock3 className="h-4 w-4" />},
+          {label:"Faltas",value:sumDays("faltas").toLocaleString("pt-BR", {maximumFractionDigits:2}) + " dias",icon:<Users className="h-4 w-4" />},
+          {label:"Atestados",value:sumDays("atestados").toLocaleString("pt-BR", {maximumFractionDigits:2}) + " dias",icon:<CalendarRange className="h-4 w-4" />},
         ].map(item => <Card key={item.label} className="rounded-2xl border-border/70 p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">{item.label}</span><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#06CAA0]/10 text-emerald-700 dark:text-emerald-300">{item.icon}</span></div>
           <div className="mt-3 text-2xl font-semibold tabular-nums">{item.value}</div>
@@ -377,13 +387,24 @@ export function Comparativos() {
         </Card>
       </div>
 
+      <Card className="mt-4 rounded-2xl border-border/70 p-4 shadow-sm sm:p-5">
+        <div className="mb-4"><h3 className="font-semibold">Débitos, faltas e atestados</h3><p className="mt-1 text-xs text-muted-foreground">Horas e dias são apresentados em unidades próprias para evitar comparações enganosas.</p></div>
+        {hasChartData && occurrenceChart.some(item => item.quantidade > 0) ? <div className="h-[250px] w-full">
+          <ResponsiveContainer width="100%" height="100%"><BarChart data={occurrenceChart} margin={{top:8,right:12,left:0,bottom:8}}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" tick={{fontSize:12}} /><YAxis tick={{fontSize:11}} />
+            <Tooltip formatter={(value) => [fmtNumber(Number(value)), "Quantidade"]} />
+            <Bar dataKey="quantidade" name="Quantidade" fill="#0D9488" radius={[6,6,0,0]} maxBarSize={56} />
+          </BarChart></ResponsiveContainer>
+        </div> : <div className="flex h-[220px] items-center justify-center rounded-xl bg-muted/20 text-center text-sm text-muted-foreground">Sem ocorrências no recorte selecionado.</div>}
+      </Card>
+
       <Card className="mt-5 overflow-hidden rounded-2xl border-border/70 shadow-sm">
         <div className="flex flex-col gap-3 border-b bg-muted/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div><h2 className="font-semibold">Detalhamento por colaborador</h2><p className="mt-1 text-xs text-muted-foreground">Valores acumulados nas competências selecionadas. Faltas e atestados exibidos em dias.</p></div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground"><FileSpreadsheet className="h-4 w-4" />Tabela detalhada</div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
+          <table className="w-full min-w-[1250px] text-left text-sm">
             <thead className="sticky top-0 bg-muted/70 text-xs uppercase tracking-wide text-muted-foreground"><tr>
               <th className="sticky left-0 z-10 bg-muted/90 px-4 py-3 font-semibold">Colaborador</th>
               {columns.map(([, label]) => <th key={label} className="whitespace-nowrap px-4 py-3 font-semibold">{label}</th>)}
