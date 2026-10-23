@@ -744,6 +744,20 @@ function DashboardHome() {
               <strong>{metrics.period}</strong>
             </div>
           </div>
+          <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {cards.map(([label, value, Icon, detail]) => (
+              <Card key={label} className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-muted-foreground">{label}</p>
+                    <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">{value}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+                  </div>
+                  <div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Icon className="h-5 w-5" /></div>
+                </div>
+              </Card>
+            ))}
+          </section>
           <section className="mt-6">
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Resumo da competência</p>
@@ -797,52 +811,6 @@ function DashboardHome() {
             </div>
           </section>
 
-          <section className="mt-6 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-            <Card className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Visão rápida</p>
-              <h2 className="mt-1 text-xl font-bold">Horas extras por departamento</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Onde estão concentradas as horas extras da competência.</p>
-              <div className="mt-5 space-y-3">
-                {departments.map(d => {
-                  const total = Math.max(metrics.overtime, 1);
-                  const width = Math.min(100, (d.minutes / total) * 100);
-                  return (
-                    <div key={d.name}>
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="truncate font-medium">{d.name}</span>
-                        <span className="font-semibold">{fmt(d.minutes)}</span>
-                      </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-primary/70" style={{ width: width + "%" }} />
-                      </div>
-                    </div>
-                  );
-                })}
-                {!departments.length && <p className="py-6 text-sm text-muted-foreground">Nenhum departamento com horas extras registradas.</p>}
-              </div>
-            </Card>
-            <Card className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Controle de horas</p>
-              <h2 className="mt-1 text-xl font-bold">Débitos individuais na competência</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Débitos registrados por funcionário na competência selecionada.</p>
-              <div className="mt-4 space-y-3">
-                {individualDebits.map(item => (
-                  <div key={item.name} className="flex items-center justify-between gap-3 border-b pb-2 text-sm last:border-0">
-                    <span className="min-w-0 truncate font-medium">{item.name}</span>
-                    <span className="shrink-0 font-semibold tabular-nums">{fmt(item.minutes)}</span>
-                  </div>
-                ))}
-                {!individualDebits.length && <p className="py-5 text-sm text-muted-foreground">Nenhum débito individual registrado nesta competência.</p>}
-              </div>
-              <div className="mt-4 border-t pt-3">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="font-medium">Total de débitos</span>
-                  <span className="font-bold tabular-nums">{fmt(individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
-                </div>
-              </div>
-            </Card>
-          </section>
-
           <section className="mt-6">
             <Card className="p-5">
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -868,6 +836,53 @@ function DashboardHome() {
               </div>
             </Card>
           </section>
+
+          <section className="mt-6 grid items-stretch gap-4 lg:grid-cols-2">
+            <Card className="flex h-[390px] min-h-0 flex-col p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Visão rápida</p>
+              <h2 className="mt-1 text-xl font-bold">Horas extras por departamento</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Onde estão concentradas as horas extras da competência.</p>
+              <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
+                {departments.map(d => {
+                  const total = Math.max(metrics.overtime, 1);
+                  const width = Math.min(100, (d.minutes / total) * 100);
+                  return (
+                    <div key={d.name}>
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate font-medium">{d.name}</span>
+                        <span className="font-semibold">{fmt(d.minutes)}</span>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary/70" style={{ width: width + "%" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {!departments.length && <p className="py-6 text-sm text-muted-foreground">Nenhum departamento com horas extras registradas.</p>}
+              </div>
+            </Card>
+            <Card className="flex h-[390px] min-h-0 flex-col p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Controle de horas</p>
+              <h2 className="mt-1 text-xl font-bold">Débitos individuais na competência</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Débitos registrados por funcionário na competência selecionada.</p>
+              <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
+                {individualDebits.map(item => (
+                  <div key={item.name} className="flex items-center justify-between gap-3 border-b pb-2 text-sm last:border-0">
+                    <span className="min-w-0 truncate font-medium">{item.name}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">{fmt(item.minutes)}</span>
+                  </div>
+                ))}
+                {!individualDebits.length && <p className="py-5 text-sm text-muted-foreground">Nenhum débito individual registrado nesta competência.</p>}
+              </div>
+              <div className="mt-4 border-t pt-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium">Total de débitos</span>
+                  <span className="font-bold tabular-nums">{fmt(individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
+                </div>
+              </div>
+            </Card>
+          </section>
+
         </div>
     </div>
   );
