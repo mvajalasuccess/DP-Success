@@ -26,7 +26,7 @@ type PreviewRow = {
   night: number;
   interjornada: number;
   saldo: number;
-  status: "ok" | "nao_encontrado" | "competencia_nao_encontrada";
+  status: "ok" | "nao_encontrado" | "competencia_nao_encontrada" | "intervalo_fora_competencia";
   employeeStatus: string;
   message: string;
 };
@@ -238,6 +238,11 @@ async function readWorkbookRows(
       } else if (!period) {
         status = "competencia_nao_encontrada";
         message = "Crie esta competência no Fechamento antes de importar";
+      } else if (range.endDate > period.end_date) {
+        const endDateLabel = `${range.endDate.slice(8, 10)}/${range.endDate.slice(5, 7)}/${range.endDate.slice(0, 4)}`;
+        const periodEndLabel = `${period.end_date.slice(8, 10)}/${period.end_date.slice(5, 7)}/${period.end_date.slice(0, 4)}`;
+        status = "intervalo_fora_competencia";
+        message = `O intervalo termina em ${endDateLabel}, mas a competência termina em ${periodEndLabel}. Separe as horas entre as competências antes de importar; não é seguro lançar o total inteiro no período anterior.`;
       }
 
       output.push({
@@ -283,6 +288,7 @@ export function SincronizarPlanilha() {
     ok: rows.filter(r => r.status === "ok").length,
     unmatched: rows.filter(r => r.status === "nao_encontrado").length,
     missingPeriod: rows.filter(r => r.status === "competencia_nao_encontrada").length,
+    intervalOutsidePeriod: rows.filter(r => r.status === "intervalo_fora_competencia").length,
   }), [rows]);
 
   useEffect(() => {
@@ -682,7 +688,7 @@ export function SincronizarPlanilha() {
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <Card className="p-5"><FileSpreadsheet className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Linhas encontradas</p><p className="mt-1 text-2xl font-bold">{rows.length}</p></Card>
         <Card className="p-5"><CheckCircle2 className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Prontas</p><p className="mt-1 text-2xl font-bold">{counts.ok}</p></Card>
-        <Card className="p-5"><AlertTriangle className="h-5 w-5 text-warning" /><p className="mt-3 text-sm text-muted-foreground">Precisam de conferência</p><p className="mt-1 text-2xl font-bold">{counts.unmatched + counts.missingPeriod}</p></Card>
+        <Card className="p-5"><AlertTriangle className="h-5 w-5 text-warning" /><p className="mt-3 text-sm text-muted-foreground">Precisam de conferência</p><p className="mt-1 text-2xl font-bold">{counts.unmatched + counts.missingPeriod + counts.intervalOutsidePeriod}</p></Card>
       </div>
 
       <Card className="mt-6 p-5">
