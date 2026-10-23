@@ -53,6 +53,12 @@ export function Comparativos() {
     try {
       const db = supabase as any;
       const periodsSelected = periods.filter(p => periodIds.includes(p.id));
+      const historicalCutoff = "2026-07-20";
+      const currentPeriods = periodsSelected
+        .filter(period => period.end_date > historicalCutoff)
+        .sort((a, b) => a.start_date.localeCompare(b.start_date));
+      const selectedRanges = periodsSelected.map(p => ({ start: p.start_date, end: p.end_date }));
+      const currentRanges = currentPeriods.map(p => ({ start: p.start_date, end: p.end_date }));
       const fetchAll = async (build: (from: number, to: number) => any) => {
         const rows: any[] = [];
         for (let from = 0; ; from += 1000) {
@@ -65,7 +71,7 @@ export function Comparativos() {
         return rows;
       };
       const historicalQuery = (from: number, to: number) => db.from("historical_kpi_data")
-        .select("id,employee_id,period_id,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+        .select("id,employee_id,period_id,absence_quantity,certificate_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
         .in("employee_id", employeeIds).in("period_id", periodIds).order("id").range(from, to);
       const overtimeQuery = (from: number, to: number) => db.from("overtime_records")
         .select("id,employee_id,minutes,launch_type,period_id,reference_date")
@@ -74,28 +80,41 @@ export function Comparativos() {
         .select("id,employee_id,minutes,kind,period_id,entry_date")
         .in("employee_id", employeeIds).in("period_id", periodIds).eq("kind", "debito").order("id").range(from, to);
       const absenceQuery = (from: number, to: number) => db.from("occurrences")
-        .select("id,employee_id,quantity,occurrence_date,end_date,occurrence_types!inner(code)")
+        .select("id,employee_id,period_id,quantity,occurrence_date,end_date,occurrence_types!inner(code)")
         .in("employee_id", employeeIds).in("occurrence_types.code", ABSENCE_CODES).order("id").range(from, to);
       const certificateQuery = (from: number, to: number) => db.from("medical_certificates")
         .select("id,employee_id,days,start_date,end_date")
         .in("employee_id", employeeIds).order("id").range(from, to);
+      const overrideQuery = (from: number, to: number) => db.from("point_closing_overrides")
+        .select("id,employee_id,period_id,absence_quantity,certificate_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
+        .in("employee_id", employeeIds).in("period_id", periodIds).order("id").range(from, to);
 
-      const [historical, overtime, debits, absences, certificates] = await Promise.all([
+      const [historical, overtime, debits, absences, certificates, overrides] = await Promise.all([
         fetchAll(historicalQuery), fetchAll(overtimeQuery), fetchAll(debitQuery),
-        fetchAll(absenceQuery), fetchAll(certificateQuery)
+        fetchAll(absenceQuery), fetchAll(certificateQuery), fetchAll(overrideQuery),
       ]);
 
-      const selectedRanges = periodsSelected.map(p => ({ start: p.start_date, end: p.end_date }));
-      const overlapDays = (startDate: string, endDate?: string | null) => {
+      const keyFor = (employeeId: string, periodId: string) => `${periodId}:${employeeId}`;
+      const historicalKeys = new Set(
+        historical.map((row: any) => keyFor(String(row.employee_id), String(row.period_id))),
+      );
+      const overridesByKey = new Map(
+        overrides.map((row: any) => [keyFor(String(row.employee_id), String(row.period_id)), row]),
+      );
+      const overlapDays = (
+        startDate: string,
+        endDate?: string | null,
+        ranges: Array<{ start: string; end: string }> = selectedRanges,
+      ) => {
         const start = new Date(startDate + "T00:00:00");
         const end = new Date((endDate ?? startDate) + "T00:00:00");
         if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
         let total = 0;
-        for (const range of selectedRanges) {
-          const rs = new Date(range.start + "T00:00:00");
-          const re = new Date(range.end + "T00:00:00");
-          const from = start > rs ? start : rs;
-          const to = end < re ? end : re;
+        for (const range of ranges) {
+          const rangeStart = new Date(range.start + "T00:00:00");
+          const rangeEnd = new Date(range.end + "T00:00:00");
+          const from = start > rangeStart ? start : rangeStart;
+          const to = end < rangeEnd ? end : rangeEnd;
           if (to >= from) total += Math.floor((to.getTime() - from.getTime()) / 86400000) + 1;
         }
         return total;
@@ -104,46 +123,93 @@ export function Comparativos() {
       const next: Record<string, Totals> = {};
       employeeIds.forEach(id => { next[id] = { ...EMPTY }; });
 
+      // BASE is the source of truth for imported historical periods; a saved
+      // closing override replaces that row, never adds to it.
       for (const row of historical) {
-        const t = next[row.employee_id]; if (!t) continue;
+        const t = next[row.employee_id];
+        if (!t) continue;
+        const key = keyFor(String(row.employee_id), String(row.period_id));
+        const source = overridesByKey.get(key) ?? row;
+        t.he60 += Number(source.he_60_minutes || 0);
+        t.he60_20 += Number(source.he_60_night_minutes || 0);
+        t.he100 += Number(source.he_100_minutes || 0);
+        t.he20 += Number(source.he_20_minutes || 0);
+        t.interjornada += Number(source.interjornada_minutes || 0);
+        t.debitos += Math.abs(Number(source.debit_minutes || 0));
+        t.faltas += Number(source.absence_quantity || 0);
+        t.atestados += Math.max(0, Number(source.certificate_minutes || 0)) / 528;
+      }
+
+      // Operational launches fill only periods without a historical BASE row or
+      // a manual closing override, so a launch cannot be counted twice.
+      for (const row of overtime) {
+        const t = next[row.employee_id];
+        if (!t) continue;
+        const key = keyFor(String(row.employee_id), String(row.period_id));
+        if (historicalKeys.has(key) || overridesByKey.has(key)) continue;
+        const type = String(row.launch_type || "").toUpperCase();
+        const minutes = Math.abs(Number(row.minutes) || 0);
+        if (type.includes("INTERJORNADA")) t.interjornada += minutes;
+        else if (type === "HE_60_NOTURNO" || type.includes("60_20") || type.includes("60%20") || type.includes("60+20")) t.he60_20 += minutes;
+        else if (type.includes("100")) t.he100 += minutes;
+        else if (type === "ADICIONAL_NOTURNO" || type.includes("20")) t.he20 += minutes;
+        else t.he60 += minutes;
+      }
+
+      for (const row of debits) {
+        const total = next[row.employee_id];
+        if (!total) continue;
+        const key = keyFor(String(row.employee_id), String(row.period_id));
+        if (historicalKeys.has(key) || overridesByKey.has(key)) continue;
+        total.debitos += Math.abs(Number(row.minutes) || 0);
+      }
+
+      for (const row of absences) {
+        const t = next[row.employee_id];
+        if (!t) continue;
+        const overlap = overlapDays(row.occurrence_date, row.end_date);
+        if (!overlap) continue;
+        const key = row.period_id ? keyFor(String(row.employee_id), String(row.period_id)) : "";
+        if (key && (historicalKeys.has(key) || overridesByKey.has(key))) continue;
+        const fullDays = Math.max(1, Math.round(Number(row.quantity || 0)));
+        const selectedDays = row.end_date
+          ? Math.min(fullDays, overlap)
+          : Number(row.quantity || 0);
+        if (selectedDays > 0) t.faltas += selectedDays;
+      }
+
+      // Live certificates apply to current-period date ranges only. Historical
+      // certificates come from the imported BASE values above.
+      for (const row of certificates) {
+        const t = next[row.employee_id];
+        if (!t) continue;
+        let remainingDays = Math.max(0, Number(row.days || 0));
+        for (const period of currentPeriods) {
+          const key = keyFor(String(row.employee_id), String(period.id));
+          if (historicalKeys.has(key) || overridesByKey.has(key)) continue;
+          const overlap = overlapDays(row.start_date, row.end_date, [{ start: period.start_date, end: period.end_date }]);
+          if (!overlap) continue;
+          const days = remainingDays > 0 ? Math.min(remainingDays, overlap) : overlap;
+          t.atestados += days;
+          if (remainingDays > 0) remainingDays -= days;
+        }
+      }
+
+      // A current manual closing is the authoritative summary for that employee
+      // and period, replacing all matching operational rows.
+      for (const row of overrides) {
+        const key = keyFor(String(row.employee_id), String(row.period_id));
+        if (historicalKeys.has(key)) continue; // already applied over the BASE row
+        const t = next[row.employee_id];
+        if (!t) continue;
         t.he60 += Number(row.he_60_minutes || 0);
         t.he60_20 += Number(row.he_60_night_minutes || 0);
         t.he100 += Number(row.he_100_minutes || 0);
         t.he20 += Number(row.he_20_minutes || 0);
         t.interjornada += Number(row.interjornada_minutes || 0);
-      }
-      for (const row of overtime) {
-        const t = next[row.employee_id]; if (!t) continue;
-        const type = String(row.launch_type || "").toUpperCase();
-        const minutes = Math.abs(Number(row.minutes) || 0);
-        if (type.includes("INTERJORNADA")) t.interjornada += minutes;
-        else if (type.includes("60_20") || type.includes("60%20") || type.includes("60+20")) t.he60_20 += minutes;
-        else if (type.includes("100")) t.he100 += minutes;
-        else if (type.includes("20")) t.he20 += minutes;
-        else t.he60 += minutes;
-      }
-      for (const row of debits) {
-        const total = next[row.employee_id];
-        if (total) total.debitos += Math.abs(Number(row.minutes) || 0);
-      }
-      for (const row of absences) {
-        const t = next[row.employee_id];
-        if (!t) continue;
-        const totalDays = Math.max(1, overlapDays(row.occurrence_date, row.end_date));
-        const fullDays = Math.max(1, Math.round(Number(row.quantity || 0)));
-        const selectedDays = row.end_date
-          ? Math.min(fullDays, totalDays)
-          : Number(row.quantity || 0);
-        if (selectedDays > 0) t.faltas += selectedDays;
-      }
-      for (const row of certificates) {
-        const t = next[row.employee_id];
-        if (!t) continue;
-        const overlap = overlapDays(row.start_date, row.end_date);
-        if (!overlap) continue;
-        const certificateDays = Number(row.days || 0);
-        const calendarDays = Math.max(1, overlapDays(row.start_date, row.end_date));
-        t.atestados += row.end_date ? Math.min(certificateDays || calendarDays, overlap) : certificateDays;
+        t.debitos += Math.abs(Number(row.debit_minutes || 0));
+        t.faltas += Number(row.absence_quantity || 0);
+        t.atestados += Math.max(0, Number(row.certificate_minutes || 0)) / 528;
       }
 
       setTotals(next);
