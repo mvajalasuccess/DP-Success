@@ -922,9 +922,10 @@ export function Kpis() {
         { data: occurrenceRows },
         { data: debitRows },
         { data: overrideRows },
+        { data: scheduleRows },
       ] = await Promise.all([
         historicalIds.length
-          ? db.from("historical_kpi_data").select("period_id,employee_id,reference_year,reference_month,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").eq("reference_year", selectedYear)
+          ? db.from("historical_kpi_data").select("period_id,employee_id,registration,employee_name,department_name,reference_year,reference_month,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").eq("reference_year", selectedYear)
           : Promise.resolve({ data: [] }),
         currentIds.length
           ? db.from("time_records").select("employee_id,period_id,expected_minutes").in("period_id", currentIds)
@@ -938,6 +939,7 @@ export function Kpis() {
         yearPeriods.length
           ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
           : Promise.resolve({ data: [] }),
+        db.from("work_schedules").select("id,weekly_minutes").eq("active", true),
       ]);
 
       // Correções manuais substituem a BASE também nas competências históricas.
@@ -947,12 +949,51 @@ export function Kpis() {
         (overrideRows ?? []).map((row: any) => [`${row.period_id}:${row.employee_id}`, row]),
       );
 
-      const employeeIncludedForPeriod = (employee: Employee, period: Period) => {
-        const active = (!employee.hireDate || employee.hireDate <= period.end_date)
-          && (!employee.terminationDate || employee.terminationDate >= period.start_date);
-        const departmentOk = selectedDepartment === "todos" || employee.department === selectedDepartment;
-        const employeeOk = !selectedEmployees.length || selectedEmployees.includes(employee.id);
-        return active && departmentOk && employeeOk;
+      // Reutiliza os mesmos critérios de identificação e filtros do card de
+      // absenteísmo. Antes, o gráfico histórico somava a BASE inteira mesmo
+      // quando um funcionário/setor estava selecionado, causando divergência
+      // entre o percentual do card e a coluna da competência.
+      const normalizeHistoricalName = (value: unknown) =>
+        String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase();
+      const resolveHistoricalEmployee = (row: any): Employee | undefined => {
+        if (row.employee_id) {
+          const byId = employees.find(e => e.id === String(row.employee_id));
+          if (byId) return byId;
+        }
+        if (row.employee_name) {
+          const normalizedName = normalizeHistoricalName(row.employee_name);
+          const byName = employees.find(e => normalizeHistoricalName(e.name) === normalizedName);
+          if (byName) return byName;
+        }
+        if (row.registration) {
+          const registration = String(row.registration).trim();
+          const matches = employees.filter(e => e.registration && e.registration === registration);
+          if (matches.length === 1) return matches[0];
+        }
+        return undefined;
+      };
+      const historicalRowIncluded = (row: any) => {
+        if (!selectedEmployees.length && selectedDepartment === "todos") return true;
+        const employee = resolveHistoricalEmployee(row);
+        if (employee) {
+          return (!selectedEmployees.length || selectedEmployees.includes(employee.id))
+            && (selectedDepartment === "todos" || employee.department === selectedDepartment);
+        }
+        if (selectedEmployees.length) return false;
+        return selectedDepartment === "todos"
+          || String(row.department_name ?? "").trim() === selectedDepartment;
+      };
+      // O card não elimina registros de uma pessoa apenas pelo status atual:
+      // ele considera os filtros selecionados, respeitando os minutos registrados.
+      const employeeIncludedForSelectedFilters = (employee: Employee) =>
+        (selectedDepartment === "todos" || employee.department === selectedDepartment)
+        && (!selectedEmployees.length || selectedEmployees.includes(employee.id));
+      const scheduleMinutes = new Map<string, number>(
+        (scheduleRows ?? []).map((row: any) => [String(row.id), Number(row.weekly_minutes || 0)]),
+      );
+      const dailyMinutesFromSchedule = (employee: Employee) => {
+        const weekly = employee.workScheduleId ? (scheduleMinutes.get(employee.workScheduleId) ?? 0) : 0;
+        return weekly ? weekly / 5 : 8.8 * 60;
       };
 
       const result = yearPeriods.map(period => {
@@ -960,7 +1001,12 @@ export function Kpis() {
         let lost = 0;
 
         for (const row of (historicalRows ?? []).filter((x: any) => x.period_id === period.id)) {
-          const override = overrideByPeriodEmployee.get(`${row.period_id}:${row.employee_id}`);
+          if (!historicalRowIncluded(row)) continue;
+          const employee = resolveHistoricalEmployee(row);
+          const overrideEmployeeId = row.employee_id ? String(row.employee_id) : employee?.id;
+          const override = overrideEmployeeId
+            ? overrideByPeriodEmployee.get(`${row.period_id}:${overrideEmployeeId}`)
+            : undefined;
           const sourceRow = override ? { ...row, ...override } : row;
           expected += Number(sourceRow.expected_minutes || 0);
           lost += Math.round(Number(sourceRow.absence_quantity || 0) * 528)
@@ -979,13 +1025,14 @@ export function Kpis() {
           for (const row of (timeRows ?? []).filter((x: any) => x.period_id === period.id)) {
             if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
             const employee = employees.find(e => e.id === row.employee_id);
-            if (!employee || !employeeIncludedForPeriod(employee, period)) continue;
-            expected += Number(row.expected_minutes || 0);
-            recorded.add(String(row.employee_id));
+            if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
+            const rowExpected = Number(row.expected_minutes || 0);
+            expected += rowExpected;
+            if (rowExpected > 0) recorded.add(String(row.employee_id));
           }
 
           for (const employee of employees) {
-            if (!employeeIncludedForPeriod(employee, period) || overrides.has(employee.id) || recorded.has(employee.id)) continue;
+            if (!employeeIncludedForSelectedFilters(employee) || overrides.has(employee.id) || recorded.has(employee.id)) continue;
             const start = employee.hireDate && employee.hireDate > period.start_date ? employee.hireDate : period.start_date;
             const end = employee.terminationDate && employee.terminationDate < period.end_date ? employee.terminationDate : period.end_date;
             if (end >= start) expected += countWorkingWeekdays(start, end) * 528;
@@ -1001,11 +1048,11 @@ export function Kpis() {
           for (const row of (occurrenceRows ?? []).filter((x: any) => x.period_id === period.id)) {
             if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
             const employee = employees.find(e => e.id === row.employee_id);
-            if (!employee || !employeeIncludedForPeriod(employee, period)) continue;
+            if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
             const code = String(row.occurrence_types?.code ?? "").toLowerCase();
             const quantity = Number(row.quantity || 0);
             const unit = String(row.unit ?? "dias").toLowerCase();
-            const minutes = unit.startsWith("dia") ? quantity * 528 : unit.startsWith("hor") ? quantity * 60 : quantity;
+            const minutes = unit.startsWith("dia") ? quantity * dailyMinutesFromSchedule(employee) : unit.startsWith("hor") ? quantity * 60 : quantity;
             if (["falta","folga_abonada","falta_justificada","falta_injustificada","abono"].includes(code)) {
               lost += Math.round(minutes);
             }
@@ -1014,7 +1061,7 @@ export function Kpis() {
           for (const row of (debitRows ?? []).filter((x: any) => x.period_id === period.id)) {
             if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
             const employee = employees.find(e => e.id === row.employee_id);
-            if (employee && employeeIncludedForPeriod(employee, period)) lost += Math.abs(Number(row.minutes || 0));
+            if (employee && employeeIncludedForSelectedFilters(employee)) lost += Math.abs(Number(row.minutes || 0));
           }
         }
 
