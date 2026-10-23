@@ -56,7 +56,7 @@ export function Payments() {
     try {
       const [periodResult, employeeResult] = await Promise.all([
         supabase.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
-        supabase.from("employees").select("id,full_name,company_id,salary,work_schedule_id,status,hire_date,termination_date,work_schedules(weekly_minutes)").order("full_name"),
+        (supabase as any).from("employees").select("id,full_name,company_id,salary,work_schedule_id,status,hire_date,termination_date,work_schedules(weekly_minutes)").order("full_name"),
       ]);
       if (periodResult.error) throw new Error(periodResult.error.message);
       if (employeeResult.error) throw new Error(employeeResult.error.message);
