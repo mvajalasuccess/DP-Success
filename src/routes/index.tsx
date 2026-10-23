@@ -4,6 +4,7 @@ import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarC
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
+const Companies = lazy(() => import("@/screens/empresas").then(m => ({ default: m.Companies })));
 const Positions = lazy(() => import("@/screens/cargos").then(m => ({ default: m.Positions })));
 const Departments = lazy(() => import("@/screens/departamentos").then(m => ({ default: m.Departments })));
 const Schedules = lazy(() => import("@/screens/jornadas-escalas").then(m => ({ default: m.Schedules })));
@@ -25,10 +26,10 @@ import { balancesByEmployees } from "@/lib/dp-model";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
-type ScreenKey = "dashboard" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "importacao-historico" | "importar-cartao-ponto";
+type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "importacao-historico" | "importar-cartao-ponto";
 
 const screenComponents = {
-  funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
+  empresas: Companies, funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours, pagamentos: Payments,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
   relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto,
@@ -44,7 +45,7 @@ function fmt(minutes: number) {
 function getScreenFromUrl(): ScreenKey {
   if (typeof window === "undefined") return "dashboard";
   const value = new URLSearchParams(window.location.search).get("tela") as ScreenKey | null;
-  const validScreens: ScreenKey[] = ["dashboard", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "importacao-historico", "importar-cartao-ponto"];
+  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "importacao-historico", "importar-cartao-ponto"];
   return value && validScreens.includes(value) ? value : "dashboard";
 }
 
@@ -136,7 +137,7 @@ function AppShell({
   const mobileGroups: { label: string; items: [string, ScreenKey, LucideIcon][] }[] = [
     { label: "Gestão", items: [["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText]] },
     { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck]] },
-    { label: "Cadastro", items: [["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays]] },
+    { label: "Cadastro", items: [["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays]] },
     { label: "Organização", items: [["Tarefas", "tarefas", ListChecks]] },
   ];
 
@@ -280,8 +281,8 @@ function AppShell({
                 </button>
                 {companyMenuOpen && <div className="mt-1 space-y-0.5">
                   {[
-                    ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
-                  ].map(([label, key]) => { const Icon = key === "funcionarios" ? UsersRound : key === "cargos" ? BriefcaseBusiness : key === "departamentos" ? Building2 : CalendarDays; return <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>; })}
+                    ["Empresas", "empresas"], ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
+                  ].map(([label, key]) => { const Icon = key === "empresas" || key === "departamentos" ? Building2 : key === "funcionarios" ? UsersRound : key === "cargos" ? BriefcaseBusiness : CalendarDays; return <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>; })}
                 </div>}
               </div>
 
@@ -299,7 +300,7 @@ function AppShell({
               {([
                 ["dashboard", LayoutDashboard, "Dashboard"], ["kpis", ChartColumn, "KPIs"], ["comparativos", UsersRound, "Comparativos"], ["relatorios", FileText, "Relatórios"],
                 ["fechamento-ponto", CalendarClock, "Fechamento"], ["importar-cartao-ponto", Upload, "Importar Cartão Ponto"], ["lancamentos", ClipboardList, "Lançamentos"], ["banco-horas", Clock3, "Banco de Horas"], ["pagamentos", BadgeDollarSign, "Pagamentos"], ["ocorrencias", CalendarX, "Faltas e Folgas"], ["atestados", ClipboardCheck, "Declarações e Atestados"],
-                ["funcionarios", UsersRound, "Funcionários"], ["cargos", BriefcaseBusiness, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", CalendarDays, "Jornadas"], ["tarefas", FileText, "Tarefas"],
+                ["empresas", Building2, "Empresas"], ["funcionarios", UsersRound, "Funcionários"], ["cargos", BriefcaseBusiness, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", CalendarDays, "Jornadas"], ["tarefas", FileText, "Tarefas"],
               ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label}><Icon className="h-4 w-4 shrink-0" /></button>)}
             </>
           )}
