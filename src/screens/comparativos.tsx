@@ -2,8 +2,9 @@ import { ArrowLeft, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 
-type Employee = { id: string; full_name: string };
+type Employee = { id: string; full_name: string; company_id?: string | null };
 type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string };
 type Totals = { he60: number; he60_20: number; he100: number; he20: number; interjornada: number; debitos: number; faltas: number; atestados: number };
 const EMPTY: Totals = { he60: 0, he60_20: 0, he100: 0, he20: 0, interjornada: 0, debitos: 0, faltas: 0, atestados: 0 };
@@ -18,6 +19,7 @@ export function Comparativos() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [companyFilter, setCompanyFilter] = useState("");
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [periodSearch, setPeriodSearch] = useState("");
@@ -30,7 +32,7 @@ export function Comparativos() {
       try {
         const db = supabase as any;
         const [{ data: employeeData, error: employeeError }, { data: periodData, error: periodError }] = await Promise.all([
-          db.from("employees").select("id,full_name").eq("status", "ativo").order("full_name"),
+          db.from("employees").select("id,full_name,company_id").eq("status", "ativo").order("full_name"),
           db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date").order("start_date", { ascending: false }),
         ]);
         if (employeeError) throw employeeError;
@@ -222,13 +224,15 @@ export function Comparativos() {
 
   const visibleEmployees = useMemo(() => {
     const q = employeeSearch.trim().toLowerCase();
-    return employees.filter(e => !q || e.full_name.toLowerCase().includes(q));
-  }, [employees, employeeSearch]);
+    return employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!q || e.full_name.toLowerCase().includes(q)));
+  }, [employees, employeeSearch, companyFilter]);
 
   const visiblePeriods = useMemo(() => {
     const q = periodSearch.trim().toLowerCase();
     return periods.filter(p => !q || `${String(p.reference_month).padStart(2, "0")}/${p.reference_year}`.includes(q));
   }, [periods, periodSearch]);
+
+  useEffect(() => { setSelectedEmployees(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id)); }, [companyFilter, employees]);
 
   function toggleEmployee(id: string) { setSelectedEmployees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function togglePeriod(id: string) { setSelectedPeriods(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
@@ -250,6 +254,7 @@ export function Comparativos() {
       {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
 
       <Card className="mt-6 p-5">
+        <div className="mb-5 max-w-sm"><label className="grid gap-1.5 text-sm font-medium">Empresa<CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label></div>
         <div className="grid gap-5 lg:grid-cols-2">
           <div>
             <div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Funcionários</h2><p className="text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · somente ativos</p></div><div className="flex gap-2"><button onClick={selectVisibleEmployees} className="rounded-lg border px-3 py-2 text-xs">Selecionar exibidos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border px-3 py-2 text-xs">Limpar</button></div></div>
