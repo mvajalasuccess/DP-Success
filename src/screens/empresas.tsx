@@ -12,7 +12,7 @@ function formatCnpj(value: string) {
     .replace(/^([A-Z0-9]{2})([A-Z0-9])/, "$1.$2")
     .replace(/^([A-Z0-9]{2})\.([A-Z0-9]{3})([A-Z0-9])/, "$1.$2.$3")
     .replace(/\.([A-Z0-9]{3})([A-Z0-9])/, ".$1/$2")
-    .replace(/([A-Z0-9]{4})([A-Z0-9])$/, "$1-$2");
+    .replace(/([A-Z0-9]{4})([0-9]{2})$/, "$1-$2");
 }
 function validCnpj(value: string) {
   const cnpj = normalizeCnpj(value);
