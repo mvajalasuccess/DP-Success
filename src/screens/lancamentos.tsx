@@ -47,7 +47,7 @@ export function Launches() {
   async function loadBase() {
     try {
       const [emps, ps] = await Promise.all([
-        supabase.from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name"),
+        (supabase as any).from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name"),
         fetchPeriods(),
       ]);
       if (emps.error) throw new Error(emps.error.message);
