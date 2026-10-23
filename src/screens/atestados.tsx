@@ -2,8 +2,9 @@ import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 
-type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null };
+type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null; company_id?: string | null };
 type Certificate = {
   id: string; employee_id: string; start_date: string; end_date: string; days: number;
   certificate_type: string; cid: string | null; notes: string | null; employees?: { full_name: string } | null;
@@ -35,6 +36,7 @@ export function Atestados() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [filterEmployee, setFilterEmployee] = useState("todos");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [filterPeriod, setFilterPeriod] = useState("todos");
   const [showCertificates, setShowCertificates] = useState(true);
   const [showDeclarations, setShowDeclarations] = useState(true);
@@ -48,7 +50,7 @@ export function Atestados() {
   const [editingDeclaration, setEditingDeclaration] = useState<Declaration | null>(null);
 
   const referenceDate = mode === "declaracao" ? declarationForm.occurrence_date : form.start_date;
-  const employeesForDate = employees.filter(e => !referenceDate || ( (!e.hire_date || e.hire_date <= referenceDate) && (!e.termination_date || e.termination_date >= referenceDate) ));
+  const employeesForDate = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && !referenceDate || ( (!e.hire_date || e.hire_date <= referenceDate) && (!e.termination_date || e.termination_date >= referenceDate) ));
 
   async function load() {
     setError("");
@@ -65,19 +67,22 @@ export function Atestados() {
   }
 
   async function loadEmployees() {
-    const { data } = await supabase.from("employees").select("id,full_name,status,hire_date,termination_date").order("full_name");
+    const { data } = await supabase.from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name");
     setEmployees((data ?? []) as Employee[]);
   }
 
   useEffect(() => { void load(); void loadEmployees(); }, []);
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
-  const employeesForFilter = employees.filter(e => !selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date)));
+  const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
+  const companyEmployeeIds = new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id));
   const filteredRows = rows.filter(row =>
+    companyEmployeeIds.has(row.employee_id) &&
     (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
     (!selectedPeriod || (row.start_date <= selectedPeriod.end_date && row.end_date >= selectedPeriod.start_date))
   );
   const filteredDeclarations = declarations.filter(row =>
+    companyEmployeeIds.has(row.employee_id) &&
     (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
     (!selectedPeriod || (row.occurrence_date >= selectedPeriod.start_date && row.occurrence_date <= selectedPeriod.end_date))
   );
