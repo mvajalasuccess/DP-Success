@@ -23,7 +23,7 @@ export function Employees() {
 
   async function loadEmployees() {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("employees")
       .select("id,full_name,status,hire_date,termination_date,department_id,position_id,work_schedule_id,salary,company_id,companies(name),departments(name),positions(name),work_schedules(name)")
       .order("full_name");
@@ -96,7 +96,7 @@ export function Employees() {
     setError("");
 
     if (editingId) {
-      const result = await supabase.from("employees").update({
+      const result = await (supabase as any).from("employees").update({
         full_name: form.name.trim(),
         department_id: form.department,
         position_id: form.role,
@@ -131,7 +131,7 @@ export function Employees() {
       return;
     }
 
-    const emp = await supabase.from("employees").insert({
+    const emp = await (supabase as any).from("employees").insert({
       full_name: form.name.trim(),
       department_id: form.department,
       position_id: form.role,
@@ -173,7 +173,7 @@ export function Employees() {
     if (!date) return;
     setError("");
     setActionLoading(employee.id);
-    const result = await supabase.from("employees").update({ status: "inativo", termination_date: date }).eq("id", employee.id);
+    const result = await (supabase as any).from("employees").update({ status: "inativo", termination_date: date }).eq("id", employee.id);
     setActionLoading(null);
     if (result.error) setError(result.error.message);
     else await loadEmployees();
@@ -184,7 +184,7 @@ export function Employees() {
     if (!confirmed) return;
     setError("");
     setActionLoading(employee.id);
-    const result = await supabase.from("employees").delete().eq("id", employee.id);
+    const result = await (supabase as any).from("employees").delete().eq("id", employee.id);
     setActionLoading(null);
     if (result.error) {
       setError('Não foi possível excluir. Se houver histórico, use "Desligar". Detalhe: ' + result.error.message);
