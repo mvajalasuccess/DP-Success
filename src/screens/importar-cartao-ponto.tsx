@@ -2,10 +2,11 @@ import { CheckCircle2, FileUp, Loader2, RotateCcw, Upload, AlertTriangle } from 
 import { useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 import { fetchPeriods, minutesToHours, periodRangeLabel, type Period } from "@/lib/dp-model";
 import { parsePointCardPdf, type PointImportDocument, type PointImportEmployee } from "@/lib/pdf-ponto-parser";
 
-type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null };
+type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null; company_id?: string | null };
 type Match = PointImportEmployee & { employeeId: string | null; period: Period | null };
 
 function normalize(value: string) {
@@ -28,6 +29,7 @@ function formatCount(n: number) {
 
 export function ImportarCartaoPonto() {
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [companyFilter, setCompanyFilter] = useState("");
   const [periods, setPeriods] = useState<Period[]>([]);
   const [document, setDocument] = useState<PointImportDocument | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,7 +40,7 @@ export function ImportarCartaoPonto() {
 
   async function loadBase() {
     const [emps, ps] = await Promise.all([
-      supabase.from("employees").select("id,full_name,status,hire_date,termination_date").order("full_name"),
+      supabase.from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name"),
       fetchPeriods(),
     ]);
     if (emps.error) throw new Error(emps.error.message);
@@ -76,8 +78,8 @@ export function ImportarCartaoPonto() {
       period: periods.find(p => p.start_date === item.periodStart && p.end_date === item.periodEnd)
         ?? periods.find(p => item.periodEnd >= p.start_date && item.periodEnd <= p.end_date)
         ?? null,
-    }));
-  }, [document, employees, periods]);
+    })).filter(row => !companyFilter || employees.some(employee => employee.id === row.employeeId && employee.company_id === companyFilter));
+  }, [document, employees, periods, companyFilter]);
 
   const totals = useMemo(() => matches.reduce((acc, row) => {
     acc.creditMinutes += row.creditMinutes;
@@ -235,6 +237,7 @@ export function ImportarCartaoPonto() {
       </header>
 
       <main className="mx-auto max-w-[1500px] space-y-6 px-6 py-7">
+        <Card className="p-4"><label className="grid max-w-sm gap-1.5 text-sm font-medium"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label><p className="mt-2 text-xs text-muted-foreground">O filtro limita a prévia e a importação à empresa selecionada. “Todas as empresas” mantém todos os funcionários do PDF.</p></Card>
         <Card className="border-dashed p-8">
           <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 text-center hover:bg-muted/30">
             {loading ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <FileUp className="h-10 w-10 text-primary" />}
