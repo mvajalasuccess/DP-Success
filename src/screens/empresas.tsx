@@ -5,25 +5,25 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Company = { id: string; name: string; cnpj: string; created_at?: string };
 
-function digits(value: string) { return value.replace(/\D/g, "").slice(0, 14); }
+function normalizeCnpj(value: string) { return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 14); }
 function formatCnpj(value: string) {
-  const d = digits(value);
+  const d = normalizeCnpj(value);
   return d
-    .replace(/^(\d{2})(\d)/, "$1.$2")
-    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-    .replace(/\.(\d{3})(\d)/, ".$1/$2")
-    .replace(/(\d{4})(\d)/, "$1-$2");
+    .replace(/^([A-Z0-9]{2})([A-Z0-9])/, "$1.$2")
+    .replace(/^([A-Z0-9]{2})\.([A-Z0-9]{3})([A-Z0-9])/, "$1.$2.$3")
+    .replace(/\.([A-Z0-9]{3})([A-Z0-9])/, ".$1/$2")
+    .replace(/([A-Z0-9]{4})([A-Z0-9])$/, "$1-$2");
 }
 function validCnpj(value: string) {
-  const cnpj = digits(value);
-  if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false;
-  const calc = (base: string, weights: number[]) => {
-    const sum = base.split("").reduce((acc, n, i) => acc + Number(n) * weights[i], 0);
+  const cnpj = normalizeCnpj(value);
+  if (!/^[A-Z0-9]{12}[0-9]{2}$/.test(cnpj) || /^([A-Z0-9])\\1{13}$/.test(cnpj)) return false;
+  const digit = (base: string, weights: number[]) => {
+    const sum = base.split("").reduce((acc, char, i) => acc + (char.charCodeAt(0) - 48) * weights[i], 0);
     const rest = sum % 11;
     return rest < 2 ? 0 : 11 - rest;
   };
-  const first = calc(cnpj.slice(0, 12), [5,4,3,2,9,8,7,6,5,4,3,2]);
-  const second = calc(cnpj.slice(0, 12) + first, [6,5,4,3,2,9,8,7,6,5,4,3,2]);
+  const first = digit(cnpj.slice(0, 12), [5,4,3,2,9,8,7,6,5,4,3,2]);
+  const second = digit(cnpj.slice(0, 12) + first, [6,5,4,3,2,9,8,7,6,5,4,3,2]);
   return cnpj === cnpj.slice(0, 12) + first + second;
 }
 
@@ -52,9 +52,9 @@ export function Companies() {
 
   async function saveCompany() {
     const cleanName = name.trim();
-    const cleanCnpj = digits(cnpj);
+    const cleanCnpj = normalizeCnpj(cnpj);
     if (!cleanName) { setError("Informe o nome da empresa."); return; }
-    if (!validCnpj(cleanCnpj)) { setError("Informe um CNPJ válido com 14 dígitos."); return; }
+    if (!validCnpj(cleanCnpj)) { setError("Informe um CNPJ válido com 14 caracteres."); return; }
     setSaving(true); setError("");
     const payload = { name: cleanName, cnpj: cleanCnpj };
     const result = editingId
@@ -81,7 +81,7 @@ export function Companies() {
     else await loadCompanies();
   }
 
-  const filtered = companies.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.cnpj.includes(digits(search)));
+  const filtered = companies.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.cnpj.includes(normalizeCnpj(search)));
   return <div className="min-h-screen bg-background">
     <header className="border-b bg-background px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground">← Voltar</a><div className="text-sm font-semibold">DP Success · Cadastros</div></div></header>
     <main className="mx-auto max-w-[1500px] px-6 py-7">
