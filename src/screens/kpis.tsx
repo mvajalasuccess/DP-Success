@@ -268,7 +268,7 @@ export function Kpis() {
               .lte("start_date", rangeEnd)
               .gte("end_date", rangeStart)
           : Promise.resolve({ data: [], error: null }),
-        db.from("work_schedules").select("id,weekly_minutes").eq("active", true),
+        db.from("work_schedules").select("id,weekly_minutes"),
         db.from("point_closing_overrides")
           .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
           .in("period_id", periodIds),
@@ -347,7 +347,7 @@ export function Kpis() {
         // que participaram da competência; portanto, não dependemos do status
         // atual nem de uma jornada ainda ativa no cadastro.
         const workingDays = countWorkingWeekdays(employeeStart, employeeEnd);
-        return Math.round(workingDays * 528);
+        return Math.round(workingDays * dailyMinutesFromSchedule(employee));
       };
 
       const dailyMinutesFromSchedule = (employee: Employee) => {
@@ -571,7 +571,8 @@ export function Kpis() {
         const expected = Number(override.expected_minutes || 0);
         const worked = Number(override.worked_minutes || 0);
         const faltaDays = Number(override.absence_quantity || 0);
-        const faltas = Math.round(faltaDays * 528);
+        const dailyMinutes = dailyMinutesFromSchedule(employee);
+        const faltas = Math.round(faltaDays * dailyMinutes);
         const atestados = Number(override.certificate_minutes || 0);
         const declaracoes = Number(override.declaration_minutes || 0);
         const abonos = Number(override.allowance_minutes || 0);
@@ -582,7 +583,7 @@ export function Kpis() {
         next.faltasDays += faltaDays;
         next.faltasMinutes += faltas;
         next.atestadosMinutes += atestados;
-        next.atestadosDays += atestados / 528;
+        next.atestadosDays += dailyMinutes > 0 ? atestados / dailyMinutes : 0;
         next.declaracoesMinutes += declaracoes;
         next.abonosMinutes += abonos;
         next.absenceMinutes += faltas + abonos + debitos;
@@ -940,7 +941,7 @@ export function Kpis() {
         yearPeriods.length
           ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
           : Promise.resolve({ data: [] }),
-        db.from("work_schedules").select("id,weekly_minutes").eq("active", true),
+        db.from("work_schedules").select("id,weekly_minutes"),
       ]);
 
       // Correções manuais substituem a BASE também nas competências históricas.
@@ -1036,14 +1037,14 @@ export function Kpis() {
             if (!employeeIncludedForSelectedFilters(employee) || overrides.has(employee.id) || recorded.has(employee.id)) continue;
             const start = employee.hireDate && employee.hireDate > period.start_date ? employee.hireDate : period.start_date;
             const end = employee.terminationDate && employee.terminationDate < period.end_date ? employee.terminationDate : period.end_date;
-            if (end >= start) expected += countWorkingWeekdays(start, end) * 528;
+            if (end >= start) expected += Math.round(countWorkingWeekdays(start, end) * dailyMinutesFromSchedule(employee));
           }
 
           for (const row of overrides.values() as Iterable<any>) {
             const employee = employees.find(e => e.id === String(row.employee_id));
             if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
             expected += Number(row.expected_minutes || 0);
-            lost += Math.round(Number(row.absence_quantity || 0) * 528)
+            lost += Math.round(Number(row.absence_quantity || 0) * dailyMinutesFromSchedule(employee))
               + Number(row.allowance_minutes || 0)
               + Number(row.debit_minutes || 0);
           }
