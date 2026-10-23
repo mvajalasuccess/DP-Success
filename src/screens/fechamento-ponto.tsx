@@ -197,6 +197,7 @@ export function PointClosing() {
       { data: debitRows, error: debitError },
       { data: certificateRows, error: certificateError },
       { data: scheduleRows, error: scheduleError },
+      { data: holidayRows, error: holidayError },
     ] = await Promise.all([
       supabase.from("employees")
         .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,departments(name),positions(name)")
@@ -220,9 +221,12 @@ export function PointClosing() {
         .gte("end_date", p.start_date),
       supabase.from("work_schedules")
         .select("id,weekly_minutes"),
+      supabase.from("holidays")
+        .select("holiday_date")
+        .eq("is_demo", false),
     ]);
 
-    if (employeeError || timeError || overtimeError || occurrenceError || debitError || certificateError || scheduleError) {
+    if (employeeError || timeError || overtimeError || occurrenceError || debitError || certificateError || scheduleError || holidayError) {
       setError(
         employeeError?.message ??
         timeError?.message ??
@@ -231,12 +235,17 @@ export function PointClosing() {
         debitError?.message ??
         certificateError?.message ??
         scheduleError?.message ??
+        holidayError?.message ??
         "Não foi possível carregar a visão da competência."
       );
       setHistoricalRows([]);
       setLoadingRows(false);
       return;
     }
+
+    const additionalHolidayDates = new Set(
+      (holidayRows ?? []).map((row: any) => String(row.holiday_date).slice(0, 10)),
+    );
 
     const inCompetence = (employee: any) =>
       (!employee.hire_date || employee.hire_date <= p.end_date) &&
@@ -269,7 +278,7 @@ export function PointClosing() {
         ? employee.termination_date
         : p.end_date;
       if (effectiveStart > effectiveEnd) return 0;
-      const workingDays = countWorkingWeekdays(effectiveStart, effectiveEnd);
+      const workingDays = countWorkingWeekdays(effectiveStart, effectiveEnd, additionalHolidayDates);
       return Math.round(workingDays * dailyMinutesForEmployee(employee));
     };
 
