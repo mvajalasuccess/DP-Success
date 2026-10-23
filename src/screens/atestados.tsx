@@ -50,7 +50,10 @@ export function Atestados() {
   const [editingDeclaration, setEditingDeclaration] = useState<Declaration | null>(null);
 
   const referenceDate = mode === "declaracao" ? declarationForm.occurrence_date : form.start_date;
-  const employeesForDate = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && !referenceDate || ( (!e.hire_date || e.hire_date <= referenceDate) && (!e.termination_date || e.termination_date >= referenceDate) ));
+  const employeesForDate = employees.filter(e =>
+    (!companyFilter || e.company_id === companyFilter) &&
+    (!referenceDate || ((!e.hire_date || e.hire_date <= referenceDate) && (!e.termination_date || e.termination_date >= referenceDate)))
+  );
 
   async function load() {
     setError("");
@@ -216,7 +219,7 @@ export function Atestados() {
       <Card className="mt-6 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-medium"><span>Filtros</span><span className="text-xs font-normal text-muted-foreground">Aplicados às duas listas</span></div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
+          <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => { setFilterPeriod(e.target.value); setFilterEmployee("todos"); }} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         </div>
       </Card>
