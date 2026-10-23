@@ -234,9 +234,11 @@ async function loadClosingRows(db: any, period: Period) {
       else if (type === "INTERJORNADA_50") interjornada += minutes;
     }
 
-    // Reproduz exatamente os campos derivados exibidos na tela atual.
-    const allowanceTotal = certificateMinutes + declarationMinutes;
-    const lostMinutes = Math.round(absenceQuantity * 528) + allowanceTotal + debitMinutes;
+    // Abonos refletem as ocorrências folga_abonada/abono; atestados e declarações
+    // permanecem em campos próprios. A folga descontada segue somente informativa.
+    const allowanceTotal = extraAllowanceMinutes;
+    const lostMinutes = Math.round(absenceQuantity * 528)
+      + certificateMinutes + declarationMinutes + allowanceTotal + debitMinutes;
     return {
       employee_id: id,
       registration: employee.registration ?? "",
