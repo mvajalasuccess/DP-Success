@@ -390,7 +390,7 @@ export function Comparativos() {
               <th className="whitespace-nowrap px-4 py-3 font-semibold">Faltas (dias)</th><th className="whitespace-nowrap px-4 py-3 font-semibold">Atestados (dias)</th>
             </tr></thead>
             <tbody className="divide-y divide-border/70">
-              {selectedEmployeeRows.map(({id,employee,t}) => <tr key={id} className="transition-colors hover:bg-muted/30">
+              {selectedEmployeeRows.map(({id,employee,totals: t}) => <tr key={id} className="transition-colors hover:bg-muted/30">
                 <td className="sticky left-0 z-[1] max-w-[260px] bg-card px-4 py-3.5 font-medium">{employee!.full_name}</td>
                 {columns.map(([key]) => <td key={key} className="whitespace-nowrap px-4 py-3.5 tabular-nums">{fmt(t[key])}</td>)}
                 <td className="px-4 py-3.5 tabular-nums">{t.faltas.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
@@ -406,5 +406,4 @@ export function Comparativos() {
       <p className="mt-4 text-xs text-muted-foreground">Os gráficos usam os mesmos valores carregados para a tabela. Interjornada permanece em coluna própria e não é incorporada às categorias de horas extras.</p>
     </main>
   </div>
-}
 }
