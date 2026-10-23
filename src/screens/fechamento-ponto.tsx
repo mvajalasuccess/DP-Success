@@ -96,6 +96,44 @@ export function PointClosing() {
       return;
     }
 
+    // A BASE histórica pode ter linhas sem employee_id. Sem vínculo, o salvamento
+    // retornava silenciosamente sem gravar a correção e ela sumia ao atualizar.
+    // Resolvemos pelo nome completo normalizado primeiro e pela matrícula somente
+    // quando ela identifica um único funcionário.
+    const { data: employeeLookup, error: employeeLookupError } = await supabase
+      .from("employees")
+      .select("id,full_name,registration");
+    if (employeeLookupError) {
+      setError("Não foi possível vincular os registros históricos aos funcionários: " + employeeLookupError.message);
+      setHistoricalRows([]);
+      setLoadingRows(false);
+      return;
+    }
+
+    const normalizeIdentity = (value: unknown) =>
+      String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toUpperCase();
+    const resolveHistoricalEmployeeId = (row: any): string | null => {
+      if (row.employee_id) return String(row.employee_id);
+      const historicalName = normalizeIdentity(row.employee_name);
+      const nameMatches = (employeeLookup ?? []).filter((employee: any) =>
+        normalizeIdentity(employee.full_name) === historicalName
+      );
+      if (nameMatches.length === 1) return String(nameMatches[0].id);
+
+      const registration = String(row.registration ?? "").trim();
+      if (registration) {
+        const registrationMatches = (employeeLookup ?? []).filter((employee: any) =>
+          String(employee.registration ?? "").trim() === registration
+        );
+        if (registrationMatches.length === 1) return String(registrationMatches[0].id);
+      }
+      return null;
+    };
+    const historicalWithEmployeeIds = (historical ?? []).map((row: any) => {
+      const employeeId = resolveHistoricalEmployeeId(row);
+      return employeeId ? { ...row, employee_id: employeeId } : row;
+    });
+
     const { data: overrideRows, error: overrideError } = await (supabase as any)
       .from("point_closing_overrides")
       .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
@@ -113,8 +151,13 @@ export function PointClosing() {
     const overrides = (overrideRows ?? []) as any[];
     const overrideByEmployee = new Map(overrides.map((row: any) => [String(row.employee_id), row]));
     const applyOverride = (row: any) => {
-      const override = overrideByEmployee.get(String(row.employee_id));
-      return override ? { ...row, ...override, has_manual_override: true } : row;
+      const resolvedEmployeeId = resolveHistoricalEmployeeId(row);
+      const override = resolvedEmployeeId ? overrideByEmployee.get(resolvedEmployeeId) : undefined;
+      return {
+        ...row,
+        ...(resolvedEmployeeId ? { employee_id: resolvedEmployeeId } : {}),
+        ...(override ? { ...override, employee_id: resolvedEmployeeId, has_manual_override: true } : {}),
+      };
     };
 
     // A BASE histórica foi importada somente até a competência de julho/2026.
@@ -129,7 +172,7 @@ export function PointClosing() {
       // toda a competência por um recálculo da fonte operacional só porque
       // algum funcionário atual não aparece na BASE.
       setRowsSource("historical");
-      setHistoricalRows((historical ?? []).map(applyOverride));
+      setHistoricalRows(historicalWithEmployeeIds.map(applyOverride));
       setLoadingRows(false);
       return;
     }
@@ -376,7 +419,11 @@ export function PointClosing() {
   }
 
   async function saveHistoricalRow() {
-    if (!editingRow || !selectedPeriod || !editingRow.employee_id) return;
+    if (!editingRow || !selectedPeriod) return;
+    if (!editingRow.employee_id) {
+      setError(`Não foi possível salvar a correção de "${editingRow.employee_name}". O registro histórico não está vinculado a um funcionário cadastrado. Confira o nome e a matrícula no cadastro de Funcionários.`);
+      return;
+    }
     setRowSaving(true); setError("");
 
     const payload = {
