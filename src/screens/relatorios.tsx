@@ -20,7 +20,7 @@ const HISTORICAL_CUTOFF = "2026-07-20";
 const reports = [
   ["fechamento", "Fechamento de ponto"],
   ["banco", "Banco de horas"],
-  ["extras", "Horas extras por funcionário"],
+  ["interjornada", "Interjornada por funcionário"],
   ["absenteismo", "Absenteísmo por departamento"],
   ["atestados", "Declarações e atestados"],
   ["ocorrencias", "Faltas e Folgas"],
@@ -459,13 +459,12 @@ type StandardReportColumn = {
 };
 
 const standardReportColumns: Record<string, StandardReportColumn[]> = {
-  extras: [
+  interjornada: [
+    { header: "Matrícula", key: "registration", width: 14 },
     { header: "Funcionário", key: "employee", width: 32 },
+    { header: "Departamento", key: "department", width: 24 },
     { header: "Data", key: "date", width: 14, format: "date" },
-    { header: "Tipo de hora extra", key: "type", width: 27 },
-    { header: "Duração", key: "minutes", width: 14, format: "duration" },
-    { header: "Adicional (%)", key: "rate_percent", width: 16, format: "number" },
-    { header: "Valor estimado (R$)", key: "estimated_value", width: 21, format: "currency" },
+    { header: "Interjornada", key: "minutes", width: 16, format: "duration" },
     { header: "Observações", key: "description", width: 42 },
   ],
   absenteismo: [
@@ -502,11 +501,11 @@ const standardReportColumns: Record<string, StandardReportColumn[]> = {
 };
 
 const standardReportTitles: Record<string, { title: string; subject: string; sheet: string; filename: string }> = {
-  extras: {
-    title: "DP SUCCESS | HORAS EXTRAS POR FUNCIONÁRIO",
-    subject: "Horas extras por funcionário",
-    sheet: "Horas Extras",
-    filename: "dp-success-horas-extras.xlsx",
+  interjornada: {
+    title: "DP SUCCESS | INTERJORNADA POR FUNCIONÁRIO",
+    subject: "Interjornada por funcionário",
+    sheet: "Resumo por funcionário",
+    filename: "dp-success-interjornada-por-funcionario.xlsx",
   },
   absenteismo: {
     title: "DP SUCCESS | ABSENTEÍSMO POR DEPARTAMENTO",
@@ -552,8 +551,8 @@ function durationToExcelValue(value: unknown) {
 async function downloadStandardReportExcel(kind: string, rows: any[]) {
   const ExcelJS = await import("exceljs");
   const definition = standardReportTitles[kind];
-  const columns = standardReportColumns[kind];
-  if (!definition || !columns) throw new Error("Tipo de relatório não reconhecido.");
+  const detailColumns = standardReportColumns[kind];
+  if (!definition || !detailColumns) throw new Error("Tipo de relatório não reconhecido.");
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "DP SUCCESS";
@@ -561,80 +560,145 @@ async function downloadStandardReportExcel(kind: string, rows: any[]) {
   workbook.title = definition.subject;
   workbook.created = new Date();
 
-  const sheet = workbook.addWorksheet(definition.sheet, {
-    views: [{ state: "frozen", ySplit: 5, xSplit: 2 }],
-  });
-  const lastColumn = columns.length;
+  const writeStyledSheet = (
+    sheetName: string,
+    title: string,
+    subtitle: string,
+    columns: StandardReportColumn[],
+    sourceRows: any[],
+  ) => {
+    const sheet = workbook.addWorksheet(sheetName, {
+      views: [{ state: "frozen", ySplit: 5, xSplit: 2 }],
+    });
+    const lastColumn = columns.length;
 
-  sheet.mergeCells(1, 1, 1, lastColumn);
-  const titleCell = sheet.getCell(1, 1);
-  titleCell.value = definition.title;
-  titleCell.font = { name: "Aptos Display", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
-  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF123B3A" } };
-  titleCell.alignment = { vertical: "middle", horizontal: "left" };
-  sheet.getRow(1).height = 30;
+    sheet.mergeCells(1, 1, 1, lastColumn);
+    const titleCell = sheet.getCell(1, 1);
+    titleCell.value = title;
+    titleCell.font = { name: "Aptos Display", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF123B3A" } };
+    titleCell.alignment = { vertical: "middle", horizontal: "left" };
+    sheet.getRow(1).height = 30;
 
-  sheet.mergeCells(2, 1, 2, lastColumn);
-  sheet.getCell(2, 1).value =
-    "Registros: todos os registros disponíveis  |  Exportado em: " + new Date().toLocaleDateString("pt-BR");
-  sheet.getCell(2, 1).font = { size: 11, bold: true, color: { argb: "FF123B3A" } };
-  sheet.getCell(2, 1).alignment = { vertical: "middle" };
-  sheet.getRow(2).height = 23;
+    sheet.mergeCells(2, 1, 2, lastColumn);
+    sheet.getCell(2, 1).value = subtitle;
+    sheet.getCell(2, 1).font = { size: 11, bold: true, color: { argb: "FF123B3A" } };
+    sheet.getCell(2, 1).alignment = { vertical: "middle", wrapText: true };
+    sheet.getRow(2).height = 23;
 
-  sheet.addRow([]);
-  sheet.addRow([]);
-  const headerRow = sheet.addRow(columns.map(column => column.header));
-  headerRow.height = 34;
-  headerRow.eachCell(cell => {
-    cell.font = { bold: true, color: { argb: "FF123B3A" } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDF7F0" } };
-    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    cell.border = { bottom: { style: "thin", color: { argb: "FF06CAA0" } } };
-  });
-
-  for (const source of rows) {
-    const values = columns.map(column => {
-      const value = source[column.key];
-      if (value == null || value === "") return "";
-      if (column.format === "date") return dateToExcelValue(value);
-      if (column.format === "duration") return durationToExcelValue(value);
-      if (column.format === "currency" || column.format === "number") {
-        const numeric = Number(value);
-        return Number.isFinite(numeric) ? numeric : "";
-      }
-      return value;
+    sheet.addRow([]);
+    sheet.addRow([]);
+    const headerRow = sheet.addRow(columns.map(column => column.header));
+    headerRow.height = 34;
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: "FF123B3A" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDF7F0" } };
+      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+      cell.border = { bottom: { style: "thin", color: { argb: "FF06CAA0" } } };
     });
 
-    const row = sheet.addRow(values);
-    row.eachCell((cell, columnNumber) => {
-      cell.alignment = {
-        vertical: "middle",
-        horizontal: columnNumber >= 3 ? "center" : "left",
-        wrapText: columnNumber === lastColumn,
-      };
-      if (row.number % 2 === 0) {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5FAF8" } };
-      }
-    });
+    for (const source of sourceRows) {
+      const values = columns.map(column => {
+        const value = source[column.key];
+        if (value == null || value === "") return "";
+        if (column.format === "date") return dateToExcelValue(value);
+        if (column.format === "duration") return durationToExcelValue(value);
+        if (column.format === "currency" || column.format === "number") {
+          const numeric = Number(value);
+          return Number.isFinite(numeric) ? numeric : "";
+        }
+        return value;
+      });
+
+      const row = sheet.addRow(values);
+      row.eachCell((cell, columnNumber) => {
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: columnNumber >= 3 ? "center" : "left",
+          wrapText: columnNumber === lastColumn,
+        };
+        if (row.number % 2 === 0) {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5FAF8" } };
+        }
+      });
+
+      columns.forEach((column, index) => {
+        const cell = row.getCell(index + 1);
+        if (column.format === "date") cell.numFmt = "dd/mm/yyyy";
+        else if (column.format === "duration") cell.numFmt = "[h]:mm;-[h]:mm";
+        else if (column.format === "currency") cell.numFmt = '"R$" #,##0.00';
+        else if (column.format === "number") cell.numFmt = "0.##";
+      });
+    }
 
     columns.forEach((column, index) => {
-      const cell = row.getCell(index + 1);
-      if (column.format === "date") cell.numFmt = "dd/mm/yyyy";
-      else if (column.format === "duration") cell.numFmt = "[h]:mm;-[h]:mm";
-      else if (column.format === "currency") cell.numFmt = '"R$" #,##0.00';
-      else if (column.format === "number") cell.numFmt = "0.##";
+      sheet.getColumn(index + 1).width = column.width;
     });
-  }
-
-  columns.forEach((column, index) => {
-    sheet.getColumn(index + 1).width = column.width;
-  });
-  sheet.autoFilter = {
-    from: { row: 5, column: 1 },
-    to: { row: Math.max(5, sheet.rowCount), column: lastColumn },
+    sheet.autoFilter = {
+      from: { row: 5, column: 1 },
+      to: { row: Math.max(5, sheet.rowCount), column: lastColumn },
+    };
+    sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+    sheet.properties.defaultRowHeight = 20;
   };
-  sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
-  sheet.properties.defaultRowHeight = 20;
+
+  const exportDate = new Date().toLocaleDateString("pt-BR");
+  if (kind === "interjornada") {
+    const grouped = new Map<string, any>();
+    for (const row of rows) {
+      const key = String(row.employee_id ?? row.registration ?? row.employee);
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.total_minutes += Math.abs(Number(row.minutes || 0));
+        existing.launch_count += 1;
+      } else {
+        grouped.set(key, {
+          registration: row.registration ?? "",
+          employee: row.employee ?? "",
+          department: row.department ?? "",
+          total_minutes: Math.abs(Number(row.minutes || 0)),
+          launch_count: 1,
+        });
+      }
+    }
+    const summaryRows = [...grouped.values()].sort((a, b) =>
+      String(a.employee).localeCompare(String(b.employee), "pt-BR")
+    );
+    const summaryColumns: StandardReportColumn[] = [
+      { header: "Matrícula", key: "registration", width: 14 },
+      { header: "Funcionário", key: "employee", width: 34 },
+      { header: "Departamento", key: "department", width: 25 },
+      { header: "Total de interjornada", key: "total_minutes", width: 22, format: "duration" },
+      { header: "Quantidade de lançamentos", key: "launch_count", width: 25, format: "number" },
+    ];
+    writeStyledSheet(
+      "Resumo por funcionário",
+      definition.title,
+      "Total por funcionário  |  Exportado em: " + exportDate + "  |  Interjornada é informativa e não compõe o saldo do banco de horas.",
+      summaryColumns,
+      summaryRows,
+    );
+
+    const detailRows = [...rows].sort((a, b) =>
+      String(a.employee).localeCompare(String(b.employee), "pt-BR") ||
+      String(a.date).localeCompare(String(b.date))
+    );
+    writeStyledSheet(
+      "Detalhamento",
+      "DP SUCCESS | DETALHAMENTO DE INTERJORNADA",
+      "Lançamentos de interjornada  |  Exportado em: " + exportDate + "  |  Informativo; não altera o saldo do banco de horas.",
+      detailColumns,
+      detailRows,
+    );
+  } else {
+    writeStyledSheet(
+      definition.sheet,
+      definition.title,
+      "Registros disponíveis: " + rows.length + "  |  Exportado em: " + exportDate,
+      detailColumns,
+      rows,
+    );
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer as BlobPart], {
@@ -647,7 +711,6 @@ async function downloadStandardReportExcel(kind: string, rows: any[]) {
   anchor.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-
 
 export function Relatorios() {
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -733,16 +796,21 @@ export function Relatorios() {
 
       let rows: any[] = [];
 
-      if (kind === "extras") {
-        const data = await fetchAll((from, to) => db.from("overtime_records").select("reference_date,launch_type,minutes,rate_percent,estimated_value,notes,employees(full_name)").order("reference_date", { ascending: false }).range(from, to));
+      if (kind === "interjornada") {
+        const data = await fetchAll((from, to) => db
+          .from("overtime_records")
+          .select("employee_id,reference_date,minutes,notes,launch_type,employees(full_name,registration,departments(name))")
+          .eq("launch_type", "INTERJORNADA_50")
+          .order("reference_date", { ascending: false })
+          .range(from, to));
         rows = data.map((x: any) => ({
-          date: x.reference_date,
-          type: x.launch_type,
-          minutes: x.minutes,
-          rate_percent: x.rate_percent,
-          estimated_value: x.estimated_value,
-          description: x.notes ?? "",
+          employee_id: x.employee_id,
+          registration: x.employees?.registration ?? "",
           employee: x.employees?.full_name ?? "",
+          department: x.employees?.departments?.name ?? "",
+          date: x.reference_date,
+          minutes: Math.abs(Number(x.minutes || 0)),
+          description: x.notes ?? "",
         }));
       }
 
@@ -865,8 +933,8 @@ export function Relatorios() {
                   ? "Excel com funcionários, horas previstas e trabalhadas, faltas, atestados, declarações, abonos, débitos e horas extras."
                   : key === "banco"
                     ? "Excel com nome do funcionário, saldo do mês, saldo acumulado, débitos, ajustes, pagamentos e composição das horas extras."
-                    : key === "extras"
-                      ? "Excel com funcionário, data, tipo de hora extra, duração, adicional, valor estimado e observações."
+                    : key === "interjornada"
+                      ? "Excel com resumo por funcionário e aba de detalhamento, totalizando as horas de interjornada sem alterar o saldo do banco."
                       : key === "absenteismo"
                         ? "Excel por departamento com funcionário, ocorrência, período, quantidade, unidade e observações."
                         : key === "atestados"
