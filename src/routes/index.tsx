@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -378,8 +378,11 @@ function DashboardHome() {
   const [declarationPeople, setDeclarationPeople] = useState<Array<{ name: string; count: number }>>([]);
   const [certificatePeople, setCertificatePeople] = useState<Array<{ name: string; count: number }>>([]);
   const [competenceNote, setCompetenceNote] = useState("");
-  const [competenceNotes, setCompetenceNotes] = useState<Array<{ id: string; note: string; created_at: string }>>([]);
+  const [competenceNotes, setCompetenceNotes] = useState<Array<{ id: string; note: string; created_at: string; completed: boolean }>>([]);
   const [savingNote, setSavingNote] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
+  const [noteActionId, setNoteActionId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("Usuário RH");
   const [userRoleLabel, setUserRoleLabel] = useState("Usuário RH");
 
@@ -425,7 +428,7 @@ function DashboardHome() {
       if (comp.data?.[0]?.id) {
         const { data: noteRows, error: notesError } = await db
           .from("dashboard_competence_notes")
-          .select("id,note,created_at")
+          .select("id,note,created_at,completed")
           .eq("period_id", comp.data[0].id)
           .order("created_at", { ascending: true });
         if (notesError) {
@@ -436,6 +439,7 @@ function DashboardHome() {
             id: String(row.id),
             note: String(row.note ?? ""),
             created_at: String(row.created_at ?? ""),
+            completed: Boolean(row.completed),
           })));
         }
         setCompetenceNote("");
@@ -717,7 +721,7 @@ function DashboardHome() {
         note: text,
         updated_by: sessionData.session.user.id,
       })
-      .select("id,note,created_at")
+      .select("id,note,created_at,completed")
       .single();
 
     if (error || !savedRow) {
@@ -730,9 +734,76 @@ function DashboardHome() {
       id: String(savedRow.id),
       note: String(savedRow.note ?? text),
       created_at: String(savedRow.created_at ?? new Date().toISOString()),
+      completed: Boolean(savedRow.completed),
     }]);
     setCompetenceNote("");
     setSavingNote(false);
+  }
+
+  async function updateCompetenceNote(id: string) {
+    const text = editingNoteText.trim();
+    if (!text) {
+      window.alert("O comentário não pode ficar vazio.");
+      return;
+    }
+    setNoteActionId(id);
+    const { data, error } = await supabase
+      .from("dashboard_competence_notes")
+      .update({ note: text })
+      .eq("id", id)
+      .select("id,note,created_at,completed")
+      .single();
+    if (error || !data) {
+      window.alert("Não foi possível atualizar o comentário. " + (error?.message ?? ""));
+      setNoteActionId(null);
+      return;
+    }
+    setCompetenceNotes(rows => rows.map(row => row.id === id ? {
+      id: String(data.id),
+      note: String(data.note ?? text),
+      created_at: String(data.created_at ?? row.created_at),
+      completed: Boolean(data.completed),
+    } : row));
+    setEditingNoteId(null);
+    setEditingNoteText("");
+    setNoteActionId(null);
+  }
+
+  async function deleteCompetenceNote(id: string) {
+    if (!window.confirm("Deseja excluir este comentário? Essa ação não pode ser desfeita.")) return;
+    setNoteActionId(id);
+    const { error } = await supabase
+      .from("dashboard_competence_notes")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      window.alert("Não foi possível excluir o comentário. " + error.message);
+      setNoteActionId(null);
+      return;
+    }
+    setCompetenceNotes(rows => rows.filter(row => row.id !== id));
+    if (editingNoteId === id) {
+      setEditingNoteId(null);
+      setEditingNoteText("");
+    }
+    setNoteActionId(null);
+  }
+
+  async function toggleCompetenceNoteCompleted(id: string, completed: boolean) {
+    setNoteActionId(id);
+    const { data, error } = await supabase
+      .from("dashboard_competence_notes")
+      .update({ completed })
+      .eq("id", id)
+      .select("id,completed")
+      .single();
+    if (error || !data) {
+      window.alert("Não foi possível atualizar o status do comentário. " + (error?.message ?? ""));
+      setNoteActionId(null);
+      return;
+    }
+    setCompetenceNotes(rows => rows.map(row => row.id === id ? { ...row, completed: Boolean(data.completed) } : row));
+    setNoteActionId(null);
   }
 
   async function signOut() {
@@ -844,18 +915,43 @@ function DashboardHome() {
               {competenceNotes.length > 0 && (
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {competenceNotes.map((item, index) => (
-                    <article key={item.id} className="rounded-xl border bg-background p-4 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                          <ClipboardCheck className="h-3.5 w-3.5" />Registro {index + 1}
+                    <article key={item.id} className={`rounded-xl border p-4 shadow-sm transition-colors ${item.completed ? "border-primary/40 bg-primary/[0.04]" : "bg-background"}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.completed ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+                          {item.completed ? <CheckCircle2 className="h-3.5 w-3.5" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
+                          {item.completed ? "Concluído" : `Registro ${index + 1}`}
                         </span>
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                        <span className="text-[11px] text-muted-foreground">
                           {item.created_at && !Number.isNaN(new Date(item.created_at).getTime())
                             ? new Date(item.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
                             : ""}
                         </span>
                       </div>
-                      <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">{item.note}</p>
+                      {editingNoteId === item.id ? (
+                        <div className="mt-3 space-y-2">
+                          <textarea value={editingNoteText} onChange={event => setEditingNoteText(event.target.value)} rows={3} className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button type="button" onClick={() => { setEditingNoteId(null); setEditingNoteText(""); }} disabled={noteActionId === item.id} className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted">Cancelar</button>
+                            <button type="button" onClick={() => void updateCompetenceNote(item.id)} disabled={noteActionId === item.id || !editingNoteText.trim()} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60">
+                              <Save className="h-3.5 w-3.5" />{noteActionId === item.id ? "Salvando..." : "Salvar edição"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className={`mt-3 whitespace-pre-wrap break-words text-sm leading-6 ${item.completed ? "text-muted-foreground" : ""}`}>{item.note}</p>
+                      )}
+                      <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
+                        <button type="button" onClick={() => void toggleCompetenceNoteCompleted(item.id, !item.completed)} disabled={noteActionId === item.id || editingNoteId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">
+                          {item.completed ? <RotateCcw className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                          {item.completed ? "Reabrir" : "Marcar como concluído"}
+                        </button>
+                        <button type="button" onClick={() => { setEditingNoteId(item.id); setEditingNoteText(item.note); }} disabled={noteActionId === item.id || editingNoteId !== null} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">
+                          <Pencil className="h-3.5 w-3.5" />Editar
+                        </button>
+                        <button type="button" onClick={() => void deleteCompetenceNote(item.id)} disabled={noteActionId === item.id || editingNoteId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/5 disabled:opacity-50">
+                          <Trash2 className="h-3.5 w-3.5" />{noteActionId === item.id ? "Processando..." : "Excluir"}
+                        </button>
+                      </div>
                     </article>
                   ))}
                 </div>
