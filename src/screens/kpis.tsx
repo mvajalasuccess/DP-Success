@@ -2,6 +2,7 @@ import { ArrowLeft, Users, Clock3, CalendarX2, Percent, UserMinus, Info, WalletC
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 import { balancesByEmployee, periodRangeLabel, type Period } from "@/lib/dp-model";
 import { countWorkingWeekdays } from "@/lib/feriados";
 
@@ -14,6 +15,7 @@ type Employee = {
   terminationDate: string | null;
   status: string;
   workScheduleId: string | null;
+  companyId: string | null;
 };
 
 type OvertimeEmployee = {
@@ -99,6 +101,7 @@ export function Kpis() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState("todos");
   const [selectedDepartment, setSelectedDepartment] = useState("todos");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [employeeFilterOpen, setEmployeeFilterOpen] = useState(false);
   const [periodLabel, setPeriodLabel] = useState("");
@@ -120,7 +123,7 @@ export function Kpis() {
         { data: holidayRows, error: holidayError },
       ] = await Promise.all([
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
-        db.from("employees").select("id,full_name,registration,department_id,hire_date,termination_date,status,work_schedule_id,departments(name)").order("full_name"),
+        db.from("employees").select("id,full_name,registration,department_id,hire_date,termination_date,status,work_schedule_id,company_id,departments(name)").order("full_name"),
         db.from("holidays").select("holiday_date").eq("is_demo", false),
       ]);
 
@@ -149,6 +152,7 @@ export function Kpis() {
           terminationDate: e.termination_date ?? confirmedTerminationDates[normalizedName] ?? null,
           status: e.status ?? "ativo",
           workScheduleId: e.work_schedule_id ?? null,
+          companyId: e.company_id ?? null,
         };
       });
 
@@ -183,10 +187,11 @@ export function Kpis() {
 
   const employeeOptions = useMemo(
     () => employees.filter(e =>
+      (!companyFilter || e.companyId === companyFilter) &&
       (selectedDepartment === "todos" || e.department === selectedDepartment) &&
       employeeWasActiveInSelection(e)
     ),
-    [employees, selectedDepartment, selectedPeriodsForEmployees],
+    [employees, selectedDepartment, selectedPeriodsForEmployees, companyFilter],
   );
 
   useEffect(() => {
@@ -1215,7 +1220,10 @@ export function Kpis() {
             ))}
           </div>
 
-          <div className="grid gap-4 p-5 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid gap-4 p-5 md:grid-cols-3 lg:grid-cols-5">
+            <label className="grid gap-1.5 text-sm font-medium">Empresa
+              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setSelectedEmployees(employees.filter(e => !value || e.companyId === value).map(e => e.id)); setSelectedDepartment("todos"); }} className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" />
+            </label>
             <label className="grid gap-1.5 text-sm font-medium">Ano
               <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
                 {[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}
