@@ -7,7 +7,7 @@ type Employee = { id: string; full_name: string };
 type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string };
 type Totals = { he60: number; he60_20: number; he100: number; he20: number; interjornada: number; debitos: number; faltas: number; atestados: number };
 const EMPTY: Totals = { he60: 0, he60_20: 0, he100: 0, he20: 0, interjornada: 0, debitos: 0, faltas: 0, atestados: 0 };
-const ABSENCE_CODES = ["falta_justificada", "falta_injustificada"];
+const ABSENCE_CODES = ["falta", "falta_justificada", "falta_injustificada"];
 
 function fmt(minutes: number) {
   const n = Math.abs(Math.round(minutes || 0));
