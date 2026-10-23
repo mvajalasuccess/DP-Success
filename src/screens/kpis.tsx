@@ -1227,8 +1227,8 @@ export function Kpis() {
           </div>
 
           <div className="grid gap-4 p-5 md:grid-cols-3 lg:grid-cols-5">
-            <label className="grid gap-1.5 text-sm font-medium">Empresa
-              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setSelectedEmployees([]); setSelectedDepartment("todos"); }} className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" />
+            <label className="grid min-w-0 gap-1.5 text-sm font-medium">Empresa
+              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setSelectedEmployees([]); setSelectedDepartment("todos"); }} className="h-10 w-full min-w-0 max-w-full rounded-lg border bg-background px-3 text-ellipsis outline-none focus:ring-2 focus:ring-primary/20" />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Ano
               <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
