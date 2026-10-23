@@ -311,14 +311,20 @@ export function Comparativos() {
         </div>
         <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-2">
           <div className="min-w-0">
-            <label className="mb-2 block text-sm font-medium">Empresa</label>
-            <CompanyFilter value={companyFilter} onChange={setCompanyFilter} />
-            <label className="mt-3 block text-sm font-medium">Situação do funcionário</label>
-            <select value={employeeStatusFilter} onChange={e => setEmployeeStatusFilter(e.target.value as "ativo" | "inativo" | "todos")} className="mt-2 w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15">
-              <option value="ativo">Ativos</option>
-              <option value="inativo">Inativos</option>
-              <option value="todos">Todos</option>
-            </select>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <label className="mb-2 block text-sm font-medium">Empresa</label>
+                <CompanyFilter value={companyFilter} onChange={setCompanyFilter} />
+              </div>
+              <div className="min-w-0">
+                <label className="mb-2 block text-sm font-medium">Status</label>
+                <select value={employeeStatusFilter} onChange={e => setEmployeeStatusFilter(e.target.value as "ativo" | "inativo" | "todos")} className="w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15">
+                  <option value="ativo">Ativos</option>
+                  <option value="inativo">Inativos</option>
+                  <option value="todos">Todos</option>
+                </select>
+              </div>
+            </div>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
               <div><h3 className="text-sm font-semibold">Colaboradores</h3><p className="mt-1 text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · {employeeStatusFilter === "todos" ? "ativos e inativos" : employeeStatusFilter === "ativo" ? "somente ativos" : "somente inativos"}</p></div>
               <div className="flex gap-2"><button onClick={selectAllEmployees} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar todos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
