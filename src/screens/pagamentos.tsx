@@ -4,10 +4,11 @@ import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { ScreenShell, inputCls } from "@/components/screen-shell";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 import { balancesByEmployee, fetchLaunches, minutesToHours, type PeriodBalance } from "@/lib/dp-model";
 
 type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string; status: string };
-type Employee = { id: string; full_name: string; salary: number | null; work_schedule_id: string | null; status: string; hire_date: string | null; termination_date: string | null; work_schedules?: { weekly_minutes: number | null } | null };
+type Employee = { id: string; full_name: string; company_id?: string | null; salary: number | null; work_schedule_id: string | null; status: string; hire_date: string | null; termination_date: string | null; work_schedules?: { weekly_minutes: number | null } | null };
 type PaymentRow = { id: string; employee_id: string; period_id: string | null; entry_date: string; minutes: number; justification: string | null; created_at?: string };
 type Detail = { key: string; label: string; minutes: number; multiplier: number };
 
@@ -26,6 +27,7 @@ export function Payments() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periodId, setPeriodId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [details, setDetails] = useState<Detail[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [balances, setBalances] = useState<PeriodBalance[]>([]);
@@ -54,7 +56,7 @@ export function Payments() {
     try {
       const [periodResult, employeeResult] = await Promise.all([
         supabase.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
-        supabase.from("employees").select("id,full_name,salary,work_schedule_id,status,hire_date,termination_date,work_schedules(weekly_minutes)").order("full_name"),
+        supabase.from("employees").select("id,full_name,company_id,salary,work_schedule_id,status,hire_date,termination_date,work_schedules(weekly_minutes)").order("full_name"),
       ]);
       if (periodResult.error) throw new Error(periodResult.error.message);
       if (employeeResult.error) throw new Error(employeeResult.error.message);
@@ -220,7 +222,9 @@ export function Payments() {
     }
   }
 
-  const history = useMemo(() => payments.filter(p => p.period_id === periodId), [payments, periodId]);
+  const companyEmployeeIds = useMemo(() => new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id)), [employees, companyFilter]);
+  const visibleEmployees = useMemo(() => employees.filter(e => companyEmployeeIds.has(e.id)), [employees, companyEmployeeIds]);
+  const history = useMemo(() => payments.filter(p => p.period_id === periodId && companyEmployeeIds.has(p.employee_id)), [payments, periodId, companyEmployeeIds]);
 
   return (
     <ScreenShell section="Fechamento de Ponto" title="Pagamentos" name="Pagamentos" subtitle="Calcule o valor das horas extras, registre o pagamento e desconte somente o total de horas do saldo geral." error={error}>
@@ -230,7 +234,10 @@ export function Payments() {
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-5 w-5" /></div>
             <div><h2 className="font-display text-base font-semibold">Dados do pagamento</h2><p className="mt-1 text-sm text-muted-foreground">Selecione a competência e o funcionário para consultar as horas e os valores.</p></div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <label className="grid gap-1.5 text-sm font-medium">Empresa
+              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(e => (!value || e.company_id === value) && (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
+            </label>
             <label className="grid gap-1.5 text-sm font-medium">Competência
               <select className={inputCls} value={periodId} onChange={e => setPeriodId(e.target.value)} disabled={loading}>
                 <option value="">Selecione a competência</option>
@@ -240,7 +247,7 @@ export function Payments() {
             <label className="grid gap-1.5 text-sm font-medium">Funcionário
               <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={loading}>
                 <option value="">Selecione o funcionário</option>
-                {employees.filter(e => (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)).map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                {visibleEmployees.filter(e => (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)).map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
               </select>
             </label>
           </div>
