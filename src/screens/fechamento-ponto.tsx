@@ -219,8 +219,7 @@ export function PointClosing() {
         .lte("start_date", p.end_date)
         .gte("end_date", p.start_date),
       supabase.from("work_schedules")
-        .select("id,weekly_minutes")
-        .eq("active", true),
+        .select("id,weekly_minutes"),
     ]);
 
     if (employeeError || timeError || overtimeError || occurrenceError || debitError || certificateError || scheduleError) {
