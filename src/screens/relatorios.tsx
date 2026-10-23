@@ -129,6 +129,7 @@ async function loadClosingRows(db: any, period: Period) {
     { data: occurrenceRows, error: occurrenceError },
     { data: debitRows, error: debitError },
     { data: certificateRows, error: certificateError },
+    { data: holidayRows, error: holidayError },
   ] = await Promise.all([
     db.from("employees")
       .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,work_schedules(weekly_minutes),departments(name),positions(name)")
@@ -147,10 +148,15 @@ async function loadClosingRows(db: any, period: Period) {
       .select("employee_id,start_date,end_date,days")
       .lte("start_date", period.end_date)
       .gte("end_date", period.start_date),
+    db.from("holidays").select("holiday_date").eq("is_demo", false),
   ]);
 
-  const queryError = employeeError ?? overtimeError ?? occurrenceError ?? debitError ?? certificateError;
+  const queryError = employeeError ?? overtimeError ?? occurrenceError ?? debitError ?? certificateError ?? holidayError;
   if (queryError) throw queryError;
+
+  const additionalHolidayDates = new Set(
+    (holidayRows ?? []).map((row: any) => String(row.holiday_date).slice(0, 10)),
+  );
 
   const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
     (!employee.hire_date || employee.hire_date <= period.end_date) &&
@@ -179,7 +185,7 @@ async function loadClosingRows(db: any, period: Period) {
     const effectiveEnd = employee.termination_date && employee.termination_date < period.end_date ? employee.termination_date : period.end_date;
     const weeklyMinutes = Number(employee.work_schedules?.weekly_minutes || 0);
     const dailyMinutes = weeklyMinutes > 0 ? weeklyMinutes / 5 : 528;
-    const expected = effectiveStart > effectiveEnd ? 0 : Math.round(countWorkingWeekdays(effectiveStart, effectiveEnd) * dailyMinutes);
+    const expected = effectiveStart > effectiveEnd ? 0 : Math.round(countWorkingWeekdays(effectiveStart, effectiveEnd, additionalHolidayDates) * dailyMinutes);
     let absenceQuantity = 0;
     let certificateMinutes = 0;
     let declarationMinutes = 0;
