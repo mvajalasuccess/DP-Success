@@ -458,6 +458,7 @@ function DashboardHome() {
         bankRows,
         scheduleRows,
         overrideRows,
+        holidayRows,
       ] = competence
         ? await Promise.all([
             db.from("overtime_records").select("employee_id,minutes,period_id,launch_type").eq("period_id", competence.id),
@@ -467,6 +468,7 @@ function DashboardHome() {
             db.from("bank_hours").select("employee_id,period_id,minutes,kind,adjustment_direction").eq("period_id", competence.id),
             db.from("work_schedules").select("id,weekly_minutes"),
             db.from("point_closing_overrides").select("employee_id,period_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes").eq("period_id", competence.id),
+            db.from("holidays").select("holiday_date").eq("is_demo", false),
           ])
         : [
             { data: [], error: null },
@@ -476,8 +478,12 @@ function DashboardHome() {
             { data: [], error: null },
             { data: [], error: null },
             { data: [], error: null },
+            { data: [], error: null },
           ];
       const scheduleMap = new Map((scheduleRows.data ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0) / 5]));
+      const additionalHolidayDates = new Set(
+        (holidayRows.data ?? []).map((row: any) => String(row.holiday_date).slice(0, 10)),
+      );
       const dailyMinutes = (employeeId: string) => {
         const employee = employees.find((e: any) => e.id === employeeId);
         return employee?.work_schedule_id ? (scheduleMap.get(String(employee.work_schedule_id)) ?? 528) : 528;
@@ -553,7 +559,7 @@ function DashboardHome() {
             const start = employee.hire_date && employee.hire_date > competence.start_date ? employee.hire_date : competence.start_date;
             const end = employee.termination_date && employee.termination_date < competence.end_date ? employee.termination_date : competence.end_date;
             if (end < start) return sum;
-            return sum + Math.round(countWorkingWeekdays(start, end) * dailyMinutes(employee.id));
+            return sum + Math.round(countWorkingWeekdays(start, end, additionalHolidayDates) * dailyMinutes(employee.id));
           }, 0)
         : currentTime.reduce((sum: number, x: any) => sum + Number(x.expected_minutes || 0), 0);
       const debitMinutes = (bankRows.data ?? [])
