@@ -110,6 +110,69 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_ormindo_overrides_20261022: {
+        Row: {
+          absence_quantity: number | null
+          allowance_minutes: number | null
+          certificate_minutes: number | null
+          created_at: string | null
+          debit_minutes: number | null
+          declaration_minutes: number | null
+          employee_id: string | null
+          expected_minutes: number | null
+          he_100_minutes: number | null
+          he_20_minutes: number | null
+          he_60_minutes: number | null
+          he_60_night_minutes: number | null
+          id: string | null
+          interjornada_minutes: number | null
+          justification: string | null
+          period_id: string | null
+          updated_at: string | null
+          worked_minutes: number | null
+        }
+        Insert: {
+          absence_quantity?: number | null
+          allowance_minutes?: number | null
+          certificate_minutes?: number | null
+          created_at?: string | null
+          debit_minutes?: number | null
+          declaration_minutes?: number | null
+          employee_id?: string | null
+          expected_minutes?: number | null
+          he_100_minutes?: number | null
+          he_20_minutes?: number | null
+          he_60_minutes?: number | null
+          he_60_night_minutes?: number | null
+          id?: string | null
+          interjornada_minutes?: number | null
+          justification?: string | null
+          period_id?: string | null
+          updated_at?: string | null
+          worked_minutes?: number | null
+        }
+        Update: {
+          absence_quantity?: number | null
+          allowance_minutes?: number | null
+          certificate_minutes?: number | null
+          created_at?: string | null
+          debit_minutes?: number | null
+          declaration_minutes?: number | null
+          employee_id?: string | null
+          expected_minutes?: number | null
+          he_100_minutes?: number | null
+          he_20_minutes?: number | null
+          he_60_minutes?: number | null
+          he_60_night_minutes?: number | null
+          id?: string | null
+          interjornada_minutes?: number | null
+          justification?: string | null
+          period_id?: string | null
+          updated_at?: string | null
+          worked_minutes?: number | null
+        }
+        Relationships: []
+      }
       bank_hours: {
         Row: {
           adjustment_direction: string | null
