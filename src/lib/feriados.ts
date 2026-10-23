@@ -80,7 +80,11 @@ export function isWeekday(date: string) {
   return weekday !== 0 && weekday !== 6;
 }
 
-export function countWorkingWeekdays(start: string, end: string) {
+export function countWorkingWeekdays(
+  start: string,
+  end: string,
+  additionalHolidayDates: ReadonlySet<string> = new Set<string>(),
+) {
   const [sy = 1970, sm = 1, sd = 1] = start.slice(0, 10).split("-").map(Number);
   const [ey = 1970, em = 1, ed = 1] = end.slice(0, 10).split("-").map(Number);
   const current = new Date(sy, sm - 1, sd);
@@ -89,7 +93,11 @@ export function countWorkingWeekdays(start: string, end: string) {
 
   while (current <= last) {
     const currentIso = iso(current);
-    if (isWeekday(currentIso) && !isBrazilNationalHoliday(currentIso)) total += 1;
+    if (
+      isWeekday(currentIso) &&
+      !isBrazilNationalHoliday(currentIso) &&
+      !additionalHolidayDates.has(currentIso)
+    ) total += 1;
     current.setDate(current.getDate() + 1);
   }
 
