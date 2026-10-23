@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-type Employee = { id: string; full_name: string; company_id?: string | null };
+type Employee = { id: string; full_name: string; company_id?: string | null; status?: string | null };
 type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string };
 type Totals = { he60: number; he60_20: number; he100: number; he20: number; interjornada: number; debitos: number; faltas: number; atestados: number };
 const EMPTY: Totals = { he60: 0, he60_20: 0, he100: 0, he20: 0, interjornada: 0, debitos: 0, faltas: 0, atestados: 0 };
@@ -21,6 +21,7 @@ export function Comparativos() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [companyFilter, setCompanyFilter] = useState("");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [periodSearch, setPeriodSearch] = useState("");
@@ -33,7 +34,7 @@ export function Comparativos() {
       try {
         const db = supabase as any;
         const [{ data: employeeData, error: employeeError }, { data: periodData, error: periodError }] = await Promise.all([
-          db.from("employees").select("id,full_name,company_id").eq("status", "ativo").order("full_name"),
+          db.from("employees").select("id,full_name,company_id,status").order("full_name"),
           db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date").order("start_date", { ascending: false }),
         ]);
         if (employeeError) throw employeeError;
@@ -225,19 +226,19 @@ export function Comparativos() {
 
   const visibleEmployees = useMemo(() => {
     const q = employeeSearch.trim().toLowerCase();
-    return employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!q || e.full_name.toLowerCase().includes(q)));
-  }, [employees, employeeSearch, companyFilter]);
+    return employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || (e.status ?? "").toLowerCase() === employeeStatusFilter) && (!q || e.full_name.toLowerCase().includes(q)));
+  }, [employees, employeeSearch, companyFilter, employeeStatusFilter]);
 
   const visiblePeriods = useMemo(() => {
     const q = periodSearch.trim().toLowerCase();
     return periods.filter(p => !q || `${String(p.reference_month).padStart(2, "0")}/${p.reference_year}`.includes(q));
   }, [periods, periodSearch]);
 
-  useEffect(() => { setSelectedEmployees(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id)); }, [companyFilter, employees]);
+  useEffect(() => { setSelectedEmployees(employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || (e.status ?? "").toLowerCase() === employeeStatusFilter)).map(e => e.id)); }, [companyFilter, employeeStatusFilter, employees]);
 
   function toggleEmployee(id: string) { setSelectedEmployees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function togglePeriod(id: string) { setSelectedPeriods(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
-  function selectAllEmployees() { setSelectedEmployees(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id)); }
+  function selectAllEmployees() { setSelectedEmployees(employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || (e.status ?? "").toLowerCase() === employeeStatusFilter)).map(e => e.id)); }
   function selectAllPeriods() { setSelectedPeriods(periods.map(p => p.id)); }
 
   const columns: [keyof Totals, string][] = [
@@ -312,8 +313,14 @@ export function Comparativos() {
           <div className="min-w-0">
             <label className="mb-2 block text-sm font-medium">Empresa</label>
             <CompanyFilter value={companyFilter} onChange={setCompanyFilter} />
+            <label className="mt-3 block text-sm font-medium">Situação do funcionário</label>
+            <select value={employeeStatusFilter} onChange={e => setEmployeeStatusFilter(e.target.value as "ativo" | "inativo" | "todos")} className="mt-2 w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15">
+              <option value="ativo">Ativos</option>
+              <option value="inativo">Inativos</option>
+              <option value="todos">Todos</option>
+            </select>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
-              <div><h3 className="text-sm font-semibold">Colaboradores</h3><p className="mt-1 text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · somente ativos</p></div>
+              <div><h3 className="text-sm font-semibold">Colaboradores</h3><p className="mt-1 text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · {employeeStatusFilter === "todos" ? "ativos e inativos" : employeeStatusFilter === "ativo" ? "somente ativos" : "somente inativos"}</p></div>
               <div className="flex gap-2"><button onClick={selectAllEmployees} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar todos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
             </div>
             <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} placeholder="Buscar colaborador..." className="w-full rounded-xl border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" /></div>
