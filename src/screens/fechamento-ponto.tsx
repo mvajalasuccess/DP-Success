@@ -111,7 +111,7 @@ export function PointClosing() {
     }
 
     const normalizeIdentity = (value: unknown) =>
-      String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toUpperCase();
+      String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
     const resolveHistoricalEmployeeId = (row: any): string | null => {
       if (row.employee_id) return String(row.employee_id);
       const historicalName = normalizeIdentity(row.employee_name);
