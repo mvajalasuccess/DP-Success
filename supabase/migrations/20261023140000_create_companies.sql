@@ -8,7 +8,39 @@ CREATE TABLE IF NOT EXISTS public.companies (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT companies_name_unique UNIQUE (name),
   CONSTRAINT companies_cnpj_unique UNIQUE (cnpj),
-  CONSTRAINT companies_cnpj_digits CHECK (cnpj ~ '^[0-9]{14}$')
+  CONSTRAINT companies_cnpj_digits CHECK (cnpj ~ '^[A-Z0-9]{12}[0-9]{2})
+);
+
+ALTER TABLE public.employees
+  ADD COLUMN IF NOT EXISTS company_id uuid NULL
+  REFERENCES public.companies(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_employees_company_id
+  ON public.employees(company_id);
+
+ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS companies_app_select ON public.companies;
+CREATE POLICY companies_app_select ON public.companies
+FOR SELECT TO authenticated
+USING ((SELECT private.has_app_access()));
+
+DROP POLICY IF EXISTS companies_app_insert ON public.companies;
+CREATE POLICY companies_app_insert ON public.companies
+FOR INSERT TO authenticated
+WITH CHECK ((SELECT private.has_role('rh'::public.app_role)));
+
+DROP POLICY IF EXISTS companies_app_update ON public.companies;
+CREATE POLICY companies_app_update ON public.companies
+FOR UPDATE TO authenticated
+USING ((SELECT private.has_role('rh'::public.app_role)))
+WITH CHECK ((SELECT private.has_role('rh'::public.app_role)));
+
+DROP POLICY IF EXISTS companies_app_delete ON public.companies;
+CREATE POLICY companies_app_delete ON public.companies
+FOR DELETE TO authenticated
+USING ((SELECT private.has_role('administrador'::public.app_role)));
+)
 );
 
 ALTER TABLE public.employees
