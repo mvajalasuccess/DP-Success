@@ -325,7 +325,7 @@ export function Comparativos() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div><h3 className="text-sm font-semibold">Competências</h3><p className="mt-1 text-xs text-muted-foreground">{selectedPeriods.length} selecionada(s)</p></div>
-              <div className="flex gap-2"><button onClick={selectAllPeriods} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar exibidas</button><button onClick={() => setSelectedPeriods([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
+              <div className="flex gap-2"><button onClick={selectAllPeriods} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar todos</button><button onClick={() => setSelectedPeriods([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
             </div>
             <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={periodSearch} onChange={e => setPeriodSearch(e.target.value)} placeholder="Buscar competência (ex.: 08/2026)..." className="w-full rounded-xl border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" /></div>
             <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto rounded-xl border bg-muted/10 p-2 sm:grid-cols-2">
@@ -400,26 +400,29 @@ export function Comparativos() {
 
       <Card className="mt-5 overflow-hidden rounded-2xl border-border/70 shadow-sm">
         <div className="flex flex-col gap-3 border-b bg-muted/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div><h2 className="font-semibold">Detalhamento por colaborador</h2><p className="mt-1 text-xs text-muted-foreground">Valores acumulados nas competências selecionadas. Faltas e atestados exibidos em dias.</p></div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground"><FileSpreadsheet className="h-4 w-4" />Tabela detalhada</div>
+          <div><h2 className="font-semibold">Comparação lado a lado por colaborador</h2><p className="mt-1 text-xs text-muted-foreground">Cada colaborador fica em uma coluna para facilitar a comparação direta dos totais nas competências selecionadas.</p></div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><FileSpreadsheet className="h-4 w-4" />Tabela comparativa</div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1250px] text-left text-sm">
-            <thead className="sticky top-0 bg-muted/70 text-xs uppercase tracking-wide text-muted-foreground"><tr>
-              <th className="sticky left-0 z-10 bg-muted/90 px-4 py-3 font-semibold">Colaborador</th>
-              {columns.map(([, label]) => <th key={label} className="whitespace-nowrap px-4 py-3 font-semibold">{label}</th>)}
-              <th className="whitespace-nowrap px-4 py-3 font-semibold">Faltas (dias)</th><th className="whitespace-nowrap px-4 py-3 font-semibold">Atestados (dias)</th>
-            </tr></thead>
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="sticky top-0 bg-muted/70 text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="sticky left-0 z-10 min-w-[190px] bg-muted/90 px-4 py-3 font-semibold">Indicador</th>
+                {selectedEmployeeRows.map(({id, employee}) => <th key={id} className="min-w-[150px] whitespace-nowrap px-4 py-3 font-semibold">{employee!.full_name}</th>)}
+              </tr>
+            </thead>
             <tbody className="divide-y divide-border/70">
-              {selectedEmployeeRows.map(({id,employee,totals: t}) => <tr key={id} className="transition-colors hover:bg-muted/30">
-                <td className="sticky left-0 z-[1] max-w-[260px] bg-card px-4 py-3.5 font-medium">{employee!.full_name}</td>
-                {columns.map(([key]) => <td key={key} className="whitespace-nowrap px-4 py-3.5 tabular-nums">{fmt(t[key])}</td>)}
-                <td className="px-4 py-3.5 tabular-nums">{t.faltas.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
-                <td className="px-4 py-3.5 tabular-nums">{t.atestados.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+              {[
+                ...columns.map(([key, label]) => ({key, label, format: (t: Totals) => fmt(t[key])})),
+                {key: "faltas" as const, label: "Faltas (dias)", format: (t: Totals) => t.faltas.toLocaleString("pt-BR", {maximumFractionDigits: 2})},
+                {key: "atestados" as const, label: "Atestados (dias)", format: (t: Totals) => t.atestados.toLocaleString("pt-BR", {maximumFractionDigits: 2})},
+              ].map(metric => <tr key={metric.label} className="transition-colors hover:bg-muted/30">
+                <th scope="row" className="sticky left-0 z-[1] bg-card px-4 py-3.5 font-medium">{metric.label}</th>
+                {selectedEmployeeRows.map(({id, totals: t}) => <td key={id} className="whitespace-nowrap px-4 py-3.5 tabular-nums">{metric.format(t)}</td>)}
               </tr>)}
-              {!selectedEmployeeRows.length && <tr><td colSpan={9} className="px-5 py-12 text-center"><Users className="mx-auto mb-2 h-7 w-7 text-muted-foreground/40" /><p className="text-sm font-medium">Nenhum colaborador selecionado</p><p className="mt-1 text-xs text-muted-foreground">Escolha pelo menos um colaborador nos filtros acima.</p></td></tr>}
-              {!!selectedEmployeeRows.length && !selectedPeriods.length && <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-muted-foreground">Selecione pelo menos uma competência para carregar os dados.</td></tr>}
-              {loading && <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-muted-foreground">Carregando comparativos...</td></tr>}
+              {!selectedEmployeeRows.length && <tr><td colSpan={2} className="px-5 py-12 text-center"><Users className="mx-auto mb-2 h-7 w-7 text-muted-foreground/40" /><p className="text-sm font-medium">Nenhum colaborador selecionado</p><p className="mt-1 text-xs text-muted-foreground">Escolha pelo menos um colaborador nos filtros acima.</p></td></tr>}
+              {!!selectedEmployeeRows.length && !selectedPeriods.length && <tr><td colSpan={selectedEmployeeRows.length + 1} className="px-5 py-10 text-center text-sm text-muted-foreground">Selecione pelo menos uma competência para carregar os dados.</td></tr>}
+              {loading && <tr><td colSpan={selectedEmployeeRows.length + 1} className="px-5 py-10 text-center text-sm text-muted-foreground">Carregando comparativos...</td></tr>}
             </tbody>
           </table>
         </div>
