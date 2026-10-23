@@ -285,12 +285,31 @@ export function Kpis() {
         return;
       }
 
-      const resolveEmployee = (row: any): Employee | undefined =>
-        employees.find(e =>
-          (row.employee_id && e.id === row.employee_id) ||
-          (row.registration && e.registration && String(row.registration).trim() === e.registration) ||
-          (row.employee_name && e.name.trim().toLowerCase() === String(row.employee_name).trim().toLowerCase())
-        );
+      const normalizeEmployeeName = (value: unknown) =>
+        String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase();
+
+      const resolveEmployee = (row: any): Employee | undefined => {
+        // Priorizar sempre o ID: existem matrículas duplicadas na BASE histórica.
+        if (row.employee_id) {
+          const byId = employees.find(e => e.id === String(row.employee_id));
+          if (byId) return byId;
+        }
+
+        // Quando o ID não está disponível, usar o nome antes da matrícula,
+        // para não associar um histórico à pessoa errada em caso de matrícula repetida.
+        if (row.employee_name) {
+          const normalizedName = normalizeEmployeeName(row.employee_name);
+          const byName = employees.find(e => normalizeEmployeeName(e.name) === normalizedName);
+          if (byName) return byName;
+        }
+
+        if (row.registration) {
+          const registration = String(row.registration).trim();
+          const matches = employees.filter(e => e.registration && e.registration === registration);
+          if (matches.length === 1) return matches[0];
+        }
+        return undefined;
+      };
 
       const isAllowedRow = (row: any) => {
         // Quando "Todos os funcionários" e "Todos os setores" estão selecionados,
@@ -371,7 +390,10 @@ export function Kpis() {
       for (const row of historical ?? []) {
         if (!isAllowedRow(row)) continue;
         const employee = resolveEmployee(row);
-        const override = employee ? overrideByKey.get(String(row.period_id) + ":" + String(employee.id)) : undefined;
+        const overrideEmployeeId = row.employee_id ? String(row.employee_id) : employee?.id;
+        const override = overrideEmployeeId
+          ? overrideByKey.get(String(row.period_id) + ":" + String(overrideEmployeeId))
+          : undefined;
         const sourceRow = override ? { ...row, ...override } : row;
         const key = employee?.id ?? `historical:${row.registration ?? row.employee_name}`;
         if (employee) historicalCount += 1;
@@ -776,7 +798,10 @@ export function Kpis() {
         for (const row of historical ?? []) {
           if (String(row.period_id) !== String(period.id) || !isAllowedRow(row)) continue;
           const employee = resolveEmployee(row);
-          const override = employee ? overrideByKey.get(String(row.period_id) + ":" + String(employee.id)) : undefined;
+          const overrideEmployeeId = row.employee_id ? String(row.employee_id) : employee?.id;
+          const override = overrideEmployeeId
+            ? overrideByKey.get(String(row.period_id) + ":" + String(overrideEmployeeId))
+            : undefined;
           const sourceRow = override ? { ...row, ...override } : row;
           const values = {
             he60: Number(sourceRow.he_60_minutes || 0),
