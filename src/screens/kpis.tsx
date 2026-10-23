@@ -502,13 +502,14 @@ export function Kpis() {
           // Atestados atuais têm como fonte oficial medical_certificates.
           // Evita duplicar o mesmo atestado se houver uma ocorrência legada.
         } else if (code === "declaracao_horas" || code === "declaracao") {
-          // Declarações são exibidas separadamente. Como já representam horas
-          // abonadas, não entram novamente no indicador de absenteísmo.
+          // Declarações reduzem horas trabalhadas, mas não entram no absenteísmo.
           next.declaracoesMinutes += minutes;
+          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
         } else if (code === "abono" || code === "folga_abonada") {
-          // Folga abonada entra em abonos, sem ser contabilizada como falta.
+          // Abono entra nas horas perdidas e também reduz as horas trabalhadas.
           next.abonosMinutes += minutes;
           next.absenceMinutes += minutes;
+          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
         }
       }
 
