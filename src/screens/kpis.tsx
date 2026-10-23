@@ -869,7 +869,7 @@ export function Kpis() {
         if (period.end_date > HISTORICAL_CUTOFF) {
           for (const override of (overrideRows ?? []).filter((item: any) => String(item.period_id) === String(period.id))) {
             const employee = employees.find(item => item.id === String(override.employee_id));
-            if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
+            if (!employee || !employeeMatches(employee, selectedEmployees, selectedDepartment)) continue;
             const values = {
               he60: Number(override.he_60_minutes || 0),
               he60Night: Number(override.he_60_night_minutes || 0),
