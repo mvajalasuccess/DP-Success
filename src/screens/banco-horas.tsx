@@ -39,7 +39,7 @@ export function BankHours() {
 
   useEffect(() => {
     void (async () => {
-      const r = await supabase.from("employees").select("id,full_name,status,termination_date,company_id").order("full_name");
+      const r = await (supabase as any).from("employees").select("id,full_name,status,termination_date,company_id").order("full_name");
       if (r.error) setError(r.error.message);
       else { setEmployees(r.data ?? []); const active = (r.data ?? []).find((e: any) => e.status !== "inativo"); if (active) setEmployeeId(active.id); else if (r.data?.[0]) setEmployeeId(r.data[0].id); }
     })();
