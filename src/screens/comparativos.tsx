@@ -314,7 +314,7 @@ export function Comparativos() {
             <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1.4fr)_minmax(140px,1fr)]">
               <div className="min-w-0">
                 <label className="mb-2 block text-sm font-medium">Empresa</label>
-                <CompanyFilter value={companyFilter} onChange={setCompanyFilter} />
+                <CompanyFilter value={companyFilter} onChange={setCompanyFilter} className="block w-full min-w-0 max-w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" />
               </div>
               <div className="min-w-0">
                 <label className="mb-2 block text-sm font-medium">Status</label>
