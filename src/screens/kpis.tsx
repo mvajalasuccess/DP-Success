@@ -989,6 +989,7 @@ export function Kpis() {
         { data: timeRows },
         { data: occurrenceRows },
         { data: debitRows },
+        { data: certificateRows },
         { data: overrideRows },
         { data: scheduleRows },
       ] = await Promise.all([
@@ -1004,8 +1005,11 @@ export function Kpis() {
         currentIds.length
           ? db.from("bank_hours").select("employee_id,period_id,minutes,kind").eq("kind","debito").in("period_id", currentIds)
           : Promise.resolve({ data: [] }),
+        currentIds.length
+          ? db.from("medical_certificates").select("employee_id,start_date,end_date,days").lte("start_date", yearPeriods[yearPeriods.length - 1]?.end_date ?? "9999-12-31").gte("end_date", yearPeriods[0]?.start_date ?? "0001-01-01")
+          : Promise.resolve({ data: [] }),
         yearPeriods.length
-          ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,declaration_minutes,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
+          ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
           : Promise.resolve({ data: [] }),
         db.from("work_schedules").select("id,weekly_minutes"),
       ]);
@@ -1113,7 +1117,8 @@ export function Kpis() {
             lost += Math.round(Number(row.absence_quantity || 0) * dailyMinutesFromSchedule(employee))
               + Number(row.allowance_minutes || 0)
               + (period.end_date > HISTORICAL_CUTOFF ? Number(row.declaration_minutes || 0) : 0)
-              + Number(row.debit_minutes || 0);
+              + Number(row.debit_minutes || 0)
+              + Number(row.certificate_minutes || 0);
           }
 
           for (const row of (occurrenceRows ?? []).filter((x: any) => x.period_id === period.id)) {
@@ -1137,6 +1142,26 @@ export function Kpis() {
             if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
             const employee = employees.find(e => e.id === row.employee_id);
             if (employee && employeeIncludedForSelectedFilters(employee)) lost += Math.abs(Number(row.minutes || 0));
+          }
+
+          // Atestados cadastrados em dias também compõem Abonos no gráfico:
+          // converte os dias para minutos conforme a jornada e distribui por competência.
+          for (const row of (certificateRows ?? []).filter((x: any) =>
+            x.start_date <= period.end_date && x.end_date >= period.start_date
+          )) {
+            if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
+            const employee = employees.find(e => e.id === row.employee_id);
+            if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
+            const start = row.start_date > period.start_date ? row.start_date : period.start_date;
+            const end = row.end_date < period.end_date ? row.end_date : period.end_date;
+            const overlapDays = Math.max(0, Math.floor(
+              (new Date(end + "T00:00:00").getTime() - new Date(start + "T00:00:00").getTime()) / 86400000
+            ) + 1);
+            const calendarDays = Math.max(0, Math.floor(
+              (new Date(row.end_date + "T00:00:00").getTime() - new Date(row.start_date + "T00:00:00").getTime()) / 86400000
+            ) + 1);
+            const days = Math.min(Math.max(0, Number(row.days || 0)), calendarDays, overlapDays);
+            lost += Math.round(days * dailyMinutesFromSchedule(employee));
           }
         }
 
