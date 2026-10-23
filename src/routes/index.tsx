@@ -553,7 +553,7 @@ function DashboardHome() {
             const start = employee.hire_date && employee.hire_date > competence.start_date ? employee.hire_date : competence.start_date;
             const end = employee.termination_date && employee.termination_date < competence.end_date ? employee.termination_date : competence.end_date;
             if (end < start) return sum;
-            return sum + Math.round(countWorkingWeekdays(start, end) * 528);
+            return sum + Math.round(countWorkingWeekdays(start, end) * dailyMinutes(employee.id));
           }, 0)
         : currentTime.reduce((sum: number, x: any) => sum + Number(x.expected_minutes || 0), 0);
       const debitMinutes = (bankRows.data ?? [])
@@ -589,7 +589,7 @@ function DashboardHome() {
       for (const override of overrides) {
         if (!periodId || override.period_id !== periodId || !activeEmployeeIds.has(override.employee_id)) continue;
         absenceMinutes +=
-          Math.round(Number(override.absence_quantity || 0) * 528)
+          Math.round(Number(override.absence_quantity || 0) * dailyMinutes(override.employee_id))
           + Number(override.allowance_minutes || 0)
           + Number(override.debit_minutes || 0);
       }
