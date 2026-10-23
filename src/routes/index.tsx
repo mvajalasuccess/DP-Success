@@ -411,7 +411,23 @@ function DashboardHome() {
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
       ]);
 
-      const allEmployees = emps.data ?? [];
+      // Mantém no Dashboard as mesmas datas de desligamento já validadas
+      // e usadas na tela de KPIs quando o cadastro antigo está incompleto.
+      const confirmedTerminationDates: Record<string, string> = {
+        "ANILEI APARECIDO ALVES": "2026-05-22",
+        "ANTONIO LUIS LIMA JUNIOR": "2026-07-30",
+        "EDINILSON DE ALMEIDA SILVA": "2026-05-29",
+        "EMILIO PICOLI FRACAROLLI": "2026-06-05",
+        "FELIPE HILMANN": "2026-07-30",
+      };
+      const allEmployees = (emps.data ?? []).map((employee: any) => {
+        const normalizedName = String(employee.full_name ?? "")
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+        return {
+          ...employee,
+          termination_date: employee.termination_date ?? confirmedTerminationDates[normalizedName] ?? null,
+        };
+      });
       if (comp.data?.[0]?.id) {
         const { data: noteRow } = await db
           .from("dashboard_competence_notes")
@@ -444,7 +460,7 @@ function DashboardHome() {
         overrideRows,
       ] = competence
         ? await Promise.all([
-            db.from("overtime_records").select("employee_id,minutes,period_id").eq("period_id", competence.id),
+            db.from("overtime_records").select("employee_id,minutes,period_id,launch_type").eq("period_id", competence.id),
             db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_date,end_date,period_id,occurrence_types(code)").eq("period_id", competence.id),
             db.from("medical_certificates").select("id,employee_id,start_date,end_date,days").lte("start_date", competence.end_date).gte("end_date", competence.start_date),
             db.from("time_records").select("employee_id,period_id,expected_minutes,worked_minutes").eq("period_id", competence.id),
@@ -468,16 +484,42 @@ function DashboardHome() {
       };
       const overtimeData = overtimeRows.data ?? [];
       const occurrences = occ.data ?? [];
+      const overrides = (overrideRows.data ?? []) as any[];
+      const overrideByEmployee = new Map<string, any>(
+        overrides.map((row: any) => [String(row.employee_id), row]),
+      );
 
-      const currentOvertime = competence
-        ? overtimeData.filter((x: any) => x.period_id === competence.id && activeEmployeeIds.has(x.employee_id))
-        : overtimeData.filter((x: any) => activeEmployeeIds.has(x.employee_id));
-      const overtime = currentOvertime.reduce((sum: number, row: any) => sum + (row.minutes || 0), 0);
+      // A correção manual substitui os lançamentos de HE da mesma competência.
+      // A interjornada permanece informativa e não entra no total de horas extras.
+      const operationalOvertime = competence
+        ? overtimeData.filter((row: any) =>
+            row.period_id === competence.id &&
+            activeEmployeeIds.has(row.employee_id) &&
+            !overrideByEmployee.has(String(row.employee_id))
+          )
+        : overtimeData.filter((row: any) =>
+            activeEmployeeIds.has(row.employee_id) &&
+            !overrideByEmployee.has(String(row.employee_id))
+          );
+      const overrideOvertime = overrides
+        .filter((row: any) => activeEmployeeIds.has(String(row.employee_id)))
+        .flatMap((row: any) => [
+          { employee_id: row.employee_id, launch_type: "HE_60", minutes: row.he_60_minutes },
+          { employee_id: row.employee_id, launch_type: "HE_60_NOTURNO", minutes: row.he_60_night_minutes },
+          { employee_id: row.employee_id, launch_type: "HE_100", minutes: row.he_100_minutes },
+          { employee_id: row.employee_id, launch_type: "ADICIONAL_NOTURNO", minutes: row.he_20_minutes },
+        ]);
+      const currentOvertime = [...operationalOvertime, ...overrideOvertime]
+        .filter((row: any) => String(row.launch_type ?? "").toUpperCase() !== "INTERJORNADA_50");
+      const overtime = currentOvertime.reduce(
+        (sum: number, row: any) => sum + Math.abs(Number(row.minutes || 0)),
+        0,
+      );
 
       const periodId = competence?.id ?? null;
       const absenceRows = occurrences.filter((x: any) => {
         const code = String(x.occurrence_types?.code ?? "").toLowerCase();
-        return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(code);
+        return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && ["folga_abonada", "falta_justificada", "falta_injustificada"].includes(code);
       });
       const absenceDays = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
       const employeeMap = new Map(allEmployees.map((e: any) => [String(e.id), String(e.full_name || "Funcionário")]));
@@ -492,12 +534,7 @@ function DashboardHome() {
       const certificateDays = certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0), 0);
       setCertificatePeople(Array.from(new Set(certificateRows.map((x: any) => employeeMap.get(String(x.employee_id)) || "Funcionário"))));
       const currentTime = (timeRows.data ?? []).filter((x: any) => (!periodId || x.period_id === periodId) && activeEmployeeIds.has(x.employee_id));
-      const overrides = (overrideRows.data ?? []) as any[];
-      const overrideByEmployee = new Map<string, any>(
-        overrides
-          .filter((x: any) => !periodId || x.period_id === periodId)
-          .map((x: any) => [String(x.employee_id), x]),
-      );
+      // Reutiliza overrideByEmployee criado junto às fontes do Dashboard.
       const timeExpectedByEmployee = new Map<string, number>();
       currentTime.forEach((x: any) => {
         timeExpectedByEmployee.set(
@@ -570,7 +607,7 @@ function DashboardHome() {
       currentOvertime.forEach((x: any) => {
         const name = departmentByEmployee.get(String(x.employee_id)) || "Sem departamento";
         const department = deptMap.get(name);
-        if (department) department.minutes += x.minutes || 0;
+        if (department) department.minutes += Math.abs(Number(x.minutes || 0));
       });
       setDepartments([...deptMap.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 6));
       // Renderiza os indicadores principais antes do cálculo mais pesado do Banco de Horas.
