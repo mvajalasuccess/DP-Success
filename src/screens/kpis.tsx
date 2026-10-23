@@ -1306,7 +1306,7 @@ export function Kpis() {
               <p className="font-semibold">Cálculo do indicador</p>
               <p className="mt-2 text-sm text-muted-foreground">
                 (Débitos + Faltas + Abonos) ÷ Horas previstas × 100.
-                Atestados ficam demonstrados separadamente e não entram no indicador. As horas efetivamente abonadas de declarações são contabilizadas em Abonos e no absenteísmo.
+                Atestados são registrados em dias, convertidos em horas pela jornada do funcionário e contabilizados automaticamente em Abonos e no absenteísmo. As horas efetivamente abonadas de declarações também entram em Abonos.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-4">
                 <div><p className="text-xs text-muted-foreground">Débitos</p><p className="font-semibold">{fmt(Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes))}</p></div>
