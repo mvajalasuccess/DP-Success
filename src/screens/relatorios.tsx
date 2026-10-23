@@ -26,7 +26,9 @@ const reports = [
   ["ocorrencias", "Faltas"],
 ] as const;
 
-const closingColumns = [
+type ClosingColumn = { header: string; key: string; width: number; duration?: boolean };
+
+const closingColumns: ClosingColumn[] = [
   { header: "Matrícula", key: "registration", width: 13 },
   { header: "Funcionário", key: "employee_name", width: 34 },
   { header: "Departamento", key: "department_name", width: 22 },
@@ -51,10 +53,10 @@ export function csv(rows: any[]) {
   const keys = Object.keys(rows[0]);
   const esc = (v: any) => {
     let s = String(v ?? "");
-    if (typeof v === "string" && /^[=+\\-@]/.test(s)) s = "'" + s;
+    if (typeof v === "string" && /^[=+\-@]/.test(s)) s = "'" + s;
     return '"' + s.replaceAll('"', '""') + '"';
   };
-  return [keys.join(";"), ...rows.map(r => keys.map(k => esc(r[k])).join(";"))].join("\\n");
+  return [keys.join(";"), ...rows.map(r => keys.map(k => esc(r[k])).join(";"))].join("\n");
 }
 
 async function fetchAll(build: (from: number, to: number) => any) {
@@ -70,7 +72,7 @@ async function fetchAll(build: (from: number, to: number) => any) {
 }
 
 function downloadCsv(name: string, rows: any[]) {
-  const blob = new Blob(["\\ufeff" + csv(rows)], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["\ufeff" + csv(rows)], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
