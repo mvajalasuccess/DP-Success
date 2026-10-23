@@ -2,6 +2,7 @@ import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 import { ScreenShell, Modal, inputCls, btnPrimary, btnOutline, btnDanger } from "@/components/screen-shell";
 import {
   CREDIT_TYPES, CREDIT_TYPE_KEYS, type CreditType, type Period, type CreditRow, type DebitRow,
@@ -9,7 +10,7 @@ import {
   formatDateBR, composeMinutes, creditTotal, balanceOf,
 } from "@/lib/dp-model";
 
-type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null };
+type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null; company_id?: string | null };
 type Group = { key: string; groupId: string | null; employee_id: string; date: string; credits: CreditRow[]; debits: DebitRow[] };
 type Line = { type: CreditType; hours: string };
 
@@ -18,6 +19,7 @@ export function Launches() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [periodId, setPeriodId] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [credits, setCredits] = useState<CreditRow[]>([]);
   const [debits, setDebits] = useState<DebitRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,15 +38,16 @@ export function Launches() {
   const employeesInPeriod = useMemo(() => {
     if (!period) return [];
     return employees.filter(e =>
+      (!companyFilter || e.company_id === companyFilter) &&
       (!e.hire_date || e.hire_date <= period.end_date) &&
       (!e.termination_date || e.termination_date >= period.start_date)
     );
-  }, [employees, period]);
+  }, [employees, period, companyFilter]);
 
   async function loadBase() {
     try {
       const [emps, ps] = await Promise.all([
-        supabase.from("employees").select("id,full_name,status,hire_date,termination_date").order("full_name"),
+        supabase.from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name"),
         fetchPeriods(),
       ]);
       if (emps.error) throw new Error(emps.error.message);
@@ -59,7 +62,9 @@ export function Launches() {
     setLoading(true); setError("");
     try {
       const r = await fetchLaunches(employeeFilter ? { start: period.start_date, end: period.end_date, employeeId: employeeFilter } : { start: period.start_date, end: period.end_date });
-      setCredits(r.credits); setDebits(r.debits);
+      const companyEmployeeIds = new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id));
+      setCredits(r.credits.filter(row => companyEmployeeIds.has(row.employee_id)));
+      setDebits(r.debits.filter(row => companyEmployeeIds.has(row.employee_id)));
     } catch (e) { setError((e as Error).message); }
     setLoading(false);
   }
@@ -208,6 +213,9 @@ export function Launches() {
       error={open ? "" : error}
       actions={<button className={btnPrimary} disabled={!periods.length} onClick={openNew}><Plus className="h-4 w-4" /> Novo lançamento</button>}>
       <Card className="mt-6 grid gap-4 p-5 md:grid-cols-3">
+        <label className="grid gap-1.5 text-sm font-medium">Empresa
+          <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setEmployeeFilter(""); }} className={inputCls} />
+        </label>
         <label className="grid gap-1.5 text-sm font-medium">Competência
           <select className={inputCls} value={periodId} onChange={e => setPeriodId(e.target.value)}>
             {!periods.length && <option value="">Nenhuma competência cadastrada</option>}
