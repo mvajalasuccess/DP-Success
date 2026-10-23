@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
 const Companies = lazy(() => import("@/screens/empresas").then(m => ({ default: m.Companies })));
 const Positions = lazy(() => import("@/screens/cargos").then(m => ({ default: m.Positions })));
@@ -370,6 +371,7 @@ function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavig
 
 function DashboardHome() {
   const navigate = useNavigate();
+  const [companyFilter, setCompanyFilter] = useState("");
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, turnover: 0, admissions: 0, terminations: 0, bankBalance: 0, period: "Nenhuma competência" });
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
@@ -405,7 +407,7 @@ function DashboardHome() {
       // Carrega primeiro apenas o contexto necessário para a primeira pintura.
       // Os dados operacionais são buscados depois, já filtrados pela competência.
       const [emps, comp] = await Promise.all([
-        db.from("employees").select("id,full_name,department_id,work_schedule_id,hire_date,termination_date,status,departments(name)"),
+        db.from("employees").select("id,full_name,department_id,work_schedule_id,hire_date,termination_date,status,company_id,departments(name)"),
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("reference_year", { ascending: false }).order("reference_month", { ascending: false }).limit(1),
       ]);
 
@@ -418,7 +420,7 @@ function DashboardHome() {
         "EMILIO PICOLI FRACAROLLI": "2026-06-05",
         "FELIPE HILMANN": "2026-07-30",
       };
-      const allEmployees = (emps.data ?? []).map((employee: any) => {
+      const allEmployees = (emps.data ?? []).filter((employee: any) => !companyFilter || employee.company_id === companyFilter).map((employee: any) => {
         const normalizedName = String(employee.full_name ?? "")
           .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
         return {
@@ -684,7 +686,7 @@ function DashboardHome() {
       setPositiveBalances(positiveResults.filter((item): item is { name: string; minutes: number } => Boolean(item)).sort((a, b) => b.minutes - a.minutes));
       setMetrics(current => ({ ...current, bankBalance }));
     })();
-  }, []);
+  }, [companyFilter]);
 
   async function saveCompetenceNote() {
     const text = competenceNote.trim();
@@ -836,6 +838,7 @@ function DashboardHome() {
               <strong>{metrics.period}</strong>
             </div>
           </div>
+          <Card className="mt-6 p-4"><label className="grid max-w-sm gap-1.5 text-sm font-medium"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label><p className="mt-2 text-xs text-muted-foreground">O filtro afeta somente os indicadores e listas exibidos no Dashboard; não altera lançamentos nem competências fechadas.</p></Card>
           <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {cards.map(([label, value, Icon, detail]) => (
               <Card key={label} className="p-5">
