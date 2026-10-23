@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { countWorkingWeekdays } from "@/lib/feriados";
+import { CompanyFilter } from "@/components/company-filter";
 
 type Period = {
   id: string;
@@ -48,6 +49,7 @@ function periodName(p: Period) {
 
 export function PointClosing() {
   const [periods, setPeriods] = useState<Period[]>([]);
+  const [companyFilter, setCompanyFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -102,7 +104,7 @@ export function PointClosing() {
     // quando ela identifica um único funcionário.
     const { data: employeeLookup, error: employeeLookupError } = await supabase
       .from("employees")
-      .select("id,full_name,registration");
+      .select("id,full_name,registration,company_id");
     if (employeeLookupError) {
       setError("Não foi possível vincular os registros históricos aos funcionários: " + employeeLookupError.message);
       setHistoricalRows([]);
@@ -129,9 +131,10 @@ export function PointClosing() {
       }
       return null;
     };
+    const employeeCompanyById = new Map((employeeLookup ?? []).map((employee: any) => [String(employee.id), employee.company_id ?? null]));
     const historicalWithEmployeeIds = (historical ?? []).map((row: any) => {
       const employeeId = resolveHistoricalEmployeeId(row);
-      return employeeId ? { ...row, employee_id: employeeId } : row;
+      return employeeId ? { ...row, employee_id: employeeId, company_id: employeeCompanyById.get(employeeId) ?? null } : row;
     });
 
     const { data: overrideRows, error: overrideError } = await (supabase as any)
@@ -200,7 +203,7 @@ export function PointClosing() {
       { data: holidayRows, error: holidayError },
     ] = await Promise.all([
       supabase.from("employees")
-        .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,departments(name),positions(name)")
+        .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,company_id,departments(name),positions(name)")
         .order("full_name"),
       supabase.from("time_records")
         .select("employee_id,period_id,expected_minutes,worked_minutes")
@@ -383,6 +386,7 @@ export function PointClosing() {
       return {
         id: id + "::manual",
         employee_id: id,
+        company_id: employee.company_id ?? null,
         registration: employee.registration,
         employee_name: employee.full_name,
         department_name: employee.departments?.name ?? "",
@@ -574,6 +578,8 @@ export function PointClosing() {
     setSaving(false);
   }
 
+  const visibleHistoricalRows = historicalRows.filter((row: any) => !companyFilter || row.company_id === companyFilter);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background px-6 py-4">
@@ -610,6 +616,7 @@ export function PointClosing() {
             <Card className="p-5">
               <button type="button" onClick={() => setSelectedPeriod(null)} className="mb-2 inline-flex items-center gap-2 text-xs text-muted-foreground"><ArrowLeft className="h-3.5 w-3.5" /> Voltar para competências</button>
               <h2 className="text-xl font-bold">{periodName(selectedPeriod)}</h2>
+              <div className="mt-4 max-w-sm"><label className="grid gap-1.5 text-sm font-medium"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label></div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {rowsSource === "historical"
                   ? "Dados importados da BASE. Ajustes feitos aqui ficam salvos como correção oficial da competência e também alimentam o Banco de Horas e os KPIs."
@@ -618,10 +625,10 @@ export function PointClosing() {
             </Card>
             <Card className="mt-4 overflow-hidden">
               {loadingRows ? <div className="p-8 text-center text-muted-foreground">Carregando fechamento...</div> :
-              historicalRows.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhum lançamento histórico encontrado nesta competência.</div> :
+              visibleHistoricalRows.length === 0 ? <div className="p-8 text-center text-muted-foreground">Nenhum lançamento encontrado para esta empresa na competência.</div> :
               <div className="max-h-[calc(100vh-260px)] overflow-auto"><table className="min-w-[1650px] w-full table-auto text-xs leading-tight"><colgroup><col className="w-[270px] min-w-[270px]" /><col span={13} className="min-w-[96px]" /></colgroup>
                 <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur"><tr>{["Funcionário","Previstas","Trabalhadas","Faltas","Atestados","Declaração","Abonos","Débito","HE 60%","HE 60%+20%","HE 100%","HE 20%","Interjornada","Ação"].map(h => <th key={h} className={`px-2 py-2.5 text-left font-semibold whitespace-normal ${h === "Funcionário" ? "sticky left-0 z-20 min-w-[270px] w-[270px] bg-muted" : "min-w-[96px]"}`}>{h}</th>)}</tr></thead>
-                <tbody className="divide-y">{historicalRows.map(row => editingRow?.id === row.id ? (
+                <tbody className="divide-y">{visibleHistoricalRows.map(row => editingRow?.id === row.id ? (
                   <tr key={row.id} className="bg-primary/5">
                     <td className="sticky left-0 z-[5] min-w-[250px] w-[250px] bg-background px-3 py-2 font-medium whitespace-normal break-words">{row.employee_name}</td>
                     {[["expected","Previstas"],["worked","Trabalhadas"],["absence_quantity","Faltas"],["certificate","Atestados"],["declaration","Declaração"],["allowance","Abonos"],["debit","Débito"],["he60","HE 60%"],["he60night","HE 60%+20%"],["he100","HE 100%"],["he20","HE 20%"],["interjornada","Interjornada"]].map(([key,label]) => <td key={String(key)} className="px-2 py-2"><input aria-label={String(label)} type={String(key) === "absence_quantity" ? "number" : "text"} min={String(key) === "absence_quantity" ? "0" : undefined} step={String(key) === "absence_quantity" ? "0.01" : undefined} value={editingRow[String(key)] ?? ""} onChange={e => setEditingRow((v: any) => ({...v,[String(key)]: String(key) === "absence_quantity" ? e.target.value : e.target.value}))} className="w-[84px] max-w-full rounded-md border bg-background px-1.5 py-1 text-center font-mono text-[11px]" placeholder={String(key) === "absence_quantity" ? "0" : "00:00"} /></td>)}
