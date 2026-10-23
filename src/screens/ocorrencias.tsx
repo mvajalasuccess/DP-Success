@@ -65,11 +65,10 @@ export function Ocorrencias() {
 
   const employeesForDate = useMemo(() => {
     const referenceDate = form.occurrence_date;
-    if (!referenceDate) return employees;
     return employees.filter(e =>
       (!companyFilter || e.company_id === companyFilter) &&
-      (!e.hire_date || e.hire_date <= referenceDate) &&
-      (!e.termination_date || e.termination_date >= referenceDate)
+      (!referenceDate || ((!e.hire_date || e.hire_date <= referenceDate) &&
+        (!e.termination_date || e.termination_date >= referenceDate)))
     );
   }, [employees, form.occurrence_date, companyFilter]);
 
@@ -263,7 +262,7 @@ export function Ocorrencias() {
           <div className="mb-3 text-sm font-medium">Filtros</div>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Empresa</span><CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setFilterEmployee("todos"); }} /></label>
-            <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
+            <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => { setFilterPeriod(e.target.value); setFilterEmployee("todos"); }} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
           </div>
         </Card>
