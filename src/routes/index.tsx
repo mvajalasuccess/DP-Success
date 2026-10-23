@@ -854,48 +854,48 @@ function DashboardHome() {
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Resumo da competência</p>
               <h2 className="mt-1 text-xl font-bold">Ocorrências por funcionário</h2>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
-                <Card className="h-full p-5 transition-shadow hover:shadow-md">
-                  <CalendarX className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">Faltas</p>
-                  <p className="mt-1 text-2xl font-bold">{absencePeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
-                  <div className="mt-3 space-y-2 border-t pt-3">
-                    {absencePeople.map(item => <div key={item.name} className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
-                    {!absencePeople.length && <p className="text-xs text-muted-foreground">Nenhuma falta registrada.</p>}
+                <Card className="h-full p-3.5 transition-shadow hover:shadow-md">
+                  <CalendarX className="h-4 w-4 text-primary" />
+                  <p className="mt-2 text-xs text-muted-foreground">Faltas</p>
+                  <p className="mt-1 text-lg font-bold">{absencePeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
+                  <div className="mt-2 max-h-28 space-y-1 overflow-y-auto border-t pt-2">
+                    {absencePeople.map(item => <div key={item.name} className="flex items-start justify-between gap-2 text-[11px]"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
+                    {!absencePeople.length && <p className="text-[11px] text-muted-foreground">Nenhuma falta registrada.</p>}
                   </div>
                 </Card>
               </button>
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
-                <Card className="h-full p-5 transition-shadow hover:shadow-md">
-                  <CalendarCheck className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">Folgas</p>
-                  <p className="mt-1 text-2xl font-bold">{folgaPeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
-                  <div className="mt-3 space-y-2 border-t pt-3">
-                    {folgaPeople.map(item => <div key={item.name} className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
-                    {!folgaPeople.length && <p className="text-xs text-muted-foreground">Nenhuma folga registrada.</p>}
+                <Card className="h-full p-3.5 transition-shadow hover:shadow-md">
+                  <CalendarCheck className="h-4 w-4 text-primary" />
+                  <p className="mt-2 text-xs text-muted-foreground">Folgas</p>
+                  <p className="mt-1 text-lg font-bold">{folgaPeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
+                  <div className="mt-2 max-h-28 space-y-1 overflow-y-auto border-t pt-2">
+                    {folgaPeople.map(item => <div key={item.name} className="flex items-start justify-between gap-2 text-[11px]"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
+                    {!folgaPeople.length && <p className="text-[11px] text-muted-foreground">Nenhuma folga registrada.</p>}
                   </div>
                 </Card>
               </button>
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "atestados" }))} className="text-left">
-                <Card className="h-full p-5 transition-shadow hover:shadow-md">
-                  <ClipboardCheck className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">Declarações</p>
-                  <p className="mt-1 text-2xl font-bold">{declarationPeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
-                  <div className="mt-3 space-y-2 border-t pt-3">
-                    {declarationPeople.map(item => <div key={item.name} className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
-                    {!declarationPeople.length && <p className="text-xs text-muted-foreground">Nenhuma declaração registrada.</p>}
+                <Card className="h-full p-3.5 transition-shadow hover:shadow-md">
+                  <ClipboardCheck className="h-4 w-4 text-primary" />
+                  <p className="mt-2 text-xs text-muted-foreground">Declarações</p>
+                  <p className="mt-1 text-lg font-bold">{declarationPeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
+                  <div className="mt-2 max-h-28 space-y-1 overflow-y-auto border-t pt-2">
+                    {declarationPeople.map(item => <div key={item.name} className="flex items-start justify-between gap-2 text-[11px]"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
+                    {!declarationPeople.length && <p className="text-[11px] text-muted-foreground">Nenhuma declaração registrada.</p>}
                   </div>
                 </Card>
               </button>
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "atestados" }))} className="text-left">
-                <Card className="h-full p-5 transition-shadow hover:shadow-md">
-                  <Stethoscope className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">Atestados</p>
-                  <p className="mt-1 text-2xl font-bold">{certificatePeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
-                  <div className="mt-3 space-y-2 border-t pt-3">
-                    {certificatePeople.map(item => <div key={item.name} className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
-                    {!certificatePeople.length && <p className="text-xs text-muted-foreground">Nenhum atestado registrado.</p>}
+                <Card className="h-full p-3.5 transition-shadow hover:shadow-md">
+                  <Stethoscope className="h-4 w-4 text-primary" />
+                  <p className="mt-2 text-xs text-muted-foreground">Atestados</p>
+                  <p className="mt-1 text-lg font-bold">{certificatePeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
+                  <div className="mt-2 max-h-28 space-y-1 overflow-y-auto border-t pt-2">
+                    {certificatePeople.map(item => <div key={item.name} className="flex items-start justify-between gap-2 text-[11px]"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
+                    {!certificatePeople.length && <p className="text-[11px] text-muted-foreground">Nenhum atestado registrado.</p>}
                   </div>
                 </Card>
               </button>
