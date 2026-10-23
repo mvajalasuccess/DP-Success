@@ -425,11 +425,11 @@ export function Kpis() {
         next.atestadosDays += atestadoDays;
         next.atestadosMinutes += atestados;
         next.declaracoesMinutes += declaracoes;
-        next.abonosMinutes += abonos;
-        // Absenteísmo: considerar somente faltas + abonos + débitos.
-        // Atestados e declarações não entram no cálculo do indicador.
+        // Declarações abonadas integram Abonos e o absenteísmo.
+        // O campo declaration_minutes é separado de allowance_minutes na BASE.
+        next.abonosMinutes += abonos + declaracoes;
         const debitos = Number(sourceRow.debit_minutes || 0);
-        next.absenceMinutes += faltas + debitos + abonos;
+        next.absenceMinutes += faltas + debitos + abonos + declaracoes;
 
         next.he60 += Number(sourceRow.he_60_minutes || 0);
         next.he60Night += Number(sourceRow.he_60_night_minutes || 0);
@@ -492,8 +492,16 @@ export function Kpis() {
       // A conversão de dias usa a jornada cadastrada; o padrão é 08:48.
       for (const row of currentOccurrences ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
-        if (hasOverride(row.employee_id, row.period_id)) continue;
         const code = String(row.occurrence_types?.code ?? "").toLowerCase();
+        const hasManualOverride = hasOverride(row.employee_id, row.period_id);
+        const override = hasManualOverride
+          ? overrideByKey.get(String(row.period_id) + ":" + String(row.employee_id))
+          : undefined;
+        // Ajustes substituem as demais ocorrências, mas não podem apagar uma
+        // declaração abonada registrada separadamente. Se a declaração já foi
+        // lançada no próprio ajuste, não a somamos novamente.
+        if (hasManualOverride && !(code === "declaracao_horas" || code === "declaracao")) continue;
+        if (hasManualOverride && Number(override?.declaration_minutes || 0) > 0) continue;
         const quantity = Number(row.quantity || 0);
         const unit = String(row.unit ?? "dias").toLowerCase();
         const employee = employees.find(e => e.id === row.employee_id);
@@ -599,8 +607,8 @@ export function Kpis() {
         next.atestadosMinutes += atestados;
         next.atestadosDays += dailyMinutes > 0 ? atestados / dailyMinutes : 0;
         next.declaracoesMinutes += declaracoes;
-        next.abonosMinutes += abonos;
-        next.absenceMinutes += faltas + abonos + debitos;
+        next.abonosMinutes += abonos + declaracoes;
+        next.absenceMinutes += faltas + abonos + debitos + declaracoes;
         next.he60 += Number(override.he_60_minutes || 0);
         next.he60Night += Number(override.he_60_night_minutes || 0);
         next.he100 += Number(override.he_100_minutes || 0);
@@ -991,7 +999,7 @@ export function Kpis() {
           ? db.from("bank_hours").select("employee_id,period_id,minutes,kind").eq("kind","debito").in("period_id", currentIds)
           : Promise.resolve({ data: [] }),
         yearPeriods.length
-          ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
+          ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,declaration_minutes,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
           : Promise.resolve({ data: [] }),
         db.from("work_schedules").select("id,weekly_minutes"),
       ]);
@@ -1098,18 +1106,23 @@ export function Kpis() {
             expected += Number(row.expected_minutes || 0);
             lost += Math.round(Number(row.absence_quantity || 0) * dailyMinutesFromSchedule(employee))
               + Number(row.allowance_minutes || 0)
+              + Number(row.declaration_minutes || 0)
               + Number(row.debit_minutes || 0);
           }
 
           for (const row of (occurrenceRows ?? []).filter((x: any) => x.period_id === period.id)) {
-            if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
+            if (!row.employee_id) continue;
             const employee = employees.find(e => e.id === row.employee_id);
             if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
             const code = String(row.occurrence_types?.code ?? "").toLowerCase();
+            const override = overrides.get(String(row.employee_id));
+            const isDeclaration = code === "declaracao_horas" || code === "declaracao";
+            if (overrides.has(String(row.employee_id)) && !isDeclaration) continue;
+            if (isDeclaration && Number(override?.declaration_minutes || 0) > 0) continue;
             const quantity = Number(row.quantity || 0);
             const unit = String(row.unit ?? "dias").toLowerCase();
             const minutes = unit.startsWith("dia") ? quantity * dailyMinutesFromSchedule(employee) : unit.startsWith("hor") ? quantity * 60 : quantity;
-            if (["falta","folga_abonada","falta_justificada","falta_injustificada","abono"].includes(code)) {
+            if (["falta","folga_abonada","falta_justificada","falta_injustificada","abono","declaracao_horas","declaracao"].includes(code)) {
               lost += Math.round(minutes);
             }
           }
