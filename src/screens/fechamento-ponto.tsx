@@ -356,12 +356,12 @@ export function PointClosing() {
         else if (type === "INTERJORNADA_50") interjornada += minutes;
       }
 
-      // Abono = atestados + declarações de horas.
-      // Horas perdidas = faltas + abonos + débitos.
-      // Horas trabalhadas = horas previstas - horas perdidas.
-      const allowanceTotal = certificateMinutes + declarationMinutes;
+      // Abonos refletem as ocorrências folga_abonada/abono.
+      // Atestados e declarações permanecem em colunas próprias.
+      // Horas trabalhadas descontam faltas, atestados, declarações, abonos e débitos.
+      const allowanceTotal = allowanceMinutes;
       const absenceMinutes = Math.round(faltasDays * 528);
-      const lostMinutes = absenceMinutes + allowanceTotal + debitMinutes;
+      const lostMinutes = absenceMinutes + certificateMinutes + declarationMinutes + allowanceTotal + debitMinutes;
       const worked = Math.max(0, expected - lostMinutes);
 
       return {
