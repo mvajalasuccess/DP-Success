@@ -129,7 +129,7 @@ export function Kpis() {
         "FELIPE HILMANN": "2026-07-30",
       };
       const parsedEmployees: Employee[] = (employeeRows ?? []).map((e: any) => {
-        const normalizedName = String(e.full_name ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toUpperCase();
+        const normalizedName = String(e.full_name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
         return {
           id: e.id,
           name: e.full_name,
@@ -286,7 +286,7 @@ export function Kpis() {
       }
 
       const normalizeEmployeeName = (value: unknown) =>
-        String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase();
+        String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 
       const resolveEmployee = (row: any): Employee | undefined => {
         // Priorizar sempre o ID: existem matrículas duplicadas na BASE histórica.
