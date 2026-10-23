@@ -5,18 +5,18 @@ import { supabase } from "@/integrations/supabase/client";
 
 type Company = { id: string; name: string; cnpj: string; created_at?: string };
 
-function digits(value: string) { return value.replace(/\\D/g, "").slice(0, 14); }
+function digits(value: string) { return value.replace(/\D/g, "").slice(0, 14); }
 function formatCnpj(value: string) {
   const d = digits(value);
   return d
-    .replace(/^(\\d{2})(\\d)/, "$1.$2")
-    .replace(/^(\\d{2})\\.(\\d{3})(\\d)/, "$1.$2.$3")
-    .replace(/\\.(\\d{3})(\\d)/, ".$1/$2")
-    .replace(/(\\d{4})(\\d)/, "$1-$2");
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1/$2")
+    .replace(/(\d{4})(\d)/, "$1-$2");
 }
 function validCnpj(value: string) {
   const cnpj = digits(value);
-  if (cnpj.length !== 14 || /^(\\d)\\1{13}$/.test(cnpj)) return false;
+  if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false;
   const calc = (base: string, weights: number[]) => {
     const sum = base.split("").reduce((acc, n, i) => acc + Number(n) * weights[i], 0);
     const rest = sum % 11;
