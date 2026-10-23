@@ -91,6 +91,11 @@ export function Kpis() {
   const [metrics, setMetrics] = useState<Metrics>(emptyMetrics);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [additionalHolidayDates, setAdditionalHolidayDates] = useState<string[]>([]);
+  const additionalHolidayDateSet = useMemo(
+    () => new Set(additionalHolidayDates),
+    [additionalHolidayDates],
+  );
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState("todos");
   const [selectedDepartment, setSelectedDepartment] = useState("todos");
@@ -109,13 +114,18 @@ export function Kpis() {
   useEffect(() => {
     void (async () => {
       const db = supabase as any;
-      const [{ data: periodRows, error: periodError }, { data: employeeRows, error: employeeError }] = await Promise.all([
+      const [
+        { data: periodRows, error: periodError },
+        { data: employeeRows, error: employeeError },
+        { data: holidayRows, error: holidayError },
+      ] = await Promise.all([
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
         db.from("employees").select("id,full_name,registration,department_id,hire_date,termination_date,status,work_schedule_id,departments(name)").order("full_name"),
+        db.from("holidays").select("holiday_date").eq("is_demo", false),
       ]);
 
-      if (periodError || employeeError) {
-        setError(periodError?.message ?? employeeError?.message ?? "Não foi possível carregar os KPIs.");
+      if (periodError || employeeError || holidayError) {
+        setError(periodError?.message ?? employeeError?.message ?? holidayError?.message ?? "Não foi possível carregar os KPIs.");
         return;
       }
 
@@ -143,6 +153,7 @@ export function Kpis() {
       });
 
       const parsedPeriods = (periodRows ?? []) as Period[];
+      setAdditionalHolidayDates((holidayRows ?? []).map((row: any) => String(row.holiday_date).slice(0, 10)));
       setEmployees(parsedEmployees);
       setPeriods(parsedPeriods);
 
@@ -344,7 +355,7 @@ export function Kpis() {
 
         // Usa a jornada cadastrada, inclusive para funcionários já inativos
         // que participaram da competência; sem jornada, o padrão é 08:48.
-        const workingDays = countWorkingWeekdays(employeeStart, employeeEnd);
+        const workingDays = countWorkingWeekdays(employeeStart, employeeEnd, additionalHolidayDateSet);
         return Math.round(workingDays * dailyMinutesFromSchedule(employee));
       };
 
@@ -884,7 +895,7 @@ export function Kpis() {
             : "Lançamentos atuais do DP-Success"
       );
     })();
-  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees]);
+  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, additionalHolidayDateSet]);
 
   // O Banco de Horas usa uma função que consulta várias fontes por funcionário.
   // Mantemos esse cálculo fora do carregamento principal para a tela aparecer
@@ -1063,7 +1074,7 @@ export function Kpis() {
             if (!employeeIncludedForSelectedFilters(employee) || overrides.has(employee.id) || recorded.has(employee.id)) continue;
             const start = employee.hireDate && employee.hireDate > period.start_date ? employee.hireDate : period.start_date;
             const end = employee.terminationDate && employee.terminationDate < period.end_date ? employee.terminationDate : period.end_date;
-            if (end >= start) expected += Math.round(countWorkingWeekdays(start, end) * dailyMinutesFromSchedule(employee));
+            if (end >= start) expected += Math.round(countWorkingWeekdays(start, end, additionalHolidayDateSet) * dailyMinutesFromSchedule(employee));
           }
 
           for (const row of overrides.values() as Iterable<any>) {
@@ -1106,7 +1117,7 @@ export function Kpis() {
 
       setMonthlyAbsenteeism(result);
     })();
-  }, [periods, employees, selectedYear, selectedDepartment, selectedEmployees]);
+  }, [periods, employees, selectedYear, selectedDepartment, selectedEmployees, additionalHolidayDateSet]);
 
   const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
   const totalOvertime = metrics.he60 + metrics.he60Night + metrics.he100 + metrics.he100Night + metrics.he20 + metrics.interjornada;
