@@ -134,10 +134,9 @@ function AppShell({
 
   const sectionButtonClass = "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground";
   const mobileGroups: { label: string; items: [string, ScreenKey, LucideIcon][] }[] = [
-    { label: "Funcionários", items: [["Funcionários", "funcionarios", Users]] },
     { label: "Gestão", items: [["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText]] },
-    { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText]] },
-    { label: "Empresa", items: [["Cargos", "cargos", Building2], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", Building2]] },
+    { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", Clock3], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText]] },
+    { label: "Cadastro", items: [["Funcionários", "funcionarios", Users], ["Cargos", "cargos", Building2], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", Building2]] },
     { label: "Organização", items: [["Tarefas", "tarefas", FileText]] },
   ];
 
@@ -254,11 +253,6 @@ function AppShell({
           {!collapsed ? (
             <>
               <div>
-                <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/40">Funcionários</div>
-                <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")}><Users className="h-4 w-4 shrink-0" /><span>Funcionários</span></button>
-              </div>
-
-              <div>
                 <button type="button" onClick={() => setManagementOpen(v => !v)} className={sectionButtonClass} aria-expanded={managementOpen}>
                   <span>Gestão</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${managementOpen ? "rotate-0" : "-rotate-90"}`} />
                 </button>
@@ -275,18 +269,18 @@ function AppShell({
                 </button>
                 {closingMenuOpen && <div className="mt-1 space-y-0.5">
                   {([
-                    ["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText],
+                    ["Fechamento", "fechamento-ponto", Clock3], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText],
                   ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
                 </div>}
               </div>
 
               <div>
                 <button type="button" onClick={() => setCompanyMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={companyMenuOpen}>
-                  <span>Empresa</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${companyMenuOpen ? "rotate-0" : "-rotate-90"}`} />
+                  <span>Cadastro</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${companyMenuOpen ? "rotate-0" : "-rotate-90"}`} />
                 </button>
                 {companyMenuOpen && <div className="mt-1 space-y-0.5">
                   {[
-                    ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
+                    ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
                   ].map(([label, key]) => <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Building2 className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
                 </div>}
               </div>
@@ -302,11 +296,10 @@ function AppShell({
             </>
           ) : (
             <>
-              <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")} title="Funcionários"><Users className="h-4 w-4 shrink-0" /></button>
               {([
                 ["dashboard", Gauge, "Dashboard"], ["kpis", Gauge, "KPIs"], ["comparativos", Users, "Comparativos"], ["relatorios", FileText, "Relatórios"],
-                ["fechamento-ponto", Clock3, "Fechamento"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["pagamentos", CircleDollarSign, "Pagamentos"], ["ocorrencias", AlertTriangle, "Faltas e Folgas"], ["atestados", FileText, "Declarações e Atestados"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"],
-                ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
+                ["fechamento-ponto", Clock3, "Fechamento"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["pagamentos", CircleDollarSign, "Pagamentos"], ["ocorrencias", AlertTriangle, "Faltas e Folgas"], ["atestados", FileText, "Declarações e Atestados"],
+                ["funcionarios", Users, "Funcionários"], ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
               ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label}><Icon className="h-4 w-4 shrink-0" /></button>)}
             </>
           )}
