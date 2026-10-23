@@ -251,9 +251,17 @@ export function PointClosing() {
       inCompetence(e)
     );
 
-    // Regra oficial do fechamento manual:
-    // cada dia útil dentro da competência vale 08:48 (528 minutos),
-    // descontando sábados, domingos e feriados.
+    // A carga diária atual é a jornada semanal cadastrada dividida por cinco;
+    // quando não há jornada cadastrada, preservamos o padrão de 08:48.
+    const scheduleWeeklyMinutes = new Map(
+      (scheduleRows ?? []).map((schedule: any) => [String(schedule.id), Number(schedule.weekly_minutes || 0)]),
+    );
+    const dailyMinutesForEmployee = (employee: any) => {
+      const weekly = employee.work_schedule_id
+        ? (scheduleWeeklyMinutes.get(String(employee.work_schedule_id)) ?? 0)
+        : 0;
+      return weekly > 0 ? weekly / 5 : 528;
+    };
     const expectedMinutesForEmployee = (employee: any) => {
       const effectiveStart = employee.hire_date && employee.hire_date > p.start_date
         ? employee.hire_date
@@ -263,7 +271,7 @@ export function PointClosing() {
         : p.end_date;
       if (effectiveStart > effectiveEnd) return 0;
       const workingDays = countWorkingWeekdays(effectiveStart, effectiveEnd);
-      return workingDays * 528;
+      return Math.round(workingDays * dailyMinutesForEmployee(employee));
     };
 
     const expectedByEmployee = new Map<string, number>();
@@ -309,7 +317,7 @@ export function PointClosing() {
         const quantity = Number(row.quantity || 0);
         const unit = String(row.unit ?? "dias").toLowerCase();
         const minutes = unit.startsWith("dia")
-          ? Math.round(quantity * 528)
+          ? Math.round(quantity * dailyMinutesForEmployee(employee))
           : unit.startsWith("hor")
             ? Math.round(quantity * 60)
             : Math.round(quantity);
@@ -338,7 +346,7 @@ export function PointClosing() {
           (new Date(overlapEnd + "T00:00:00").getTime() - new Date(overlapStart + "T00:00:00").getTime()) / 86400000
         ) + 1;
         const days = Math.max(0, Math.min(Number(row.days || 0), calendarDays));
-        certificateMinutes += Math.round(days * 528);
+        certificateMinutes += Math.round(days * dailyMinutesForEmployee(employee));
       }
 
       for (const row of debitByEmployee.get(String(id)) ?? []) {
@@ -360,7 +368,7 @@ export function PointClosing() {
       // Atestados e declarações permanecem em colunas próprias.
       // Horas trabalhadas descontam faltas, atestados, declarações, abonos e débitos.
       const allowanceTotal = allowanceMinutes;
-      const absenceMinutes = Math.round(faltasDays * 528);
+      const absenceMinutes = Math.round(faltasDays * dailyMinutesForEmployee(employee));
       const lostMinutes = absenceMinutes + certificateMinutes + declarationMinutes + allowanceTotal + debitMinutes;
       const worked = Math.max(0, expected - lostMinutes);
 
