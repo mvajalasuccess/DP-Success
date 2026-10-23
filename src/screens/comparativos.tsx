@@ -237,8 +237,8 @@ export function Comparativos() {
 
   function toggleEmployee(id: string) { setSelectedEmployees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function togglePeriod(id: string) { setSelectedPeriods(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
-  function selectVisibleEmployees() { setSelectedEmployees(prev => [...new Set([...prev, ...visibleEmployees.map(e => e.id)])]); }
-  function selectVisiblePeriods() { setSelectedPeriods(prev => [...new Set([...prev, ...visiblePeriods.map(p => p.id)])]); }
+  function selectAllEmployees() { setSelectedEmployees(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id)); }
+  function selectAllPeriods() { setSelectedPeriods(periods.map(p => p.id)); }
 
   const columns: [keyof Totals, string][] = [
     ["he60", "HE 60%"], ["he60_20", "HE 60%20"], ["he100", "HE 100%"], ["he20", "HE 20%"],
@@ -314,7 +314,7 @@ export function Comparativos() {
             <CompanyFilter value={companyFilter} onChange={setCompanyFilter} />
             <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
               <div><h3 className="text-sm font-semibold">Colaboradores</h3><p className="mt-1 text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · somente ativos</p></div>
-              <div className="flex gap-2"><button onClick={selectVisibleEmployees} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar exibidos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
+              <div className="flex gap-2"><button onClick={selectAllEmployees} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar todos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
             </div>
             <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} placeholder="Buscar colaborador..." className="w-full rounded-xl border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" /></div>
             <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto rounded-xl border bg-muted/10 p-2 sm:grid-cols-2">
@@ -325,7 +325,7 @@ export function Comparativos() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div><h3 className="text-sm font-semibold">Competências</h3><p className="mt-1 text-xs text-muted-foreground">{selectedPeriods.length} selecionada(s)</p></div>
-              <div className="flex gap-2"><button onClick={selectVisiblePeriods} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar exibidas</button><button onClick={() => setSelectedPeriods([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
+              <div className="flex gap-2"><button onClick={selectAllPeriods} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar exibidas</button><button onClick={() => setSelectedPeriods([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
             </div>
             <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={periodSearch} onChange={e => setPeriodSearch(e.target.value)} placeholder="Buscar competência (ex.: 08/2026)..." className="w-full rounded-xl border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" /></div>
             <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto rounded-xl border bg-muted/10 p-2 sm:grid-cols-2">
