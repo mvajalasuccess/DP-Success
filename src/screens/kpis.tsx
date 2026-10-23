@@ -342,10 +342,8 @@ export function Kpis() {
 
         if (employeeEnd < employeeStart) return 0;
 
-        // O fechamento de ponto usa 08:48 (528 min) por dia útil.
-        // Essa regra também precisa funcionar para funcionários já inativos
-        // que participaram da competência; portanto, não dependemos do status
-        // atual nem de uma jornada ainda ativa no cadastro.
+        // Usa a jornada cadastrada, inclusive para funcionários já inativos
+        // que participaram da competência; sem jornada, o padrão é 08:48.
         const workingDays = countWorkingWeekdays(employeeStart, employeeEnd);
         return Math.round(workingDays * dailyMinutesFromSchedule(employee));
       };
@@ -480,7 +478,7 @@ export function Kpis() {
 
       // Regra de absenteísmo:
       // horas perdidas = horas de falta + horas de débito + horas de abono.
-      // Uma falta de 1 dia corresponde a 08:48 (528 minutos).
+      // A conversão de dias usa a jornada cadastrada; o padrão é 08:48.
       for (const row of currentOccurrences ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
         if (hasOverride(row.employee_id, row.period_id)) continue;
