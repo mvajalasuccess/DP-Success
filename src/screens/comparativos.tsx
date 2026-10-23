@@ -1,8 +1,9 @@
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, BarChart3, Users, CalendarRange, Clock3, FileSpreadsheet, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 type Employee = { id: string; full_name: string; company_id?: string | null };
 type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string };
@@ -244,55 +245,166 @@ export function Comparativos() {
     ["interjornada", "Interjornada"], ["debitos", "Débitos"]
   ];
 
+
+  const selectedEmployeeRows = useMemo(() => selectedEmployees
+    .map(id => ({ id, employee: employees.find(e => e.id === id), totals: totals[id] ?? EMPTY }))
+    .filter(row => !!row.employee), [selectedEmployees, employees, totals]);
+  const chartCategories = useMemo(() => [
+    { name: "HE 60%", key: "he60" as const },
+    { name: "HE 60% + noturno", key: "he60_20" as const },
+    { name: "HE 100%", key: "he100" as const },
+    { name: "HE 20%", key: "he20" as const },
+  ].map(item => ({
+    name: item.name,
+    horas: selectedEmployeeRows.reduce((sum, row) => sum + row.totals[item.key], 0) / 60,
+  })), [selectedEmployeeRows]);
+  const chartEmployees = useMemo(() => selectedEmployeeRows
+    .map(row => ({
+      name: row.employee!.full_name,
+      he60: row.totals.he60 / 60,
+      he60_20: row.totals.he60_20 / 60,
+      he100: row.totals.he100 / 60,
+      he20: row.totals.he20 / 60,
+      total: (row.totals.he60 + row.totals.he60_20 + row.totals.he100 + row.totals.he20) / 60,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8), [selectedEmployeeRows]);
+  const fmtNumber = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  const sumHours = (key: "he60" | "he60_20" | "he100" | "he20") =>
+    selectedEmployeeRows.reduce((sum, row) => sum + row.totals[key], 0);
+  const hasChartData = selectedEmployeeRows.length > 0 && selectedPeriods.length > 0;
+
   return <div className="min-h-screen bg-background">
-    <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a><b>DP Success · Comparativos</b></div></header>
-    <main className="mx-auto max-w-[1600px] px-6 py-7">
-      <p className="text-sm text-primary">Gestão</p>
-      <h1 className="mt-1 text-3xl font-bold">Comparativos</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Compare funcionários e selecione livremente as competências que deseja analisar.</p>
+    <header className="border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
+        <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a>
+        <div className="flex items-center gap-2 text-sm font-semibold"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#06CAA0]/15 text-[#079A7B]"><BarChart3 className="h-4 w-4" /></span><span>DP SUCCESS <span className="text-muted-foreground">/ Comparativos</span></span></div>
+      </div>
+    </header>
+    <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:py-8">
+      <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#06CAA0]/30 bg-[#06CAA0]/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300"><TrendingUp className="h-3.5 w-3.5" />ANÁLISE DE RH</div>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Comparativos</h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Analise horas extras e ocorrências por colaborador nas competências selecionadas.</p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="rounded-lg border bg-card px-3 py-2">{selectedEmployeeRows.length} funcionário(s)</span>
+          <span className="rounded-lg border bg-card px-3 py-2">{selectedPeriods.length} competência(s)</span>
+        </div>
+      </div>
 
-      {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
+      {error && <div className="mb-5 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
-      <Card className="mt-6 p-5">
-        <div className="mb-5 max-w-sm"><label className="grid gap-1.5 text-sm font-medium">Empresa<CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label></div>
-        <div className="grid gap-5 lg:grid-cols-2">
-          <div>
-            <div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Funcionários</h2><p className="text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · somente ativos</p></div><div className="flex gap-2"><button onClick={selectVisibleEmployees} className="rounded-lg border px-3 py-2 text-xs">Selecionar exibidos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border px-3 py-2 text-xs">Limpar</button></div></div>
-            <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} placeholder="Buscar funcionário..." className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm" /></div>
-            <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
-              {visibleEmployees.map(e => <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 hover:bg-muted/40"><input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={() => toggleEmployee(e.id)} /><span className="truncate text-sm">{e.full_name}</span></label>)}
+      <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
+        <div className="flex items-start gap-3 border-b bg-muted/20 px-5 py-4 sm:px-6">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#06CAA0]/15 text-emerald-700 dark:text-emerald-300"><CalendarRange className="h-5 w-5" /></span>
+          <div><h2 className="font-semibold">Configure sua análise</h2><p className="mt-1 text-xs text-muted-foreground">Escolha a empresa, os colaboradores e as competências. Os dados salvos não são alterados.</p></div>
+        </div>
+        <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-2">
+          <div className="min-w-0">
+            <label className="mb-2 block text-sm font-medium">Empresa</label>
+            <CompanyFilter value={companyFilter} onChange={setCompanyFilter} />
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+              <div><h3 className="text-sm font-semibold">Colaboradores</h3><p className="mt-1 text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · somente ativos</p></div>
+              <div className="flex gap-2"><button onClick={selectVisibleEmployees} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar exibidos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
+            </div>
+            <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} placeholder="Buscar colaborador..." className="w-full rounded-xl border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" /></div>
+            <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto rounded-xl border bg-muted/10 p-2 sm:grid-cols-2">
+              {visibleEmployees.map(e => <label key={e.id} className="flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-card px-3 py-2.5 transition hover:border-[#06CAA0]/40 hover:bg-[#06CAA0]/5"><input type="checkbox" className="accent-[#06CAA0]" checked={selectedEmployees.includes(e.id)} onChange={() => toggleEmployee(e.id)} /><span className="truncate text-sm">{e.full_name}</span></label>)}
+              {!visibleEmployees.length && <p className="col-span-full px-3 py-6 text-center text-sm text-muted-foreground">Nenhum colaborador encontrado para este filtro.</p>}
             </div>
           </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Competências</h2><p className="text-xs text-muted-foreground">{selectedPeriods.length} selecionada(s) · selecione as competências que deseja comparar</p></div><div className="flex gap-2"><button onClick={selectVisiblePeriods} className="rounded-lg border px-3 py-2 text-xs">Selecionar exibidas</button><button onClick={() => setSelectedPeriods([])} className="rounded-lg border px-3 py-2 text-xs">Limpar</button></div></div>
-            <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={periodSearch} onChange={e => setPeriodSearch(e.target.value)} placeholder="Buscar competência (ex.: 08/2026)..." className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm" /></div>
-            <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
-              {visiblePeriods.map(p => <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 hover:bg-muted/40"><input type="checkbox" checked={selectedPeriods.includes(p.id)} onChange={() => togglePeriod(p.id)} /><span className="text-sm">{String(p.reference_month).padStart(2, "0")}/{p.reference_year}<span className="ml-1 text-xs text-muted-foreground">{p.start_date} a {p.end_date}</span></span></label>)}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div><h3 className="text-sm font-semibold">Competências</h3><p className="mt-1 text-xs text-muted-foreground">{selectedPeriods.length} selecionada(s)</p></div>
+              <div className="flex gap-2"><button onClick={selectVisiblePeriods} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar exibidas</button><button onClick={() => setSelectedPeriods([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
+            </div>
+            <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={periodSearch} onChange={e => setPeriodSearch(e.target.value)} placeholder="Buscar competência (ex.: 08/2026)..." className="w-full rounded-xl border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" /></div>
+            <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto rounded-xl border bg-muted/10 p-2 sm:grid-cols-2">
+              {visiblePeriods.map(p => <label key={p.id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-transparent bg-card px-3 py-2.5 transition hover:border-[#06CAA0]/40 hover:bg-[#06CAA0]/5"><input type="checkbox" className="mt-1 accent-[#06CAA0]" checked={selectedPeriods.includes(p.id)} onChange={() => togglePeriod(p.id)} /><span className="min-w-0 text-sm"><span className="block font-medium">{String(p.reference_month).padStart(2, "0")}/{p.reference_year}</span><span className="mt-0.5 block text-xs text-muted-foreground">{p.start_date.split("-").reverse().join("/")} a {p.end_date.split("-").reverse().join("/")}</span></span></label>)}
+              {!visiblePeriods.length && <p className="col-span-full px-3 py-6 text-center text-sm text-muted-foreground">Nenhuma competência encontrada.</p>}
             </div>
           </div>
         </div>
       </Card>
 
-      <Card className="mt-6 overflow-x-auto">
-        <table className="w-full min-w-[1250px] text-left text-sm">
-          <thead className="bg-muted/40 text-xs text-muted-foreground"><tr>
-            <th className="px-4 py-3">Funcionário</th>
-            {columns.map(([, label]) => <th key={label} className="px-4 py-3">{label}</th>)}
-            <th className="px-4 py-3">Faltas (dias)</th><th className="px-4 py-3">Atestados (dias)</th>
-          </tr></thead>
-          <tbody className="divide-y">
-            {selectedEmployees.map(id => { const employee = employees.find(e => e.id === id); const t = totals[id] ?? EMPTY; return <tr key={id}>
-              <td className="px-4 py-4 font-medium">{employee?.full_name ?? "Funcionário"}</td>
-              {columns.map(([key]) => <td key={key} className="px-4 py-4">{fmt(t[key])}</td>)}
-              <td className="px-4 py-4">{t.faltas.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
-              <td className="px-4 py-4">{t.atestados.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
-            </tr>; })}
-            {!selectedEmployees.length && <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-muted-foreground">Selecione pelo menos um funcionário.</td></tr>}
-            {!selectedPeriods.length && !!selectedEmployees.length && <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-muted-foreground">Selecione pelo menos uma competência.</td></tr>}
-          </tbody>
-        </table>
+      <div className="mt-7 mb-4 flex items-end justify-between gap-3">
+        <div><h2 className="text-xl font-semibold tracking-tight">Resumo da seleção</h2><p className="mt-1 text-sm text-muted-foreground">Totais agregados do recorte selecionado, sem incluir dados inventados.</p></div>
+        <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><Clock3 className="h-3.5 w-3.5" />Horas em HH:MM na tabela</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          {label:"HE 60%",value:fmt(sumHours("he60")),icon:<Clock3 className="h-4 w-4" />},
+          {label:"HE 60% + noturno",value:fmt(sumHours("he60_20")),icon:<Clock3 className="h-4 w-4" />},
+          {label:"HE 100%",value:fmt(sumHours("he100")),icon:<TrendingUp className="h-4 w-4" />},
+          {label:"HE 20%",value:fmt(sumHours("he20")),icon:<Clock3 className="h-4 w-4" />},
+        ].map(item => <Card key={item.label} className="rounded-2xl border-border/70 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">{item.label}</span><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#06CAA0]/10 text-emerald-700 dark:text-emerald-300">{item.icon}</span></div>
+          <div className="mt-3 text-2xl font-semibold tabular-nums">{item.value}</div>
+          <p className="mt-1 text-xs text-muted-foreground">Total acumulado · HH:MM</p>
+        </Card>)}
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+        <Card className="rounded-2xl border-border/70 p-4 shadow-sm sm:p-5">
+          <div className="mb-4"><h3 className="font-semibold">Horas por tipo</h3><p className="mt-1 text-xs text-muted-foreground">Distribuição das categorias selecionadas · em horas decimais no gráfico</p></div>
+          {hasChartData && chartCategories.some(item => item.horas > 0) ? <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%"><BarChart data={chartCategories} margin={{top:8,right:12,left:0,bottom:8}}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{fontSize:11}} interval={0} />
+              <YAxis tick={{fontSize:11}} />
+              <Tooltip formatter={(value: number) => [fmtNumber(value) + " h", "Horas"]} />
+              <Bar dataKey="horas" name="Horas" fill="#06CAA0" radius={[6,6,0,0]} maxBarSize={48} />
+            </BarChart></ResponsiveContainer>
+          </div> : <div className="flex h-[280px] flex-col items-center justify-center rounded-xl bg-muted/20 text-center"><BarChart3 className="mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-medium">Sem valores para exibir</p><p className="mt-1 text-xs text-muted-foreground">Selecione colaboradores e competências com dados.</p></div>}
+        </Card>
+        <Card className="rounded-2xl border-border/70 p-4 shadow-sm sm:p-5">
+          <div className="mb-4"><h3 className="font-semibold">Comparação entre colaboradores</h3><p className="mt-1 text-xs text-muted-foreground">Até 8 colaboradores com maior volume nas categorias de HE selecionadas</p></div>
+          {hasChartData && chartEmployees.some(item => item.total > 0) ? <div className="h-[280px] w-full">
+            <ResponsiveContainer width="100%" height="100%"><BarChart data={chartEmployees} margin={{top:8,right:12,left:0,bottom:48}}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{fontSize:10}} angle={-28} textAnchor="end" interval={0} height={65} />
+              <YAxis tick={{fontSize:11}} />
+              <Tooltip formatter={(value: number) => [fmtNumber(value) + " h", "Horas"]} />
+              <Legend wrapperStyle={{fontSize:11}} />
+              <Bar dataKey="he60" name="HE 60%" stackId="he" fill="#06CAA0" />
+              <Bar dataKey="he60_20" name="HE 60% + noturno" stackId="he" fill="#0D9488" />
+              <Bar dataKey="he100" name="HE 100%" stackId="he" fill="#64748B" />
+              <Bar dataKey="he20" name="HE 20%" stackId="he" fill="#A7B7C7" radius={[4,4,0,0]} />
+            </BarChart></ResponsiveContainer>
+          </div> : <div className="flex h-[280px] flex-col items-center justify-center rounded-xl bg-muted/20 text-center"><Users className="mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-medium">Sem valores para comparar</p><p className="mt-1 text-xs text-muted-foreground">Os gráficos aparecem quando houver valores no recorte.</p></div>}
+        </Card>
+      </div>
+
+      <Card className="mt-5 overflow-hidden rounded-2xl border-border/70 shadow-sm">
+        <div className="flex flex-col gap-3 border-b bg-muted/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div><h2 className="font-semibold">Detalhamento por colaborador</h2><p className="mt-1 text-xs text-muted-foreground">Valores acumulados nas competências selecionadas. Faltas e atestados exibidos em dias.</p></div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground"><FileSpreadsheet className="h-4 w-4" />Tabela detalhada</div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1100px] text-left text-sm">
+            <thead className="sticky top-0 bg-muted/70 text-xs uppercase tracking-wide text-muted-foreground"><tr>
+              <th className="sticky left-0 z-10 bg-muted/90 px-4 py-3 font-semibold">Colaborador</th>
+              {columns.map(([, label]) => <th key={label} className="whitespace-nowrap px-4 py-3 font-semibold">{label}</th>)}
+              <th className="whitespace-nowrap px-4 py-3 font-semibold">Faltas (dias)</th><th className="whitespace-nowrap px-4 py-3 font-semibold">Atestados (dias)</th>
+            </tr></thead>
+            <tbody className="divide-y divide-border/70">
+              {selectedEmployeeRows.map(({id,employee,t}) => <tr key={id} className="transition-colors hover:bg-muted/30">
+                <td className="sticky left-0 z-[1] max-w-[260px] bg-card px-4 py-3.5 font-medium">{employee!.full_name}</td>
+                {columns.map(([key]) => <td key={key} className="whitespace-nowrap px-4 py-3.5 tabular-nums">{fmt(t[key])}</td>)}
+                <td className="px-4 py-3.5 tabular-nums">{t.faltas.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+                <td className="px-4 py-3.5 tabular-nums">{t.atestados.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+              </tr>)}
+              {!selectedEmployeeRows.length && <tr><td colSpan={9} className="px-5 py-12 text-center"><Users className="mx-auto mb-2 h-7 w-7 text-muted-foreground/40" /><p className="text-sm font-medium">Nenhum colaborador selecionado</p><p className="mt-1 text-xs text-muted-foreground">Escolha pelo menos um colaborador nos filtros acima.</p></td></tr>}
+              {!!selectedEmployeeRows.length && !selectedPeriods.length && <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-muted-foreground">Selecione pelo menos uma competência para carregar os dados.</td></tr>}
+              {loading && <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-muted-foreground">Carregando comparativos...</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </Card>
+      <p className="mt-4 text-xs text-muted-foreground">Os gráficos usam os mesmos valores carregados para a tabela. Interjornada permanece em coluna própria e não é incorporada às categorias de horas extras.</p>
     </main>
   </div>
+}
 }
