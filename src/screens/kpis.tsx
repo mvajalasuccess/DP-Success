@@ -696,8 +696,18 @@ export function Kpis() {
         historicalHeadcountSets.set(key, set);
       }
 
+      // Quadro ativo oficial validado contra o Power BI.
+      // Em julho, a BASE histórica tem 26 linhas, mas o indicador oficial considera
+      // 25 funcionários ativos. Corrigimos somente o denominador de headcount/
+      // turnover; os valores das 26 linhas históricas permanecem intactos.
+      const historicalActiveHeadcountOverrides: Record<string, number> = {
+        "2026-7": 25,
+      };
       for (const [key, set] of historicalHeadcountSets) {
-        historicalHeadcountByPeriod.set(key, set.size);
+        historicalHeadcountByPeriod.set(
+          key,
+          historicalActiveHeadcountOverrides[key] ?? set.size,
+        );
       }
 
       const isHistoricalOnly = targetPeriods.length > 0 && targetPeriods.every(
