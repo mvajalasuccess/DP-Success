@@ -320,7 +320,7 @@ async function downloadClosingExcel(period: Period, rows: any[]) {
       if (row.number % 2 === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5FAF8" } };
     });
     for (let index = 0; index < closingColumns.length; index++) {
-      if (closingColumns[index].duration) row.getCell(index + 1).numFmt = "[h]:mm;-[h]:mm";
+      if (closingColumns[index]?.duration) row.getCell(index + 1).numFmt = "[h]:mm;-[h]:mm";
     }
     row.getCell(7).numFmt = "0.##";
   }
@@ -427,7 +427,7 @@ async function downloadBankHoursExcel(period: Period, rows: any[]) {
       }
     });
     for (let index = 0; index < bankColumns.length; index++) {
-      if (bankColumns[index].duration) row.getCell(index + 1).numFmt = "[h]:mm;-[h]:mm";
+      if (bankColumns[index]?.duration) row.getCell(index + 1).numFmt = "[h]:mm;-[h]:mm";
     }
   }
 
@@ -535,7 +535,7 @@ function dateToExcelValue(value: unknown) {
   const parts = raw.split("-");
   if (parts.length !== 3 || !parts.every(part => /^\d+$/.test(part))) return raw;
   const [year, month, day] = parts.map(Number);
-  return new Date(Date.UTC(year, month - 1, day));
+  return new Date(Date.UTC(year!, month! - 1, day!));
 }
 
 function durationToExcelValue(value: unknown) {
@@ -825,7 +825,7 @@ export function Relatorios() {
           const employeeBalances = balancesById[String(employee.id)] ?? [];
           const periodBalance = employeeBalances.find((item: any) => item.period.id === competence.id);
           const generalBalance = employeeBalances.length
-            ? Number(employeeBalances[employeeBalances.length - 1].accumulated ?? 0)
+            ? Number(employeeBalances[employeeBalances.length - 1]!.accumulated ?? 0)
             : 0;
 
           // A tela Pagamentos não cria composição quando o saldo geral acumulado não é positivo.
