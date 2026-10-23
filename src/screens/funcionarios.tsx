@@ -9,11 +9,13 @@ export function Employees() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [positions, setPositions] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [companyFilter, setCompanyFilter] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("ativo");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ name: string; role: string; department: string; salary: string; admission: string; termination: string; bank: string; work_schedule_id: string; status: "ativo" | "inativo" }>({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo" });
+  const [form, setForm] = useState<{ name: string; role: string; department: string; salary: string; admission: string; termination: string; bank: string; work_schedule_id: string; status: "ativo" | "inativo"; company_id: string }>({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -23,7 +25,7 @@ export function Employees() {
     setLoading(true);
     const { data, error } = await supabase
       .from("employees")
-      .select("id,full_name,status,hire_date,termination_date,department_id,position_id,work_schedule_id,salary,departments(name),positions(name),work_schedules(name)")
+      .select("id,full_name,status,hire_date,termination_date,department_id,position_id,work_schedule_id,salary,company_id,companies(name),departments(name),positions(name),work_schedules(name)")
       .order("full_name");
     if (error) setError(error.message);
     else setEmployees(data ?? []);
@@ -31,18 +33,20 @@ export function Employees() {
   }
 
   async function loadFormOptions() {
-    const [dep, pos, schedule] = await Promise.all([
+    const [dep, pos, schedule, company] = await Promise.all([
       (supabase).from("departments").select("id,name").eq("active", true).order("name"),
       (supabase).from("positions").select("id,name").eq("active", true).order("name"),
       (supabase).from("work_schedules").select("id,name").eq("active", true).order("name"),
+      (supabase as any).from("companies").select("id,name").order("name"),
     ]);
-    if (dep.error || pos.error || schedule.error) {
-      setError(dep.error?.message || pos.error?.message || schedule.error?.message || "Não foi possível carregar as opções do cadastro.");
+    if (dep.error || pos.error || schedule.error || company.error) {
+      setError(dep.error?.message || pos.error?.message || schedule.error?.message || company.error?.message || "Não foi possível carregar as opções do cadastro.");
       return;
     }
     setDepartments(dep.data ?? []);
     setPositions(pos.data ?? []);
     setSchedules(schedule.data ?? []);
+    setCompanies(company.data ?? []);
   }
 
   useEffect(() => {
@@ -70,6 +74,7 @@ export function Employees() {
       bank: "",
       status: employee.status ?? "ativo",
       work_schedule_id: employee.work_schedule_id ?? "",
+      company_id: employee.company_id ?? "",
     });
     setOpen(true);
   }
@@ -99,6 +104,7 @@ export function Employees() {
         termination_date: form.status === "inativo" ? form.termination || null : null,
         status: form.status,
         work_schedule_id: form.work_schedule_id || null,
+        company_id: form.company_id || null,
         salary: Number(form.salary.replace(",", ".")),
       }).eq("id", editingId);
       if (result.error) {
@@ -133,6 +139,7 @@ export function Employees() {
       termination_date: form.status === "inativo" ? form.termination || null : null,
       status: form.status,
       work_schedule_id: form.work_schedule_id || null,
+      company_id: form.company_id || null,
       salary,
     }).select("id").single();
 
@@ -189,7 +196,8 @@ export function Employees() {
   const filtered = employees.filter((e) => {
     const matchesSearch = e.full_name.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "todos" || e.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesCompany = !companyFilter || e.company_id === companyFilter;
+    return matchesSearch && matchesStatus && matchesCompany;
   });
   return (
     <div className="min-h-screen bg-background">
@@ -221,18 +229,19 @@ export function Employees() {
         <Card className="mt-6 overflow-hidden">
           <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
             <div><h2 className="font-display font-bold">Lista de funcionários</h2><p className="text-xs text-muted-foreground">Funcionários cadastrados</p></div>
-            <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><div className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 sm:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "todos" | "ativo" | "inativo")} className="rounded-lg border bg-background px-3 py-2 text-sm outline-none"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select></div>
+            <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto"><div className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 sm:w-72"><Search className="h-4 w-4 text-muted-foreground" /><input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Buscar funcionário..." /></div><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "todos" | "ativo" | "inativo")} className="rounded-lg border bg-background px-3 py-2 text-sm outline-none"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select><select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm outline-none"><option value="">Todas as empresas</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
           </div>
           <div className="max-h-[calc(100vh-250px)] overflow-auto">
             <table className="w-full text-left text-sm">
               <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
-                <th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Cargo</th><th className="px-5 py-3">Departamento</th><th className="px-5 py-3">Admissão</th><th className="px-5 py-3">Desligamento</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Ações</th>
+                <th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Empresa</th><th className="px-5 py-3">Cargo</th><th className="px-5 py-3">Departamento</th><th className="px-5 py-3">Admissão</th><th className="px-5 py-3">Desligamento</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Ações</th>
               </tr></thead>
               <tbody className="divide-y">
-                {loading ? <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Carregando...</td></tr> :
-                filtered.length === 0 ? <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Nenhum funcionário encontrado.</td></tr> :
+                {loading ? <tr><td colSpan={8} className="px-5 py-8 text-center text-muted-foreground">Carregando...</td></tr> :
+                filtered.length === 0 ? <tr><td colSpan={8} className="px-5 py-8 text-center text-muted-foreground">Nenhum funcionário encontrado.</td></tr> :
                 filtered.map((e) => <tr key={e.id} className="transition-colors hover:bg-muted/25">
                   <td className="px-5 py-4 font-medium">{e.full_name}</td>
+                  <td className="px-5 py-4 text-muted-foreground">{e.companies?.name ?? "—"}</td>
                   <td className="px-5 py-4 text-muted-foreground">{e.positions?.name ?? "—"}</td>
                   <td className="px-5 py-4 text-muted-foreground">{e.departments?.name ?? "—"}</td>
                   <td className="px-5 py-4">{e.hire_date ? new Date(e.hire_date + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</td>
@@ -256,6 +265,7 @@ export function Employees() {
 
           <div className="mt-7 grid gap-y-7 gap-x-10 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium md:col-span-2">Nome completo<input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="Nome completo" /></label>
+            <label className="grid gap-1 text-sm font-medium">Empresa<select value={form.company_id} onChange={(e) => setForm({ ...form, company_id: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Sem empresa vinculada</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
             <label className="grid gap-1 text-sm font-medium">Cargo<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione o cargo</option>{positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
             <label className="grid gap-1 text-sm font-medium">Departamento<select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione o departamento</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
             <label className="grid gap-1 text-sm font-medium">Salário<input type="number" min="0" step="0.01" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="3000,00" /></label>
