@@ -522,7 +522,7 @@ export function Kpis() {
           (new Date(row.end_date + "T00:00:00").getTime() - new Date(row.start_date + "T00:00:00").getTime()) / 86400000
         ) + 1);
         const recordedDays = Math.max(0, Math.min(Number(row.days || 0), calendarDays));
-        const dailyMinutes = 528;
+        const dailyMinutes = dailyMinutesFromSchedule(employee);
         // Distribui os dias do atestado entre as competências pelo intervalo real,
         // em vez de atribuir todos os dias à competência em que o atestado começa.
         let selectedDays = 0;
