@@ -31,7 +31,7 @@ type PreviewRow = {
   message: string;
 };
 
-type Employee = { id: string; full_name: string; status?: string };
+type Employee = { id: string; full_name: string; status?: string; termination_date?: string | null };
 
 type SyncChange = {
   id: string;
@@ -241,8 +241,22 @@ async function readWorkbookRows(
       } else if (range.endDate > period.end_date) {
         const endDateLabel = `${range.endDate.slice(8, 10)}/${range.endDate.slice(5, 7)}/${range.endDate.slice(0, 4)}`;
         const periodEndLabel = `${period.end_date.slice(8, 10)}/${period.end_date.slice(5, 7)}/${period.end_date.slice(0, 4)}`;
-        status = "intervalo_fora_competencia";
-        message = `O intervalo termina em ${endDateLabel}, mas a competência termina em ${periodEndLabel}. Separe as horas entre as competências antes de importar; não é seguro lançar o total inteiro no período anterior.`;
+        const endMatchesTermination = Boolean(
+          resolved.employee?.termination_date &&
+          resolved.employee.termination_date === range.endDate &&
+          range.endDate > period.end_date
+        );
+        if (endMatchesTermination) {
+          // Em planilhas de desligamento, o intervalo da linha pode chegar até a
+          // data de desligamento mesmo quando as horas consolidadas pertencem à
+          // competência iniciada no range.startDate. Preservamos todo o total
+          // na competência encontrada e ancoramos a data do lançamento no fim dela.
+          status = "ok";
+          message = `Intervalo da planilha vai até o desligamento em ${endDateLabel}; as horas desta linha serão mantidas na competência encerrada em ${periodEndLabel}. Registre atestados/ocorrências posteriores na competência seguinte separadamente.`;
+        } else {
+          status = "intervalo_fora_competencia";
+          message = `O intervalo termina em ${endDateLabel}, mas a competência termina em ${periodEndLabel}. Separe e confirme as horas antes de importar.`;
+        }
       }
 
       output.push({
@@ -319,7 +333,7 @@ export function SincronizarPlanilha() {
 
   async function ensureBase() {
     const [employeesResult, periodResult] = await Promise.all([
-      supabase.from("employees").select("id,full_name,status").order("full_name"),
+      supabase.from("employees").select("id,full_name,status,termination_date").order("full_name"),
       fetchPeriods(),
     ]);
     if (employeesResult.error) throw new Error(employeesResult.error.message);
@@ -409,12 +423,18 @@ export function SincronizarPlanilha() {
           }
         }
 
+        // A data da linha pode ser a data de desligamento, posterior ao fim
+        // da competência que contém as horas consolidadas. Grave o lançamento
+        // dentro da competência vinculada, sem mover o total para o período seguinte.
+        const launchDate = row.endDate > (periods.find(p => p.id === row.periodId)?.end_date ?? row.endDate)
+          ? (periods.find(p => p.id === row.periodId)?.end_date ?? row.endDate)
+          : row.endDate;
         const creditRows: any[] = [];
         const addCredit = (type: CreditType, minutes: number) => {
           if (minutes <= 0) return;
           creditRows.push({
             employee_id: row.employeeId,
-            reference_date: row.endDate,
+            reference_date: launchDate,
             period_id: row.periodId,
             minutes,
             launch_type: type,
@@ -437,7 +457,7 @@ export function SincronizarPlanilha() {
         if (row.debit > 0) {
           const result = await db.from("bank_hours").insert({
             employee_id: row.employeeId,
-            entry_date: row.endDate,
+            entry_date: launchDate,
             period_id: row.periodId,
             kind: "debito",
             minutes: row.debit,
