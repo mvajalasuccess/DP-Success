@@ -2,8 +2,9 @@ import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 
-type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null };
+type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null; company_id?: string | null };
 type OccType = { id: string; code: string; name: string; unit: string; requires_justification: boolean; affects_balance: boolean };
 type Occ = {
   id: string;
@@ -48,6 +49,7 @@ export function Ocorrencias() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [filterEmployee, setFilterEmployee] = useState("todos");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [filterPeriod, setFilterPeriod] = useState("todos");
   const [showAbsences, setShowAbsences] = useState(true);
   const [showDaysOff, setShowDaysOff] = useState(true);
@@ -65,10 +67,11 @@ export function Ocorrencias() {
     const referenceDate = form.occurrence_date;
     if (!referenceDate) return employees;
     return employees.filter(e =>
+      (!companyFilter || e.company_id === companyFilter) &&
       (!e.hire_date || e.hire_date <= referenceDate) &&
       (!e.termination_date || e.termination_date >= referenceDate)
     );
-  }, [employees, form.occurrence_date]);
+  }, [employees, form.occurrence_date, companyFilter]);
 
   async function load() {
     setError("");
@@ -83,7 +86,7 @@ export function Ocorrencias() {
 
   async function loadOptions() {
     const [e, t, p] = await Promise.all([
-      supabase.from("employees").select("id,full_name,status,hire_date,termination_date").order("full_name"),
+      supabase.from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name"),
       supabase.from("occurrence_types").select("id,code,name,unit,requires_justification,affects_balance").eq("active", true).order("name"),
       supabase.from("time_periods").select("id,start_date,end_date").order("start_date", { ascending: false }),
     ]);
@@ -99,8 +102,10 @@ export function Ocorrencias() {
   }, []);
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
-  const employeesForFilter = employees.filter(e => !selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date)));
+  const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
+  const companyEmployeeIds = new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id));
   const filteredRows = rows.filter(row =>
+    companyEmployeeIds.has(row.employee_id) &&
     (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
     (!selectedPeriod || (row.occurrence_date <= selectedPeriod.end_date && (row.end_date ?? row.occurrence_date) >= selectedPeriod.start_date))
   );
@@ -256,7 +261,8 @@ export function Ocorrencias() {
 
         <Card className="mt-6 p-4">
           <div className="mb-3 text-sm font-medium">Filtros</div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Empresa</span><CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setFilterEmployee("todos"); }} /></label>
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
           </div>
