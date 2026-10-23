@@ -563,9 +563,14 @@ export function Kpis() {
           ) + 1);
           const periodDays = Math.min(recordedDays, overlapDays);
           selectedDays += periodDays;
-          const periodMinutes = periodDays * dailyMinutes;
+          const periodMinutes = Math.round(periodDays * dailyMinutes);
           const key = String(row.employee_id) + ":" + String(period.id);
-          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + Math.round(periodMinutes));
+          // Atestados são cadastrados em dias, convertidos para horas pela jornada
+          // do funcionário e contabilizados automaticamente como Abonos no KPI.
+          // A mesma quantidade compõe o numerador do absenteísmo apenas uma vez.
+          next.abonosMinutes += periodMinutes;
+          next.absenceMinutes += periodMinutes;
+          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + periodMinutes);
         }
         next.atestadosDays += selectedDays;
         next.atestadosMinutes += Math.round(selectedDays * dailyMinutes);
@@ -606,8 +611,10 @@ export function Kpis() {
         next.atestadosMinutes += atestados;
         next.atestadosDays += dailyMinutes > 0 ? atestados / dailyMinutes : 0;
         next.declaracoesMinutes += declaracoes;
-        next.abonosMinutes += abonos + declaracoes;
-        next.absenceMinutes += faltas + abonos + debitos + declaracoes;
+        // No fechamento manual, certificate_minutes já contém as horas convertidas
+        // do atestado. Incluí-las em Abonos evita que desapareçam quando há override.
+        next.abonosMinutes += abonos + declaracoes + atestados;
+        next.absenceMinutes += faltas + abonos + debitos + declaracoes + atestados;
         next.he60 += Number(override.he_60_minutes || 0);
         next.he60Night += Number(override.he_60_night_minutes || 0);
         next.he100 += Number(override.he_100_minutes || 0);
