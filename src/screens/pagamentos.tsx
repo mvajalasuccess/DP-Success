@@ -239,7 +239,7 @@ export function Payments() {
               <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(e => (!value || e.company_id === value) && (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Competência
-              <select className={inputCls} value={periodId} onChange={e => setPeriodId(e.target.value)} disabled={loading}>
+              <select className={inputCls} value={periodId} onChange={e => { const nextPeriodId = e.target.value; setPeriodId(nextPeriodId); const nextPeriod = periods.find(item => item.id === nextPeriodId); const first = employees.find(person => (!companyFilter || person.company_id === companyFilter) && (!nextPeriod || !person.hire_date || person.hire_date <= nextPeriod.end_date) && (!nextPeriod || !person.termination_date || person.termination_date >= nextPeriod.start_date)); setEmployeeId(first?.id ?? ""); }} disabled={loading}>
                 <option value="">Selecione a competência</option>
                 {periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}
               </select>
