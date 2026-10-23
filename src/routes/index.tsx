@@ -378,8 +378,8 @@ function DashboardHome() {
   const [declarationPeople, setDeclarationPeople] = useState<Array<{ name: string; count: number }>>([]);
   const [certificatePeople, setCertificatePeople] = useState<Array<{ name: string; count: number }>>([]);
   const [competenceNote, setCompetenceNote] = useState("");
+  const [competenceNotes, setCompetenceNotes] = useState<Array<{ id: string; note: string; created_at: string }>>([]);
   const [savingNote, setSavingNote] = useState(false);
-  const [noteSaved, setNoteSaved] = useState(false);
   const [userEmail, setUserEmail] = useState("Usuário RH");
   const [userRoleLabel, setUserRoleLabel] = useState("Usuário RH");
 
@@ -423,16 +423,25 @@ function DashboardHome() {
         };
       });
       if (comp.data?.[0]?.id) {
-        const { data: noteRow } = await db
+        const { data: noteRows, error: notesError } = await db
           .from("dashboard_competence_notes")
-          .select("id,note")
+          .select("id,note,created_at")
           .eq("period_id", comp.data[0].id)
-          .maybeSingle();
-        setCompetenceNote(noteRow?.note ?? "");
-        setNoteSaved(Boolean(noteRow?.id));
-      } else {
+          .order("created_at", { ascending: true });
+        if (notesError) {
+          console.error("Falha ao carregar comentários da competência:", notesError.message);
+          setCompetenceNotes([]);
+        } else {
+          setCompetenceNotes((noteRows ?? []).map((row: any) => ({
+            id: String(row.id),
+            note: String(row.note ?? ""),
+            created_at: String(row.created_at ?? ""),
+          })));
+        }
         setCompetenceNote("");
-        setNoteSaved(false);
+      } else {
+        setCompetenceNotes([]);
+        setCompetenceNote("");
       }
       const competence = comp.data?.[0];
       const employees = competence
@@ -680,7 +689,6 @@ function DashboardHome() {
     }
 
     setSavingNote(true);
-    setNoteSaved(false);
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionData.session) {
       window.alert("Sua sessão expirou. Entre novamente para salvar os comentários.");
@@ -704,22 +712,26 @@ function DashboardHome() {
 
     const { data: savedRow, error } = await supabase
       .from("dashboard_competence_notes")
-      .upsert({
+      .insert({
         period_id: competence.id,
         note: text,
         updated_by: sessionData.session.user.id,
-      }, { onConflict: "period_id" })
-      .select("id,note")
+      })
+      .select("id,note,created_at")
       .single();
 
     if (error || !savedRow) {
-      window.alert("Os comentários não foram salvos. Verifique se a migração dashboard_competence_notes foi aplicada no banco de dados. " + (error?.message ?? ""));
+      window.alert("O comentário não foi salvo. Verifique se a migração de comentários múltiplos foi aplicada no banco de dados. " + (error?.message ?? ""));
       setSavingNote(false);
       return;
     }
 
-    setCompetenceNote(savedRow.note ?? text);
-    setNoteSaved(true);
+    setCompetenceNotes(current => [...current, {
+      id: String(savedRow.id),
+      note: String(savedRow.note ?? text),
+      created_at: String(savedRow.created_at ?? new Date().toISOString()),
+    }]);
+    setCompetenceNote("");
     setSavingNote(false);
   }
 
@@ -827,19 +839,38 @@ function DashboardHome() {
                   <h2 className="mt-1 text-xl font-bold">Comentários da competência</h2>
                   <p className="mt-1 text-sm text-muted-foreground">Registre observações importantes sobre o fechamento desta competência.</p>
                 </div>
-                {noteSaved && <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary"><ClipboardCheck className="h-4 w-4" />Checkpoint concluído</span>}
+                {competenceNotes.length > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary"><ClipboardCheck className="h-4 w-4" />{competenceNotes.length} {competenceNotes.length === 1 ? "comentário salvo" : "comentários salvos"}</span>}
               </div>
+              {competenceNotes.length > 0 && (
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {competenceNotes.map((item, index) => (
+                    <article key={item.id} className="rounded-xl border bg-background p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                          <ClipboardCheck className="h-3.5 w-3.5" />Registro {index + 1}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {item.created_at && !Number.isNaN(new Date(item.created_at).getTime())
+                            ? new Date(item.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+                            : ""}
+                        </span>
+                      </div>
+                      <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">{item.note}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
               <textarea
                 value={competenceNote}
-                onChange={event => { setCompetenceNote(event.target.value); setNoteSaved(false); }}
-                placeholder="Digite as observações importantes sobre o fechamento desta competência..."
-                rows={5}
+                onChange={event => setCompetenceNote(event.target.value)}
+                placeholder="Escreva uma nova observação sobre o fechamento desta competência..."
+                rows={3}
                 className="mt-4 w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
               />
               <div className="mt-3 flex justify-end">
-                <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote || !competenceNote.trim()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">
                   <Save className="h-4 w-4" />
-                  {savingNote ? "Salvando..." : noteSaved ? "Atualizar checkpoint" : "Salvar e concluir checkpoint"}
+                  {savingNote ? "Salvando..." : "Adicionar comentário"}
                 </button>
               </div>
             </Card>
