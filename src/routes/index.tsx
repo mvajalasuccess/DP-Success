@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Clock3, FileText, Gauge, LogOut, Users, UsersRound, WalletCards, Save, TrendingUp, Settings, Menu, CircleDollarSign, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarX, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -134,10 +134,10 @@ function AppShell({
 
   const sectionButtonClass = "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground";
   const mobileGroups: { label: string; items: [string, ScreenKey, LucideIcon][] }[] = [
-    { label: "Gestão", items: [["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText]] },
-    { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", Clock3], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText]] },
-    { label: "Cadastro", items: [["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", Building2], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", Building2]] },
-    { label: "Organização", items: [["Tarefas", "tarefas", FileText]] },
+    { label: "Gestão", items: [["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText]] },
+    { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck]] },
+    { label: "Cadastro", items: [["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays]] },
+    { label: "Organização", items: [["Tarefas", "tarefas", ListChecks]] },
   ];
 
   useEffect(() => {
@@ -258,7 +258,7 @@ function AppShell({
                 </button>
                 {managementOpen && <div className="mt-1 space-y-0.5">
                   {([
-                    ["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText],
+                    ["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText],
                   ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
                 </div>}
               </div>
@@ -269,7 +269,7 @@ function AppShell({
                 </button>
                 {closingMenuOpen && <div className="mt-1 space-y-0.5">
                   {([
-                    ["Fechamento", "fechamento-ponto", Clock3], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText],
+                    ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck],
                   ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
                 </div>}
               </div>
@@ -281,7 +281,7 @@ function AppShell({
                 {companyMenuOpen && <div className="mt-1 space-y-0.5">
                   {[
                     ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
-                  ].map(([label, key]) => <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Building2 className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
+                  ].map(([label, key]) => <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><IconForCadastro label={label} /><span>{label}</span></button>)}
                 </div>}
               </div>
 
@@ -297,9 +297,9 @@ function AppShell({
           ) : (
             <>
               {([
-                ["dashboard", Gauge, "Dashboard"], ["kpis", Gauge, "KPIs"], ["comparativos", Users, "Comparativos"], ["relatorios", FileText, "Relatórios"],
-                ["fechamento-ponto", Clock3, "Fechamento"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["pagamentos", CircleDollarSign, "Pagamentos"], ["ocorrencias", AlertTriangle, "Faltas e Folgas"], ["atestados", FileText, "Declarações e Atestados"],
-                ["funcionarios", UsersRound, "Funcionários"], ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
+                ["dashboard", LayoutDashboard, "Dashboard"], ["kpis", ChartColumn, "KPIs"], ["comparativos", UsersRound, "Comparativos"], ["relatorios", FileText, "Relatórios"],
+                ["fechamento-ponto", CalendarClock, "Fechamento"], ["importar-cartao-ponto", Upload, "Importar Cartão Ponto"], ["lancamentos", ClipboardList, "Lançamentos"], ["banco-horas", Clock3, "Banco de Horas"], ["pagamentos", BadgeDollarSign, "Pagamentos"], ["ocorrencias", CalendarX, "Faltas e Folgas"], ["atestados", ClipboardCheck, "Declarações e Atestados"],
+                ["funcionarios", UsersRound, "Funcionários"], ["cargos", BriefcaseBusiness, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", CalendarDays, "Jornadas"], ["tarefas", FileText, "Tarefas"],
               ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label}><Icon className="h-4 w-4 shrink-0" /></button>)}
             </>
           )}
@@ -694,8 +694,8 @@ function DashboardHome() {
   }
 
   const cards = [
-    ["Funcionários ativos", String(metrics.employees), Users, "ativos na competência"],
-    ["Absenteísmo", metrics.absenteeism.toFixed(1) + "%", Gauge, "horas perdidas ÷ previstas"],
+    ["Funcionários ativos", String(metrics.employees), UsersRound, "ativos na competência"],
+    ["Absenteísmo", metrics.absenteeism.toFixed(1) + "%", CalendarX, "horas perdidas ÷ previstas"],
     ["Turnover", metrics.turnover.toFixed(1) + "%", TrendingUp, metrics.admissions + " admissões · " + metrics.terminations + " desligamentos"],
     ["Banco de horas", fmt(metrics.bankBalance), WalletCards, "saldo positivo disponível"],
   ] as const;
@@ -783,7 +783,7 @@ function DashboardHome() {
               </button>
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "atestados" }))} className="text-left">
                 <Card className="h-full p-5 transition-shadow hover:shadow-md">
-                  <FileText className="h-5 w-5 text-primary" />
+                  <ClipboardCheck className="h-5 w-5 text-primary" />
                   <p className="mt-4 text-sm text-muted-foreground">Declarações e Atestados</p>
                   <p className="mt-1 text-2xl font-bold">{metrics.certificates}</p>
                   <p className="mt-1 text-xs text-muted-foreground">registros na competência · clique para ver</p>
@@ -794,7 +794,7 @@ function DashboardHome() {
                 </Card>
               </button>
               <Card className="p-5">
-                <Users className="h-5 w-5 text-primary" />
+                <TrendingUp className="h-5 w-5 text-primary" />
                 <p className="mt-4 text-sm text-muted-foreground">Movimentações</p>
                 <p className="mt-1 text-2xl font-bold">{metrics.admissions + metrics.terminations}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p>
