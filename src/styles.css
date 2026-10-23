@@ -158,6 +158,8 @@
 
   :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
     color: var(--color-foreground);
+    border-color: var(--color-input);
+    border-radius: 0.625rem;
     transition: border-color 140ms ease, box-shadow 140ms ease;
   }
 }
