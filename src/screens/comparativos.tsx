@@ -354,7 +354,7 @@ export function Comparativos() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tick={{fontSize:11}} interval={0} />
               <YAxis tick={{fontSize:11}} />
-              <Tooltip formatter={(value: number) => [fmtNumber(value) + " h", "Horas"]} />
+              <Tooltip formatter={(value) => [fmtNumber(Number(value)) + " h", "Horas"]} />
               <Bar dataKey="horas" name="Horas" fill="#06CAA0" radius={[6,6,0,0]} maxBarSize={48} />
             </BarChart></ResponsiveContainer>
           </div> : <div className="flex h-[280px] flex-col items-center justify-center rounded-xl bg-muted/20 text-center"><BarChart3 className="mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-medium">Sem valores para exibir</p><p className="mt-1 text-xs text-muted-foreground">Selecione colaboradores e competências com dados.</p></div>}
@@ -366,7 +366,7 @@ export function Comparativos() {
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tick={{fontSize:10}} angle={-28} textAnchor="end" interval={0} height={65} />
               <YAxis tick={{fontSize:11}} />
-              <Tooltip formatter={(value: number) => [fmtNumber(value) + " h", "Horas"]} />
+              <Tooltip formatter={(value) => [fmtNumber(Number(value)) + " h", "Horas"]} />
               <Legend wrapperStyle={{fontSize:11}} />
               <Bar dataKey="he60" name="HE 60%" stackId="he" fill="#06CAA0" />
               <Bar dataKey="he60_20" name="HE 60% + noturno" stackId="he" fill="#0D9488" />
