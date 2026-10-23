@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarX, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -372,8 +372,10 @@ function DashboardHome() {
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, turnover: 0, admissions: 0, terminations: 0, bankBalance: 0, period: "Nenhuma competência" });
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
-  const [absencePeople, setAbsencePeople] = useState<string[]>([]);
-  const [certificatePeople, setCertificatePeople] = useState<string[]>([]);
+  const [absencePeople, setAbsencePeople] = useState<Array<{ name: string; count: number }>>([]);
+  const [folgaPeople, setFolgaPeople] = useState<Array<{ name: string; count: number }>>([]);
+  const [declarationPeople, setDeclarationPeople] = useState<Array<{ name: string; count: number }>>([]);
+  const [certificatePeople, setCertificatePeople] = useState<Array<{ name: string; count: number }>>([]);
   const [competenceNote, setCompetenceNote] = useState("");
   const [noteItems, setNoteItems] = useState<Array<{ id: string; text: string; done: boolean }>>([]);
   const [newNoteItem, setNewNoteItem] = useState("");
@@ -516,22 +518,29 @@ function DashboardHome() {
       );
 
       const periodId = competence?.id ?? null;
-      const absenceRows = occurrences.filter((x: any) => {
-        const code = String(x.occurrence_types?.code ?? "").toLowerCase();
-        return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && ["folga_abonada", "falta", "falta_justificada", "falta_injustificada"].includes(code);
-      });
+      const currentOccurrences = occurrences.filter((x: any) => periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id));
+      const codeOf = (x: any) => String(x.occurrence_types?.code ?? "").toLowerCase();
+      const absenceRows = currentOccurrences.filter((x: any) => ["falta", "falta_justificada", "falta_injustificada"].includes(codeOf(x)));
+      const folgaRows = currentOccurrences.filter((x: any) => ["folga_abonada", "folga_descontada"].includes(codeOf(x)));
+      const declarationRows = currentOccurrences.filter((x: any) => codeOf(x) === "declaracao_horas");
       const absenceDays = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
       const employeeMap = new Map(allEmployees.map((e: any) => [String(e.id), String(e.full_name || "Funcionário")]));
-      setAbsencePeople(Array.from(new Set(absenceRows.map((x: any) => employeeMap.get(String(x.employee_id)) || "Funcionário"))));
-      const declarationMinutes = occurrences
-        .filter((x: any) => periodId && x.period_id === periodId && String(x.occurrence_types?.code ?? "").toLowerCase() === "declaracao_horas")
+      const countByEmployee = (rows: any[]) => {
+        const counts = new Map<string, number>();
+        rows.forEach((row: any) => counts.set(String(row.employee_id), (counts.get(String(row.employee_id)) ?? 0) + 1));
+        return [...counts.entries()].map(([id, count]) => ({ name: employeeMap.get(id) || "Funcionário", count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "pt-BR"));
+      };
+      setAbsencePeople(countByEmployee(absenceRows));
+      setFolgaPeople(countByEmployee(folgaRows));
+      setDeclarationPeople(countByEmployee(declarationRows));
+      const declarationMinutes = declarationRows
         .reduce((sum: number, x: any) => sum + Math.round(Number(x.quantity || 0) * 60), 0);
       const certificateRows = (cert.data ?? []).filter((x: any) => {
         if (!competence) return false;
         return x.start_date <= competence.end_date && x.end_date >= competence.start_date && activeEmployeeIds.has(x.employee_id);
       });
       const certificateDays = certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0), 0);
-      setCertificatePeople(Array.from(new Set(certificateRows.map((x: any) => employeeMap.get(String(x.employee_id)) || "Funcionário"))));
+      setCertificatePeople(countByEmployee(certificateRows));
       const currentTime = (timeRows.data ?? []).filter((x: any) => (!periodId || x.period_id === periodId) && activeEmployeeIds.has(x.employee_id));
       // Reutiliza overrideByEmployee criado junto às fontes do Dashboard.
       const timeExpectedByEmployee = new Map<string, number>();
@@ -718,87 +727,55 @@ function DashboardHome() {
             </div>
           </div>
           <section className="mt-6">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {cards.map(([label, value, Icon, description]) => (
-                <Card key={label} className="p-5">
-                  <Icon className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">{label}</p>
-                  <p className="mt-1 text-3xl font-bold">{value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-                </Card>
-              ))}
-            </div>
-          </section>
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            <Card className="p-5">
-              <div className="flex items-end justify-between gap-3">
-                <div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Banco de horas</p><h2 className="mt-1 text-xl font-bold">Saldos positivos</h2><p className="text-xs text-muted-foreground">Crédito disponível nesta competência.</p></div>
-                <span className="text-2xl font-bold text-primary">{fmt(metrics.bankBalance)}</span>
-              </div>
-              <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">{positiveBalances.map((r) => <div key={r.name} className="flex items-center justify-between rounded-lg border p-3 text-xs"><span className="font-medium">{r.name}</span><span className="font-semibold text-primary">{fmt(r.minutes)}</span></div>)}{!positiveBalances.length && <p className="py-6 text-sm text-muted-foreground">Nenhum funcionário com crédito disponível nesta competência.</p>}</div>
-            </Card>
-            <Card className="p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Acompanhamento</p><h2 className="mt-1 text-xl font-bold">Pendências da competência</h2><p className="text-xs text-muted-foreground">Organize aqui o que precisa ser resolvido nesta competência.</p></div>
-                <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs text-primary-foreground disabled:opacity-50"><Save className="h-3.5 w-3.5"/>{savingNote ? "Salvando..." : "Salvar"}</button>
-              </div>
-              <div className="mt-4 space-y-2">
-                {noteItems.map(item => <div key={item.id} className="flex items-center gap-3 rounded-xl border bg-muted/20 p-3">
-                  <input type="checkbox" checked={item.done} onChange={e => { setNoteItems(items => items.map(x => x.id === item.id ? { ...x, done: e.target.checked } : x)); setNoteSaved(false); }} className="h-4 w-4" />
-                  <span className={item.done ? "flex-1 text-sm text-muted-foreground line-through" : "flex-1 text-sm"}>{item.text}</span>
-                  <button type="button" onClick={() => { setNoteItems(items => items.filter(x => x.id !== item.id)); setNoteSaved(false); }} className="text-xs text-muted-foreground hover:text-destructive">Excluir</button>
-                </div>)}
-                {!noteItems.length && <p className="rounded-xl border border-dashed p-5 text-center text-xs text-muted-foreground">Nenhuma pendência adicionada.</p>}
-              </div>
-              <div className="mt-3 flex gap-2">
-                <input value={newNoteItem} onChange={e => setNewNoteItem(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addNoteItem(); } }} placeholder="Digite uma pendência..." className="flex-1 rounded-xl border bg-muted/20 px-3 py-2 text-sm outline-none focus:border-primary" />
-                <button type="button" onClick={addNoteItem} className="rounded-xl border px-3 py-2 text-sm font-medium">Adicionar</button>
-              </div>
-              <div className="mt-2 flex items-center justify-between"><span className="text-[11px] text-muted-foreground">As pendências ficam vinculadas à competência atual.</span>{noteSaved && <span className="text-[11px] font-medium text-primary">Salvo ✓</span>}</div>
-            </Card>
-          </div>
-          <section className="mt-6">
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Resumo da competência</p>
-              <h2 className="mt-1 text-xl font-bold">O que merece atenção agora</h2>
+              <h2 className="mt-1 text-xl font-bold">Ocorrências por funcionário</h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <Card className="p-5">
-                <Clock3 className="h-5 w-5 text-primary" />
-                <p className="mt-4 text-sm text-muted-foreground">Horas extras</p>
-                <p className="mt-1 text-2xl font-bold">{fmt(metrics.overtime)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">registradas na competência</p>
-              </Card>
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
                 <Card className="h-full p-5 transition-shadow hover:shadow-md">
-                  <AlertTriangle className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">Faltas e Folgas</p>
-                  <p className="mt-1 text-2xl font-bold">{Math.round(metrics.absenceDays)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">dias registrados · clique para ver</p>
-                  {absencePeople.length > 0 && <div className="mt-3 border-t pt-3">
-                    {absencePeople.slice(0, 3).map(name => <p key={name} className="truncate text-xs font-medium">{name}</p>)}
-                    {absencePeople.length > 3 && <p className="mt-1 text-[11px] text-muted-foreground">+ {absencePeople.length - 3} funcionário(s)</p>}
-                  </div>}
+                  <CalendarX className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">Faltas</p>
+                  <p className="mt-1 text-2xl font-bold">{absencePeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
+                  <div className="mt-3 space-y-2 border-t pt-3">
+                    {absencePeople.map(item => <div key={item.name} className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
+                    {!absencePeople.length && <p className="text-xs text-muted-foreground">Nenhuma falta registrada.</p>}
+                  </div>
+                </Card>
+              </button>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
+                <Card className="h-full p-5 transition-shadow hover:shadow-md">
+                  <CalendarCheck className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">Folgas</p>
+                  <p className="mt-1 text-2xl font-bold">{folgaPeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
+                  <div className="mt-3 space-y-2 border-t pt-3">
+                    {folgaPeople.map(item => <div key={item.name} className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
+                    {!folgaPeople.length && <p className="text-xs text-muted-foreground">Nenhuma folga registrada.</p>}
+                  </div>
                 </Card>
               </button>
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "atestados" }))} className="text-left">
                 <Card className="h-full p-5 transition-shadow hover:shadow-md">
                   <ClipboardCheck className="h-5 w-5 text-primary" />
-                  <p className="mt-4 text-sm text-muted-foreground">Declarações e Atestados</p>
-                  <p className="mt-1 text-2xl font-bold">{metrics.certificates}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">registros na competência · clique para ver</p>
-                  {certificatePeople.length > 0 && <div className="mt-3 border-t pt-3">
-                    {certificatePeople.slice(0, 3).map(name => <p key={name} className="truncate text-xs font-medium">{name}</p>)}
-                    {certificatePeople.length > 3 && <p className="mt-1 text-[11px] text-muted-foreground">+ {certificatePeople.length - 3} funcionário(s)</p>}
-                  </div>}
+                  <p className="mt-4 text-sm text-muted-foreground">Declarações</p>
+                  <p className="mt-1 text-2xl font-bold">{declarationPeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
+                  <div className="mt-3 space-y-2 border-t pt-3">
+                    {declarationPeople.map(item => <div key={item.name} className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
+                    {!declarationPeople.length && <p className="text-xs text-muted-foreground">Nenhuma declaração registrada.</p>}
+                  </div>
                 </Card>
               </button>
-              <Card className="p-5">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <p className="mt-4 text-sm text-muted-foreground">Movimentações</p>
-                <p className="mt-1 text-2xl font-bold">{metrics.admissions + metrics.terminations}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p>
-              </Card>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "atestados" }))} className="text-left">
+                <Card className="h-full p-5 transition-shadow hover:shadow-md">
+                  <Stethoscope className="h-5 w-5 text-primary" />
+                  <p className="mt-4 text-sm text-muted-foreground">Atestados</p>
+                  <p className="mt-1 text-2xl font-bold">{certificatePeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
+                  <div className="mt-3 space-y-2 border-t pt-3">
+                    {certificatePeople.map(item => <div key={item.name} className="flex items-start justify-between gap-3 text-xs"><span className="min-w-0 truncate font-medium">{item.name}</span><span className="shrink-0 font-semibold">{item.count}</span></div>)}
+                    {!certificatePeople.length && <p className="text-xs text-muted-foreground">Nenhum atestado registrado.</p>}
+                  </div>
+                </Card>
+              </button>
             </div>
           </section>
 
