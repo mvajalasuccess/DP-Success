@@ -519,7 +519,7 @@ function DashboardHome() {
       const periodId = competence?.id ?? null;
       const absenceRows = occurrences.filter((x: any) => {
         const code = String(x.occurrence_types?.code ?? "").toLowerCase();
-        return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && ["folga_abonada", "falta_justificada", "falta_injustificada"].includes(code);
+        return periodId && x.period_id === periodId && activeEmployeeIds.has(x.employee_id) && ["folga_abonada", "falta", "falta_justificada", "falta_injustificada"].includes(code);
       });
       const absenceDays = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
       const employeeMap = new Map(allEmployees.map((e: any) => [String(e.id), String(e.full_name || "Funcionário")]));
