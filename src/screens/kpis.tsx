@@ -935,7 +935,7 @@ export function Kpis() {
             : "Lançamentos atuais do DP-Success"
       );
     })();
-  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, additionalHolidayDateSet]);
+  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, companyFilter, additionalHolidayDateSet]);
 
   // O Banco de Horas usa uma função que consulta várias fontes por funcionário.
   // Mantemos esse cálculo fora do carregamento principal para a tela aparecer
