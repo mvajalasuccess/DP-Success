@@ -372,6 +372,7 @@ function DashboardHome() {
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, turnover: 0, admissions: 0, terminations: 0, bankBalance: 0, period: "Nenhuma competência" });
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
+  const [individualDebits, setIndividualDebits] = useState<Array<{ name: string; minutes: number }>>([]);
   const [absencePeople, setAbsencePeople] = useState<Array<{ name: string; count: number }>>([]);
   const [folgaPeople, setFolgaPeople] = useState<Array<{ name: string; count: number }>>([]);
   const [declarationPeople, setDeclarationPeople] = useState<Array<{ name: string; count: number }>>([]);
@@ -651,6 +652,23 @@ function DashboardHome() {
         const payableMinutes = Number(monthly.dashboardBalance || 0);
         return payableMinutes > 0 ? { name: employee.full_name, minutes: payableMinutes } : null;
       });
+      const debitByEmployee = new Map<string, number>();
+      (bankRows.data ?? []).forEach((row: any) => {
+        const employeeId = String(row.employee_id);
+        if (!targetPeriodId || row.period_id !== targetPeriodId || !activeEmployeeIds.has(employeeId) ||
+            row.kind !== "debito" || overrideByEmployee.has(employeeId)) return;
+        debitByEmployee.set(employeeId, (debitByEmployee.get(employeeId) ?? 0) + Math.abs(Number(row.minutes || 0)));
+      });
+      overrides.forEach((row: any) => {
+        const employeeId = String(row.employee_id);
+        if (!targetPeriodId || row.period_id !== targetPeriodId || !activeEmployeeIds.has(employeeId)) return;
+        const minutes = Math.abs(Number(row.debit_minutes || 0));
+        if (minutes > 0) debitByEmployee.set(employeeId, (debitByEmployee.get(employeeId) ?? 0) + minutes);
+      });
+      setIndividualDebits([...debitByEmployee.entries()]
+        .filter(([, minutes]) => minutes > 0)
+        .map(([id, minutes]) => ({ name: employeeMap.get(id) || "Funcionário", minutes }))
+        .sort((a, b) => b.minutes - a.minutes || a.name.localeCompare(b.name, "pt-BR")));
       const bankBalance = positiveResults.reduce((sum, item) => sum + (item?.minutes ?? 0), 0);
       setPositiveBalances(positiveResults.filter((item): item is { name: string; minutes: number } => Boolean(item)).sort((a, b) => b.minutes - a.minutes));
       setMetrics(current => ({ ...current, bankBalance }));
@@ -681,7 +699,7 @@ function DashboardHome() {
         updated_by: sessionData.session?.user.id ?? null,
       }, { onConflict: "period_id" });
     if (error) {
-      window.alert("Não foi possível salvar as pendências: " + error.message);
+      window.alert("Não foi possível salvar os comentários da competência: " + error.message);
       setSavingNote(false);
       return;
     }
@@ -804,12 +822,50 @@ function DashboardHome() {
               </div>
             </Card>
             <Card className="p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Próximo passo</p>
-              <h2 className="mt-1 text-xl font-bold">Análise detalhada</h2>
-              <p className="mt-2 text-sm text-muted-foreground">Use a tela de KPIs quando precisar investigar a origem dos indicadores, comparar competências, setores ou funcionários.</p>
-              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "kpis" }))} className="mt-5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground">
-                Abrir KPIs
-              </button>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Controle de horas</p>
+              <h2 className="mt-1 text-xl font-bold">Débitos individuais na competência</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Débitos registrados por funcionário na competência selecionada.</p>
+              <div className="mt-4 space-y-3">
+                {individualDebits.map(item => (
+                  <div key={item.name} className="flex items-center justify-between gap-3 border-b pb-2 text-sm last:border-0">
+                    <span className="min-w-0 truncate font-medium">{item.name}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">{fmt(item.minutes)}</span>
+                  </div>
+                ))}
+                {!individualDebits.length && <p className="py-5 text-sm text-muted-foreground">Nenhum débito individual registrado nesta competência.</p>}
+              </div>
+              <div className="mt-4 border-t pt-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium">Total de débitos</span>
+                  <span className="font-bold tabular-nums">{fmt(individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
+                </div>
+              </div>
+            </Card>
+          </section>
+
+          <section className="mt-6">
+            <Card className="p-5">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Registro da competência</p>
+                  <h2 className="mt-1 text-xl font-bold">Comentários da competência</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Registre observações importantes sobre o fechamento desta competência.</p>
+                </div>
+                {noteSaved && <span className="text-xs font-medium text-primary">Comentários salvos</span>}
+              </div>
+              <textarea
+                value={competenceNote}
+                onChange={event => { setCompetenceNote(event.target.value); setNoteSaved(false); }}
+                placeholder="Digite aqui as anotações sobre a competência..."
+                rows={5}
+                className="mt-4 w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <div className="mt-3 flex justify-end">
+                <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">
+                  <Save className="h-4 w-4" />
+                  {savingNote ? "Salvando..." : "Salvar comentários"}
+                </button>
+              </div>
             </Card>
           </section>
         </div>
