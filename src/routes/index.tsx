@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu, CircleDollarSign, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu, CircleDollarSign, X, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -122,19 +122,79 @@ function AppShell({
   onToggleCollapsed: () => void;
   children: ReactNode;
 }) {
-  const go = (key: ScreenKey) => onNavigate(key);
+  const go = (key: ScreenKey) => { onNavigate(key); setMobileMenuOpen(false); };
   const [managementOpen, setManagementOpen] = useState(true);
   const [closingMenuOpen, setClosingMenuOpen] = useState(true);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const buttonClass = (key: ScreenKey) =>
     `flex w-full items-center rounded-lg py-2.5 text-left text-sm transition-colors ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
 
   const sectionButtonClass = "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground";
+  const mobileGroups: { label: string; items: [string, ScreenKey, LucideIcon][] }[] = [
+    { label: "Funcionários", items: [["Funcionários", "funcionarios", Users]] },
+    { label: "Gestão", items: [["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText]] },
+    { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", Clock3], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText]] },
+    { label: "Empresa", items: [["Cargos", "cargos", Building2], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", Building2]] },
+    { label: "Organização", items: [["Tarefas", "tarefas", FileText]] },
+  ];
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileMenuOpen]);
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 shadow-sm backdrop-blur lg:hidden">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Clock3 className="h-4 w-4" /></span>
+          <span className="truncate font-display text-sm font-bold tracking-tight">DP SUCCESS</span>
+        </div>
+        <button type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-haspopup="dialog" className="inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Menu className="h-4 w-4" /> Menu
+        </button>
+      </div>
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[70] bg-foreground/40 lg:hidden">
+          <button type="button" className="absolute inset-0 h-full w-full cursor-default" onClick={() => setMobileMenuOpen(false)} aria-label="Fechar menu de navegação" />
+          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl">
+            <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></span>
+                <div><p className="font-display text-base font-bold">DP SUCCESS</p><p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">RH · DP · Gestão</p></div>
+              </div>
+              <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" aria-label="Fechar menu"><X className="h-5 w-5" /></button>
+            </div>
+            <nav className="sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3">
+              {mobileGroups.map(group => (
+                <section key={group.label} className="mb-4">
+                  <p className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45">{group.label}</p>
+                  <div className="space-y-0.5">
+                    {group.items.map(([label, key, Icon]) => (
+                      <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
+                        <Icon className="h-4 w-4 shrink-0" /><span>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </nav>
+            <SidebarProfile collapsed={false} onNavigate={go} />
+          </aside>
+        </div>
+      )}
       {collapsed && (
         <div className="fixed inset-x-0 top-0 z-50 hidden h-16 items-center border-b bg-background/95 px-6 shadow-sm backdrop-blur lg:flex">
           <button
@@ -245,7 +305,7 @@ function AppShell({
               <button type="button" onClick={() => go("funcionarios")} className={buttonClass("funcionarios")} title="Funcionários"><Users className="h-4 w-4 shrink-0" /></button>
               {([
                 ["dashboard", Gauge, "Dashboard"], ["kpis", Gauge, "KPIs"], ["comparativos", Users, "Comparativos"], ["relatorios", FileText, "Relatórios"],
-                ["fechamento-ponto", Clock3, "Fechamento"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["pagamentos", CircleDollarSign, "Pagamentos"], ["ocorrencias", AlertTriangle, "Faltas"], ["atestados", FileText, "Declarações e Atestados"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"],
+                ["fechamento-ponto", Clock3, "Fechamento"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["pagamentos", CircleDollarSign, "Pagamentos"], ["ocorrencias", AlertTriangle, "Faltas e Folgas"], ["atestados", FileText, "Declarações e Atestados"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"],
                 ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
               ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label}><Icon className="h-4 w-4 shrink-0" /></button>)}
             </>
