@@ -299,6 +299,9 @@ const isJoseLuciano = employeeName.includes("JOSE LUCIANO") || employeeName.incl
         HE_60: Number(override.he_60_minutes || 0),
         HE_60_NOTURNO: Number(override.he_60_night_minutes || 0),
         HE_100: Number(override.he_100_minutes || 0),
+        // O campo de fechamento HE 100% já consolida HE_100 e HE_100_NOTURNO.
+        // Não manter a parcela operacional paralela quando o ajuste a substitui.
+        HE_100_NOTURNO: 0,
         ADICIONAL_NOTURNO: Number(override.he_20_minutes || 0),
         INTERJORNADA_50: Number(override.interjornada_minutes || 0),
         debit: Number(override.debit_minutes || 0),
@@ -491,6 +494,9 @@ const isJoseLuciano = employeeNameNormalized.includes("JOSE LUCIANO") || employe
         HE_60: Number(override.he_60_minutes || 0),
         HE_60_NOTURNO: Number(override.he_60_night_minutes || 0),
         HE_100: Number(override.he_100_minutes || 0),
+        // O campo de fechamento HE 100% já consolida HE_100 e HE_100_NOTURNO.
+        // Não manter a parcela operacional paralela quando o ajuste a substitui.
+        HE_100_NOTURNO: 0,
         ADICIONAL_NOTURNO: Number(override.he_20_minutes || 0),
         INTERJORNADA_50: Number(override.interjornada_minutes || 0),
         debit: Number(override.debit_minutes || 0),
