@@ -86,7 +86,7 @@ export function Ocorrencias() {
 
   async function loadOptions() {
     const [e, t, p] = await Promise.all([
-      supabase.from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name"),
+      (supabase as any).from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name"),
       supabase.from("occurrence_types").select("id,code,name,unit,requires_justification,affects_balance").eq("active", true).order("name"),
       supabase.from("time_periods").select("id,start_date,end_date").order("start_date", { ascending: false }),
     ]);
