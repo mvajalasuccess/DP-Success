@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Clock3, FileText, Gauge, LogOut, Users, WalletCards, Save, TrendingUp, Settings, Menu, CircleDollarSign, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Clock3, FileText, Gauge, LogOut, Users, UsersRound, WalletCards, Save, TrendingUp, Settings, Menu, CircleDollarSign, X, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
@@ -136,7 +136,7 @@ function AppShell({
   const mobileGroups: { label: string; items: [string, ScreenKey, LucideIcon][] }[] = [
     { label: "Gestão", items: [["Dashboard", "dashboard", Gauge], ["KPIs", "kpis", Gauge], ["Comparativos", "comparativos", Users], ["Relatórios", "relatorios", FileText]] },
     { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", Clock3], ["Importar Cartão Ponto", "importar-cartao-ponto", FileText], ["Lançamentos", "lancamentos", FileText], ["Banco de Horas", "banco-horas", WalletCards], ["Pagamentos", "pagamentos", CircleDollarSign], ["Faltas e Folgas", "ocorrencias", AlertTriangle], ["Declarações e Atestados", "atestados", FileText]] },
-    { label: "Cadastro", items: [["Funcionários", "funcionarios", Users], ["Cargos", "cargos", Building2], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", Building2]] },
+    { label: "Cadastro", items: [["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", Building2], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", Building2]] },
     { label: "Organização", items: [["Tarefas", "tarefas", FileText]] },
   ];
 
@@ -299,7 +299,7 @@ function AppShell({
               {([
                 ["dashboard", Gauge, "Dashboard"], ["kpis", Gauge, "KPIs"], ["comparativos", Users, "Comparativos"], ["relatorios", FileText, "Relatórios"],
                 ["fechamento-ponto", Clock3, "Fechamento"], ["importar-cartao-ponto", FileText, "Importar Cartão Ponto"], ["lancamentos", FileText, "Lançamentos"], ["banco-horas", WalletCards, "Banco de Horas"], ["pagamentos", CircleDollarSign, "Pagamentos"], ["ocorrencias", AlertTriangle, "Faltas e Folgas"], ["atestados", FileText, "Declarações e Atestados"],
-                ["funcionarios", Users, "Funcionários"], ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
+                ["funcionarios", UsersRound, "Funcionários"], ["cargos", Building2, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", Building2, "Jornadas"], ["tarefas", FileText, "Tarefas"],
               ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label}><Icon className="h-4 w-4 shrink-0" /></button>)}
             </>
           )}
