@@ -2,6 +2,7 @@ import { ArrowLeft, Download, FileBarChart } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CompanyFilter } from "@/components/company-filter";
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees, minutesToHours } from "@/lib/dp-model";
 
@@ -91,7 +92,13 @@ function minutesToExcelDuration(value: unknown) {
   return Math.round(Number(value || 0)) / 1440;
 }
 
-async function loadClosingRows(db: any, period: Period) {
+async function loadClosingRows(db: any, period: Period, companyId = "") {
+  const { data: companyEmployees, error: companyEmployeesError } = await db.from("employees").select("id,company_id,full_name,registration");
+  if (companyEmployeesError) throw companyEmployeesError;
+  const allowedEmployeeIds = new Set((companyEmployees ?? []).filter((employee: any) => !companyId || employee.company_id === companyId).map((employee: any) => String(employee.id)));
+  const employeeByName = new Map((companyEmployees ?? []).map((employee: any) => [String(employee.full_name ?? "").trim().toLowerCase(), String(employee.id)]));
+  const employeeByRegistration = new Map((companyEmployees ?? []).filter((employee: any) => employee.registration).map((employee: any) => [String(employee.registration).trim(), String(employee.id)]));
+  const belongsToCompany = (row: any) => !companyId || (row.employee_id ? allowedEmployeeIds.has(String(row.employee_id)) : allowedEmployeeIds.has(employeeByRegistration.get(String(row.registration ?? "").trim()) ?? employeeByName.get(String(row.employee_name ?? "").trim().toLowerCase()) ?? ""));
   const { data: historical, error: historicalError } = await db
     .from("historical_kpi_data")
     .select("id,employee_id,registration,employee_name,department_name,position_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
@@ -120,7 +127,7 @@ async function loadClosingRows(db: any, period: Period) {
   // Para competências históricas, exporta a mesma visão que o Fechamento de Ponto:
   // valores BASE preservados e ajustes manuais aplicados por funcionário/competência.
   if (period.end_date <= HISTORICAL_CUTOFF && (historical ?? []).length > 0) {
-    return (historical ?? []).map(applyOverride);
+    return (historical ?? []).filter(belongsToCompany).map(applyOverride);
   }
 
   const [
@@ -132,7 +139,7 @@ async function loadClosingRows(db: any, period: Period) {
     { data: holidayRows, error: holidayError },
   ] = await Promise.all([
     db.from("employees")
-      .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,work_schedules(weekly_minutes),departments(name),positions(name)")
+      .select("id,full_name,registration,department_id,position_id,hire_date,termination_date,status,work_schedule_id,company_id,work_schedules(weekly_minutes),departments(name),positions(name)")
       .order("full_name"),
     db.from("overtime_records")
       .select("employee_id,period_id,minutes,launch_type")
@@ -159,6 +166,7 @@ async function loadClosingRows(db: any, period: Period) {
   );
 
   const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
+    (!companyId || employee.company_id === companyId) &&
     (!employee.hire_date || employee.hire_date <= period.end_date) &&
     (!employee.termination_date || employee.termination_date >= period.start_date)
   );
@@ -728,6 +736,7 @@ async function downloadStandardReportExcel(kind: string, rows: any[], subtitle?:
 export function Relatorios() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -754,9 +763,12 @@ export function Relatorios() {
     const db = supabase as any;
 
     try {
+      const { data: companyEmployeeRows, error: companyEmployeeError } = await db.from("employees").select("id,company_id");
+      if (companyEmployeeError) throw companyEmployeeError;
+      const allowedEmployeeIds = new Set((companyEmployeeRows ?? []).filter((employee: any) => !companyFilter || employee.company_id === companyFilter).map((employee: any) => String(employee.id)));
       if (kind === "fechamento") {
         if (!competence) throw new Error("Selecione uma competência para exportar.");
-        const rows = await loadClosingRows(db, competence);
+        const rows = await loadClosingRows(db, competence, companyFilter);
         if (!rows.length) throw new Error("Não há funcionários ou lançamentos para exportar nessa competência.");
         await downloadClosingExcel(competence, rows);
         return;
@@ -766,13 +778,14 @@ export function Relatorios() {
         if (!competence) throw new Error("Selecione uma competência para exportar.");
         const { data: employeeRows, error: employeeError } = await db
           .from("employees")
-          .select("id,full_name,registration,status,hire_date,termination_date,departments(name)")
+          .select("id,full_name,registration,status,hire_date,termination_date,company_id,departments(name)")
           .order("full_name");
         if (employeeError) throw employeeError;
 
         // Mantém funcionários ativos e inativos que participaram da competência selecionada,
         // como na tela Banco de Horas; não inclui quem ainda não havia sido admitido.
         const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
+          (!companyFilter || employee.company_id === companyFilter) &&
           (!employee.hire_date || employee.hire_date <= competence.end_date) &&
           (!employee.termination_date || employee.termination_date >= competence.start_date)
         );
@@ -812,11 +825,12 @@ export function Relatorios() {
 
         const { data: employeeRows, error: employeeError } = await db
           .from("employees")
-          .select("id,full_name,salary,registration,status,hire_date,termination_date,work_schedules(weekly_minutes)")
+          .select("id,full_name,salary,registration,status,hire_date,termination_date,company_id,work_schedules(weekly_minutes)")
           .order("full_name");
         if (employeeError) throw employeeError;
 
         const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
+          (!companyFilter || employee.company_id === companyFilter) &&
           (!employee.hire_date || employee.hire_date <= competence.end_date) &&
           (!employee.termination_date || employee.termination_date >= competence.start_date)
         );
@@ -908,11 +922,11 @@ export function Relatorios() {
       if (kind === "interjornada") {
         const data = await fetchAll((from, to) => db
           .from("overtime_records")
-          .select("employee_id,reference_date,minutes,notes,launch_type,employees(full_name,registration,departments(name))")
+          .select("employee_id,reference_date,minutes,notes,launch_type,employees(full_name,registration,company_id,departments(name))")
           .eq("launch_type", "INTERJORNADA_50")
           .order("reference_date", { ascending: false })
           .range(from, to));
-        rows = data.map((x: any) => ({
+        rows = data.filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => ({
           employee_id: x.employee_id,
           registration: x.employees?.registration ?? "",
           employee: x.employees?.full_name ?? "",
@@ -925,22 +939,22 @@ export function Relatorios() {
 
       if (kind === "atestados") {
         const [certificates, leaves, declarations] = await Promise.all([
-          fetchAll((from, to) => db.from("medical_certificates").select("start_date,end_date,days,certificate_type,cid,notes,employees(full_name)").order("start_date", { ascending: false }).range(from, to)),
-          fetchAll((from, to) => db.from("occurrences").select("occurrence_date,end_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code,name)").eq("occurrence_types.code", "afastamento").order("occurrence_date", { ascending: false }).range(from, to)),
-          fetchAll((from, to) => db.from("occurrences").select("occurrence_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code)").eq("occurrence_types.code", "declaracao_horas").order("occurrence_date", { ascending: false }).range(from, to)),
+          fetchAll((from, to) => db.from("medical_certificates").select("employee_id,start_date,end_date,days,certificate_type,cid,notes,employees(full_name)").order("start_date", { ascending: false }).range(from, to)),
+          fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,end_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code,name)").eq("occurrence_types.code", "afastamento").order("occurrence_date", { ascending: false }).range(from, to)),
+          fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code)").eq("occurrence_types.code", "declaracao_horas").order("occurrence_date", { ascending: false }).range(from, to)),
         ]);
         rows = [
-          ...(certificates ?? []).map((x: any) => ({
+          ...(certificates ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => ({
             tipo: "Atestado", employee: x.employees?.full_name ?? "", start_date: x.start_date,
             end_date: x.end_date, days: x.days, horas_abonadas: "", motivo: "",
             certificate_type: x.certificate_type, cid: x.cid, notes: x.notes ?? "",
           })),
-          ...(leaves ?? []).map((x: any) => ({
+          ...(leaves ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => ({
             tipo: "Afastamento", employee: x.employees?.full_name ?? "", start_date: x.occurrence_date,
             end_date: x.end_date ?? x.occurrence_date, days: x.quantity, horas_abonadas: "", motivo: "",
             certificate_type: "", cid: "", notes: x.notes ?? "",
           })),
-          ...(declarations ?? []).map((x: any) => {
+          ...(declarations ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => {
             const parts = String(x.notes ?? "").split(" — ");
             const minutes = Math.round(Number(x.quantity ?? 0) * 60);
             return {
@@ -954,8 +968,8 @@ export function Relatorios() {
       }
 
       if (kind === "ocorrencias") {
-        const data = await fetchAll((from, to) => db.from("occurrences").select("occurrence_date,end_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code,name)").in("occurrence_types.code", ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"]).order("occurrence_date", { ascending: false }).range(from, to));
-        rows = data.map((x: any) => ({
+        const data = await fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,end_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code,name)").in("occurrence_types.code", ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"]).order("occurrence_date", { ascending: false }).range(from, to));
+        rows = data.filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => ({
           date: x.occurrence_date,
           end_date: x.end_date ?? "",
           type: x.occurrence_types?.name ?? "",
