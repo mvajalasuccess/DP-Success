@@ -139,13 +139,22 @@ export function PointClosing() {
       .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
       .eq("period_id", p.id);
 
-    // A migration pode ainda não ter sido aplicada no Supabase. Nesse caso,
-    // mantemos o fechamento funcionando com os dados originais até a tabela existir.
-    if (overrideError && !String(overrideError.message ?? "").toLowerCase().includes("point_closing_overrides")) {
-      setError(overrideError.message);
+    // Nunca ignorar silenciosamente falhas ao ler as correções persistidas:
+    // isso fazia a tela exibir a BASE novamente após atualizar, mesmo quando
+    // a origem do problema era permissão ou falha de leitura da tabela.
+    const overrideErrorMessage = String(overrideError?.message ?? "");
+    const overrideTableMissing = Boolean(overrideError && (
+      ["42P01", "PGRST205"].includes(String(overrideError.code ?? "")) ||
+      /relation .*point_closing_overrides.* does not exist|could not find the table .*point_closing_overrides.*schema cache/i.test(overrideErrorMessage)
+    ));
+    if (overrideError && !overrideTableMissing) {
+      setError("Não foi possível carregar os ajustes salvos da competência: " + overrideErrorMessage);
       setHistoricalRows([]);
       setLoadingRows(false);
       return;
+    }
+    if (overrideTableMissing) {
+      setError("A tabela de correções persistentes não está disponível no Supabase. Os valores históricos foram preservados, mas as correções não podem ser salvas até aplicar a migração point_closing_overrides.");
     }
 
     const overrides = (overrideRows ?? []) as any[];
