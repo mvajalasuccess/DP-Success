@@ -824,6 +824,11 @@ export function Kpis() {
 
         for (const row of overtime ?? []) {
           if (String(row.period_id) !== String(period.id) || !row.employee_id || !allowedIds.has(row.employee_id)) continue;
+          // Se há ajuste manual, a composição corrigida abaixo substitui os lançamentos originais.
+          if ((overrideRows ?? []).some((override: any) =>
+            String(override.period_id) === String(row.period_id) &&
+            String(override.employee_id) === String(row.employee_id)
+          )) continue;
           const key = overtimeByType(String(row.launch_type ?? ""));
           if (!key) continue;
           const minutes = Number(row.minutes || 0);
@@ -834,6 +839,29 @@ export function Kpis() {
           else if (key === "he20") he20 += minutes;
           else if (key === "interjornada") interjornada += minutes;
           if (minutes > 0) employeeSet.add(String(row.employee_id));
+        }
+
+        // Em competências atuais, usa a composição corrigida, não os lançamentos substituídos.
+        if (period.end_date > HISTORICAL_CUTOFF) {
+          for (const override of (overrideRows ?? []).filter((item: any) => String(item.period_id) === String(period.id))) {
+            const employee = employees.find(item => item.id === String(override.employee_id));
+            if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
+            const values = {
+              he60: Number(override.he_60_minutes || 0),
+              he60Night: Number(override.he_60_night_minutes || 0),
+              he100: Number(override.he_100_minutes || 0),
+              he100Night: 0,
+              he20: Number(override.he_20_minutes || 0),
+              interjornada: Number(override.interjornada_minutes || 0),
+            };
+            he60 += values.he60;
+            he60Night += values.he60Night;
+            he100 += values.he100;
+            he100Night += values.he100Night;
+            he20 += values.he20;
+            interjornada += values.interjornada;
+            if (Object.values(values).some(value => value > 0)) employeeSet.add(employee.id);
+          }
         }
 
         return {
