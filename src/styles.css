@@ -277,7 +277,7 @@ textarea:focus-visible {
     padding-right: 1rem;
   }
 
-  .min-h-screen > main {
+  .min-h-screen > main.mx-auto {
     padding: 1.25rem 1rem 1.5rem;
     min-width: 0;
   }
