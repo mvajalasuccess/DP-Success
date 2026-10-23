@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import * as ExcelJS from "exceljs";
 import { supabase } from "@/integrations/supabase/client";
 import { countWorkingWeekdays } from "@/lib/feriados";
+import { balancesByEmployees, minutesToHours } from "@/lib/dp-model";
 
 type Period = {
   id: string;
@@ -343,6 +344,111 @@ async function downloadClosingExcel(period: Period, rows: any[]) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+
+type BankColumn = {
+  header: string;
+  key: string;
+  width: number;
+  duration?: boolean;
+  signedText?: boolean;
+};
+
+const bankColumns: BankColumn[] = [
+  { header: "Matrícula", key: "registration", width: 13 },
+  { header: "Funcionário", key: "employee_name", width: 34 },
+  { header: "Status", key: "status_label", width: 14 },
+  { header: "Departamento", key: "department_name", width: 22 },
+  { header: "Saldo do mês", key: "month_balance", width: 17, signedText: true },
+  { header: "Saldo disponível acumulado", key: "accumulated_balance", width: 27, signedText: true },
+  { header: "HE 60%", key: "he60", width: 13, duration: true },
+  { header: "HE 60% + 20% noturno", key: "he60Night", width: 23, duration: true },
+  { header: "HE 100%", key: "he100", width: 13, duration: true },
+  { header: "HE 100% + 20% noturno", key: "he100Night", width: 24, duration: true },
+  { header: "Adicional noturno 20%", key: "night20", width: 23, duration: true },
+  { header: "Débito / atrasos", key: "debit", width: 18, duration: true },
+  { header: "Ajustes (+/-)", key: "adjustment", width: 16, signedText: true },
+  { header: "Pagamentos de HE", key: "payment_minutes", width: 18, duration: true },
+  { header: "Interjornada (informativo)", key: "interjornada", width: 25, duration: true },
+];
+
+async function downloadBankHoursExcel(period: Period, rows: any[]) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "DP SUCCESS";
+  workbook.subject = "Banco de Horas";
+  workbook.title = `Banco de Horas - ${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Banco de Horas", {
+    views: [{ state: "frozen", ySplit: 5, xSplit: 2 }],
+  });
+  const lastColumn = bankColumns.length;
+  sheet.mergeCells(1, 1, 1, lastColumn);
+  const titleCell = sheet.getCell(1, 1);
+  titleCell.value = "DP SUCCESS | BANCO DE HORAS";
+  titleCell.font = { name: "Aptos Display", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF123B3A" } };
+  titleCell.alignment = { vertical: "middle", horizontal: "left" };
+  sheet.getRow(1).height = 30;
+
+  sheet.mergeCells(2, 1, 2, lastColumn);
+  sheet.getCell(2, 1).value = `Competência: ${formatDate(period.start_date)} a ${formatDate(period.end_date)}  |  Referência: ${String(period.reference_month).padStart(2, "0")}/${period.reference_year}  |  Status: ${period.status}`;
+  sheet.getCell(2, 1).font = { size: 11, bold: true, color: { argb: "FF123B3A" } };
+  sheet.getCell(2, 1).alignment = { vertical: "middle" };
+  sheet.getRow(2).height = 23;
+
+  sheet.addRow([]);
+  sheet.addRow([]);
+  const headerRow = sheet.addRow(bankColumns.map(column => column.header));
+  headerRow.height = 34;
+  headerRow.eachCell(cell => {
+    cell.font = { bold: true, color: { argb: "FF123B3A" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDF7F0" } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    cell.border = { bottom: { style: "thin", color: { argb: "FF06CAA0" } } };
+  });
+
+  for (const source of rows) {
+    const rowData: Record<string, unknown> = {};
+    for (const column of bankColumns) {
+      const value = source[column.key];
+      if (column.signedText) rowData[column.key] = minutesToHours(Number(value || 0), true);
+      else if (column.duration) rowData[column.key] = minutesToExcelDuration(value);
+      else rowData[column.key] = value ?? "";
+    }
+    const row = sheet.addRow(bankColumns.map(column => rowData[column.key]));
+    row.eachCell((cell, columnNumber) => {
+      cell.alignment = {
+        vertical: "middle",
+        horizontal: columnNumber >= 5 ? "center" : "left",
+      };
+      if (row.number % 2 === 0) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5FAF8" } };
+      }
+    });
+    for (let index = 0; index < bankColumns.length; index++) {
+      if (bankColumns[index].duration) row.getCell(index + 1).numFmt = "[h]:mm;-[h]:mm";
+    }
+  }
+
+  bankColumns.forEach((column, index) => {
+    sheet.getColumn(index + 1).width = column.width;
+  });
+  sheet.autoFilter = { from: { row: 5, column: 1 }, to: { row: Math.max(5, sheet.rowCount), column: lastColumn } };
+  sheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  sheet.properties.defaultRowHeight = 20;
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer as BlobPart], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `dp-success-banco-de-horas-${period.start_date}-a-${period.end_date}.xlsx`;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function Relatorios() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
@@ -380,20 +486,52 @@ export function Relatorios() {
         return;
       }
 
-      let rows: any[] = [];
       if (kind === "banco") {
-        const data = await fetchAll((from, to) => db.from("bank_hours").select("entry_date,kind,minutes,previous_balance_minutes,balance_minutes,justification,employees(full_name),time_periods(reference_year,reference_month,start_date,end_date)").order("entry_date", { ascending: false }).range(from, to));
-        rows = data.map((x: any) => ({
-          date: x.entry_date,
-          competencia: x.time_periods ? String(x.time_periods.reference_month).padStart(2, "0") + "/" + x.time_periods.reference_year : "",
-          employee: x.employees?.full_name ?? "",
-          kind: x.kind,
-          minutes: x.minutes,
-          previous_balance_minutes: x.previous_balance_minutes,
-          balance_minutes: x.balance_minutes,
-          justification: x.justification ?? "",
-        }));
+        if (!competence) throw new Error("Selecione uma competência para exportar.");
+        const { data: employeeRows, error: employeeError } = await db
+          .from("employees")
+          .select("id,full_name,registration,status,hire_date,termination_date,departments(name)")
+          .order("full_name");
+        if (employeeError) throw employeeError;
+
+        // Mantém funcionários ativos e inativos que participaram da competência selecionada,
+        // como na tela Banco de Horas; não inclui quem ainda não havia sido admitido.
+        const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
+          (!employee.hire_date || employee.hire_date <= competence.end_date) &&
+          (!employee.termination_date || employee.termination_date >= competence.start_date)
+        );
+        if (!employeesInPeriod.length) throw new Error("Não há funcionários para exportar nessa competência.");
+
+        // Usa o cálculo central do Banco de Horas para respeitar BASE histórica,
+        // overrides, ajustes manuais, pagamentos e saldos especiais já validados.
+        const balancesById = await balancesByEmployees(employeesInPeriod.map((employee: any) => String(employee.id)));
+        const bankRows = employeesInPeriod.map((employee: any) => {
+          const balance = (balancesById[String(employee.id)] ?? []).find((item: any) => item.period.id === competence.id);
+          if (!balance) return null;
+          return {
+            registration: employee.registration ?? "",
+            employee_name: employee.full_name ?? "",
+            status_label: String(employee.status ?? "ativo").toLowerCase() === "inativo" ? "Inativo" : "Ativo",
+            department_name: employee.departments?.name ?? "",
+            month_balance: balance.monthBalance,
+            accumulated_balance: balance.accumulated,
+            he60: balance.composition.HE_60,
+            he60Night: balance.composition.HE_60_NOTURNO,
+            he100: balance.composition.HE_100,
+            he100Night: balance.composition.HE_100_NOTURNO,
+            night20: balance.composition.ADICIONAL_NOTURNO,
+            debit: balance.composition.debit,
+            adjustment: balance.adjustment,
+            payment_minutes: balance.paymentMinutes,
+            interjornada: balance.composition.INTERJORNADA_50,
+          };
+        }).filter(Boolean);
+        if (!bankRows.length) throw new Error("Não há saldos calculados para a competência selecionada.");
+        await downloadBankHoursExcel(competence, bankRows);
+        return;
       }
+
+      let rows: any[] = [];
 
       if (kind === "extras") {
         const data = await fetchAll((from, to) => db.from("overtime_records").select("reference_date,launch_type,minutes,rate_percent,estimated_value,notes,employees(full_name)").order("reference_date", { ascending: false }).range(from, to));
@@ -495,7 +633,7 @@ export function Relatorios() {
         </p>
 
         <div className="mt-5 max-w-xl">
-          <label htmlFor="report-period" className="mb-1.5 block text-sm font-medium">Competência do Fechamento de Ponto</label>
+          <label htmlFor="report-period" className="mb-1.5 block text-sm font-medium">Competência do Fechamento de Ponto e Banco de Horas</label>
           <select
             id="report-period"
             value={competence?.id ?? ""}
@@ -510,7 +648,7 @@ export function Relatorios() {
             ))}
           </select>
           <p className="mt-1 text-xs text-muted-foreground">
-            A planilha do Fechamento exporta todos os funcionários e os campos exibidos na tabela da competência selecionada.
+            Os relatórios de Fechamento de Ponto e Banco de Horas usam a competência selecionada; o banco mostra o saldo mensal e o saldo acumulado por funcionário.
           </p>
         </div>
 
@@ -524,15 +662,17 @@ export function Relatorios() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {key === "fechamento"
                   ? "Excel com funcionários, horas previstas e trabalhadas, faltas, atestados, declarações, abonos, débitos e horas extras."
-                  : "Exporte os dados desse relatório em formato CSV."}
+                  : key === "banco"
+                    ? "Excel com nome do funcionário, saldo do mês, saldo acumulado, débitos, ajustes, pagamentos e composição das horas extras."
+                    : "Exporte os dados desse relatório em formato CSV."}
               </p>
               <button
                 onClick={() => void exportReport(key)}
-                disabled={!!busy || loading || (key === "fechamento" && !competence)}
+                disabled={!!busy || loading || ((key === "fechamento" || key === "banco") && !competence)}
                 className="mt-4 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
               >
                 <Download className="h-4 w-4" />
-                {busy === key ? "Gerando…" : key === "fechamento" ? "Exportar Excel" : "Exportar CSV"}
+                {busy === key ? "Gerando…" : key === "fechamento" || key === "banco" ? "Exportar Excel" : "Exportar CSV"}
               </button>
             </Card>
           ))}
