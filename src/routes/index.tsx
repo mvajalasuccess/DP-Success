@@ -281,7 +281,7 @@ function AppShell({
                 {companyMenuOpen && <div className="mt-1 space-y-0.5">
                   {[
                     ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
-                  ].map(([label, key]) => <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><IconForCadastro label={label} /><span>{label}</span></button>)}
+                  ].map(([label, key]) => { const Icon = key === "funcionarios" ? UsersRound : key === "cargos" ? BriefcaseBusiness : key === "departamentos" ? Building2 : CalendarDays; return <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>; })}
                 </div>}
               </div>
 
