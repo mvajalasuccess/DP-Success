@@ -96,18 +96,61 @@ export function PointClosing() {
       return;
     }
 
+    // Vincula registros da BASE sem employee_id pelo nome completo e,
+    // apenas se for único, pela matrícula. Sem isso, o botão Salvar apenas
+    // retornava e as alterações pareciam sumir ao atualizar.
+    const { data: employeeLookup, error: employeeLookupError } = await supabase
+      .from("employees")
+      .select("id,full_name,registration");
+    if (employeeLookupError) {
+      setError("Não foi possível vincular os registros históricos aos funcionários: " + employeeLookupError.message);
+      setHistoricalRows([]);
+      setLoadingRows(false);
+      return;
+    }
+
+    const normalizeIdentity = (value: unknown) =>
+      String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+    const resolveHistoricalEmployeeId = (row: any): string | null => {
+      if (row.employee_id) return String(row.employee_id);
+      const historicalName = normalizeIdentity(row.employee_name);
+      const nameMatches = (employeeLookup ?? []).filter((employee: any) =>
+        normalizeIdentity(employee.full_name) === historicalName
+      );
+      if (nameMatches.length === 1) return String(nameMatches[0].id);
+
+      const registration = String(row.registration ?? "").trim();
+      if (registration) {
+        const registrationMatches = (employeeLookup ?? []).filter((employee: any) =>
+          String(employee.registration ?? "").trim() === registration
+        );
+        if (registrationMatches.length === 1) return String(registrationMatches[0].id);
+      }
+      return null;
+    };
+    const historicalWithEmployeeIds = (historical ?? []).map((row: any) => {
+      const employeeId = resolveHistoricalEmployeeId(row);
+      return employeeId ? { ...row, employee_id: employeeId } : row;
+    });
+
     const { data: overrideRows, error: overrideError } = await (supabase as any)
       .from("point_closing_overrides")
       .select("period_id,employee_id,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
       .eq("period_id", p.id);
 
-    // A migration pode ainda não ter sido aplicada no Supabase. Nesse caso,
-    // mantemos o fechamento funcionando com os dados originais até a tabela existir.
-    if (overrideError && !String(overrideError.message ?? "").toLowerCase().includes("point_closing_overrides")) {
-      setError(overrideError.message);
+    const overrideErrorMessage = String(overrideError?.message ?? "");
+    const overrideTableMissing = Boolean(overrideError && (
+      ["42P01", "PGRST205"].includes(String(overrideError.code ?? "")) ||
+      /relation .*point_closing_overrides.* does not exist|could not find the table .*point_closing_overrides.*schema cache/i.test(overrideErrorMessage)
+    ));
+    if (overrideError && !overrideTableMissing) {
+      setError("Não foi possível carregar os ajustes salvos da competência: " + overrideErrorMessage);
       setHistoricalRows([]);
       setLoadingRows(false);
       return;
+    }
+    if (overrideTableMissing) {
+      setError("A tabela de correções persistentes não está disponível no Supabase. Os valores históricos foram preservados, mas as correções não podem ser salvas até aplicar a migração point_closing_overrides.");
     }
 
     const overrides = (overrideRows ?? []) as any[];
@@ -125,7 +168,7 @@ export function PointClosing() {
     const HISTORICAL_CUTOFF = "2026-07-20";
     if (p.end_date <= HISTORICAL_CUTOFF && (historical ?? []).length > 0) {
       setRowsSource("historical");
-      setHistoricalRows((historical ?? []).map(applyOverride));
+      setHistoricalRows(historicalWithEmployeeIds.map(applyOverride));
       setLoadingRows(false);
       return;
     }
@@ -322,7 +365,11 @@ export function PointClosing() {
   }
 
   async function saveHistoricalRow() {
-    if (!editingRow || !selectedPeriod || !editingRow.employee_id) return;
+    if (!editingRow || !selectedPeriod) return;
+    if (!editingRow.employee_id) {
+      setError(`Não foi possível salvar a correção de "${editingRow.employee_name}". O registro histórico não está vinculado a um funcionário cadastrado. Confira o nome e a matrícula no cadastro de Funcionários.`);
+      return;
+    }
     setRowSaving(true); setError("");
 
     const payload = {
