@@ -272,10 +272,10 @@ export function BankHours() {
 
       <Card className="mt-6 p-4">
         <div className="flex flex-wrap items-end gap-4">
-          <label className="grid w-[220px] gap-1.5 text-sm font-medium">Empresa
+          <label className="grid w-full min-w-0 gap-1.5 text-sm font-medium sm:w-[220px]">Empresa
             <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(x => (!value || x.company_id === value) && (statusFilter === "todos" || (statusFilter === "ativo" ? x.status !== "inativo" : x.status === "inativo"))); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
           </label>
-          <label className="grid w-[150px] gap-1.5 text-sm font-medium">Status
+          <label className="grid w-full min-w-0 gap-1.5 text-sm font-medium sm:w-[150px]">Status
             <select className={inputCls} value={statusFilter} onChange={e => {
               const next = e.target.value as "ativo" | "inativo" | "todos";
               setStatusFilter(next);
@@ -303,8 +303,8 @@ export function BankHours() {
             </div>
           </div>
           <div className="ml-auto text-right"><p className="text-xs text-muted-foreground">Saldo disponível atual</p><p className={"text-2xl font-bold " + cls(accumulated)}>{minutesToHours(accumulated, true)}</p></div>
-          <div className="flex gap-2">
-            <button type="button" onClick={openAdjustmentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Novo ajuste</button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={openAdjustmentNew className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold"><Plus className="h-4 w-4" /> Novo ajuste</button>
             <button type="button" onClick={openPaymentNew} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Registrar pagamento de HE</button>
           </div>
         </div>
