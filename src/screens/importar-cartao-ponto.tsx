@@ -224,11 +224,11 @@ export function ImportarCartaoPonto() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="dp-screen min-h-screen bg-background">
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between px-6 py-5">
           <div>
-            <p className="text-sm font-medium text-primary">Fechamento de Ponto</p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Fechamento de Ponto</p>
             <h1 className="text-2xl font-bold">Importar Cartão Ponto</h1>
             <p className="mt-1 text-sm text-muted-foreground">Envie o PDF do cartão ponto e importe somente Crédito, Débito, Saldo do mês, HE 60% + 20% noturno e Interjornada.</p>
           </div>
