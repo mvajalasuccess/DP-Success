@@ -1263,7 +1263,7 @@ export function Kpis() {
   const absenteeismTone = absenteeismRate >= KPI_THRESHOLDS.absenteeismCritical ? "critical" : absenteeismRate >= KPI_THRESHOLDS.absenteeismAttention ? "warning" : "neutral";
   const turnoverTone = metrics.turnover >= turnoverThresholds.critical ? "critical" : metrics.turnover >= turnoverThresholds.attention ? "warning" : "neutral";
   const bankTone = Math.abs(bankBalance) >= KPI_THRESHOLDS.bankCriticalMinutes ? "critical" : Math.abs(bankBalance) >= KPI_THRESHOLDS.bankAttentionMinutes ? "warning" : "neutral";
-  const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0 || bankBalance !== 0;
+  const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0;
 
   const demographicKpiEmployees = employees.filter(e =>
     (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
@@ -1329,7 +1329,7 @@ export function Kpis() {
         { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: `${fmt(metrics.absenceMinutes)} perdidas / ${fmt(metrics.expected)} previstas`, tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100. Referência gerencial: atenção a partir de 3% e crítico a partir de 5%.", primary: true },
         { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: appliedMonth === "todos" ? "Pessoas distintas no período selecionado" : "Quadro ativo da competência", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
         { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: `[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100. Faixas gerenciais: atenção a partir de ${turnoverThresholds.attention}% e crítico a partir de ${turnoverThresholds.critical}%.` },
-        { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: "neutral", title: "Saldo acumulado no Banco de Horas até o fim do período selecionado." },
+
       ];
 
   return (
@@ -1364,7 +1364,7 @@ export function Kpis() {
         <section className="mt-6" aria-label="Indicadores principais">
           {isCalculating || isLoadingPage ? (
             <div className="kpi-band" aria-label="Carregando indicadores" aria-live="polite">
-              {["principal", "secundario-1", "secundario-2", "secundario-3"].map((key, index) => (
+              {(activeSection === "absenteismo" ? ["principal", "secundario-1", "secundario-2"] : ["principal", "secundario-1", "secundario-2", "secundario-3"]).map((key, index) => (
                 <div key={key} className={index === 0 ? "kpi-primary" : "kpi-secondary"}>
                   <div className="kpi-skeleton h-3 w-28" />
                   <div className="kpi-skeleton mt-4 h-9 w-32" />
