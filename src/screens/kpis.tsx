@@ -1295,6 +1295,47 @@ export function Kpis() {
           </div>
         </section>
 
+        <section className="mt-6" aria-label="Indicadores principais">
+          {isCalculating || isLoadingPage ? (
+            <div className="kpi-band" aria-label="Carregando indicadores" aria-live="polite">
+              {["principal", "secundario-1", "secundario-2", "secundario-3"].map((key, index) => (
+                <div key={key} className={index === 0 ? "kpi-primary" : "kpi-secondary"}>
+                  <div className="kpi-skeleton h-3 w-28" />
+                  <div className="kpi-skeleton mt-4 h-9 w-32" />
+                  <div className="kpi-skeleton mt-3 h-3 w-full max-w-48" />
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="border-y border-[var(--kpi-border)] bg-[var(--kpi-critical-soft)] px-5 py-5" role="alert">
+              <p className="text-sm font-semibold text-[var(--kpi-critical)]">Não foi possível carregar os indicadores</p>
+              <p className="mt-1 break-words text-[13px] text-[var(--kpi-text)]">{error}</p>
+              <p className="mt-2 text-[12px] text-[var(--kpi-text-muted)]">Confira os filtros e tente atualizar novamente. Os cálculos não foram alterados.</p>
+            </div>
+          ) : !hasKpiData ? (
+            <div className="border-y border-[var(--kpi-border)] bg-[var(--kpi-surface)] px-5 py-7" role="status">
+              <p className="text-sm font-semibold text-[var(--kpi-text)]">Sem dados para a seleção</p>
+              <p className="mt-1 text-[13px] text-[var(--kpi-text-muted)]">Escolha outro ano, mês ou conjunto de filtros e clique em “Atualizar KPIs”.</p>
+            </div>
+          ) : (
+            <div className="kpi-band">
+              {kpiItems.map((item, index) => (
+                <div key={item.label} className={index === 0 ? "kpi-primary" : "kpi-secondary"} title={item.title} aria-label={`${item.label}. ${item.title}`}>
+                  <p className="text-[12px] font-semibold leading-5 text-[var(--kpi-text-muted)]">{item.label}</p>
+                  <p className={`kpi-value ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : ""}`}>{item.value}</p>
+                  <p className="kpi-support">{item.support}</p>
+                  {item.status && <span className={`kpi-status ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : "is-neutral"}`}>{item.status}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-2 text-[11px] leading-4 text-[var(--kpi-text-muted)]">As faixas de atenção são provisórias e visuais; não alteram os cálculos nem os dados.</p>
+        </section>
+
+        <div className="mt-3 flex min-h-7 items-center justify-end gap-2 text-[12px] text-[var(--kpi-text-muted)]" aria-live="polite">
+          {isCalculating || isLoadingPage ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--kpi-border)] border-t-[var(--kpi-accent)]" /> Atualizando indicadores para os filtros selecionados</> : <span>Indicadores atualizados para os filtros aplicados</span>}
+        </div>
+
         <section className="mt-7" aria-label="Navegação e filtros dos indicadores">
           <div role="tablist" aria-label="Categorias de KPIs" className="flex flex-wrap items-center gap-x-1 border-b border-[var(--kpi-border)]">
             {[
@@ -1407,46 +1448,6 @@ export function Kpis() {
           </div>
         </section>
 
-        <section className="mt-6" aria-label="Indicadores principais">
-          {isCalculating || isLoadingPage ? (
-            <div className="kpi-band" aria-label="Carregando indicadores" aria-live="polite">
-              {["principal", "secundario-1", "secundario-2", "secundario-3"].map((key, index) => (
-                <div key={key} className={index === 0 ? "kpi-primary" : "kpi-secondary"}>
-                  <div className="kpi-skeleton h-3 w-28" />
-                  <div className="kpi-skeleton mt-4 h-9 w-32" />
-                  <div className="kpi-skeleton mt-3 h-3 w-full max-w-48" />
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="border-y border-[var(--kpi-border)] bg-[var(--kpi-critical-soft)] px-5 py-5" role="alert">
-              <p className="text-sm font-semibold text-[var(--kpi-critical)]">Não foi possível carregar os indicadores</p>
-              <p className="mt-1 break-words text-[13px] text-[var(--kpi-text)]">{error}</p>
-              <p className="mt-2 text-[12px] text-[var(--kpi-text-muted)]">Confira os filtros e tente atualizar novamente. Os cálculos não foram alterados.</p>
-            </div>
-          ) : !hasKpiData ? (
-            <div className="border-y border-[var(--kpi-border)] bg-[var(--kpi-surface)] px-5 py-7" role="status">
-              <p className="text-sm font-semibold text-[var(--kpi-text)]">Sem dados para a seleção</p>
-              <p className="mt-1 text-[13px] text-[var(--kpi-text-muted)]">Escolha outro ano, mês ou conjunto de filtros e clique em “Atualizar KPIs”.</p>
-            </div>
-          ) : (
-            <div className="kpi-band">
-              {kpiItems.map((item, index) => (
-                <div key={item.label} className={index === 0 ? "kpi-primary" : "kpi-secondary"} title={item.title} aria-label={`${item.label}. ${item.title}`}>
-                  <p className="text-[12px] font-semibold leading-5 text-[var(--kpi-text-muted)]">{item.label}</p>
-                  <p className={`kpi-value ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : ""}`}>{item.value}</p>
-                  <p className="kpi-support">{item.support}</p>
-                  {item.status && <span className={`kpi-status ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : "is-neutral"}`}>{item.status}</span>}
-                </div>
-              ))}
-            </div>
-          )}
-          <p className="mt-2 text-[11px] leading-4 text-[var(--kpi-text-muted)]">As faixas de atenção são provisórias e visuais; não alteram os cálculos nem os dados.</p>
-        </section>
-
-        <div className="mt-3 flex min-h-7 items-center justify-end gap-2 text-[12px] text-[var(--kpi-text-muted)]" aria-live="polite">
-          {isCalculating || isLoadingPage ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--kpi-border)] border-t-[var(--kpi-accent)]" /> Atualizando indicadores para os filtros selecionados</> : <span>Indicadores atualizados para os filtros aplicados</span>}
-        </div>
         {activeSection === "demograficos" && (
           <section id="kpi-panel-demograficos" role="tabpanel" aria-labelledby="kpi-tab-demograficos" tabIndex={0} className="mt-6 space-y-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             {(() => {
