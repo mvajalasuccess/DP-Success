@@ -219,9 +219,7 @@ function AppShell({
             </div>
           )}
           {collapsed && (
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_0_18px_rgba(6,202,160,0.22)]">
-              <Clock3 className="h-5 w-5" />
-            </div>
+            <img src="/grupo-success-logo.svg" alt="Grupo Success" className="h-10 w-10 object-contain" />
           )}
           <button
             type="button"
