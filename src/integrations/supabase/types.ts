@@ -245,6 +245,30 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          cnpj: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          cnpj: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
           address: string
@@ -286,6 +310,7 @@ export type Database = {
       }
       dashboard_competence_notes: {
         Row: {
+          completed: boolean
           created_at: string
           id: string
           items: Json
@@ -295,6 +320,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          completed?: boolean
           created_at?: string
           id?: string
           items?: Json
@@ -304,6 +330,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          completed?: boolean
           created_at?: string
           id?: string
           items?: Json
@@ -316,7 +343,7 @@ export type Database = {
           {
             foreignKeyName: "dashboard_competence_notes_period_id_fkey"
             columns: ["period_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "time_periods"
             referencedColumns: ["id"]
           },
@@ -359,19 +386,353 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_audit_history: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          employee_id: string
+          event_date: string | null
+          id: string
+          original_data: Json | null
+          source: string
+          source_reference: string | null
+          title: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          employee_id: string
+          event_date?: string | null
+          id?: string
+          original_data?: Json | null
+          source?: string
+          source_reference?: string | null
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          employee_id?: string
+          event_date?: string | null
+          id?: string
+          original_data?: Json | null
+          source?: string
+          source_reference?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_audit_history_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_checklist_instances: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          notes: string | null
+          process_type: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          notes?: string | null
+          process_type: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          notes?: string | null
+          process_type?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_checklist_instances_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_checklist_steps: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          id: string
+          instance_id: string
+          notes: string | null
+          position: number
+          status: string
+          template_id: string | null
+          title_snapshot: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          instance_id: string
+          notes?: string | null
+          position?: number
+          status?: string
+          template_id?: string | null
+          title_snapshot: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          instance_id?: string
+          notes?: string | null
+          position?: number
+          status?: string
+          template_id?: string | null
+          title_snapshot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_checklist_steps_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "employee_checklist_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_checklist_steps_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "employee_checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_checklist_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          position: number
+          process_type: string
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          position?: number
+          process_type: string
+          title: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          position?: number
+          process_type?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      employee_document_catalog: {
+        Row: {
+          active: boolean
+          alert_days: number
+          category: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          alert_days?: number
+          category?: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          alert_days?: number
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      employee_document_records: {
+        Row: {
+          catalog_id: string | null
+          created_at: string
+          created_by: string | null
+          document_name: string
+          due_date: string | null
+          employee_id: string
+          id: string
+          last_completed_on: string | null
+          notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          catalog_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_name: string
+          due_date?: string | null
+          employee_id: string
+          id?: string
+          last_completed_on?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          catalog_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_name?: string
+          due_date?: string | null
+          employee_id?: string
+          id?: string
+          last_completed_on?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_document_records_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "employee_document_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_document_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_life_events: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          direction: string
+          employee_id: string
+          event_date: string
+          id: string
+          is_star: boolean
+          period_id: string | null
+          score: number
+          source: string
+          source_reference: string | null
+          status: string
+          title: string
+          updated_at: string
+          void_reason: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          direction?: string
+          employee_id: string
+          event_date?: string
+          id?: string
+          is_star?: boolean
+          period_id?: string | null
+          score?: number
+          source?: string
+          source_reference?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          void_reason?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          direction?: string
+          employee_id?: string
+          event_date?: string
+          id?: string
+          is_star?: boolean
+          period_id?: string | null
+          score?: number
+          source?: string
+          source_reference?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          void_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_life_events_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_life_events_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "time_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           birth_date: string | null
+          company_id: string | null
           cpf: string | null
           created_at: string
           department_id: string | null
           email: string | null
           full_name: string
+          gender: string | null
           hire_date: string | null
           id: string
           is_demo: boolean
           manager_id: string | null
           notes: string | null
+          pension_amount: number
           phone: string | null
           position_id: string | null
           registration: string | null
@@ -383,16 +744,19 @@ export type Database = {
         }
         Insert: {
           birth_date?: string | null
+          company_id?: string | null
           cpf?: string | null
           created_at?: string
           department_id?: string | null
           email?: string | null
           full_name: string
+          gender?: string | null
           hire_date?: string | null
           id?: string
           is_demo?: boolean
           manager_id?: string | null
           notes?: string | null
+          pension_amount?: number
           phone?: string | null
           position_id?: string | null
           registration?: string | null
@@ -404,16 +768,19 @@ export type Database = {
         }
         Update: {
           birth_date?: string | null
+          company_id?: string | null
           cpf?: string | null
           created_at?: string
           department_id?: string | null
           email?: string | null
           full_name?: string
+          gender?: string | null
           hire_date?: string | null
           id?: string
           is_demo?: boolean
           manager_id?: string | null
           notes?: string | null
+          pension_amount?: number
           phone?: string | null
           position_id?: string | null
           registration?: string | null
@@ -424,6 +791,13 @@ export type Database = {
           work_schedule_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employees_department_id_fkey"
             columns: ["department_id"]
