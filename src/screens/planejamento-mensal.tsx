@@ -60,7 +60,8 @@ export function PlanejamentoMensal() {
       const normalized=label.toLocaleLowerCase("pt-BR");
       const category=String(doc.employee_document_catalog?.category||"").toLocaleLowerCase("pt-BR");
       const kind:EventItem["kind"]=category.includes("trein")||normalized.includes("trein")||normalized.includes("curso")? "training" : category.includes("exame")||normalized.includes("exame")||normalized.includes("aso")? "exam" : "task";
-      const days=Math.ceil((new Date(d+"T00:00:00").getTime()-new Date(dateKey(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())+"T00:00:00").getTime())/86400000);\n      const alertDays=Number(doc.employee_document_catalog?.alert_days??30);
+      const days=Math.ceil((new Date(d+"T00:00:00").getTime()-new Date(dateKey(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())+"T00:00:00").getTime())/86400000);
+      const alertDays=Number(doc.employee_document_catalog?.alert_days??30);
       const person=doc.employees?.full_name ? " · "+doc.employees.full_name : "";
       all.push({id:"doc-"+doc.id,date:d,title:"Vencimento: "+label,detail:(days<0?"Vencido":days<=alertDays?"Próximo do vencimento":"Vencimento agendado")+person,kind});
     });
