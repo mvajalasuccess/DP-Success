@@ -116,6 +116,7 @@ export function Kpis() {
   const [source, setSource] = useState("");
   const [bankBalance, setBankBalance] = useState(0);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
   const [interjornadaStatus, setInterjornadaStatus] = useState<"ativo" | "inativo" | "todos">("todos");
   const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<Array<{ periodId: string; label: string; rate: number; expected: number; lost: number }>>([]);
   const [monthlyOvertime, setMonthlyOvertime] = useState<Array<{ periodId: string; label: string; total: number; interjornada: number; employees: number }>>([]);
@@ -958,7 +959,7 @@ export function Kpis() {
             : "Lançamentos atuais do DP-Success"
       );
     })();
-  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, companyFilter, additionalHolidayDateSet]);
+  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, companyFilter, additionalHolidayDateSet, refreshToken]);
 
   // O Banco de Horas usa uma função que consulta várias fontes por funcionário.
   // Mantemos esse cálculo fora do carregamento principal para a tela aparecer
@@ -1299,6 +1300,11 @@ export function Kpis() {
                 </div>
               )}
             </div>
+          </div>
+          <div className="flex justify-end border-t px-5 py-3">
+            <button type="button" onClick={() => setRefreshToken(value => value + 1)} disabled={isCalculating} className="inline-flex min-w-40 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-wait disabled:opacity-70">
+              {isCalculating ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" /> Pensando…</> : "Atualizar KPIs"}
+            </button>
           </div>
         </Card>
 
