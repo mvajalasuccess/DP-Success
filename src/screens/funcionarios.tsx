@@ -209,7 +209,7 @@ export function Employees() {
     return matchesSearch && matchesStatus && matchesCompany;
   });
   return (
-    <div className="min-h-screen bg-background">
+    <div className="dp-screen min-h-screen bg-background">
       <header className="border-b bg-background px-6 py-4">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between">
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a>
@@ -217,9 +217,9 @@ export function Employees() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] px-6 py-7">
+      <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div><p className="text-sm font-medium text-primary">Cadastro base</p><h1 className="mt-1 text-3xl font-bold">Funcionários</h1><p className="mt-1 text-sm text-muted-foreground">Gerencie os colaboradores, vínculos e status do quadro de funcionários.</p></div>
+          <div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Cadastro base</p><h1 className="mt-1 text-3xl font-bold">Funcionários</h1><p className="mt-1 text-sm text-muted-foreground">Gerencie os colaboradores, vínculos e status do quadro de funcionários.</p></div>
           <button type="button" onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4" /> Novo funcionário</button>
         </div>
 
