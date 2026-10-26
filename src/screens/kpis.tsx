@@ -1370,7 +1370,7 @@ export function Kpis() {
           ) : (
             <div className="kpi-band">
               {kpiItems.map((item, index) => (
-                <div key={item.label} className={index === 0 ? "kpi-primary" : "kpi-secondary"} title={item.title} aria-label={`${item.label}. ${item.title}`}>
+                <div key={item.label} className={`${index === 0 ? "kpi-primary" : "kpi-secondary"} kpi-tone-${item.tone}`} title={item.title} aria-label={`${item.label}. ${item.title}`}>
                   <p className="text-[12px] font-semibold leading-5 text-[var(--kpi-text-muted)]">{item.label}</p>
                   <p className={`kpi-value ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : ""}`}>{item.value}</p>
                   <p className="kpi-support">{item.support}</p>
