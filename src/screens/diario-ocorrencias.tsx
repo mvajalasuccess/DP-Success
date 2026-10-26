@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 
 type Employee = { id: string; full_name: string; status?: string; company_id?: string | null; hire_date?: string | null; termination_date?: string | null };
-type LifeEvent = { id: string; employee_id: string; event_date: string; category: string; direction: "positive"|"negative"|"neutral"; title: string; description: string|null; score: number; is_star: boolean; status: "active"|"void"; employees?: { full_name: string }|null };
+type LifeEvent = { id: string; employee_id: string; event_date: string; period_id?: string|null; category: string; direction: "positive"|"negative"|"neutral"; title: string; description: string|null; score: number; is_star: boolean; status: "active"|"void"; employees?: { full_name: string }|null };
 type DocRecord = { id: string; employee_id: string; document_name: string; catalog_id?: string|null; last_completed_on: string|null; due_date: string|null; notes: string|null; status: string; employees?: { full_name: string }|null };
 type DocCatalog = { id: string; name: string; category: string; alert_days: number; active: boolean };
 type AuditRecord = { id: string; employee_id: string; event_date: string|null; category: string; title: string; description: string|null; source: string; employees?: { full_name: string }|null };
@@ -20,6 +20,7 @@ export function DiarioOcorrencias() {
   const [tab,setTab]=useState<(typeof tabs)[number]["id"]>("diario");
   const [employees,setEmployees]=useState<Employee[]>([]);
   const [events,setEvents]=useState<LifeEvent[]>([]);
+  const [periods,setPeriods]=useState<{id:string;start_date:string;end_date:string}[]>([]);
   const [documents,setDocuments]=useState<DocRecord[]>([]);
   const [docCatalog,setDocCatalog]=useState<DocCatalog[]>([]);
   const [catalogName,setCatalogName]=useState("");
@@ -33,7 +34,7 @@ export function DiarioOcorrencias() {
   const [notice,setNotice]=useState("");
   const [companyFilter,setCompanyFilter]=useState("");
   const [employeeFilter,setEmployeeFilter]=useState("todos");
-  const [periodFilter,setPeriodFilter]=useState(new Date().toISOString().slice(0,7));
+  const [periodFilter,setPeriodFilter]=useState("todos");
   const [eventOpen,setEventOpen]=useState(false);
   const [editingEvent,setEditingEvent]=useState<LifeEvent|null>(null);
   const [eventForm,setEventForm]=useState(emptyEvent);
@@ -50,7 +51,7 @@ export function DiarioOcorrencias() {
 
   const visibleEmployees=useMemo(()=>employees.filter(e=>!companyFilter||e.company_id===companyFilter),[employees,companyFilter]);
   const visibleIds=new Set(visibleEmployees.map(e=>e.id));
-  const visibleEvents=events.filter(e=>visibleIds.has(e.employee_id)&&(employeeFilter==="todos"||e.employee_id===employeeFilter)&&(!periodFilter||e.event_date.slice(0,7)===periodFilter));
+  const visibleEvents=events.filter(e=>visibleIds.has(e.employee_id)&&(employeeFilter==="todos"||e.employee_id===employeeFilter)&&(periodFilter==="todos"||e.period_id===periodFilter));
   const scoreTotals=visibleEvents.filter(e=>e.status==="active").reduce((acc,e)=>{if(e.direction==="positive")acc.positive+=e.score;if(e.direction==="negative")acc.negative+=e.score;if(e.is_star)acc.stars+=1;return acc;},{positive:0,negative:0,stars:0});
   const filteredDocs=documents.filter(d=>visibleIds.has(d.employee_id)&&(employeeFilter==="todos"||d.employee_id===employeeFilter));
   const filteredAudit=audit.filter(a=>visibleIds.has(a.employee_id)&&(employeeFilter==="todos"||a.employee_id===employeeFilter));
@@ -58,18 +59,19 @@ export function DiarioOcorrencias() {
 
   async function load(){
     setLoading(true);setError("");setNotice("");
-    const [e,o,d,a,t,cat]=await Promise.all([
+    const [e,o,d,a,t,cat,p]=await Promise.all([
       (supabase as any).from("employees").select("id,full_name,status,company_id,hire_date,termination_date").order("full_name"),
       (supabase as any).from("employee_life_events").select("*,employees(full_name)").order("event_date",{ascending:false}),
       (supabase as any).from("employee_document_records").select("*,employees(full_name)").order("due_date"),
       (supabase as any).from("employee_audit_history").select("*,employees(full_name)").order("event_date",{ascending:false}),
       (supabase as any).from("employee_checklist_templates").select("*").order("position").order("title"),
-      (supabase as any).from("employee_document_catalog").select("*").eq("active",true).order("name")
+      (supabase as any).from("employee_document_catalog").select("*").eq("active",true).order("name"),
+      (supabase as any).from("time_periods").select("id,start_date,end_date").order("start_date",{ascending:false})
     ]);
     if(e.error) setError("Não foi possível carregar funcionários: "+e.error.message);
     else setEmployees(e.data??[]);
-    if(o.error||d.error||a.error||t.error||cat.error) setError("O módulo está no repositório, mas parte das tabelas pode ainda não estar aplicada no Supabase. Detalhe: "+(o.error||d.error||a.error||t.error).message);
-    setEvents(o.data??[]);setDocuments(d.data??[]);setAudit(a.data??[]);setTemplates(t.data??[]);setDocCatalog(cat.data??[]);
+    if(o.error||d.error||a.error||t.error||cat.error||p.error) setError("O módulo está no repositório, mas parte das tabelas pode ainda não estar aplicada no Supabase. Detalhe: "+(o.error||d.error||a.error||t.error).message);
+    setEvents(o.data??[]);setDocuments(d.data??[]);setAudit(a.data??[]);setTemplates(t.data??[]);setDocCatalog(cat.data??[]);setPeriods(p.data??[]);\n    if(periodFilter==="todos"){const current=(p.data??[]).find((item:any)=>item.start_date<=today()&&item.end_date>=today());if(current)setPeriodFilter(current.id);}
     setLoading(false);
   }
   useEffect(()=>{void load();},[]);
@@ -78,7 +80,7 @@ export function DiarioOcorrencias() {
   async function saveEvent(){
     if(!eventForm.employee_id||!eventForm.event_date||!eventForm.title.trim()){setError("Preencha funcionário, data e título da ocorrência.");return;}
     setLoading(true);const user=await (supabase as any).auth.getUser();
-    const payload={employee_id:eventForm.employee_id,event_date:eventForm.event_date,category:eventForm.category.trim()||"Geral",direction:eventForm.direction,title:eventForm.title.trim(),description:eventForm.description.trim()||null,score:Number(eventForm.score),is_star:eventForm.is_star,source:"manual",created_by:user.data?.user?.id??null};
+    const period=periods.find(p=>eventForm.event_date>=p.start_date&&eventForm.event_date<=p.end_date);\n    const payload={employee_id:eventForm.employee_id,event_date:eventForm.event_date,period_id:period?.id??null,category:eventForm.category.trim()||"Geral",direction:eventForm.direction,title:eventForm.title.trim(),description:eventForm.description.trim()||null,score:Number(eventForm.score),is_star:eventForm.is_star,source:"manual",created_by:user.data?.user?.id??null};
     const result=editingEvent?await (supabase as any).from("employee_life_events").update(payload).eq("id",editingEvent.id):await (supabase as any).from("employee_life_events").insert(payload);
     setLoading(false);if(result.error){setError(result.error.message);return;}setEventOpen(false);setNotice("Ocorrência salva.");await load();
   }
@@ -127,7 +129,7 @@ export function DiarioOcorrencias() {
     <header className="border-b px-6 py-5"><div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-medium text-primary">Organização do RH</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Diário de Ocorrências</h1><p className="mt-1 text-sm text-muted-foreground">Registro da trajetória funcional, documentos, processos e auditoria.</p></div><button onClick={()=>void load()} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted"><RefreshCw className="h-4 w-4"/>Atualizar</button></div></header>
     <main className="mx-auto max-w-[1500px] space-y-5 px-6 py-6">
       {(error||notice)&&<div className={"rounded-lg border p-3 text-sm "+(error?"border-destructive/30 text-destructive":"border-primary/30 text-primary")}>{error||notice}</div>}
-      <Card className="p-4"><div className="grid gap-3 md:grid-cols-3"><label className="grid gap-1 text-sm"><span className="text-muted-foreground">Empresa</span><CompanyFilter value={companyFilter} onChange={v=>{setCompanyFilter(v);setEmployeeFilter("todos");}}/></label><label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select className="rounded-lg border bg-background px-3 py-2" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)}><option value="todos">Todos os funcionários</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência (ocorrências)</span><input type="month" className="rounded-lg border bg-background px-3 py-2" value={periodFilter} onChange={e=>setPeriodFilter(e.target.value)}/></label></div></Card>
+      <Card className="p-4"><div className="grid gap-3 md:grid-cols-3"><label className="grid gap-1 text-sm"><span className="text-muted-foreground">Empresa</span><CompanyFilter value={companyFilter} onChange={v=>{setCompanyFilter(v);setEmployeeFilter("todos");}}/></label><label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select className="rounded-lg border bg-background px-3 py-2" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)}><option value="todos">Todos os funcionários</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência (21 a 20)</span><select className="rounded-lg border bg-background px-3 py-2" value={periodFilter} onChange={e=>setPeriodFilter(e.target.value)}><option value="todos">Todas as competências</option>{periods.map(p=><option key={p.id} value={p.id}>{dateLabel(p.start_date)} a {dateLabel(p.end_date)}</option>)}</select></label></div></Card>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Card className="p-4"><p className="text-sm text-muted-foreground">Pontos positivos</p><p className="mt-1 text-2xl font-semibold text-emerald-600">{scoreTotals.positive}</p></Card><Card className="p-4"><p className="text-sm text-muted-foreground">Pontos negativos</p><p className="mt-1 text-2xl font-semibold text-rose-600">{scoreTotals.negative}</p></Card><Card className="p-4"><p className="text-sm text-muted-foreground">Saldo de pontos</p><p className="mt-1 text-2xl font-semibold">{scoreTotals.positive-scoreTotals.negative}</p></Card><Card className="p-4"><p className="text-sm text-muted-foreground">Destaques com estrela</p><p className="mt-1 flex items-center gap-2 text-2xl font-semibold"><Star className="h-5 w-5 fill-amber-400 text-amber-500"/>{scoreTotals.stars}</p></Card></div>
       <div className="flex flex-wrap gap-2 border-b pb-3">{tabs.map(t=>{const Icon=t.icon;return <button key={t.id} onClick={()=>setTab(t.id)} className={"inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm "+(tab===t.id?"bg-primary text-primary-foreground":"border hover:bg-muted")}><Icon className="h-4 w-4"/>{t.label}</button>})}</div>
       {loading&&<p className="text-sm text-muted-foreground">Carregando dados...</p>}
