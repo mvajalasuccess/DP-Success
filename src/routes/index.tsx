@@ -160,7 +160,8 @@ function AppShell({
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 shadow-sm backdrop-blur lg:hidden">
         <div className="flex min-w-0 items-center gap-2.5">
-          <img src="/grupo-success-logo.svg" alt="Grupo Success" className="h-9 w-auto max-w-[180px] object-contain" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Clock3 className="h-4 w-4" /></span>
+          <span className="truncate font-display text-sm font-bold tracking-tight">DP SUCCESS</span>
         </div>
         <button type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-haspopup="dialog" className="inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Menu className="h-4 w-4" /> Menu
@@ -172,7 +173,8 @@ function AppShell({
           <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl">
             <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
               <div className="flex items-center gap-3">
-                <img src="/grupo-success-logo.svg" alt="Grupo Success" className="h-10 w-auto max-w-[190px] object-contain" />
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></span>
+                <div><p className="font-display text-base font-bold">DP SUCCESS</p><p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">RH · DP · Gestão</p></div>
               </div>
               <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" aria-label="Fechar menu"><X className="h-5 w-5" /></button>
             </div>
@@ -206,7 +208,10 @@ function AppShell({
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
-            <img src="/grupo-success-logo.svg" alt="Grupo Success" className="h-8 w-auto max-w-[150px] object-contain" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Clock3 className="h-4 w-4" />
+            </div>
+            <span className="font-display text-base font-bold text-foreground">DP Success</span>
           </div>
         </div>
       )}
@@ -215,11 +220,25 @@ function AppShell({
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-sidebar-primary/80" />
           {!collapsed && (
             <div className="flex min-w-0 items-center gap-3">
-              <img src="/grupo-success-logo.svg" alt="Grupo Success" className="h-12 w-full max-w-[190px] object-contain object-left" />
+              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_0_22px_rgba(6,202,160,0.24)]">
+                <div className="absolute inset-1 rounded-xl border border-white/20" />
+                <Clock3 className="relative h-5 w-5" strokeWidth={2.2} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-1.5 leading-none">
+                  <span className="font-display text-[20px] font-extrabold tracking-[-0.04em] text-sidebar-foreground">DP</span>
+                  <span className="font-display text-[20px] font-extrabold tracking-[-0.04em] text-sidebar-primary">SUCCESS</span>
+                </div>
+                <div className="mt-2 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">
+                  <span>RH</span><span className="text-sidebar-primary/70">•</span><span>DP</span><span className="text-sidebar-primary/70">•</span><span>GESTÃO</span>
+                </div>
+              </div>
             </div>
           )}
           {collapsed && (
-            <img src="/grupo-success-logo.svg" alt="Grupo Success" className="h-10 w-10 object-contain" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_0_18px_rgba(6,202,160,0.22)]">
+              <Clock3 className="h-5 w-5" />
+            </div>
           )}
           <button
             type="button"
