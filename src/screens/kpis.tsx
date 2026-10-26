@@ -124,6 +124,7 @@ export function Kpis() {
   const [source, setSource] = useState("");
   const [bankBalance, setBankBalance] = useState(0);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
   const [interjornadaStatus, setInterjornadaStatus] = useState<"ativo" | "inativo" | "todos">("todos");
   const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<Array<{ periodId: string; label: string; rate: number; expected: number; lost: number }>>([]);
@@ -145,6 +146,7 @@ export function Kpis() {
 
       if (periodError || employeeError || holidayError) {
         setError(periodError?.message ?? employeeError?.message ?? holidayError?.message ?? "Não foi possível carregar os KPIs.");
+        setIsLoadingPage(false);
         return;
       }
 
@@ -184,6 +186,7 @@ export function Kpis() {
       const years = [...new Set(parsedPeriods.map(p => p.reference_year))].sort((a, b) => b - a);
       const firstYear = years[0];
       if (firstYear !== undefined) { setSelectedYear(firstYear); setAppliedYear(firstYear); }
+      setIsLoadingPage(false);
     })();
   }, []);
 
@@ -1405,7 +1408,7 @@ export function Kpis() {
         </section>
 
         <section className="mt-6" aria-label="Indicadores principais">
-          {isCalculating ? (
+          {isCalculating || isLoadingPage ? (
             <div className="kpi-band" aria-label="Carregando indicadores" aria-live="polite">
               {["principal", "secundario-1", "secundario-2", "secundario-3"].map((key, index) => (
                 <div key={key} className={index === 0 ? "kpi-primary" : "kpi-secondary"}>
@@ -1415,7 +1418,13 @@ export function Kpis() {
                 </div>
               ))}
             </div>
-          ) : !hasKpiData && !error ? (
+          ) : error ? (
+            <div className="border-y border-[var(--kpi-border)] bg-[var(--kpi-critical-soft)] px-5 py-5" role="alert">
+              <p className="text-sm font-semibold text-[var(--kpi-critical)]">Não foi possível carregar os indicadores</p>
+              <p className="mt-1 break-words text-[13px] text-[var(--kpi-text)]">{error}</p>
+              <p className="mt-2 text-[12px] text-[var(--kpi-text-muted)]">Confira os filtros e tente atualizar novamente. Os cálculos não foram alterados.</p>
+            </div>
+          ) : !hasKpiData ? (
             <div className="border-y border-[var(--kpi-border)] bg-[var(--kpi-surface)] px-5 py-7" role="status">
               <p className="text-sm font-semibold text-[var(--kpi-text)]">Sem dados para a seleção</p>
               <p className="mt-1 text-[13px] text-[var(--kpi-text-muted)]">Escolha outro ano, mês ou conjunto de filtros e clique em “Atualizar KPIs”.</p>
@@ -1436,10 +1445,8 @@ export function Kpis() {
         </section>
 
         <div className="mt-3 flex min-h-7 items-center justify-end gap-2 text-[12px] text-[var(--kpi-text-muted)]" aria-live="polite">
-          {isCalculating ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--kpi-border)] border-t-[var(--kpi-accent)]" /> Atualizando indicadores para os filtros selecionados</> : <span>Indicadores atualizados para os filtros aplicados</span>}
+          {isCalculating || isLoadingPage ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--kpi-border)] border-t-[var(--kpi-accent)]" /> Atualizando indicadores para os filtros selecionados</> : <span>Indicadores atualizados para os filtros aplicados</span>}
         </div>
-        {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
-
         {activeSection === "demograficos" && (
           <section id="kpi-panel-demograficos" role="tabpanel" aria-labelledby="kpi-tab-demograficos" tabIndex={0} className="mt-6 space-y-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             {(() => {
