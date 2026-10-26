@@ -11,11 +11,11 @@
  */
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
 
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
@@ -63,7 +63,7 @@
 }
 
 :root {
-  --radius: 1rem;
+  --radius: 2px;
 
   /* DP Success — #06CAA0 como assinatura, com base grafite e neutra */
   --background: oklch(0.978 0.006 160);
@@ -159,7 +159,7 @@
   :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
     color: var(--color-foreground);
     border-color: var(--color-input);
-    border-radius: 0.625rem;
+    border-radius: 2px;
     transition: border-color 140ms ease, box-shadow 140ms ease;
   }
 }
@@ -444,7 +444,7 @@ textarea:focus-visible {
   --kpi-warning-soft: oklch(0.96 0.045 80);
   --kpi-critical: oklch(0.48 0.15 27);
   --kpi-critical-soft: oklch(0.96 0.025 25);
-  --kpi-radius: 4px;
+  --kpi-radius: 2px;
   --kpi-control-height: 38px;
   --kpi-space-1: 4px;
   --kpi-space-2: 8px;
@@ -623,7 +623,7 @@ textarea:focus-visible {
 
 /* DP Success — padrões compartilhados de interface para todas as telas */
 :root {
-  --radius: 0.625rem;
+  --radius: 2px;
   --dp-page-gap: 1.25rem;
   --dp-control-height: 2.25rem;
   --dp-border: oklch(0.89 0.008 165);
@@ -668,4 +668,15 @@ tbody tr:hover td { background-color: oklch(0.975 0.006 165); }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* Política global de cantos: sem arredondamento decorativo no sistema. */
+:where(.rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl, .rounded-full) {
+  border-radius: 2px !important;
+}
+
+/* Elementos de interface com estilos próprios também seguem o limite global. */
+:where(button, input:not([type="checkbox"]):not([type="radio"]), select, textarea, [role="combobox"], [role="button"], [data-slot="card"]) {
+  border-radius: 2px;
 }
