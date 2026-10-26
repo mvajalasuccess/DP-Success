@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { balancesByEmployee, periodRangeLabel, type Period } from "@/lib/dp-model";
 import { countWorkingWeekdays } from "@/lib/feriados";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from "recharts";
 
 type Employee = {
   id: string;
@@ -1324,25 +1325,89 @@ export function Kpis() {
         {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
 
         {activeSection === "demograficos" && (
-          <section className="mt-6">
-            <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Idade, tempo de empresa e distribuição por sexo. Aplicam os filtros selecionados.</p></div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-<Card className="p-5"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.birthDate && (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))).map(e => { const d = new Date(e.birthDate + "T00:00:00"); const now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }).filter(n => n >= 0 && n < 120); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
-            <Card className="p-5"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-2xl font-bold">{(() => { const now = new Date(); const values = employees.filter(e => e.hireDate && (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))).map(e => Math.max(0, Math.floor(((e.terminationDate ? new Date(e.terminationDate + "T00:00:00") : now).getTime() - new Date(e.hireDate + "T00:00:00").getTime()) / 86400000))); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length / 365.25).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
-            <Card className="p-5"><p className="text-sm text-muted-foreground">Distribuição por sexo</p><div className="mt-2 space-y-1.5 text-sm">{(() => { const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))); const counts = new Map<string, number>(); base.forEach(e => { const label = e.gender === "feminino" ? "Feminino" : e.gender === "masculino" ? "Masculino" : e.gender === "outro" ? "Outro" : e.gender === "prefere_nao_informar" ? "Prefere não informar" : "Não informado"; counts.set(label, (counts.get(label) ?? 0) + 1); }); return [...counts.entries()].map(([label, count]) => <div key={label} className="flex justify-between gap-3"><span>{label}</span><strong>{count}</strong></div>); })()}</div></Card>
-            
-            </div>
+          <section className="mt-6 space-y-4">
+            {(() => {
+              const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)));
+              const today = new Date();
+              const ageOf = (birth: string) => { const d = new Date(birth + "T00:00:00"); return today.getFullYear() - d.getFullYear() - (today < new Date(today.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); };
+              const ages = base.filter(e => e.birthDate).map(e => ageOf(e.birthDate as string)).filter(n => n >= 0 && n < 120);
+              const tenure = base.filter(e => e.hireDate).map(e => Math.max(0, ((new Date((e.terminationDate || today.toISOString().slice(0,10)) + "T00:00:00").getTime() - new Date((e.hireDate as string) + "T00:00:00").getTime()) / 86400000) / 365.25));
+              const genderLabels = ["Feminino", "Masculino", "Outro", "Não informado"];
+              const genderColors = ["#ec4899", "#3b82f6", "#8b5cf6", "#94a3b8"];
+              const genderData = genderLabels.map((name, i) => ({ name, value: base.filter(e => i === 0 ? e.gender === "feminino" : i === 1 ? e.gender === "masculino" : i === 2 ? e.gender === "outro" : !e.gender || !["feminino","masculino","outro"].includes(e.gender)).length, fill: genderColors[i] })).filter(x => x.value > 0);
+              const ageData = [{ faixa: "Até 25", total: ages.filter(n => n <= 25).length }, { faixa: "26–35", total: ages.filter(n => n >= 26 && n <= 35).length }, { faixa: "36–45", total: ages.filter(n => n >= 36 && n <= 45).length }, { faixa: "46–55", total: ages.filter(n => n >= 46 && n <= 55).length }, { faixa: "56+", total: ages.filter(n => n >= 56).length }];
+              const tenureData = [{ faixa: "Menos de 1 ano", total: tenure.filter(n => n < 1).length }, { faixa: "1–3 anos", total: tenure.filter(n => n >= 1 && n < 3).length }, { faixa: "3–5 anos", total: tenure.filter(n => n >= 3 && n < 5).length }, { faixa: "5+ anos", total: tenure.filter(n => n >= 5).length }];
+              const deptData = [...new Set(base.map(e => e.department || "Sem setor"))].map(name => ({ setor: name, total: base.filter(e => (e.department || "Sem setor") === name).length })).sort((a,b) => b.total-a.total).slice(0,8);
+              const average = (values: number[]) => values.length ? values.reduce((a,b)=>a+b,0)/values.length : 0;
+              const ageAverage = average(ages);
+              const tenureAverage = average(tenure);
+              return <>
+                <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Explore a composição do quadro por sexo, idade, tempo de empresa e setor. Passe o cursor nos gráficos para ver os detalhes.</p></div>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-background p-5 dark:from-pink-950/30"><p className="text-sm text-muted-foreground">Funcionários na seleção</p><p className="mt-2 text-3xl font-bold">{base.length}</p><p className="mt-1 text-xs text-muted-foreground">Conforme os filtros aplicados</p></Card>
+                  <Card className="border-violet-200 bg-gradient-to-br from-violet-50 to-background p-5 dark:from-violet-950/30"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-3xl font-bold">{ages.length ? ageAverage.toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos" : "Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">{ages.length} cadastro(s) com nascimento</p></Card>
+                  <Card className="border-sky-200 bg-gradient-to-br from-sky-50 to-background p-5 dark:from-sky-950/30"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-3xl font-bold">{tenure.length ? tenureAverage.toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos" : "Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">{tenure.length} cadastro(s) com admissão</p></Card>
+                  <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-background p-5 dark:from-emerald-950/30"><p className="text-sm text-muted-foreground">Dados de nascimento preenchidos</p><p className="mt-2 text-3xl font-bold">{base.length ? Math.round(ages.length/base.length*100) : 0}%</p><p className="mt-1 text-xs text-muted-foreground">{base.length-ages.length} cadastro(s) sem idade calculável</p></Card>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <Card className="p-5"><h3 className="font-bold">Distribuição por sexo</h3><p className="text-xs text-muted-foreground">Quantidade e proporção de cada categoria cadastrada.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={genderData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={88} innerRadius={48} paddingAngle={3} label={({name,percent})=>`${name} ${((percent||0)*100).toFixed(0)}%`}><Cell fill="#ec4899"/><Cell fill="#3b82f6"/><Cell fill="#8b5cf6"/><Cell fill="#94a3b8"/></Pie><Tooltip formatter={(value: number) => [value, "Funcionários"]}/><Legend /></PieChart></ResponsiveContainer></div>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Faixas etárias</h3><p className="text-xs text-muted-foreground">Distribuição por idade; considera apenas cadastros com data de nascimento válida.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={ageData} margin={{top:12,right:8,left:-18,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar dataKey="total" name="Funcionários" radius={[7,7,0,0]}>{ageData.map((_,i)=><Cell key={i} fill={["#f97316","#eab308","#22c55e","#06b6d4","#6366f1"][i]}/>)}</Bar></BarChart></ResponsiveContainer></div>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Tempo de empresa</h3><p className="text-xs text-muted-foreground">Faixas calculadas a partir da admissão até hoje ou até o desligamento cadastrado.</p>
+                    <div className="mt-3 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={tenureData} layout="vertical" margin={{top:4,right:16,left:24,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="faixa" width={105} tick={{fontSize:11}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar dataKey="total" name="Funcionários" radius={[0,7,7,0]}>{tenureData.map((_,i)=><Cell key={i} fill={["#14b8a6","#0ea5e9","#a855f7","#f43f5e"][i]}/>)}</Bar></BarChart></ResponsiveContainer></div>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Funcionários por setor</h3><p className="text-xs text-muted-foreground">Até 8 setores com maior número de pessoas na seleção.</p>
+                    <div className="mt-3 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptData} layout="vertical" margin={{top:4,right:16,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar dataKey="total" name="Funcionários" fill="#8b5cf6" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
+                  </Card>
+                </div>
+                <p className="text-xs text-muted-foreground">Os gráficos usam os dados cadastrados dos funcionários e respeitam empresa, setor e seleção de funcionários após clicar em “Atualizar KPIs”.</p>
+              </>;
+            })()}
           </section>
         )}
 
         {activeSection === "salariais" && (
-          <section className="mt-6">
-            <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Média salarial e valores mensais de pensão cadastrados, conforme os filtros selecionados.</p></div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-<Card className="p-5"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.salary != null && e.salary > 0 && (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))).map(e => e.salary as number); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Sem dados"; })()}</p></Card>
-              <Card className="p-5"><p className="text-sm text-muted-foreground">Funcionários com pensão</p><p className="mt-2 text-2xl font-bold">{employees.filter(e => e.pensionAmount > 0 && (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))).length}</p><p className="mt-1 text-xs text-muted-foreground">Quantidade de funcionários com pensão alimentícia cadastrada.</p></Card>
-            
-            </div>
+          <section className="mt-6 space-y-4">
+            {(() => {
+              const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)));
+              const salaries = base.filter(e => e.salary != null && e.salary > 0).map(e => ({...e, salary: Number(e.salary)}));
+              const avg = salaries.length ? salaries.reduce((s,e)=>s+(e.salary||0),0)/salaries.length : 0;
+              const totalPayroll = salaries.reduce((s,e)=>s+(e.salary||0),0);
+              const pensioned = base.filter(e=>e.pensionAmount>0);
+              const pensionTotal = pensioned.reduce((s,e)=>s+e.pensionAmount,0);
+              const money = (n:number) => n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+              const salaryRanges = [{faixa:"Até R$ 2 mil",total:salaries.filter(e=>(e.salary||0)<=2000).length},{faixa:"R$ 2–3 mil",total:salaries.filter(e=>(e.salary||0)>2000&&(e.salary||0)<=3000).length},{faixa:"R$ 3–5 mil",total:salaries.filter(e=>(e.salary||0)>3000&&(e.salary||0)<=5000).length},{faixa:"R$ 5–8 mil",total:salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000).length},{faixa:"Acima de R$ 8 mil",total:salaries.filter(e=>(e.salary||0)>8000).length}];
+              const deptSalaries = [...new Set(salaries.map(e=>e.department||"Sem setor"))].map(setor=>{const values=salaries.filter(e=>(e.department||"Sem setor")===setor);return {setor,media:values.reduce((s,e)=>s+(e.salary||0),0)/values.length,quantidade:values.length};}).sort((a,b)=>b.media-a.media).slice(0,10);
+              const topSalaries = [...salaries].sort((a,b)=>(b.salary||0)-(a.salary||0)).slice(0,8).map(e=>({funcionario:e.name,salario:e.salary||0}));
+              const salaryColors = ["#06b6d4","#8b5cf6","#f97316","#22c55e","#ec4899"];
+              return <>
+                <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Visão interativa da folha cadastrada, faixas salariais, diferenças entre setores e pensões alimentícias. Valores respeitam os filtros aplicados.</p></div>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <Card className="border-cyan-200 bg-gradient-to-br from-cyan-50 to-background p-5 dark:from-cyan-950/30"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{salaries.length?money(avg):"Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">Base de {salaries.length} salário(s) cadastrado(s)</p></Card>
+                  <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50 to-background p-5 dark:from-indigo-950/30"><p className="text-sm text-muted-foreground">Folha mensal estimada</p><p className="mt-2 text-2xl font-bold">{money(totalPayroll)}</p><p className="mt-1 text-xs text-muted-foreground">Soma dos salários cadastrados, sem encargos</p></Card>
+                  <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-background p-5 dark:from-rose-950/30"><p className="text-sm text-muted-foreground">Funcionários com pensão</p><p className="mt-2 text-2xl font-bold">{pensioned.length}</p><p className="mt-1 text-xs text-muted-foreground">Com valor mensal maior que zero</p></Card>
+                  <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-background p-5 dark:from-emerald-950/30"><p className="text-sm text-muted-foreground">Total mensal de pensões</p><p className="mt-2 text-2xl font-bold">{money(pensionTotal)}</p><p className="mt-1 text-xs text-muted-foreground">Soma dos valores informados no cadastro</p></Card>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <Card className="p-5"><h3 className="font-bold">Distribuição por faixa salarial</h3><p className="text-xs text-muted-foreground">Quantidade de funcionários em cada intervalo.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={salaryRanges} margin={{top:12,right:8,left:-18,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}} interval={0} angle={-12} textAnchor="end" height={55}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar dataKey="total" name="Funcionários" radius={[7,7,0,0]}>{salaryRanges.map((_,i)=><Cell key={i} fill={salaryColors[i]}/>)}</Bar></BarChart></ResponsiveContainer></div>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Salário médio por setor</h3><p className="text-xs text-muted-foreground">Até 10 setores, ordenados pela média salarial cadastrada.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptSalaries} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[money(value),"Salário médio"]}/><Bar dataKey="media" name="Salário médio" fill="#8b5cf6" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Maiores salários cadastrados</h3><p className="text-xs text-muted-foreground">Até 8 registros de maior valor na seleção atual.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={topSalaries} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><YAxis type="category" dataKey="funcionario" width={140} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[money(value),"Salário"]}/><Bar dataKey="salario" name="Salário" fill="#f97316" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Composição salarial da seleção</h3><p className="text-xs text-muted-foreground">Distribuição dos salários por setor, considerando os 8 maiores totais.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={[...new Set(salaries.map(e=>e.department||"Sem setor"))].map(setor=>({name:setor,value:salaries.filter(e=>(e.department||"Sem setor")===setor).reduce((s,e)=>s+(e.salary||0),0)})).sort((a,b)=>b.value-a.value).slice(0,8)} dataKey="value" nameKey="name" cx="50%" cy="48%" outerRadius={92} label={({name,percent})=>`${String(name).slice(0,14)} ${((percent||0)*100).toFixed(0)}%`}><Cell fill="#06b6d4"/><Cell fill="#8b5cf6"/><Cell fill="#f97316"/><Cell fill="#22c55e"/><Cell fill="#ec4899"/><Cell fill="#eab308"/><Cell fill="#3b82f6"/><Cell fill="#14b8a6"/></Pie><Tooltip formatter={(value:number)=>[money(value),"Total salarial"]}/><Legend/></PieChart></ResponsiveContainer></div>
+                  </Card>
+                </div>
+                <p className="text-xs text-muted-foreground">A folha mensal estimada é apenas a soma dos salários cadastrados: não inclui encargos, benefícios, adicionais ou descontos. Os gráficos exibem dados de cadastro, não recalculam fechamentos nem alteram pagamentos.</p>
+              </>;
+            })()}
           </section>
         )}
         {activeSection === "absenteismo" && (
