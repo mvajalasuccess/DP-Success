@@ -205,7 +205,7 @@ export function Kpis() {
   const employeeWasActiveInSelection = (employee: Employee) =>
     selectedPeriodsForEmployees.some(period =>
       (!employee.hireDate || employee.hireDate <= period.end_date) &&
-      (!employee.terminationDate || employee.terminationDate >= period.start_date)
+      (!employee.terminationDate || employee.terminationDate > period.end_date)
     );
 
   const employeeOptions = useMemo(
@@ -1321,13 +1321,13 @@ export function Kpis() {
     : activeSection === "turnover"
     ? [
         { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: `[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100. Faixas gerenciais: atenção a partir de ${turnoverThresholds.attention}% e crítico a partir de ${turnoverThresholds.critical}%.`, primary: true },
-        { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: "Ativos na competência selecionada", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
+        { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: appliedMonth === "todos" ? "Pessoas distintas no período selecionado" : "Quadro ativo da competência", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
         { label: "Admissões", value: String(metrics.admissions), support: "Dentro do período selecionado", tone: "neutral", title: "Admissões com data dentro do período selecionado." },
         { label: "Desligamentos", value: String(metrics.terminations), support: "Dentro do período selecionado", tone: "neutral", title: "Desligamentos com data dentro do período selecionado." },
       ]
     : [
         { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: `${fmt(metrics.absenceMinutes)} perdidas / ${fmt(metrics.expected)} previstas`, tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100. Referência gerencial: atenção a partir de 3% e crítico a partir de 5%.", primary: true },
-        { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: "Ativos na competência selecionada", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
+        { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: appliedMonth === "todos" ? "Pessoas distintas no período selecionado" : "Quadro ativo da competência", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
         { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: `[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100. Faixas gerenciais: atenção a partir de ${turnoverThresholds.attention}% e crítico a partir de ${turnoverThresholds.critical}%.` },
         { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: "neutral", title: "Saldo acumulado no Banco de Horas até o fim do período selecionado." },
       ];
