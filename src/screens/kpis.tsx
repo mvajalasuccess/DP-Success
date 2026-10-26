@@ -540,7 +540,7 @@ export function Kpis() {
         addOvertime(
           row,
           employees.find(e => e.id === row.employee_id),
-          Math.abs(Number(row.minutes || 0)),
+          Number(row.minutes || 0),
           String(row.launch_type ?? ""),
         );
       }
@@ -867,7 +867,7 @@ export function Kpis() {
         item.total = item.he60 + item.he60Night + item.he100 + item.he100Night + item.he20 + item.interjornada;
       }
 
-      const comparisonRows = [...comparison.values()].filter(item => item.total > 0).sort((a, b) => b.total - a.total);
+      const comparisonRows = [...comparison.values()].filter(item => item.total !== 0).sort((a, b) => b.total - a.total);
       next.he60 = comparisonRows.reduce((sum, row) => sum + row.he60, 0);
       next.he60Night = comparisonRows.reduce((sum, row) => sum + row.he60Night, 0);
       next.he100 = comparisonRows.reduce((sum, row) => sum + row.he100, 0);
