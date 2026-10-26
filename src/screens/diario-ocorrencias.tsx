@@ -71,7 +71,8 @@ export function DiarioOcorrencias() {
     if(e.error) setError("Não foi possível carregar funcionários: "+e.error.message);
     else setEmployees(e.data??[]);
     if(o.error||d.error||a.error||t.error||cat.error||p.error) setError("O módulo está no repositório, mas parte das tabelas pode ainda não estar aplicada no Supabase. Detalhe: "+(o.error||d.error||a.error||t.error).message);
-    setEvents(o.data??[]);setDocuments(d.data??[]);setAudit(a.data??[]);setTemplates(t.data??[]);setDocCatalog(cat.data??[]);setPeriods(p.data??[]);\n    if(periodFilter==="todos"){const current=(p.data??[]).find((item:any)=>item.start_date<=today()&&item.end_date>=today());if(current)setPeriodFilter(current.id);}
+    setEvents(o.data??[]);setDocuments(d.data??[]);setAudit(a.data??[]);setTemplates(t.data??[]);setDocCatalog(cat.data??[]);setPeriods(p.data??[]);
+    if(periodFilter==="todos"){const current=(p.data??[]).find((item:any)=>item.start_date<=today()&&item.end_date>=today());if(current)setPeriodFilter(current.id);}
     setLoading(false);
   }
   useEffect(()=>{void load();},[]);
@@ -80,7 +81,8 @@ export function DiarioOcorrencias() {
   async function saveEvent(){
     if(!eventForm.employee_id||!eventForm.event_date||!eventForm.title.trim()){setError("Preencha funcionário, data e título da ocorrência.");return;}
     setLoading(true);const user=await (supabase as any).auth.getUser();
-    const period=periods.find(p=>eventForm.event_date>=p.start_date&&eventForm.event_date<=p.end_date);\n    const payload={employee_id:eventForm.employee_id,event_date:eventForm.event_date,period_id:period?.id??null,category:eventForm.category.trim()||"Geral",direction:eventForm.direction,title:eventForm.title.trim(),description:eventForm.description.trim()||null,score:Number(eventForm.score),is_star:eventForm.is_star,source:"manual",created_by:user.data?.user?.id??null};
+    const period=periods.find(p=>eventForm.event_date>=p.start_date&&eventForm.event_date<=p.end_date);
+    const payload={employee_id:eventForm.employee_id,event_date:eventForm.event_date,period_id:period?.id??null,category:eventForm.category.trim()||"Geral",direction:eventForm.direction,title:eventForm.title.trim(),description:eventForm.description.trim()||null,score:Number(eventForm.score),is_star:eventForm.is_star,source:"manual",created_by:user.data?.user?.id??null};
     const result=editingEvent?await (supabase as any).from("employee_life_events").update(payload).eq("id",editingEvent.id):await (supabase as any).from("employee_life_events").insert(payload);
     setLoading(false);if(result.error){setError(result.error.message);return;}setEventOpen(false);setNotice("Ocorrência salva.");await load();
   }
