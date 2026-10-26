@@ -1296,28 +1296,14 @@ export function Kpis() {
         {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
 
         <section className="mt-6">
+          <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-xl font-bold">Indicadores demográficos e salariais</h2><p className="mt-1 text-sm text-muted-foreground">Aplicam os filtros de empresa, setor e funcionários selecionados.</p></div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Card className="p-5">
-              <Users className="h-5 w-5 text-primary" />
-              <p className="mt-4 text-sm text-muted-foreground">Funcionários no período</p>
-              <p className="mt-1 text-3xl font-bold">{Math.round(metrics.employees)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">ativos na competência selecionada</p>
-            </Card>
-            <Card className="p-5">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <p className="mt-4 text-sm text-muted-foreground">Absenteísmo</p>
-              <p className="mt-1 text-3xl font-bold">{pct(absenteeismRate)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{fmt(metrics.absenceMinutes)} perdidas / {fmt(metrics.expected)} previstas</p>
-            </Card>
-            <Card className="p-5">
-              <Percent className="h-5 w-5 text-primary" />
-              <p className="mt-4 text-sm text-muted-foreground">Turnover</p>
-              <p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p>
-            </Card>
-           </div>
+            <Card className="p-5"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.birthDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => { const d = new Date(e.birthDate + "T00:00:00"); const now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }).filter(n => n >= 0 && n < 120); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
+            <Card className="p-5"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-2xl font-bold">{(() => { const now = new Date(); const values = employees.filter(e => e.hireDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => Math.max(0, Math.floor(((e.terminationDate ? new Date(e.terminationDate + "T00:00:00") : now).getTime() - new Date(e.hireDate + "T00:00:00").getTime()) / 86400000))); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length / 365.25).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
+            <Card className="p-5"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.salary != null && e.salary > 0 && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => e.salary as number); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Sem dados"; })()}</p></Card>
+            <Card className="p-5"><p className="text-sm text-muted-foreground">Sexo e pensão</p><p className="mt-2 text-sm font-medium">Campos não disponíveis no cadastro atual</p><p className="mt-1 text-xs text-muted-foreground">Precisam ser registrados no cadastro para gerar indicadores confiáveis.</p></Card>
+          </div>
         </section>
-
         {activeSection === "absenteismo" && (
           <section className="mt-6">
           <div className="flex items-end justify-between gap-4">
