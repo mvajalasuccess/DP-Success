@@ -1009,22 +1009,40 @@ function DashboardHome() {
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Ocorrências da competência</p>
               <h2 className="mt-1 text-xl font-bold">Horas por tipo de ocorrência</h2>
               <p className="mt-1 text-xs text-muted-foreground">Comparativo de horas de faltas, folgas, atestados e declarações, considerando a competência e a empresa selecionadas.</p>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {occurrenceHours.map(item => {
-                  const maxMinutes = Math.max(1, ...occurrenceHours.map(value => value.minutes));
-                  const width = Math.min(100, (item.minutes / maxMinutes) * 100);
-                  return (
-                    <div key={item.name} className="min-w-0 rounded-xl border bg-background p-4">
-                      <div className="flex min-h-10 items-start justify-between gap-2">
-                        <span className="text-sm font-medium">{item.name}</span>
-                        <span className="shrink-0 text-sm font-bold tabular-nums">{fmt(item.minutes)}</span>
-                      </div>
-                      <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-primary/75 transition-all" style={{ width: width + "%" }} />
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="mt-5 grid items-center gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
+                <div className="relative mx-auto h-52 w-52">
+                  <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90" role="img" aria-label="Gráfico de rosca das horas por tipo de ocorrência">
+                    {(() => {
+                      const colors = ["#06CAA0", "#3B82F6", "#8B5CF6", "#F59E0B"];
+                      const total = occurrenceHours.reduce((sum, item) => sum + item.minutes, 0);
+                      let offset = 0;
+                      return occurrenceHours.map((item, index) => {
+                        const fraction = total > 0 ? item.minutes / total : 0;
+                        const dash = fraction * 2 * Math.PI * 72;
+                        const circle = <circle key={item.name} cx="100" cy="100" r="72" fill="none" stroke={colors[index]} strokeWidth="28" strokeDasharray={`${dash} ${2 * Math.PI * 72 - dash}`} strokeDashoffset={-offset} />;
+                        offset += dash;
+                        return circle;
+                      });
+                    })()}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xs text-muted-foreground">Total de horas</span>
+                    <span className="text-xl font-bold tabular-nums">{fmt(occurrenceHours.reduce((sum, item) => sum + item.minutes, 0))}</span>
+                  </div>
+                </div>
+                <div className="min-w-0 space-y-3">
+                  {occurrenceHours.map((item, index) => {
+                    const colors = ["#06CAA0", "#3B82F6", "#8B5CF6", "#F59E0B"];
+                    const total = occurrenceHours.reduce((sum, value) => sum + value.minutes, 0);
+                    const percent = total > 0 ? Math.round(item.minutes / total * 100) : 0;
+                    return <div key={item.name} className="flex items-center gap-3 border-b pb-3 last:border-0">
+                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: colors[index] }} />
+                      <span className="min-w-0 flex-1 text-sm font-medium">{item.name}</span>
+                      <span className="text-sm font-semibold tabular-nums">{fmt(item.minutes)}</span>
+                      <span className="w-10 text-right text-xs text-muted-foreground">{percent}%</span>
+                    </div>;
+                  })}
+                </div>
               </div>
             </Card>
           </section>
@@ -1057,23 +1075,46 @@ function DashboardHome() {
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Controle de horas</p>
               <h2 className="mt-1 text-xl font-bold">Débitos individuais na competência</h2>
               <p className="mt-1 text-xs text-muted-foreground">Débitos registrados por funcionário na competência selecionada.</p>
-              <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
-                {individualDebits.map(item => {
-                  const maxMinutes = Math.max(1, ...individualDebits.map(value => value.minutes));
-                  const width = Math.min(100, (item.minutes / maxMinutes) * 100);
-                  return (
-                    <div key={item.name} className="border-b pb-2 last:border-0">
-                      <div className="flex items-center justify-between gap-3 text-sm">
-                        <span className="min-w-0 truncate font-medium">{item.name}</span>
-                        <span className="shrink-0 font-semibold tabular-nums">{fmt(item.minutes)}</span>
-                      </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-amber-500/80" style={{ width: width + "%" }} />
-                      </div>
-                    </div>
-                  );
-                })}
-                {!individualDebits.length && <p className="py-5 text-sm text-muted-foreground">Nenhum débito individual registrado nesta competência.</p>}
+              <div className="mt-4 grid min-h-0 flex-1 items-center gap-4 sm:grid-cols-[170px_minmax(0,1fr)]">
+                <div className="relative mx-auto h-40 w-40">
+                  <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90" role="img" aria-label="Gráfico de rosca dos débitos por funcionário">
+                    {(() => {
+                      const top = individualDebits.slice(0, 5);
+                      const other = individualDebits.slice(5).reduce((sum, item) => sum + item.minutes, 0);
+                      const values = [...top, ...(other > 0 ? [{ name: "Outros", minutes: other }] : [])];
+                      const colors = ["#06CAA0", "#3B82F6", "#8B5CF6", "#F97316", "#EF4444", "#FBBF24"];
+                      const total = values.reduce((sum, item) => sum + item.minutes, 0);
+                      let offset = 0;
+                      return values.map((item, index) => {
+                        const fraction = total > 0 ? item.minutes / total : 0;
+                        const dash = fraction * 2 * Math.PI * 72;
+                        const circle = <circle key={item.name} cx="100" cy="100" r="72" fill="none" stroke={colors[index % colors.length]} strokeWidth="28" strokeDasharray={`${dash} ${2 * Math.PI * 72 - dash}`} strokeDashoffset={-offset} />;
+                        offset += dash;
+                        return circle;
+                      });
+                    })()}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xs text-muted-foreground">Total débitos</span>
+                    <span className="text-lg font-bold tabular-nums">{fmt(individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
+                  </div>
+                </div>
+                <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
+                  {(() => {
+                    const top = individualDebits.slice(0, 5);
+                    const other = individualDebits.slice(5).reduce((sum, item) => sum + item.minutes, 0);
+                    const values = [...top, ...(other > 0 ? [{ name: "Outros", minutes: other }] : [])];
+                    const colors = ["#06CAA0", "#3B82F6", "#8B5CF6", "#F97316", "#EF4444", "#FBBF24"];
+                    const total = values.reduce((sum, item) => sum + item.minutes, 0);
+                    return values.map((item, index) => <div key={item.name} className="flex items-center gap-2 border-b pb-2 text-sm last:border-0">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />
+                      <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                      <span className="shrink-0 font-semibold tabular-nums">{fmt(item.minutes)}</span>
+                      <span className="w-9 text-right text-xs text-muted-foreground">{total > 0 ? Math.round(item.minutes / total * 100) : 0}%</span>
+                    </div>);
+                  })()}
+                  {!individualDebits.length && <p className="py-5 text-sm text-muted-foreground">Nenhum débito individual registrado nesta competência.</p>}
+                </div>
               </div>
               <div className="mt-4 border-t pt-3">
                 <div className="flex items-center justify-between gap-3 text-sm">
