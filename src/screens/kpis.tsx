@@ -38,6 +38,7 @@ type Metrics = {
   absenceMinutes: number;
   faltasMinutes: number;
   faltasDays: number;
+  folgasDays: number;
   atestadosMinutes: number;
   atestadosDays: number;
   declaracoesMinutes: number;
@@ -56,7 +57,7 @@ type Metrics = {
 };
 
 const emptyMetrics: Metrics = {
-  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, faltasDays: 0, atestadosMinutes: 0, atestadosDays: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0,
+  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, faltasDays: 0, folgasDays: 0, atestadosMinutes: 0, atestadosDays: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0,
   he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0,
   interjornada: 0, turnover: 0, admissions: 0, terminations: 0, activeHeadcount: 0,
 };
@@ -547,7 +548,14 @@ export function Kpis() {
           next.abonosMinutes += minutes;
           next.absenceMinutes += minutes;
           currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
-        } else if (code === "abono" || code === "folga_abonada") {
+        } else if (code === "folga_abonada" || code === "folga_descontada" || code === "folga") {
+          next.folgasDays += isDayBased ? quantity : minutes / Math.max(1, dailyMinutes);
+          // Folga descontada é visual apenas e não altera abonos, banco ou cálculos.
+          if (code === "folga_descontada" || code === "folga") continue;
+          next.abonosMinutes += minutes;
+          next.absenceMinutes += minutes;
+          currentLostByKey.set(key, (currentLostByKey.get(key) ?? 0) + minutes);
+        } else if (code === "abono") {
           // Abono entra nas horas perdidas e também reduz as horas trabalhadas.
           next.abonosMinutes += minutes;
           next.absenceMinutes += minutes;
@@ -1391,9 +1399,9 @@ export function Kpis() {
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p></Card>
+            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Folgas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.folgasDays)}</p></Card>
             <Card className="p-5"><FileText className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p></Card>
-            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
-            <Card className="p-5"><Clock3 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Horas previstas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.expected)}</p></Card>
+            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações de horas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
