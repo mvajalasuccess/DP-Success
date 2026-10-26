@@ -171,7 +171,7 @@ export function Employees() {
       if (bank.error) setError("Funcionário criado, mas o saldo inicial não pôde ser lançado: " + bank.error.message);
     }
 
-    setForm({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo" });
+    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "0", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
     setOpen(false);
     setSaving(false);
     await loadEmployees();
