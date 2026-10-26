@@ -205,7 +205,7 @@ export function Kpis() {
   const employeeWasActiveInSelection = (employee: Employee) =>
     selectedPeriodsForEmployees.some(period =>
       (!employee.hireDate || employee.hireDate <= period.end_date) &&
-      (!employee.terminationDate || employee.terminationDate > period.end_date)
+      (!employee.terminationDate || employee.terminationDate >= period.start_date)
     );
 
   const employeeOptions = useMemo(
@@ -825,7 +825,7 @@ export function Kpis() {
 
         return allowedEmployees.filter(employee =>
           (!employee.hireDate || employee.hireDate <= period.end_date) &&
-          (!employee.terminationDate || employee.terminationDate >= period.start_date)
+          (!employee.terminationDate || employee.terminationDate > period.end_date)
         ).length;
       });
 
