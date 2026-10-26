@@ -99,7 +99,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   const showValue = (key: string, value: unknown) => {
     if (value == null || value === "") return "—";
     const raw = String(value);
-    if (/(date|_date|start_date|end_date)/i.test(key) && /^\\d{4}-\\d{2}-\\d{2}/.test(raw)) return formatDate(raw.slice(0, 10));
+    if (/(date|_date|start_date|end_date)/i.test(key) && /^\d{4}-\d{2}-\d{2}/.test(raw)) return formatDate(raw.slice(0, 10));
     if (typeof value === "number" && /value|valor/i.test(key)) return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     return raw;
   };
@@ -813,61 +813,71 @@ export function Relatorios() {
       if (companyEmployeeError) throw companyEmployeeError;
       const allowedEmployeeIds = new Set((companyEmployeeRows ?? []).filter((employee: any) => !companyFilter || employee.company_id === companyFilter).map((employee: any) => String(employee.id)));
       if (kind === "fechamento") {
-        if (!competence) throw new Error("Selecione uma competência para exportar.");
-        const rows = await loadClosingRows(db, competence, companyFilter);
-        if (!rows.length) throw new Error("Não há funcionários ou lançamentos para exportar nessa competência.");
-        await downloadClosingExcel(competence, rows);
+        const targetPeriods = allCompetencies ? periods : competence ? [competence] : [];
+        if (!targetPeriods.length) throw new Error("Não há competências para exportar.");
+        const pdfRows: any[] = [];
+        let exported = 0;
+        for (const targetPeriod of targetPeriods) {
+          const rows = await loadClosingRows(db, targetPeriod, companyFilter);
+          if (!rows.length) continue;
+          const ref = String(targetPeriod.reference_month).padStart(2, "0") + "/" + targetPeriod.reference_year;
+          pdfRows.push(...rows.map((row: any) => ({ Competência: ref, Funcionário: row.employee_name, Matrícula: row.registration, Departamento: row.department_name, Cargo: row.position_name, "Horas previstas": minutesToHours(row.expected_minutes), "Horas trabalhadas": minutesToHours(row.worked_minutes), "Faltas (dias)": row.absence_quantity, "Atestados (min)": row.certificate_minutes, "Declarações (min)": row.declaration_minutes, "Abonos (min)": row.allowance_minutes, "Débito (min)": row.debit_minutes, "HE 60% (min)": row.he_60_minutes, "HE 60% + 20% (min)": row.he_60_night_minutes, "HE 100% (min)": row.he_100_minutes, "HE 20% (min)": row.he_20_minutes, "Interjornada (min)": row.interjornada_minutes })));
+          if (format === "excel") { await downloadClosingExcel(targetPeriod, rows); exported++; }
+        }
+        if (!pdfRows.length) throw new Error("Não há funcionários ou lançamentos para exportar nas competências selecionadas.");
+        if (format === "pdf") downloadReportPdf("Fechamento de ponto", pdfRows, allCompetencies ? "Todas as competências" : "Competência: " + formatDate(competence!.start_date) + " a " + formatDate(competence!.end_date));
         return;
       }
 
       if (kind === "banco") {
-        if (!competence) throw new Error("Selecione uma competência para exportar.");
+        const targetPeriods = allCompetencies ? periods : competence ? [competence] : [];
+        if (!targetPeriods.length) throw new Error("Não há competências para exportar.");
         const { data: employeeRows, error: employeeError } = await db
           .from("employees")
           .select("id,full_name,registration,status,hire_date,termination_date,company_id,departments(name)")
           .order("full_name");
         if (employeeError) throw employeeError;
-
-        // Mantém funcionários ativos e inativos que participaram da competência selecionada,
-        // como na tela Banco de Horas; não inclui quem ainda não havia sido admitido.
-        const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
-          (!companyFilter || employee.company_id === companyFilter) &&
-          (!employee.hire_date || employee.hire_date <= competence.end_date) &&
-          (!employee.termination_date || employee.termination_date >= competence.start_date)
-        );
-        if (!employeesInPeriod.length) throw new Error("Não há funcionários para exportar nessa competência.");
-
-        // Usa o cálculo central do Banco de Horas para respeitar BASE histórica,
-        // overrides, ajustes manuais, pagamentos e saldos especiais já validados.
-        const balancesById = await balancesByEmployees(employeesInPeriod.map((employee: any) => String(employee.id)));
-        const bankRows = employeesInPeriod.map((employee: any) => {
-          const balance = (balancesById[String(employee.id)] ?? []).find((item: any) => item.period.id === competence.id);
-          if (!balance) return null;
-          return {
-            registration: employee.registration ?? "",
-            employee_name: employee.full_name ?? "",
-            status_label: String(employee.status ?? "ativo").toLowerCase() === "inativo" ? "Inativo" : "Ativo",
-            department_name: employee.departments?.name ?? "",
-            month_balance: balance.monthBalance,
-            accumulated_balance: balance.accumulated,
-            he60: balance.composition.HE_60,
-            he60Night: balance.composition.HE_60_NOTURNO,
-            he100: balance.composition.HE_100,
-            he100Night: balance.composition.HE_100_NOTURNO,
-            night20: balance.composition.ADICIONAL_NOTURNO,
-            debit: balance.composition.debit,
-            adjustment: balance.adjustment,
-            payment_minutes: balance.paymentMinutes,
-            interjornada: balance.composition.INTERJORNADA_50,
-          };
-        }).filter(Boolean);
-        if (!bankRows.length) throw new Error("Não há saldos calculados para a competência selecionada.");
-        await downloadBankHoursExcel(competence, bankRows);
+        const pdfRows: any[] = [];
+        for (const targetPeriod of targetPeriods) {
+          const employeesInPeriod = (employeeRows ?? []).filter((employee: any) =>
+            (!companyFilter || employee.company_id === companyFilter) &&
+            (!employee.hire_date || employee.hire_date <= targetPeriod.end_date) &&
+            (!employee.termination_date || employee.termination_date >= targetPeriod.start_date)
+          );
+          if (!employeesInPeriod.length) continue;
+          const balancesById = await balancesByEmployees(employeesInPeriod.map((employee: any) => String(employee.id)));
+          const bankRows = employeesInPeriod.map((employee: any) => {
+            const balance = (balancesById[String(employee.id)] ?? []).find((item: any) => item.period.id === targetPeriod.id);
+            if (!balance) return null;
+            return {
+              registration: employee.registration ?? "",
+              employee_name: employee.full_name ?? "",
+              status_label: String(employee.status ?? "ativo").toLowerCase() === "inativo" ? "Inativo" : "Ativo",
+              department_name: employee.departments?.name ?? "",
+              month_balance: balance.monthBalance,
+              accumulated_balance: balance.accumulated,
+              he60: balance.composition.HE_60,
+              he60Night: balance.composition.HE_60_NOTURNO,
+              he100: balance.composition.HE_100,
+              he100Night: balance.composition.HE_100_NOTURNO,
+              night20: balance.composition.ADICIONAL_NOTURNO,
+              debit: balance.composition.debit,
+              adjustment: balance.adjustment,
+              payment_minutes: balance.paymentMinutes,
+              interjornada: balance.composition.INTERJORNADA_50,
+            };
+          }).filter(Boolean);
+          const ref = String(targetPeriod.reference_month).padStart(2, "0") + "/" + targetPeriod.reference_year;
+          pdfRows.push(...bankRows.map((row: any) => ({ Competência: ref, Matrícula: row.registration, Funcionário: row.employee_name, Situação: row.status_label, Departamento: row.department_name, "Saldo do mês (min)": row.month_balance, "Saldo acumulado (min)": row.accumulated_balance, "HE 60% (min)": row.he60, "HE 60% + 20% (min)": row.he60Night, "HE 100% (min)": row.he100, "HE 100% + 20% (min)": row.he100Night, "Adicional noturno (min)": row.night20, "Débito (min)": row.debit, "Ajustes (min)": row.adjustment, "Pagamentos (min)": row.payment_minutes, "Interjornada (min)": row.interjornada })));
+          if (format === "excel" && bankRows.length) await downloadBankHoursExcel(targetPeriod, bankRows);
+        }
+        if (!pdfRows.length) throw new Error("Não há saldos calculados para exportar.");
+        if (format === "pdf") downloadReportPdf("Banco de horas", pdfRows, allCompetencies ? "Todas as competências" : "Competência: " + formatDate(competence!.start_date) + " a " + formatDate(competence!.end_date));
         return;
       }
 
       if (kind === "horas_pagar") {
-        if (!competence) throw new Error("Selecione uma competência para exportar.");
+        if (!competence) throw new Error("Para Horas a Pagar, selecione uma competência específica; o saldo acumulado não deve ser somado entre períodos.");
 
         const { data: employeeRows, error: employeeError } = await db
           .from("employees")
@@ -1073,7 +1083,7 @@ export function Relatorios() {
             ? "Carregando competências…"
             : competence
               ? `Competência selecionada: ${String(competence.reference_month).padStart(2, "0")}/${competence.reference_year} (${formatDate(competence.start_date)} a ${formatDate(competence.end_date)})`
-              : "Nenhuma competência cadastrada."}
+              : allCompetencies ? "Todas as competências selecionadas" : "Nenhuma competência cadastrada."}
         </p>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
