@@ -581,7 +581,7 @@ export function PointClosing() {
   const visibleHistoricalRows = historicalRows.filter((row: any) => !companyFilter || row.company_id === companyFilter);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="dp-screen min-h-screen bg-background">
       <header className="border-b bg-background px-6 py-4">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between">
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a>
@@ -592,7 +592,7 @@ export function PointClosing() {
       <main className="mx-auto w-full max-w-none px-4 py-7">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-sm font-medium text-primary">Operação</p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Operação</p>
             <h1 className="mt-1 text-3xl font-bold">Fechamento de Ponto</h1>
             <p className="mt-1 text-sm text-muted-foreground">Gerencie as competências do ponto. O padrão é do dia 21 ao dia 20, com opção de período personalizado.</p>
           </div>
