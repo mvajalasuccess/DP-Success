@@ -304,45 +304,45 @@ export function Comparativos() {
 
       {error && <div className="mb-5 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
-      <Card className="overflow-hidden rounded-2xl border-border/70 shadow-sm">
-        <div className="flex items-start gap-3 border-b bg-muted/20 px-5 py-4 sm:px-6">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#06CAA0]/15 text-emerald-700 dark:text-emerald-300"><CalendarRange className="h-5 w-5" /></span>
-          <div><h2 className="font-semibold">Configure sua análise</h2><p className="mt-1 text-xs text-muted-foreground">Escolha a empresa, os colaboradores e as competências. Os dados salvos não são alterados.</p></div>
+      <Card className="overflow-hidden rounded-xl border-border/60 bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3.5 sm:px-5">
+          <div><h2 className="text-sm font-semibold tracking-tight">Filtros da análise</h2><p className="mt-0.5 text-xs text-muted-foreground">Personalize o recorte sem alterar os dados salvos.</p></div>
+          <span className="rounded-md bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">Seleção atual</span>
         </div>
-        <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-2">
+        <div className="grid gap-5 p-4 sm:p-5 xl:grid-cols-2">
           <div className="min-w-0">
-            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1.4fr)_minmax(140px,1fr)]">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(140px,1fr)]">
               <div className="min-w-0">
-                <label className="mb-2 block text-sm font-medium">Empresa</label>
-                <CompanyFilter value={companyFilter} onChange={setCompanyFilter} className="block w-full min-w-0 max-w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" />
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">EMPRESA</label>
+                <CompanyFilter value={companyFilter} onChange={setCompanyFilter} className="block min-h-10 w-full min-w-0 max-w-full rounded-lg border-border/70 bg-muted/20 px-3 py-2 text-sm outline-none transition focus:border-[#06CAA0] focus:bg-background focus:ring-2 focus:ring-[#06CAA0]/10" />
               </div>
               <div className="min-w-0">
-                <label className="mb-2 block text-sm font-medium">Status</label>
-                <select value={employeeStatusFilter} onChange={e => setEmployeeStatusFilter(e.target.value as "ativo" | "inativo" | "todos")} className="w-full rounded-xl border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15">
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">STATUS</label>
+                <select value={employeeStatusFilter} onChange={e => setEmployeeStatusFilter(e.target.value as "ativo" | "inativo" | "todos")} className="min-h-10 w-full rounded-lg border-border/70 bg-muted/20 px-3 py-2 text-sm outline-none transition focus:border-[#06CAA0] focus:bg-background focus:ring-2 focus:ring-[#06CAA0]/10">
                   <option value="ativo">Ativos</option>
                   <option value="inativo">Inativos</option>
                   <option value="todos">Todos</option>
                 </select>
               </div>
             </div>
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-4">
               <div><h3 className="text-sm font-semibold">Colaboradores</h3><p className="mt-1 text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · {employeeStatusFilter === "todos" ? "ativos e inativos" : employeeStatusFilter === "ativo" ? "somente ativos" : "somente inativos"}</p></div>
-              <div className="flex gap-2"><button onClick={selectAllEmployees} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar todos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
+              <div className="flex gap-2"><button onClick={selectAllEmployees} className="rounded-md border-border/60 bg-transparent px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Selecionar todos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
             </div>
-            <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} placeholder="Buscar colaborador..." className="w-full rounded-xl border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" /></div>
-            <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto rounded-xl border bg-muted/10 p-2 sm:grid-cols-2">
-              {visibleEmployees.map(e => <label key={e.id} className="flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-card px-3 py-2.5 transition hover:border-[#06CAA0]/40 hover:bg-[#06CAA0]/5"><input type="checkbox" className="accent-[#06CAA0]" checked={selectedEmployees.includes(e.id)} onChange={() => toggleEmployee(e.id)} /><span className="truncate text-sm">{e.full_name}</span></label>)}
+            <div className="relative mt-3"><Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground/70" /><input value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} placeholder="Buscar colaborador..." className="min-h-9 w-full rounded-lg border-border/60 bg-transparent py-2 pl-8 pr-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-[#06CAA0] focus:bg-background focus:ring-2 focus:ring-[#06CAA0]/10" /></div>
+            <div className="mt-2 grid max-h-52 gap-1.5 overflow-y-auto rounded-lg border border-border/50 bg-muted/15 p-1.5 sm:grid-cols-2">
+              {visibleEmployees.map(e => <label key={e.id} className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md border border-transparent px-2.5 py-2 transition hover:bg-[#06CAA0]/8"><input type="checkbox" className="accent-[#06CAA0]" checked={selectedEmployees.includes(e.id)} onChange={() => toggleEmployee(e.id)} /><span className="truncate text-sm">{e.full_name}</span></label>)}
               {!visibleEmployees.length && <p className="col-span-full px-3 py-6 text-center text-sm text-muted-foreground">Nenhum colaborador encontrado para este filtro.</p>}
             </div>
           </div>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-4 xl:border-t-0 xl:pt-0">
               <div><h3 className="text-sm font-semibold">Competências</h3><p className="mt-1 text-xs text-muted-foreground">{selectedPeriods.length} selecionada(s)</p></div>
               <div className="flex gap-2"><button type="button" aria-label="Selecionar todas as competências" title="Selecionar todas as competências" onClick={selectAllPeriods} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar todos</button><button onClick={() => setSelectedPeriods([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
             </div>
-            <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><input value={periodSearch} onChange={e => setPeriodSearch(e.target.value)} placeholder="Buscar competência (ex.: 08/2026)..." className="w-full rounded-xl border bg-background py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-[#06CAA0] focus:ring-2 focus:ring-[#06CAA0]/15" /></div>
-            <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto rounded-xl border bg-muted/10 p-2 sm:grid-cols-2">
-              {visiblePeriods.map(p => <label key={p.id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-transparent bg-card px-3 py-2.5 transition hover:border-[#06CAA0]/40 hover:bg-[#06CAA0]/5"><input type="checkbox" className="mt-1 accent-[#06CAA0]" checked={selectedPeriods.includes(p.id)} onChange={() => togglePeriod(p.id)} /><span className="min-w-0 text-sm"><span className="block font-medium">{String(p.reference_month).padStart(2, "0")}/{p.reference_year}</span><span className="mt-0.5 block text-xs text-muted-foreground">{p.start_date.split("-").reverse().join("/")} a {p.end_date.split("-").reverse().join("/")}</span></span></label>)}
+            <div className="relative mt-3"><Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground/70" /><input value={periodSearch} onChange={e => setPeriodSearch(e.target.value)} placeholder="Buscar competência (ex.: 08/2026)..." className="min-h-9 w-full rounded-lg border-border/60 bg-transparent py-2 pl-8 pr-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-[#06CAA0] focus:bg-background focus:ring-2 focus:ring-[#06CAA0]/10" /></div>
+            <div className="mt-2 grid max-h-52 gap-1.5 overflow-y-auto rounded-lg border border-border/50 bg-muted/15 p-1.5 sm:grid-cols-2">
+              {visiblePeriods.map(p => <label key={p.id} className="flex cursor-pointer items-start gap-2 rounded-md border border-transparent px-2.5 py-2 transition hover:bg-[#06CAA0]/8"><input type="checkbox" className="mt-1 accent-[#06CAA0]" checked={selectedPeriods.includes(p.id)} onChange={() => togglePeriod(p.id)} /><span className="min-w-0 text-sm"><span className="block font-medium">{String(p.reference_month).padStart(2, "0")}/{p.reference_year}</span><span className="mt-0.5 block text-xs text-muted-foreground">{p.start_date.split("-").reverse().join("/")} a {p.end_date.split("-").reverse().join("/")}</span></span></label>)}
               {!visiblePeriods.length && <p className="col-span-full px-3 py-6 text-center text-sm text-muted-foreground">Nenhuma competência encontrada.</p>}
             </div>
           </div>
