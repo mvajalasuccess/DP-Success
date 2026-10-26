@@ -108,6 +108,11 @@ export function Kpis() {
   const [selectedDepartment, setSelectedDepartment] = useState("todos");
   const [companyFilter, setCompanyFilter] = useState("");
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [appliedYear, setAppliedYear] = useState(new Date().getFullYear());
+  const [appliedMonth, setAppliedMonth] = useState("todos");
+  const [appliedDepartment, setAppliedDepartment] = useState("todos");
+  const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
+  const [appliedEmployees, setAppliedEmployees] = useState<string[]>([]);
   const [employeeFilterOpen, setEmployeeFilterOpen] = useState(false);
   const [periodLabel, setPeriodLabel] = useState("");
   const [error, setError] = useState("");
@@ -175,7 +180,7 @@ export function Kpis() {
 
       const years = [...new Set(parsedPeriods.map(p => p.reference_year))].sort((a, b) => b - a);
       const firstYear = years[0];
-      if (firstYear !== undefined) setSelectedYear(firstYear);
+      if (firstYear !== undefined) { setSelectedYear(firstYear); setAppliedYear(firstYear); }
     })();
   }, []);
 
@@ -218,13 +223,13 @@ export function Kpis() {
       setIsCalculating(true);
       const db = supabase as any;
 
-      const targetPeriods = selectedMonth === "todos"
-        ? periods.filter(p => p.reference_year === selectedYear)
-        : periods.filter(p => p.id === selectedMonth);
+      const targetPeriods = appliedMonth === "todos"
+        ? periods.filter(p => p.reference_year === appliedYear)
+        : periods.filter(p => p.id === appliedMonth);
 
       if (!targetPeriods.length) {
         setMetrics(emptyMetrics);
-        setPeriodLabel(String(selectedYear));
+        setPeriodLabel(String(appliedYear));
         setIsCalculating(false);
         return;
       }
@@ -235,15 +240,15 @@ export function Kpis() {
       const rangeStart = targetPeriods.reduce((min, p) => p.start_date < min ? p.start_date : min, firstTarget.start_date);
       const rangeEnd = targetPeriods.reduce((max, p) => p.end_date > max ? p.end_date : max, firstTarget.end_date);
 
-      setPeriodLabel(selectedMonth === "todos" ? `Ano ${selectedYear}` : periodRangeLabel(firstTarget));
+      setPeriodLabel(appliedMonth === "todos" ? `Ano ${appliedYear}` : periodRangeLabel(firstTarget));
 
-      const selectedEmployeeSet = new Set(selectedEmployees);
+      const selectedEmployeeSet = new Set(appliedEmployees);
       // O filtro de empresa restringe os funcionários considerados nos indicadores,
       // sem alterar as fontes ou as regras de cálculo históricas.
       const allowedEmployees = employees.filter(e =>
-        (!companyFilter || e.companyId === companyFilter) &&
-        employeeMatches(e, [], selectedDepartment) &&
-        (!selectedEmployees.length || selectedEmployeeSet.has(e.id))
+        (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
+        employeeMatches(e, [], appliedDepartment) &&
+        (!appliedEmployees.length || selectedEmployeeSet.has(e.id))
       );
       const allowedIds = new Set(allowedEmployees.map(e => e.id));
 
@@ -269,8 +274,8 @@ export function Kpis() {
           ? (() => {
               const query = db.from("historical_kpi_data")
                 .select("period_id,reference_year,reference_month,employee_id,registration,employee_name,department_name,expected_minutes,worked_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes,interjornada_minutes")
-                .eq("reference_year", selectedYear);
-              if (selectedMonth !== "todos") {
+                .eq("reference_year", appliedYear);
+              if (appliedMonth !== "todos") {
                 const selectedPeriod = targetPeriods[0];
                 if (selectedPeriod) return query.eq("reference_month", selectedPeriod.reference_month);
               }
@@ -352,15 +357,15 @@ export function Kpis() {
       const isAllowedRow = (row: any) => {
         // Sem filtro de empresa, preservar a regra histórica que inclui pessoas
         // que constavam na BASE da competência, mesmo que hoje não estejam cadastradas.
-        if (!companyFilter && !selectedEmployees.length && selectedDepartment === "todos") return true;
+        if (!appliedCompanyFilter && !appliedEmployees.length && appliedDepartment === "todos") return true;
 
         const employee = resolveEmployee(row);
         if (employee) return allowedIds.has(employee.id);
 
         // Não atribuir históricos sem correspondência cadastral a uma empresa,
         // pois isso poderia misturar indicadores de empresas diferentes.
-        if (companyFilter || selectedEmployees.length) return false;
-        return selectedDepartment === "todos" || String(row.department_name ?? "").trim() === selectedDepartment;
+        if (appliedCompanyFilter || appliedEmployees.length) return false;
+        return appliedDepartment === "todos" || String(row.department_name ?? "").trim() === appliedDepartment;
       };
 
       const next = { ...emptyMetrics };
@@ -710,7 +715,7 @@ export function Kpis() {
       const historicalRowsForHeadcount = (historical ?? []).filter((row: any) => {
         const month = Number(row.reference_month);
         const year = Number(row.reference_year);
-        return year === selectedYear && month >= 1 && month <= 7;
+        return year === appliedYear && month >= 1 && month <= 7;
       });
 
       const historicalHeadcountByPeriod = new Map<string, number>();
@@ -734,12 +739,12 @@ export function Kpis() {
         // Os filtros de funcionário/setor também precisam respeitar os dados
         // históricos da BASE, sem excluir alguém só porque o cadastro atual
         // mudou.
-        if (selectedEmployees.length) {
+        if (appliedEmployees.length) {
           const employee = resolveEmployee(row);
           if (!employee || !selectedEmployeeSet.has(employee.id)) continue;
         }
-        if (selectedDepartment !== "todos" &&
-            String(row.department_name ?? "").trim() !== selectedDepartment) {
+        if (appliedDepartment !== "todos" &&
+            String(row.department_name ?? "").trim() !== appliedDepartment) {
           continue;
         }
 
@@ -818,12 +823,12 @@ export function Kpis() {
         ? activeHeadcountByPeriod.reduce((sum, value) => sum + value, 0) / activeHeadcountByPeriod.length
         : 0;
 
-      const activeHeadcount = selectedMonth === "todos"
+      const activeHeadcount = appliedMonth === "todos"
         ? averageActiveHeadcount
         : (activeHeadcountByPeriod[0] ?? 0);
 
       // Para "Todos os meses", mostrar a quantidade distinta de funcionários que participaram de pelo menos uma competência selecionada. A média mensal continua sendo usada apenas no cálculo do turnover.
-      next.employees = selectedMonth === "todos" ? distinctEmployeesInSelection.size : activeHeadcount;
+      next.employees = appliedMonth === "todos" ? distinctEmployeesInSelection.size : activeHeadcount;
       next.admissions = admissionEmployees.length;
       next.terminations = terminationEmployees.length;
       next.activeHeadcount = activeHeadcount;
@@ -917,7 +922,7 @@ export function Kpis() {
         if (period.end_date > HISTORICAL_CUTOFF) {
           for (const override of (overrideRows ?? []).filter((item: any) => String(item.period_id) === String(period.id))) {
             const employee = employees.find(item => item.id === String(override.employee_id));
-            if (!employee || !employeeMatches(employee, selectedEmployees, selectedDepartment)) continue;
+            if (!employee || !employeeMatches(employee, appliedEmployees, appliedDepartment)) continue;
             const values = {
               he60: Number(override.he_60_minutes || 0),
               he60Night: Number(override.he_60_night_minutes || 0),
@@ -959,7 +964,7 @@ export function Kpis() {
             : "Lançamentos atuais do DP-Success"
       );
     })();
-  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees, companyFilter, additionalHolidayDateSet, refreshToken]);
+  }, [periods, employees, appliedYear, appliedMonth, appliedDepartment, appliedEmployees, appliedCompanyFilter, additionalHolidayDateSet, refreshToken]);
 
   // O Banco de Horas usa uma função que consulta várias fontes por funcionário.
   // Mantemos esse cálculo fora do carregamento principal para a tela aparecer
@@ -967,19 +972,19 @@ export function Kpis() {
   useEffect(() => {
     if (!periods.length || !employees.length) return;
 
-    const targetPeriods = selectedMonth === "todos"
-      ? periods.filter(p => p.reference_year === selectedYear)
-      : periods.filter(p => p.id === selectedMonth);
+    const targetPeriods = appliedMonth === "todos"
+      ? periods.filter(p => p.reference_year === appliedYear)
+      : periods.filter(p => p.id === appliedMonth);
     const lastTarget = [...targetPeriods].sort((a, b) => a.end_date.localeCompare(b.end_date)).at(-1);
     if (!lastTarget) {
       setBankBalance(0);
       return;
     }
 
-    const selectedEmployeeSet = new Set(selectedEmployees);
+    const selectedEmployeeSet = new Set(appliedEmployees);
     const allowedEmployees = employees.filter(e =>
-      employeeMatches(e, [], selectedDepartment) &&
-      (!selectedEmployees.length || selectedEmployeeSet.has(e.id)) &&
+      employeeMatches(e, [], appliedDepartment) &&
+      (!appliedEmployees.length || selectedEmployeeSet.has(e.id)) &&
       targetPeriods.some(period =>
         (!e.hireDate || e.hireDate <= period.end_date) &&
         (!e.terminationDate || e.terminationDate >= period.start_date)
@@ -999,7 +1004,7 @@ export function Kpis() {
         setBankBalance(0);
       }
     })();
-  }, [periods, employees, selectedYear, selectedMonth, selectedDepartment, selectedEmployees]);
+  }, [periods, employees, appliedYear, appliedMonth, appliedDepartment, appliedEmployees]);
 
   useEffect(() => {
     if (!periods.length || !employees.length) return;
@@ -1007,7 +1012,7 @@ export function Kpis() {
     void (async () => {
       const db = supabase as any;
       const yearPeriods = periods
-        .filter(p => p.reference_year === selectedYear)
+        .filter(p => p.reference_year === appliedYear)
         .sort((a, b) => a.start_date.localeCompare(b.start_date));
 
       if (!yearPeriods.length) {
@@ -1029,7 +1034,7 @@ export function Kpis() {
         { data: scheduleRows },
       ] = await Promise.all([
         historicalIds.length
-          ? db.from("historical_kpi_data").select("period_id,employee_id,registration,employee_name,department_name,reference_year,reference_month,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").eq("reference_year", selectedYear)
+          ? db.from("historical_kpi_data").select("period_id,employee_id,registration,employee_name,department_name,reference_year,reference_month,expected_minutes,absence_quantity,allowance_minutes,debit_minutes").eq("reference_year", appliedYear)
           : Promise.resolve({ data: [] }),
         currentIds.length
           ? db.from("time_records").select("employee_id,period_id,expected_minutes").in("period_id", currentIds)
@@ -1080,21 +1085,23 @@ export function Kpis() {
         return undefined;
       };
       const historicalRowIncluded = (row: any) => {
-        if (!selectedEmployees.length && selectedDepartment === "todos") return true;
+        if (!appliedEmployees.length && appliedDepartment === "todos" && !appliedCompanyFilter) return true;
         const employee = resolveHistoricalEmployee(row);
         if (employee) {
-          return (!selectedEmployees.length || selectedEmployees.includes(employee.id))
-            && (selectedDepartment === "todos" || employee.department === selectedDepartment);
+          return (!appliedEmployees.length || appliedEmployees.includes(employee.id))
+            && (appliedDepartment === "todos" || employee.department === appliedDepartment)
+            && (!appliedCompanyFilter || employee.companyId === appliedCompanyFilter);
         }
-        if (selectedEmployees.length) return false;
-        return selectedDepartment === "todos"
-          || String(row.department_name ?? "").trim() === selectedDepartment;
+        if (appliedEmployees.length || appliedCompanyFilter) return false;
+        return appliedDepartment === "todos"
+          || String(row.department_name ?? "").trim() === appliedDepartment;
       };
       // O card não elimina registros de uma pessoa apenas pelo status atual:
       // ele considera os filtros selecionados, respeitando os minutos registrados.
       const employeeIncludedForSelectedFilters = (employee: Employee) =>
-        (selectedDepartment === "todos" || employee.department === selectedDepartment)
-        && (!selectedEmployees.length || selectedEmployees.includes(employee.id));
+        (!appliedCompanyFilter || employee.companyId === appliedCompanyFilter)
+        && (appliedDepartment === "todos" || employee.department === appliedDepartment)
+        && (!appliedEmployees.length || appliedEmployees.includes(employee.id));
       const scheduleMinutes = new Map<string, number>(
         (scheduleRows ?? []).map((row: any) => [String(row.id), Number(row.weekly_minutes || 0)]),
       );
@@ -1211,7 +1218,7 @@ export function Kpis() {
 
       setMonthlyAbsenteeism(result);
     })();
-  }, [periods, employees, selectedYear, selectedDepartment, selectedEmployees, additionalHolidayDateSet]);
+  }, [periods, employees, appliedYear, appliedDepartment, appliedEmployees, additionalHolidayDateSet]);
 
   const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
   const totalOvertime = metrics.he60 + metrics.he60Night + metrics.he100 + metrics.he100Night + metrics.he20 + metrics.interjornada;
@@ -1304,7 +1311,7 @@ export function Kpis() {
             </div>
           </div>
           <div className="flex justify-end border-t px-5 py-3">
-            <button type="button" onClick={() => setRefreshToken(value => value + 1)} disabled={isCalculating} className="inline-flex min-w-40 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-wait disabled:opacity-70">
+            <button type="button" onClick={() => { setAppliedYear(selectedYear); setAppliedMonth(selectedMonth); setAppliedDepartment(selectedDepartment); setAppliedCompanyFilter(companyFilter); setAppliedEmployees(selectedEmployees); setRefreshToken(value => value + 1); }} disabled={isCalculating} className="inline-flex min-w-40 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-wait disabled:opacity-70">
               {isCalculating ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" /> Pensando…</> : "Atualizar KPIs"}
             </button>
           </div>
@@ -1319,9 +1326,9 @@ export function Kpis() {
           <section className="mt-6">
             <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Idade, tempo de empresa e distribuição por sexo. Aplicam os filtros selecionados.</p></div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-<Card className="p-5"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.birthDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => { const d = new Date(e.birthDate + "T00:00:00"); const now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }).filter(n => n >= 0 && n < 120); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
-            <Card className="p-5"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-2xl font-bold">{(() => { const now = new Date(); const values = employees.filter(e => e.hireDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => Math.max(0, Math.floor(((e.terminationDate ? new Date(e.terminationDate + "T00:00:00") : now).getTime() - new Date(e.hireDate + "T00:00:00").getTime()) / 86400000))); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length / 365.25).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
-            <Card className="p-5"><p className="text-sm text-muted-foreground">Distribuição por sexo</p><div className="mt-2 space-y-1.5 text-sm">{(() => { const base = employees.filter(e => (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))); const counts = new Map<string, number>(); base.forEach(e => { const label = e.gender === "feminino" ? "Feminino" : e.gender === "masculino" ? "Masculino" : e.gender === "outro" ? "Outro" : e.gender === "prefere_nao_informar" ? "Prefere não informar" : "Não informado"; counts.set(label, (counts.get(label) ?? 0) + 1); }); return [...counts.entries()].map(([label, count]) => <div key={label} className="flex justify-between gap-3"><span>{label}</span><strong>{count}</strong></div>); })()}</div></Card>
+<Card className="p-5"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.birthDate && (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))).map(e => { const d = new Date(e.birthDate + "T00:00:00"); const now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }).filter(n => n >= 0 && n < 120); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
+            <Card className="p-5"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-2xl font-bold">{(() => { const now = new Date(); const values = employees.filter(e => e.hireDate && (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))).map(e => Math.max(0, Math.floor(((e.terminationDate ? new Date(e.terminationDate + "T00:00:00") : now).getTime() - new Date(e.hireDate + "T00:00:00").getTime()) / 86400000))); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length / 365.25).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
+            <Card className="p-5"><p className="text-sm text-muted-foreground">Distribuição por sexo</p><div className="mt-2 space-y-1.5 text-sm">{(() => { const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))); const counts = new Map<string, number>(); base.forEach(e => { const label = e.gender === "feminino" ? "Feminino" : e.gender === "masculino" ? "Masculino" : e.gender === "outro" ? "Outro" : e.gender === "prefere_nao_informar" ? "Prefere não informar" : "Não informado"; counts.set(label, (counts.get(label) ?? 0) + 1); }); return [...counts.entries()].map(([label, count]) => <div key={label} className="flex justify-between gap-3"><span>{label}</span><strong>{count}</strong></div>); })()}</div></Card>
             
             </div>
           </section>
