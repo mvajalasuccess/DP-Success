@@ -1691,7 +1691,7 @@ export function Kpis() {
                 <span className="text-xs text-muted-foreground">{appliedYear}</span>
               </div>
               <div className="mt-5 h-56"><ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyAbsenteeism} margin={{top:12,right:12,left:0,bottom:0}}>
+                <BarChart data={monthlyAbsenteeism} margin={{top:12,right:12,left:0,bottom:0}}>
                   
                   <CartesianGrid strokeDasharray="3 3" vertical={false}/>
                   <XAxis dataKey="label" tick={{fontSize:10}}/>
