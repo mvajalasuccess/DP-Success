@@ -375,7 +375,7 @@ export function Kpis() {
       };
 
       const next = { ...emptyMetrics };
-      let historicalCount = 0;      let historicalCount = 0;
+      let historicalCount = 0;
       let operationalCount = 0;
       const scheduleMinutes = new Map<string, number>(
         (scheduleRows ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0)]),
