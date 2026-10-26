@@ -1050,7 +1050,6 @@ export function Kpis() {
         { data: timeRows },
         { data: occurrenceRows },
         { data: debitRows },
-        { data: creditRows },
         { data: certificateRows },
         { data: overrideRows },
         { data: scheduleRows },
@@ -1066,9 +1065,6 @@ export function Kpis() {
           : Promise.resolve({ data: [] }),
         currentIds.length
           ? db.from("bank_hours").select("employee_id,period_id,minutes,kind").eq("kind","debito").in("period_id", currentIds)
-          : Promise.resolve({ data: [] }),
-        yearPeriods.length
-          ? db.from("overtime_records").select("employee_id,period_id,minutes,notes").in("period_id", yearPeriods.map(p => p.id)).ilike("notes", "%Crédito total do período%")
           : Promise.resolve({ data: [] }),
         currentIds.length
           ? db.from("medical_certificates").select("employee_id,start_date,end_date,days").lte("start_date", yearPeriods[yearPeriods.length - 1]?.end_date ?? "9999-12-31").gte("end_date", yearPeriods[0]?.start_date ?? "0001-01-01")
@@ -1139,10 +1135,6 @@ export function Kpis() {
         let expected = 0;
         let lost = 0;
         let debits = 0;
-        const periodCredits = (creditRows ?? []).filter((row: any) => {
-          const employee = employees.find(e => e.id === row.employee_id);
-          return row.period_id === period.id && employee && employeeIncludedForSelectedFilters(employee);
-        }).reduce((sum: number, row: any) => sum + Math.abs(Number(row.minutes || 0)), 0);
 
         for (const row of (historicalRows ?? []).filter((x: any) => x.period_id === period.id)) {
           if (!historicalRowIncluded(row)) continue;
