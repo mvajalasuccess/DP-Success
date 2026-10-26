@@ -1618,11 +1618,14 @@ export function Kpis() {
               <h3 className="font-bold">Composição das ocorrências (%)</h3>
               <p className="text-xs text-muted-foreground">Participação de atestados, declarações de horas, faltas e folgas no total registrado nesta competência.</p>
               {(() => {
+                // Normalize all categories to equivalent 8-hour days before calculating shares.
+                // The chart is a visual composition only and does not alter KPI or absence calculations.
+                const minutesPerDisplayDay = 480;
                 const items = [
-                  { name: "Atestados", value: Math.max(0, metrics.atestadosDays), color: "#06CAA0" },
-                  { name: "Declarações de horas", value: Math.max(0, metrics.declaracoesMinutes), color: "#3B82F6" },
-                  { name: "Faltas", value: Math.max(0, metrics.faltasMinutes), color: "#8B5CF6" },
-                  { name: "Folgas", value: Math.max(0, metrics.folgasDays), color: "#F59E0B" },
+                  { name: "Atestados", value: Math.max(0, metrics.atestadosMinutes) / minutesPerDisplayDay, display: daysFmt(metrics.atestadosDays), color: "#06CAA0" },
+                  { name: "Declarações de horas", value: Math.max(0, metrics.declaracoesMinutes) / minutesPerDisplayDay, display: fmt(metrics.declaracoesMinutes), color: "#3B82F6" },
+                  { name: "Faltas", value: Math.max(0, metrics.faltasMinutes) / minutesPerDisplayDay, display: fmt(metrics.faltasMinutes), color: "#8B5CF6" },
+                  { name: "Folgas", value: Math.max(0, metrics.folgasDays), display: daysFmt(metrics.folgasDays), color: "#F59E0B" },
                 ];
                 const total = items.reduce((sum, item) => sum + item.value, 0);
                 return <div className="mt-4 grid items-center gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
@@ -1637,11 +1640,11 @@ export function Kpis() {
                   <div className="space-y-3">{items.map(item => <div key={item.name} className="flex items-center gap-2 text-sm">
                     <span className="h-3 w-3 shrink-0 rounded-full" style={{backgroundColor:item.color}}/>
                     <span className="min-w-0 flex-1">{item.name}</span>
-                    <strong>{total ? (item.value / total * 100).toFixed(1) : "0.0"}%</strong>
+                    <span className="text-right"><strong>{total ? (item.value / total * 100).toFixed(1) : "0.0"}%</strong><span className="block text-xs text-muted-foreground">{item.display}</span></span>
                   </div>)}</div>
                 </div>;
               })()}
-              <p className="mt-2 text-xs text-muted-foreground">Atestados e folgas são exibidos na unidade em que estão cadastrados; os percentuais representam participação relativa entre os registros.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Para comparar categorias diferentes, os percentuais usam dias equivalentes de 8 horas; os valores originais aparecem abaixo de cada percentual. Este gráfico é apenas visual e não altera os cálculos de absenteísmo.</p>
             </Card>
             <Card className="p-5">
               <div className="flex items-center justify-between gap-3">
