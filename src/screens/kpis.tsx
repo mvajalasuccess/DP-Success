@@ -1386,12 +1386,12 @@ export function Kpis() {
               </label>
               <div className="relative grid min-w-0 gap-[5px]">
                 <label htmlFor="kpi-employee-filter" className="kpi-toolbar-label"><span>Funcionários da competência</span></label>
-                <button id="kpi-employee-filter" type="button" aria-haspopup="listbox" aria-expanded={employeeFilterOpen} aria-controls="kpi-employee-options" className={`kpi-control flex items-center justify-between text-left ${selectedEmployees.length ? "is-filtered" : ""}`} onClick={() => setEmployeeFilterOpen(v => !v)} onKeyDown={event => { if (event.key === "Escape") setEmployeeFilterOpen(false); }}>
+                <button id="kpi-employee-filter" type="button" aria-haspopup="dialog" aria-expanded={employeeFilterOpen} aria-controls="kpi-employee-options" className={`kpi-control flex items-center justify-between text-left ${selectedEmployees.length ? "is-filtered" : ""}`} onClick={() => setEmployeeFilterOpen(v => !v)} onKeyDown={event => { if (event.key === "Escape") setEmployeeFilterOpen(false); }}>
                   <span className="truncate">{selectedEmployees.length === 0 ? "Todos os funcionários" : `${selectedEmployees.length} selecionado(s)`}</span>
                   <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-[var(--kpi-text-muted)]" aria-hidden="true" />
                 </button>
                 {employeeFilterOpen && (
-                  <div id="kpi-employee-options" role="listbox" aria-label="Selecionar funcionários da competência" aria-multiselectable="true" className="kpi-select-popover absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-72 overflow-y-auto p-2 text-[13px]">
+                  <div id="kpi-employee-options" role="dialog" aria-label="Selecionar funcionários da competência" className="kpi-select-popover absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-72 overflow-y-auto p-2 text-[13px]">
                     <label className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-2 hover:bg-[var(--kpi-surface-muted)]">
                       <input type="checkbox" checked={selectedEmployees.length === 0} onChange={() => setSelectedEmployees([])} />
                       <span>Todos os funcionários</span>
