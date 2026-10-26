@@ -1613,6 +1613,45 @@ export function Kpis() {
             </Card>
           )}
 
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+            <Card className="p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div><h3 className="font-bold">Evolução mensal</h3><p className="text-xs text-muted-foreground">Percentual de horas perdidas consideradas em cada competência.</p></div>
+                <span className="text-xs text-muted-foreground">{appliedYear}</span>
+              </div>
+              <div className="mt-5 h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyAbsenteeism} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                    <defs><linearGradient id="absenteeismFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.75}/><stop offset="95%" stopColor="#f97316" stopOpacity={0.05}/></linearGradient></defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }}/>
+                    <YAxis tickFormatter={(value:number) => `${value}%`} tick={{ fontSize: 10 }}/>
+                    <Tooltip formatter={(value:number, name:string, props:any) => [`${pct(value)} · ${fmt(props.payload.lost)} perdidas / ${fmt(props.payload.expected)} previstas`, "Absenteísmo"]}/>
+                    <Area type="monotone" dataKey="rate" name="Absenteísmo" stroke="#ea580c" strokeWidth={3} fill="url(#absenteeismFill)" activeDot={{ r: 6 }}/>
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados para o ano selecionado.</p>}
+            </Card>
+
+            <Card className="p-5">
+              <h3 className="font-bold">Composição de horas</h3>
+              <p className="text-xs text-muted-foreground">Mostra o que está gerando o indicador.</p>
+              <div className="mt-5 space-y-3">
+                {[
+                  ["Créditos", Math.max(0, metrics.worked - metrics.expected)],
+                  ["Débitos", Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)],
+                ].map(([label, value]) => (
+                  <div key={String(label)}>
+                    <div className="flex justify-between text-sm"><span>{label}</span><strong>{fmt(Number(value))}</strong></div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${metrics.absenceMinutes ? Math.min(100, Number(value) / metrics.absenceMinutes * 100) : 0}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Card className="p-5">
               <h3 className="font-bold">Composição das ocorrências (%)</h3>
@@ -1662,44 +1701,6 @@ export function Kpis() {
                 </AreaChart>
               </ResponsiveContainer></div>
               {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados históricos para o ano selecionado.</p>}
-            </Card>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-            <Card className="p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div><h3 className="font-bold">Evolução mensal</h3><p className="text-xs text-muted-foreground">Percentual de horas perdidas consideradas em cada competência.</p></div>
-                <span className="text-xs text-muted-foreground">{appliedYear}</span>
-              </div>
-              <div className="mt-5 h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={monthlyAbsenteeism} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
-                    <defs><linearGradient id="absenteeismFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.75}/><stop offset="95%" stopColor="#f97316" stopOpacity={0.05}/></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }}/>
-                    <YAxis tickFormatter={(value:number) => `${value}%`} tick={{ fontSize: 10 }}/>
-                    <Tooltip formatter={(value:number, name:string, props:any) => [`${pct(value)} · ${fmt(props.payload.lost)} perdidas / ${fmt(props.payload.expected)} previstas`, "Absenteísmo"]}/>
-                    <Area type="monotone" dataKey="rate" name="Absenteísmo" stroke="#ea580c" strokeWidth={3} fill="url(#absenteeismFill)" activeDot={{ r: 6 }}/>
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados para o ano selecionado.</p>}
-            </Card>
-
-            <Card className="p-5">
-              <h3 className="font-bold">Composição de horas</h3>
-              <p className="text-xs text-muted-foreground">Mostra o que está gerando o indicador.</p>
-              <div className="mt-5 space-y-3">
-                {[
-                  ["Créditos", Math.max(0, metrics.worked - metrics.expected)],
-                  ["Débitos", Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)],
-                ].map(([label, value]) => (
-                  <div key={String(label)}>
-                    <div className="flex justify-between text-sm"><span>{label}</span><strong>{fmt(Number(value))}</strong></div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${metrics.absenceMinutes ? Math.min(100, Number(value) / metrics.absenceMinutes * 100) : 0}%` }} /></div>
-                  </div>
-                ))}
-              </div>
             </Card>
           </div>
 
