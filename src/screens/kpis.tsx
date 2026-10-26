@@ -1720,7 +1720,7 @@ export function Kpis() {
                   <XAxis dataKey="label" tick={{fontSize:10}}/>
                   <YAxis tickFormatter={(value:number) => fmt(value)} tick={{fontSize:10}}/>
                   <Tooltip formatter={(value:number) => [fmt(value), "Débitos"]}/>
-                  <Bar dataKey="debits" name="Débitos" fill="#0D9488" radius={[6,6,0,0]} activeBar={{ fill: "#0F766E" }}/>>
+                  <Bar dataKey="debits" name="Débitos" fill="#0D9488" radius={[6,6,0,0]} activeBar={{ fill: "#0F766E" }}/>
                 </BarChart>
               </ResponsiveContainer></div>
               {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados históricos para o ano selecionado.</p>}
