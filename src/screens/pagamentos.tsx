@@ -276,7 +276,7 @@ export function Payments() {
                 {periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}
               </select>
             </label>
-            <label className="grid gap-1.5 text-sm font-medium">Funcionário
+            <label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Funcionário
               <div className="flex min-w-0 items-center gap-1.5">
                 <button type="button" aria-label="Funcionário anterior" title="Funcionário anterior" onClick={() => navigateEmployee(-1)} disabled={loading || selectableEmployees.length < 2 || selectedEmployeeIndex <= 0} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
                 <select className={inputCls + " min-w-0 flex-1"} value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={loading}>
