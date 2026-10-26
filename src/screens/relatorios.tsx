@@ -116,7 +116,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
     '<div class="meta"><strong>Registros: ' + rows.length + '</strong><span>Gerado em ' + new Date().toLocaleString("pt-BR") + '</span></div><table><thead><tr>' +
     columns.map(key => '<th>' + escapeReportHtml(headers[key] || key.replace(/_/g, " ")) + '</th>').join("") + '</tr></thead><tbody>' +
     rows.map(row => '<tr>' + columns.map(key => '<td>' + escapeReportHtml(showValue(key, row[key])) + '</td>').join("") + '</tr>').join("") +
-    '</tbody></table><div class="footer">DP SUCCESS · Relatório gerencial · Documento para conferência interna</div><script>window.onload=function(){setTimeout(function(){window.print()},300)};</script></body></html>';
+    '</tbody></table><div class="footer">DP SUCCESS · Relatório gerencial · Documento para conferência interna</div></body></html>';
   const frame = document.createElement("iframe");
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
   document.body.appendChild(frame);
@@ -820,13 +820,12 @@ export function Relatorios() {
         const targetPeriods = allCompetencies ? periods : competence ? [competence] : [];
         if (!targetPeriods.length) throw new Error("Não há competências para exportar.");
         const pdfRows: any[] = [];
-        let exported = 0;
         for (const targetPeriod of targetPeriods) {
           const rows = await loadClosingRows(db, targetPeriod, companyFilter);
           if (!rows.length) continue;
           const ref = String(targetPeriod.reference_month).padStart(2, "0") + "/" + targetPeriod.reference_year;
           pdfRows.push(...rows.map((row: any) => ({ Competência: ref, Funcionário: row.employee_name, Matrícula: row.registration, Departamento: row.department_name, Cargo: row.position_name, "Horas previstas": minutesToHours(row.expected_minutes), "Horas trabalhadas": minutesToHours(row.worked_minutes), "Faltas (dias)": row.absence_quantity, "Atestados (min)": row.certificate_minutes, "Declarações (min)": row.declaration_minutes, "Abonos (min)": row.allowance_minutes, "Débito (min)": row.debit_minutes, "HE 60% (min)": row.he_60_minutes, "HE 60% + 20% (min)": row.he_60_night_minutes, "HE 100% (min)": row.he_100_minutes, "HE 20% (min)": row.he_20_minutes, "Interjornada (min)": row.interjornada_minutes })));
-          if (format === "excel") { await downloadClosingExcel(targetPeriod, rows); exported++; }
+          if (format === "excel") await downloadClosingExcel(targetPeriod, rows);
         }
         if (!pdfRows.length) throw new Error("Não há funcionários ou lançamentos para exportar nas competências selecionadas.");
         if (format === "pdf") downloadReportPdf("Fechamento de ponto", pdfRows, allCompetencies ? "Todas as competências" : "Competência: " + formatDate(competence!.start_date) + " a " + formatDate(competence!.end_date));
