@@ -1300,7 +1300,7 @@ export function Kpis() {
         { label: "Horas extras", value: fmt(Math.max(0, totalOvertime - metrics.interjornada)), support: "Total de HE, sem interjornada", tone: "neutral", title: "Soma dos tipos de hora extra já apurados nesta seleção.", primary: true },
         { label: "Funcionários com HE", value: String(overtimeEmployees.filter(item => item.total - item.interjornada > 0).length), support: "Com horas extras no período", tone: "neutral", title: "Contagem de funcionários com horas extras na seleção." },
         { label: "Interjornada", value: fmt(metrics.interjornada), support: "Exibida separadamente; não soma ao saldo", tone: "neutral", title: "Interjornada é exibida separadamente e não compõe o saldo." },
-        { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: bankTone, status: toneLabel(bankTone), title: "Saldo apurado pelo modelo atual de Banco de Horas." },
+        { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: "neutral", title: "Saldo apurado pelo modelo atual de Banco de Horas." },
       ]
     : activeSection === "turnover"
     ? [
@@ -1313,7 +1313,7 @@ export function Kpis() {
         { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: `${fmt(metrics.absenceMinutes)} perdidas / ${fmt(metrics.expected)} previstas`, tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100. Referência gerencial: atenção a partir de 3% e crítico a partir de 5%.", primary: true },
         { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: "Ativos na competência selecionada", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
         { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: `[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100. Faixas gerenciais: atenção a partir de ${turnoverThresholds.attention}% e crítico a partir de ${turnoverThresholds.critical}%.` },
-        { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: bankTone, status: toneLabel(bankTone), title: "Saldo acumulado no Banco de Horas até o fim do período selecionado." },
+        { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: "neutral", title: "Saldo acumulado no Banco de Horas até o fim do período selecionado." },
       ];
 
   return (
@@ -1370,7 +1370,7 @@ export function Kpis() {
           ) : (
             <div className="kpi-band">
               {kpiItems.map((item, index) => (
-                <div key={item.label} className={`${index === 0 ? "kpi-primary" : "kpi-secondary"} kpi-tone-${item.tone}`} title={item.title} aria-label={`${item.label}. ${item.title}`}>
+                <div key={item.label} className={`${index === 0 ? "kpi-primary" : "kpi-secondary"} ${item.label === "Absenteísmo" || item.label === "Turnover" ? `kpi-tone-${item.tone}` : ""}`} title={item.title} aria-label={`${item.label}. ${item.title}`}>
                   <p className="text-[12px] font-semibold leading-5 text-[var(--kpi-text-muted)]">{item.label}</p>
                   <p className={`kpi-value ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : ""}`}>{item.value}</p>
                   <p className="kpi-support">{item.support}</p>
