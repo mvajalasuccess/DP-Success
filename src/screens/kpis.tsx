@@ -14,6 +14,8 @@ type Employee = {
   hireDate: string | null;
   terminationDate: string | null;
   status: string;
+  birthDate: string | null;
+  salary: number | null;
   workScheduleId: string | null;
   companyId: string | null;
 };
@@ -110,6 +112,8 @@ export function Kpis() {
   const [overtimeEmployees, setOvertimeEmployees] = useState<OvertimeEmployee[]>([]);
   const [source, setSource] = useState("");
   const [bankBalance, setBankBalance] = useState(0);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [interjornadaStatus, setInterjornadaStatus] = useState<"ativo" | "inativo" | "todos">("todos");
   const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<Array<{ periodId: string; label: string; rate: number; expected: number; lost: number }>>([]);
   const [monthlyOvertime, setMonthlyOvertime] = useState<Array<{ periodId: string; label: string; total: number; interjornada: number; employees: number }>>([]);
   const [showAbsenceCalculation, setShowAbsenceCalculation] = useState(false);
@@ -123,7 +127,7 @@ export function Kpis() {
         { data: holidayRows, error: holidayError },
       ] = await Promise.all([
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
-        db.from("employees").select("id,full_name,registration,department_id,hire_date,termination_date,status,work_schedule_id,company_id,departments(name)").order("full_name"),
+        db.from("employees").select("id,full_name,registration,department_id,birth_date,salary,hire_date,termination_date,status,work_schedule_id,company_id,departments(name)").order("full_name"),
         db.from("holidays").select("holiday_date").eq("is_demo", false),
       ]);
 
@@ -151,6 +155,8 @@ export function Kpis() {
           hireDate: e.hire_date ?? null,
           terminationDate: e.termination_date ?? confirmedTerminationDates[normalizedName] ?? null,
           status: e.status ?? "ativo",
+          birthDate: e.birth_date ?? null,
+          salary: e.salary == null ? null : Number(e.salary),
           workScheduleId: e.work_schedule_id ?? null,
           companyId: e.company_id ?? null,
         };
@@ -203,6 +209,7 @@ export function Kpis() {
 
     void (async () => {
       setError("");
+      setIsCalculating(true);
       const db = supabase as any;
 
       const targetPeriods = selectedMonth === "todos"
@@ -212,6 +219,7 @@ export function Kpis() {
       if (!targetPeriods.length) {
         setMetrics(emptyMetrics);
         setPeriodLabel(String(selectedYear));
+        setIsCalculating(false);
         return;
       }
 
@@ -298,12 +306,14 @@ export function Kpis() {
 
       if (historicalError || overtimeError || timeError || occurrenceError || debitError || certificateError || scheduleError) {
         setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
+        setIsCalculating(false);
         return;
       }
       // Enquanto a migration não estiver aplicada, a ausência da tabela de ajustes
       // não impede o KPI de funcionar com as fontes originais.
       if (overrideError && !String(overrideError.message ?? "").toLowerCase().includes("point_closing_overrides")) {
         setError(overrideError.message);
+        setIsCalculating(false);
         return;
       }
 
@@ -927,6 +937,7 @@ export function Kpis() {
       // Não bloquear a renderização dos KPIs com dezenas de consultas
       // individuais do Banco de Horas. O saldo é carregado em segundo plano.
       setMetrics(next);
+      setIsCalculating(false);
       setSource(
         historicalCount && operationalCount
           ? "Histórico da BASE + lançamentos atuais do DP-Success"
@@ -1208,7 +1219,15 @@ export function Kpis() {
           <p className="mt-1 text-sm text-muted-foreground">{periodLabel || "Selecione os filtros para analisar os indicadores."}</p>
         </div>
 
-        <Card className="mt-6 border shadow-sm">
+        <section className="mt-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Funcionários no período</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.employees)}</p><p className="mt-1 text-xs text-muted-foreground">ativos na competência selecionada</p></Card>
+            <Card className="p-5"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Absenteísmo</p><p className="mt-1 text-3xl font-bold">{pct(absenteeismRate)}</p><p className="mt-1 text-xs text-muted-foreground">{fmt(metrics.absenceMinutes)} perdidas / {fmt(metrics.expected)} previstas</p></Card>
+            <Card className="p-5"><Percent className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Turnover</p><p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p><p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p></Card>
+          </div>
+        </section>
+
+        <Card className="mt-4 border shadow-sm">
           <div className="flex items-center gap-1 border-b px-3 pt-3">
             {[
               ["absenteismo", "Absenteísmo"],
@@ -1271,6 +1290,9 @@ export function Kpis() {
           </div>
         </Card>
 
+        <div className="mt-3 flex min-h-8 items-center justify-end gap-2 text-xs text-muted-foreground" aria-live="polite">
+          {isCalculating ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" /> Pensando… atualizando os indicadores com os filtros selecionados</> : <span>Indicadores atualizados para os filtros selecionados</span>}
+        </div>
         {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
 
         <section className="mt-6">
@@ -1293,13 +1315,7 @@ export function Kpis() {
               <p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p>
               <p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p>
             </Card>
-            <Card className="p-5">
-              <WalletCards className="h-5 w-5 text-primary" />
-              <p className="mt-4 text-sm text-muted-foreground">Banco de horas</p>
-              <p className={`mt-1 text-3xl font-bold ${bankBalance < 0 ? "text-destructive" : "text-primary"}`}>{fmt(bankBalance)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">saldo acumulado até o fim da seleção</p>
-            </Card>
-          </div>
+           </div>
         </section>
 
         {activeSection === "absenteismo" && (
@@ -1354,13 +1370,12 @@ export function Kpis() {
             </Card>
 
             <Card className="p-5">
-              <h3 className="font-bold">Composição das horas perdidas</h3>
+              <h3 className="font-bold">Composição de horas</h3>
               <p className="text-xs text-muted-foreground">Mostra o que está gerando o indicador.</p>
               <div className="mt-5 space-y-3">
                 {[
+                  ["Créditos", Math.max(0, metrics.worked - metrics.expected)],
                   ["Débitos", Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)],
-                  ["Faltas", metrics.faltasMinutes],
-                  ["Abonos", metrics.abonosMinutes],
                 ].map(([label, value]) => (
                   <div key={String(label)}>
                     <div className="flex justify-between text-sm"><span>{label}</span><strong>{fmt(Number(value))}</strong></div>
@@ -1422,6 +1437,12 @@ export function Kpis() {
               </div>
             </div>
 
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3 rounded-xl border p-4">
+              <label className="grid gap-1.5 text-sm font-medium">Situação na lista de interjornada
+                <select value={interjornadaStatus} onChange={e => setInterjornadaStatus(e.target.value as "ativo" | "inativo" | "todos")} className="h-10 min-w-44 rounded-lg border bg-background px-3 text-sm"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select>
+              </label>
+              <p className="max-w-xl text-xs text-muted-foreground">Valores conforme os lançamentos e a base histórica importada, sem recalcular competências fechadas.</p>
+            </div>
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
               {[
                 ["HE 60%", metrics.he60],
@@ -1538,7 +1559,7 @@ export function Kpis() {
                   </div>
                   <div className="divide-y">
                     {overtimeEmployees
-                      .filter(item => item.interjornada > 0)
+                      .filter(item => item.interjornada > 0 && (interjornadaStatus === "todos" || employees.find(e => e.id === item.employeeId)?.status === interjornadaStatus))
                       .sort((a, b) => b.interjornada - a.interjornada)
                       .map(item => (
                         <div key={item.employeeId} className="grid grid-cols-[1fr_auto] items-center gap-4 px-4 py-3 text-sm">
@@ -1546,7 +1567,7 @@ export function Kpis() {
                           <strong>{fmt(item.interjornada)}</strong>
                         </div>
                       ))}
-                    {!overtimeEmployees.some(item => item.interjornada > 0) && (
+                    {!overtimeEmployees.some(item => item.interjornada > 0 && (interjornadaStatus === "todos" || employees.find(e => e.id === item.employeeId)?.status === interjornadaStatus)) && (
                       <p className="px-4 py-8 text-center text-sm text-muted-foreground">Nenhum funcionário com interjornada no período selecionado.</p>
                     )}
                   </div>
@@ -1570,11 +1591,10 @@ export function Kpis() {
                 <p className="mt-1 text-xs text-muted-foreground">{periodLabel}</p>
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-3">
               <Card className="p-6"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Admissões</p><p className="mt-1 text-3xl font-bold">{metrics.admissions}</p></Card>
               <Card className="p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Desligamentos</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
               <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários ativos</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.activeHeadcount).toLocaleString("pt-BR")}</p></Card>
-              <Card className="p-6"><Percent className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Índice de Turnover</p><p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p></Card>
             </div>
             <Card className="mt-4 border-primary/20 bg-primary/5 p-5">
               <p className="font-semibold">Como o índice é calculado</p>
