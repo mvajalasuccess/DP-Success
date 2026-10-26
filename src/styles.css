@@ -534,6 +534,18 @@ textarea:focus-visible {
   border-bottom: 1px solid var(--kpi-border);
   background: var(--kpi-surface);
 }
+.kpis-page .kpi-tone-neutral {
+  border-left: 3px solid #16a34a;
+  background: #f0fdf4;
+}
+.kpis-page .kpi-tone-warning {
+  border-left: 3px solid var(--kpi-warning);
+  background: var(--kpi-warning-soft);
+}
+.kpis-page .kpi-tone-critical {
+  border-left: 3px solid var(--kpi-critical);
+  background: var(--kpi-critical-soft);
+}
 .kpis-page .kpi-primary {
   min-width: 0;
   padding: 22px 24px;
