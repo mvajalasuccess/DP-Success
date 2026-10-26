@@ -5,18 +5,18 @@ export function ScreenShell({ section, title, subtitle, name, actions, error, ch
   section: string; title: string; subtitle?: string; name: string; actions?: ReactNode; error?: string; children: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-background px-4 py-3 sm:px-6 sm:py-4">
+    <div className="dp-screen min-h-screen bg-background">
+      <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3">
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a>
           <span className="text-sm font-semibold">DP Success · {name}</span>
         </div>
       </header>
-      <main className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-7">
+      <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-sm font-medium text-primary">{section}</p>
-            <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{title}</h1>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{section}</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-[30px]">{title}</h1>
             {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -31,7 +31,7 @@ export function ScreenShell({ section, title, subtitle, name, actions, error, ch
 export function Modal({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl border bg-card p-6 shadow-lg">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-card p-5 shadow-none sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-xl font-bold">{title}</h2>
           <button type="button" onClick={onClose} className="text-sm text-muted-foreground">Fechar</button>
@@ -43,7 +43,7 @@ export function Modal({ title, onClose, children, footer }: { title: string; onC
   );
 }
 
-export const inputCls = "w-full rounded-lg border bg-background px-3 py-2 text-sm font-normal";
-export const btnPrimary = "inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50";
-export const btnOutline = "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-50";
-export const btnDanger = "inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50";
+export const inputCls = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-normal shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50";
+export const btnPrimary = "inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+export const btnOutline = "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+export const btnDanger = "inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-destructive/30 bg-background px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
