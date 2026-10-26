@@ -1448,18 +1448,17 @@ export function Kpis() {
                 <div><h3 className="font-bold">Evolução mensal</h3><p className="text-xs text-muted-foreground">Percentual de horas perdidas consideradas em cada competência.</p></div>
                 <span className="text-xs text-muted-foreground">{appliedYear}</span>
               </div>
-              <div className="mt-5 flex h-48 items-end gap-2 overflow-x-auto pb-6">
-                {monthlyAbsenteeism.map(item => {
-                  const max = Math.max(...monthlyAbsenteeism.map(x => x.rate), 1);
-                  const height = Math.max(8, (item.rate / max) * 118);
-                  return (
-                    <div key={item.periodId} className="flex min-w-14 flex-1 flex-col items-center justify-end gap-2">
-                      <span className="text-[10px] font-semibold">{pct(item.rate)}</span>
-                      <div className="w-full max-w-12 rounded-t-md bg-primary/70" style={{ height }} title={`${item.label}: ${pct(item.rate)} · ${fmt(item.lost)} / ${fmt(item.expected)}`} />
-                      <span className="text-[10px] text-muted-foreground">{item.label}</span>
-                    </div>
-                  );
-                })}
+              <div className="mt-5 h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monthlyAbsenteeism} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                    <defs><linearGradient id="absenteeismFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.75}/><stop offset="95%" stopColor="#f97316" stopOpacity={0.05}/></linearGradient></defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                    <XAxis dataKey="label" tick={{ fontSize: 10 }}/>
+                    <YAxis tickFormatter={(value:number) => `${value}%`} tick={{ fontSize: 10 }}/>
+                    <Tooltip formatter={(value:number, name:string, props:any) => [`${pct(value)} · ${fmt(props.payload.lost)} perdidas / ${fmt(props.payload.expected)} previstas`, "Absenteísmo"]}/>
+                    <Area type="monotone" dataKey="rate" name="Absenteísmo" stroke="#ea580c" strokeWidth={3} fill="url(#absenteeismFill)" activeDot={{ r: 6 }}/>
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
               {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados para o ano selecionado.</p>}
             </Card>
@@ -1558,18 +1557,16 @@ export function Kpis() {
                   </div>
                   <TrendingUp className="h-5 w-5 text-primary" />
                 </div>
-                <div className="mt-6 flex h-56 items-end gap-2 overflow-x-auto pb-7">
-                  {monthlyOvertime.map(item => {
-                    const max = Math.max(...monthlyOvertime.map(x => x.total), 1);
-                    const height = Math.max(8, (item.total / max) * 140);
-                    return (
-                      <div key={item.periodId} className="flex min-w-14 flex-1 flex-col items-center justify-end gap-2">
-                        <span className="text-[10px] font-semibold">{fmt(item.total)}</span>
-                        <div className="w-full max-w-12 rounded-t-md bg-primary/70" style={{ height }} />
-                        <span className="text-[10px] text-muted-foreground">{item.label}</span>
-                      </div>
-                    );
-                  })}
+                <div className="mt-6 h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyOvertime} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }}/>
+                      <YAxis tickFormatter={(value:number) => fmt(value)} tick={{ fontSize: 10 }}/>
+                      <Tooltip formatter={(value:number) => [fmt(value), "Horas extras"]}/>
+                      <Bar dataKey="total" name="Horas extras" fill="#8b5cf6" radius={[7,7,0,0]} activeBar={{ fill: "#6d28d9" }}/>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
                 {!monthlyOvertime.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados para o período selecionado.</p>}
               </Card>
@@ -1692,6 +1689,42 @@ export function Kpis() {
               <Card className="p-6"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Admissões</p><p className="mt-1 text-3xl font-bold">{metrics.admissions}</p></Card>
               <Card className="p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Desligamentos</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
               <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários ativos</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.activeHeadcount).toLocaleString("pt-BR")}</p></Card>
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Card className="p-5">
+                <h3 className="font-bold">Movimentações na competência</h3>
+                <p className="text-xs text-muted-foreground">Comparativo entre admissões e desligamentos no período selecionado.</p>
+                <div className="mt-4 h-60">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[{ tipo: "Admissões", quantidade: metrics.admissions }, { tipo: "Desligamentos", quantidade: metrics.terminations }]} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                      <XAxis dataKey="tipo" tick={{ fontSize: 11 }}/>
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }}/>
+                      <Tooltip formatter={(value:number) => [value, "Funcionários"]}/>
+                      <Bar dataKey="quantidade" name="Funcionários" radius={[7,7,0,0]} activeBar={{ fill: "#0d9488" }}>
+                        <Cell fill="#06b6d4"/><Cell fill="#f43f5e"/>
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+              <Card className="p-5">
+                <h3 className="font-bold">Composição das movimentações</h3>
+                <p className="text-xs text-muted-foreground">Participação de admissões e desligamentos no total de movimentações.</p>
+                <div className="mt-4 h-60">
+                  {metrics.admissions + metrics.terminations > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={[{ name: "Admissões", value: metrics.admissions }, { name: "Desligamentos", value: metrics.terminations }]} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={88} paddingAngle={4} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                          <Cell fill="#06b6d4"/><Cell fill="#f43f5e"/>
+                        </Pie>
+                        <Tooltip formatter={(value:number) => [value, "Funcionários"]}/>
+                        <Legend/>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : <p className="flex h-full items-center justify-center text-sm text-muted-foreground">Sem movimentações na competência.</p>}
+                </div>
+              </Card>
             </div>
             <Card className="mt-4 border-primary/20 bg-primary/5 p-5">
               <p className="font-semibold">Como o índice é calculado</p>
