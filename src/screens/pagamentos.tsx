@@ -38,6 +38,7 @@ export function Payments() {
   const [error, setError] = useState("");
   const [confirmPayment, setConfirmPayment] = useState(false);
   const [confirmReversal, setConfirmReversal] = useState<PaymentRow | null>(null);
+  const [historyVisible, setHistoryVisible] = useState(true);
 
   const allCompetencies = periodId === "todos";
   const period = periods.find(p => p.id === periodId) ?? (allCompetencies ? [...periods].sort((a, b) => b.end_date.localeCompare(a.end_date))[0] ?? null : null);
@@ -319,13 +320,13 @@ export function Payments() {
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">O sistema mantém o detalhamento por tipo de hora, mas lança apenas um débito equivalente ao total pago no Banco de Horas.</p>
           </Card>
           <Card className="p-5">
-            <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground"><BadgeCheck className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Histórico de pagamentos</h2><p className="text-xs text-muted-foreground">{allCompetencies ? "Todas as competências" : period ? periodLabel(period) : "Selecione uma competência"}</p></div></div>
-            <div className="mt-4 space-y-3">
+            <div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground"><BadgeCheck className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Histórico de pagamentos</h2><p className="text-xs text-muted-foreground">{allCompetencies ? "Todas as competências" : period ? periodLabel(period) : "Selecione uma competência"}</p></div></div><button type="button" onClick={() => setHistoryVisible(value => !value)} aria-expanded={historyVisible} className="shrink-0 rounded-lg border px-3 py-2 text-xs font-medium transition hover:bg-muted">{historyVisible ? "Ocultar registros" : "Mostrar registros"}</button></div>
+            {historyVisible && <div className="mt-4 space-y-3">
               {!history.length ? <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhum pagamento registrado {allCompetencies ? "nas competências selecionadas" : "nesta competência"}.</p> : history.map(payment => <div key={payment.id} className="rounded-xl border p-3">
                 <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{employees.find(e => e.id === payment.employee_id)?.full_name ?? "Funcionário"}</p><p className="mt-1 text-xs text-muted-foreground">{dateBR(payment.entry_date)} · {hhmm(payment.minutes)}</p><p className="mt-1 text-sm font-semibold tabular-nums">{payment.justification?.match(/Valor: (R\$\s*[\d.,]+)/)?.[1] ?? "Valor não informado"}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${isReversed(payment) ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>{isReversed(payment) ? "Estornado" : "Pago"}</span></div>
                 {payment.employee_id === employeeId && !isReversed(payment) && <button type="button" onClick={() => setConfirmReversal(payment)} disabled={saving || isConsultaOnly()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Estornar pagamento</button>}
               </div>)}
-            </div>
+            </div>}
           </Card>
         </div>
       </div>
