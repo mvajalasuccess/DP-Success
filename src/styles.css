@@ -11,11 +11,11 @@
  */
 
 @theme inline {
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 2px;
-  --radius-xl: 2px;
-  --radius-2xl: 2px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
 
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
@@ -63,7 +63,7 @@
 }
 
 :root {
-  --radius: 2px;
+  --radius: 10px;
 
   /* DP Success — #06CAA0 como assinatura, com base grafite e neutra */
   --background: oklch(0.978 0.006 160);
@@ -623,7 +623,7 @@ textarea:focus-visible {
 
 /* DP Success — padrões compartilhados de interface para todas as telas */
 :root {
-  --radius: 2px;
+  --radius: 10px;
   --dp-page-gap: 1.25rem;
   --dp-control-height: 2.25rem;
   --dp-border: oklch(0.89 0.008 165);
@@ -671,12 +671,109 @@ tbody tr:hover td { background-color: oklch(0.975 0.006 165); }
 }
 
 
-/* Política global de cantos: sem arredondamento decorativo no sistema. */
-:where(.rounded, .rounded-sm, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl, .rounded-full) {
-  border-radius: 2px !important;
+/* Cantos consistentes: aparência contemporânea sem transformar o sistema em uma coleção de "pílulas". */
+:where(.rounded, .rounded-sm) { border-radius: 6px !important; }
+:where(.rounded-md) { border-radius: 8px !important; }
+:where(.rounded-lg) { border-radius: 10px !important; }
+:where(.rounded-xl, .rounded-2xl, .rounded-3xl) { border-radius: 14px !important; }
+:where(.rounded-full) { border-radius: 9999px !important; }
+
+:where(button, input:not([type="checkbox"]):not([type="radio"]), select, textarea, [role="combobox"], [role="button"], [data-slot="card"]) {
+  border-radius: 8px;
 }
 
-/* Elementos de interface com estilos próprios também seguem o limite global. */
-:where(button, input:not([type="checkbox"]):not([type="radio"]), select, textarea, [role="combobox"], [role="button"], [data-slot="card"]) {
-  border-radius: 2px;
+/* Refinamento visual global — apenas apresentação; não altera dados nem regras de cálculo. */
+:root {
+  --background: oklch(0.968 0.006 160);
+  --panel: oklch(0.985 0.003 160);
+  --card: oklch(0.998 0.002 160);
+  --border: oklch(0.88 0.012 160);
+  --input: oklch(0.84 0.014 160);
+  --dp-border: oklch(0.88 0.012 160);
+  --dp-surface-muted: oklch(0.955 0.008 160);
+}
+
+body {
+  background-image: radial-gradient(ellipse at 8% 0%, color-mix(in oklab, var(--color-primary) 5%, transparent), transparent 34rem);
+  background-attachment: fixed;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-height: 40px;
+  border-radius: 8px !important;
+  background-color: var(--color-card);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus {
+  border-color: var(--color-primary-strong);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 15%, transparent);
+}
+
+:where(button, [role="button"]) {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+:where(button:not(:disabled):not([data-sidebar="menu-button"]), [role="button"]:not([aria-disabled="true"])):active {
+  transform: translateY(1px);
+}
+
+/* Cards mais nítidos, com borda fina e sombra suave; não altera o conteúdo interno. */
+:where([data-slot="card"], main .rounded-lg.border.bg-card, main .rounded-xl.border.bg-card, main .border.bg-card) {
+  border-color: var(--dp-border);
+  border-radius: 12px !important;
+  box-shadow: 0 2px 5px color-mix(in oklab, oklch(0.22 0.025 160) 4%, transparent), 0 12px 28px color-mix(in oklab, oklch(0.22 0.025 160) 3%, transparent);
+}
+
+:where([data-slot="card"], main .rounded-lg.border.bg-card, main .rounded-xl.border.bg-card, main .border.bg-card):hover {
+  border-color: color-mix(in oklab, var(--color-primary-strong) 22%, var(--dp-border));
+}
+
+/* Tabelas com hierarquia mais clara e leitura confortável de dados. */
+table thead th {
+  background: oklch(0.945 0.012 160);
+  color: oklch(0.38 0.022 160);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+}
+
+table tbody td {
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+
+table tbody tr:hover td {
+  background: oklch(0.965 0.018 160);
+}
+
+/* Ações primárias mais sólidas e legíveis, mantendo o verde da marca. */
+button.bg-primary,
+a.bg-primary,
+button[class*="bg-primary"] {
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--color-primary-strong) 16%, transparent);
+}
+
+button.bg-primary:hover:not(:disabled),
+a.bg-primary:hover,
+button[class*="bg-primary"]:hover:not(:disabled) {
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--color-primary-strong) 18%, transparent);
+}
+
+/* Títulos de página e conteúdo: mais respiro sem mudar a estrutura das telas. */
+main h1 {
+  color: oklch(0.23 0.025 160);
+  letter-spacing: -0.035em;
+}
+
+main h2 {
+  letter-spacing: -0.025em;
+}
+
+@media (max-width: 640px) {
+  :where([data-slot="card"], main .rounded-lg.border.bg-card, main .rounded-xl.border.bg-card, main .border.bg-card) {
+    border-radius: 10px !important;
+  }
 }
