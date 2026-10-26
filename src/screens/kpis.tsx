@@ -1616,7 +1616,7 @@ export function Kpis() {
           <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
             <Card className="p-5">
               <div className="flex items-center justify-between gap-3">
-                <div><h3 className="font-bold">Evolução mensal</h3><p className="text-xs text-muted-foreground">Percentual de horas perdidas consideradas em cada competência.</p></div>
+                <div><h3 className="font-bold">Evolução Absenteísmo</h3><p className="text-xs text-muted-foreground">Percentual de horas perdidas consideradas em cada competência.</p></div>
                 <span className="text-xs text-muted-foreground">{appliedYear}</span>
               </div>
               <div className="mt-5 h-56">
@@ -1692,13 +1692,13 @@ export function Kpis() {
               </div>
               <div className="mt-5 h-56"><ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={monthlyAbsenteeism} margin={{top:12,right:12,left:0,bottom:0}}>
-                  <defs><linearGradient id="debitsEvolutionFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3B82F6" stopOpacity={0.7}/><stop offset="95%" stopColor="#3B82F6" stopOpacity={0.05}/></linearGradient></defs>
+                  
                   <CartesianGrid strokeDasharray="3 3" vertical={false}/>
                   <XAxis dataKey="label" tick={{fontSize:10}}/>
                   <YAxis tickFormatter={(value:number) => fmt(value)} tick={{fontSize:10}}/>
                   <Tooltip formatter={(value:number, name:string, props:any) => [`${fmt(props.payload.lost)} perdidas · ${pct(props.payload.rate)} absenteísmo`, "Horas perdidas"]}/>
-                  <Area type="monotone" dataKey="lost" name="Horas perdidas" stroke="#3B82F6" strokeWidth={3} fill="url(#debitsEvolutionFill)" activeDot={{r:5}}/>
-                </AreaChart>
+                  <Bar dataKey="lost" name="Horas perdidas" fill="#0D9488" radius={[6,6,0,0]} activeBar={{ fill: "#0F766E" }}/>
+                </BarChart>
               </ResponsiveContainer></div>
               {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados históricos para o ano selecionado.</p>}
             </Card>
