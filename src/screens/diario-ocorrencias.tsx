@@ -93,8 +93,20 @@ export function DiarioOcorrencias() {
     const {error}=await (supabase as any).from("employee_life_events").update({status:"void",void_reason:reason.trim()}).eq("id",e.id);
     if(error)setError(error.message);else{setNotice("Ocorrência cancelada e preservada no histórico.");await load();}
   }
+  async function saveCatalog(){
+    if(!catalogName.trim()){setError("Informe o nome do item.");return;}
+    const {error}=await (supabase as any).from("employee_document_catalog").insert({name:catalogName.trim(),category:catalogCategory,alert_days:Number(catalogAlertDays)||0,active:true});
+    if(error){setError(error.message);return;}setCatalogName("");setNotice("Item adicionado à lista padrão.");await load();
+  }
+  async function removeCatalog(item:DocCatalog){
+    if(!window.confirm(`Desativar "${item.name}" da lista padrão?`))return;
+    const {error}=await (supabase as any).from("employee_document_catalog").update({active:false}).eq("id",item.id);
+    if(error)setError(error.message);else{setNotice("Item desativado.");await load();}
+  }
   async function saveDoc(){
-    if(!docForm.employee_id||!docForm.document_name.trim()){setError("Selecione o funcionário e informe o nome do documento, exame ou treinamento.");return;}
+    const chosen=docCatalog.find(c=>c.id===selectedCatalog);
+    const documentName=(chosen?.name??docForm.document_name).trim();
+    if(!docForm.employee_id||!documentName){setError("Selecione o funcionário e informe o nome do documento, exame ou treinamento.");return;}
     const {data:userData}=await (supabase as any).auth.getUser();
     const {error}=await (supabase as any).from("employee_document_records").insert({employee_id:docForm.employee_id,catalog_id:chosen?.id??null,document_name:documentName,last_completed_on:docForm.last_completed_on||null,due_date:docForm.due_date||null,notes:docForm.notes.trim()||null,created_by:userData?.user?.id??null});
     if(error){setError(error.message);return;}setDocOpen(false);setDocForm(emptyDoc);setSelectedCatalog("");setNotice("Documento registrado.");await load();

@@ -18,7 +18,7 @@ function validCnpj(value: string) {
   const cnpj = normalizeCnpj(value);
   if (!/^[A-Z0-9]{12}[0-9]{2}$/.test(cnpj) || /^([A-Z0-9])\\1{13}$/.test(cnpj)) return false;
   const digit = (base: string, weights: number[]) => {
-    const sum = base.split("").reduce((acc, char, i) => acc + (char.charCodeAt(0) - 48) * weights[i], 0);
+    const sum = base.split("").reduce((acc, char, i) => acc + (char.charCodeAt(0) - 48) * (weights[i] ?? 0), 0);
     const rest = sum % 11;
     return rest < 2 ? 0 : 11 - rest;
   };
