@@ -16,6 +16,8 @@ type Employee = {
   status: string;
   birthDate: string | null;
   salary: number | null;
+  gender: string | null;
+  pensionAmount: number;
   workScheduleId: string | null;
   companyId: string | null;
 };
@@ -128,7 +130,7 @@ export function Kpis() {
         { data: holidayRows, error: holidayError },
       ] = await Promise.all([
         db.from("time_periods").select("id,reference_year,reference_month,start_date,end_date,status").order("start_date", { ascending: false }),
-        db.from("employees").select("id,full_name,registration,department_id,birth_date,salary,hire_date,termination_date,status,work_schedule_id,company_id,departments(name)").order("full_name"),
+        db.from("employees").select("id,full_name,registration,department_id,birth_date,salary,gender,pension_amount,hire_date,termination_date,status,work_schedule_id,company_id,departments(name)").order("full_name"),
         db.from("holidays").select("holiday_date").eq("is_demo", false),
       ]);
 
@@ -158,6 +160,8 @@ export function Kpis() {
           status: e.status ?? "ativo",
           birthDate: e.birth_date ?? null,
           salary: e.salary == null ? null : Number(e.salary),
+          gender: e.gender ?? null,
+          pensionAmount: Number(e.pension_amount ?? 0),
           workScheduleId: e.work_schedule_id ?? null,
           companyId: e.company_id ?? null,
         };
@@ -1309,7 +1313,8 @@ export function Kpis() {
             <Card className="p-5"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.birthDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => { const d = new Date(e.birthDate + "T00:00:00"); const now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }).filter(n => n >= 0 && n < 120); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
             <Card className="p-5"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-2xl font-bold">{(() => { const now = new Date(); const values = employees.filter(e => e.hireDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => Math.max(0, Math.floor(((e.terminationDate ? new Date(e.terminationDate + "T00:00:00") : now).getTime() - new Date(e.hireDate + "T00:00:00").getTime()) / 86400000))); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length / 365.25).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
             <Card className="p-5"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.salary != null && e.salary > 0 && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => e.salary as number); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Sem dados"; })()}</p></Card>
-            <Card className="p-5"><p className="text-sm text-muted-foreground">Sexo e pensão</p><p className="mt-2 text-sm font-medium">Campos não disponíveis no cadastro atual</p><p className="mt-1 text-xs text-muted-foreground">Precisam ser registrados no cadastro para gerar indicadores confiáveis.</p></Card>
+            <Card className="p-5"><p className="text-sm text-muted-foreground">Distribuição por sexo</p><div className="mt-2 space-y-1.5 text-sm">{(() => { const base = employees.filter(e => (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))); const counts = new Map<string, number>(); base.forEach(e => { const label = e.gender === "feminino" ? "Feminino" : e.gender === "masculino" ? "Masculino" : e.gender === "outro" ? "Outro" : e.gender === "prefere_nao_informar" ? "Prefere não informar" : "Não informado"; counts.set(label, (counts.get(label) ?? 0) + 1); }); return [...counts.entries()].map(([label, count]) => <div key={label} className="flex justify-between gap-3"><span>{label}</span><strong>{count}</strong></div>); })()}</div></Card>
+            <Card className="p-5"><p className="text-sm text-muted-foreground">Total mensal de pensão</p><p className="mt-2 text-2xl font-bold">{employees.filter(e => (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).reduce((sum, e) => sum + (e.pensionAmount || 0), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p><p className="mt-1 text-xs text-muted-foreground">Soma dos valores cadastrados para os funcionários filtrados.</p></Card>
           </div>
         </section>
         {activeSection === "absenteismo" && (
