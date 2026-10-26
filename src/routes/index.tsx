@@ -825,17 +825,17 @@ function DashboardHome() {
 
   return (
     <div className="min-h-screen bg-background">
-        <header className="flex h-16 items-center border-b bg-background/90 px-6">
+        <header className="dp-screen-topbar flex h-14 items-center border-b bg-background px-4 sm:px-6">
           <span className="text-xs text-muted-foreground">RH / Visão geral</span>
         </header>
-        <div className="mx-auto max-w-[1500px] px-6 py-7">
+        <div className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
-              <p className="text-sm font-medium text-primary">Gestão</p>
-              <h1 className="mt-1 text-3xl font-bold tracking-tight">Dashboard</h1>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Gestão</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-[30px]">Dashboard</h1>
               <p className="mt-1 text-sm text-muted-foreground">Resumo executivo de RH e DP da competência atual.</p>
             </div>
-            <div className="rounded-2xl border bg-card px-5 py-3 text-sm shadow-sm">
+            <div className="rounded-lg border bg-card px-5 py-3 text-sm shadow-none">
               <p className="text-xs text-muted-foreground">Competência atual</p>
               <strong>{metrics.period}</strong>
             </div>
