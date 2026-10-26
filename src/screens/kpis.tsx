@@ -47,7 +47,6 @@ type Metrics = {
   declaracoesMinutes: number;
   abonosMinutes: number;
   worked: number;
-  creditsMinutes: number;
   he60: number;
   he60Night: number;
   he100: number;
@@ -61,7 +60,7 @@ type Metrics = {
 };
 
 const emptyMetrics: Metrics = {
-  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, faltasDays: 0, folgasDays: 0, atestadosMinutes: 0, atestadosDays: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0, creditsMinutes: 0,
+  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, faltasDays: 0, folgasDays: 0, atestadosMinutes: 0, atestadosDays: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0,
   he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0,
   interjornada: 0, turnover: 0, admissions: 0, terminations: 0, activeHeadcount: 0,
 };
@@ -270,7 +269,6 @@ export function Kpis() {
       const [
         { data: historical, error: historicalError },
         { data: overtime, error: overtimeError },
-        { data: creditRows, error: creditError },
         { data: timeRecords, error: timeError },
         { data: currentOccurrences, error: occurrenceError },
         { data: currentDebits, error: debitError },
@@ -294,12 +292,6 @@ export function Kpis() {
           ? db.from("overtime_records")
               .select("employee_id,period_id,minutes,launch_type,notes")
               .in("period_id", currentPeriodIds)
-          : Promise.resolve({ data: [], error: null }),
-        periodIds.length
-          ? db.from("overtime_records")
-              .select("employee_id,period_id,minutes,notes")
-              .in("period_id", periodIds)
-              .ilike("notes", "%Crédito total do período%")
           : Promise.resolve({ data: [], error: null }),
         currentPeriodIds.length
           ? db.from("time_records")
@@ -329,8 +321,8 @@ export function Kpis() {
           .in("period_id", periodIds),
       ]);
 
-      if (historicalError || overtimeError || creditError || timeError || occurrenceError || debitError || certificateError || scheduleError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? creditError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || timeError || occurrenceError || debitError || certificateError || scheduleError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
         setIsCalculating(false);
         return;
       }
@@ -383,16 +375,7 @@ export function Kpis() {
       };
 
       const next = { ...emptyMetrics };
-      // Créditos vêm exclusivamente dos lançamentos que a importação identificou
-      // como "Crédito total do período". Não inferir pela diferença entre trabalhadas
-      // e previstas, nem transformar ajustes negativos em créditos positivos.
-      // Competências sem esse lançamento não têm crédito histórico disponível nesta fonte.
-      next.creditsMinutes = (creditRows ?? []).reduce((sum: number, row: any) => {
-        if (!row.employee_id || !allowedIds.has(String(row.employee_id))) return sum;
-        const minutes = Number(row.minutes);
-        return Number.isFinite(minutes) ? sum + minutes : sum;
-      }, 0);
-      let historicalCount = 0;
+      let historicalCount = 0;      let historicalCount = 0;
       let operationalCount = 0;
       const scheduleMinutes = new Map<string, number>(
         (scheduleRows ?? []).map((s: any) => [String(s.id), Number(s.weekly_minutes || 0)]),
@@ -1668,19 +1651,24 @@ export function Kpis() {
             </Card>
 
             <Card className="p-5">
-              <h3 className="font-bold">Composição de horas</h3>
-              <p className="text-xs text-muted-foreground">Mostra o que está gerando o indicador.</p>
-              <div className="mt-5 space-y-3">
-                {[
-                  ["Créditos", metrics.creditsMinutes],
+              <h3 className="font-bold">Composição das horas perdidas</h3>
+              <p className="text-xs text-muted-foreground">Débitos, faltas e abonos que compõem o absenteísmo.</p>
+              {(() => {
+                const parts: [string, number][] = [
                   ["Débitos", Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)],
-                ].map(([label, value]) => (
-                  <div key={String(label)}>
-                    <div className="flex justify-between text-sm"><span>{label}</span><strong>{fmt(Number(value))}</strong></div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${(metrics.creditsMinutes + Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)) ? Math.min(100, Number(value) / (metrics.creditsMinutes + Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)) * 100) : 0}%` }} /></div>
-                  </div>
-                ))}
-              </div>
+                  ["Faltas", Math.max(0, metrics.faltasMinutes)],
+                  ["Abonos", Math.max(0, metrics.abonosMinutes)],
+                ];
+                const total = parts.reduce((sum, [, value]) => sum + value, 0);
+                return <div className="mt-5 space-y-4">
+                  {parts.map(([label, value]) => (
+                    <div key={label}>
+                      <div className="flex justify-between gap-3 text-sm"><span>{label}</span><strong>{fmt(value)}{total > 0 ? ` · ${(value / total * 100).toFixed(1)}%` : ""}</strong></div>
+                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${total ? Math.min(100, value / total * 100) : 0}%` }} /></div>
+                    </div>
+                  ))}
+                </div>;
+              })()}
             </Card>
           </div>
 
