@@ -28,6 +28,7 @@ export function Payments() {
   const [periodId, setPeriodId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState("ativos");
   const [details, setDetails] = useState<Detail[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [balances, setBalances] = useState<PeriodBalance[]>([]);
@@ -242,7 +243,7 @@ export function Payments() {
   }
 
   const companyEmployeeIds = useMemo(() => new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id)), [employees, companyFilter]);
-  const visibleEmployees = useMemo(() => employees.filter(e => companyEmployeeIds.has(e.id)), [employees, companyEmployeeIds]);
+  const visibleEmployees = useMemo(() => employees.filter(e => companyEmployeeIds.has(e.id) && (employeeStatusFilter === "todos" || (employeeStatusFilter === "ativos" ? e.status !== "inativo" : e.status === "inativo"))), [employees, companyEmployeeIds, employeeStatusFilter]);
   const selectableEmployees = useMemo(() => visibleEmployees.filter(e => allCompetencies || (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)), [visibleEmployees, allCompetencies, period]);
   const selectedEmployeeIndex = selectableEmployees.findIndex(e => e.id === employeeId);
   const navigateEmployee = (direction: -1 | 1) => {
@@ -263,11 +264,13 @@ export function Payments() {
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="grid gap-1.5 text-sm font-medium">Empresa
-              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(e => (!value || e.company_id === value) && (allCompetencies || !period || !e.hire_date || e.hire_date <= period.end_date) && (allCompetencies || !period || !e.termination_date || e.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
+              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(e => (!value || e.company_id === value) && (employeeStatusFilter === "todos" || (employeeStatusFilter === "ativos" ? e.status !== "inativo" : e.status === "inativo")) && (allCompetencies || !period || !e.hire_date || e.hire_date <= period.end_date) && (allCompetencies || !period || !e.termination_date || e.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">Situação
+              <select className={inputCls} value={employeeStatusFilter} onChange={e => { const nextStatus = e.target.value; setEmployeeStatusFilter(nextStatus); const first = employees.find(person => (!companyFilter || person.company_id === companyFilter) && (nextStatus === "todos" || (nextStatus === "ativos" ? person.status !== "inativo" : person.status === "inativo")) && (allCompetencies || !period || !person.hire_date || person.hire_date <= period.end_date) && (allCompetencies || !period || !person.termination_date || person.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }}><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Competência
-              <select className={inputCls} value={periodId} onChange={e => { const nextPeriodId = e.target.value; setPeriodId(nextPeriodId); const nextPeriod = periods.find(item => item.id === nextPeriodId); const first = employees.find(person => (!companyFilter || person.company_id === companyFilter) && (nextPeriodId === "todos" || !nextPeriod || !person.hire_date || person.hire_date <= nextPeriod.end_date) && (nextPeriodId === "todos" || !nextPeriod || !person.termination_date || person.termination_date >= nextPeriod.start_date)); setEmployeeId(first?.id ?? ""); }} disabled={loading}>
-                <option value="">Selecione a competência</option>
+              <select className={inputCls} value={periodId || (periods[0]?.id ?? "todos")} onChange={e => { const nextPeriodId = e.target.value; setPeriodId(nextPeriodId); const nextPeriod = periods.find(item => item.id === nextPeriodId); const first = employees.find(person => (!companyFilter || person.company_id === companyFilter) && (nextPeriodId === "todos" || !nextPeriod || !person.hire_date || person.hire_date <= nextPeriod.end_date) && (nextPeriodId === "todos" || !nextPeriod || !person.termination_date || person.termination_date >= nextPeriod.start_date)); setEmployeeId(first?.id ?? ""); }} disabled={loading}>
                 <option value="todos">Todas as competências</option>
                 {periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}
               </select>
