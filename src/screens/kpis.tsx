@@ -1613,6 +1613,55 @@ export function Kpis() {
             </Card>
           )}
 
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Card className="p-5">
+              <h3 className="font-bold">Composição das ocorrências (%)</h3>
+              <p className="text-xs text-muted-foreground">Participação de atestados, declarações de horas, faltas e folgas no total registrado nesta competência.</p>
+              {(() => {
+                const items = [
+                  { name: "Atestados", value: Math.max(0, metrics.atestadosDays), color: "#06CAA0" },
+                  { name: "Declarações de horas", value: Math.max(0, metrics.declaracoesMinutes), color: "#3B82F6" },
+                  { name: "Faltas", value: Math.max(0, metrics.faltasMinutes), color: "#8B5CF6" },
+                  { name: "Folgas", value: Math.max(0, metrics.folgasDays), color: "#F59E0B" },
+                ];
+                const total = items.reduce((sum, item) => sum + item.value, 0);
+                return <div className="mt-4 grid items-center gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
+                  <div className="relative mx-auto h-48 w-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart><Pie data={items} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={58} outerRadius={86} paddingAngle={2} stroke="none">
+                        {items.map(item => <Cell key={item.name} fill={item.color}/>)}
+                      </Pie><Tooltip formatter={(value:number, name:string) => [`${total ? (Number(value) / total * 100).toFixed(1) : "0.0"}%`, name]}/></PieChart>
+                    </ResponsiveContainer>
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"><span className="text-xs text-muted-foreground">Ocorrências</span><strong className="text-xl">{total ? "100%" : "0%"}</strong></div>
+                  </div>
+                  <div className="space-y-3">{items.map(item => <div key={item.name} className="flex items-center gap-2 text-sm">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{backgroundColor:item.color}}/>
+                    <span className="min-w-0 flex-1">{item.name}</span>
+                    <strong>{total ? (item.value / total * 100).toFixed(1) : "0.0"}%</strong>
+                  </div>)}</div>
+                </div>;
+              })()}
+              <p className="mt-2 text-xs text-muted-foreground">Atestados e folgas são exibidos na unidade em que estão cadastrados; os percentuais representam participação relativa entre os registros.</p>
+            </Card>
+            <Card className="p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div><h3 className="font-bold">Evolução dos débitos</h3><p className="text-xs text-muted-foreground">Horas perdidas por competência ao longo do ano selecionado.</p></div>
+                <span className="text-xs text-muted-foreground">{appliedYear}</span>
+              </div>
+              <div className="mt-5 h-56"><ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyAbsenteeism} margin={{top:12,right:12,left:0,bottom:0}}>
+                  <defs><linearGradient id="debitsEvolutionFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3B82F6" stopOpacity={0.7}/><stop offset="95%" stopColor="#3B82F6" stopOpacity={0.05}/></linearGradient></defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                  <XAxis dataKey="label" tick={{fontSize:10}}/>
+                  <YAxis tickFormatter={(value:number) => fmt(value)} tick={{fontSize:10}}/>
+                  <Tooltip formatter={(value:number, name:string, props:any) => [`${fmt(props.payload.lost)} perdidas · ${pct(props.payload.rate)} absenteísmo`, "Horas perdidas"]}/>
+                  <Area type="monotone" dataKey="lost" name="Horas perdidas" stroke="#3B82F6" strokeWidth={3} fill="url(#debitsEvolutionFill)" activeDot={{r:5}}/>
+                </AreaChart>
+              </ResponsiveContainer></div>
+              {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados históricos para o ano selecionado.</p>}
+            </Card>
+          </div>
+
           <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_1fr]">
             <Card className="p-5">
               <div className="flex items-center justify-between gap-3">
