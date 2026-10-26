@@ -100,7 +100,11 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
     if (value == null || value === "") return "—";
     const raw = String(value);
     if (/(date|_date|start_date|end_date)/i.test(key) && /^\d{4}-\d{2}-\d{2}/.test(raw)) return formatDate(raw.slice(0, 10));
-    if (typeof value === "number" && /value|valor/i.test(key)) return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    if (typeof value === "number" && /value|valor|\(R\$\)/i.test(key)) return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    if (typeof value === "number" && /min\)/i.test(key)) {
+      const minutes = Math.round(Math.abs(value));
+      return (value < 0 ? "-" : "") + Math.floor(minutes / 60).toString().padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0");
+    }
     return raw;
   };
   const html = '<html lang="pt-BR"><head><meta charset="utf-8"><title>' + escapeReportHtml(title) + '</title><style>' +
@@ -117,14 +121,14 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
   document.body.appendChild(frame);
   if (!frame.contentDocument) { frame.remove(); throw new Error("Não foi possível preparar o PDF."); }
-  frame.contentDocument.open();
-  frame.contentDocument.write(html);
-  frame.contentDocument.close();
   frame.onload = () => {
     frame.contentWindow?.focus();
     frame.contentWindow?.print();
     window.setTimeout(() => frame.remove(), 60000);
   };
+  frame.contentDocument.open();
+  frame.contentDocument.write(html);
+  frame.contentDocument.close();
 }
 
 function formatDate(value: string) {
@@ -1132,10 +1136,10 @@ export function Relatorios() {
                           : "Excel de faltas e folgas com funcionário, período, tipo, quantidade e observações."}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <button onClick={() => void exportReport(key, "excel")} disabled={!!busy || loading} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
+                <button onClick={() => void exportReport(key, "excel")} disabled={!!busy || loading || (key === "horas_pagar" && allCompetencies)} title={key === "horas_pagar" && allCompetencies ? "Selecione uma competência específica para calcular Horas a Pagar." : undefined} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
                   <Download className="h-4 w-4" /> {busy === key ? "Gerando…" : "Exportar Excel"}
                 </button>
-                <button onClick={() => void exportReport(key, "pdf")} disabled={!!busy || loading} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+                <button onClick={() => void exportReport(key, "pdf")} disabled={!!busy || loading || (key === "horas_pagar" && allCompetencies)} title={key === "horas_pagar" && allCompetencies ? "Selecione uma competência específica para calcular Horas a Pagar." : undefined} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
                   <FileBarChart className="h-4 w-4" /> Exportar PDF
                 </button>
               </div>
