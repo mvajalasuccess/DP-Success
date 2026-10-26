@@ -106,7 +106,7 @@ export function DiarioOcorrencias() {
     const steps=templates.filter(t=>t.process_type===processType&&t.active);
     if(!steps.length){setError("Cadastre ao menos uma etapa ativa para este tipo de processo.");return;}
     const {data:userData}=await (supabase as any).auth.getUser();
-    const {data:instance,error}=await (supabase as any).from("employee_checklist_instances").insert({employee_id:selectedEmployee,process_type:processType,created_by:userData?.user?.id??null}).select("id").single();
+    const {data:instance,error}=await (supabase as any).from("employee_checklist_instances").insert({employee_id:selectedEmployee,process_type:processType}).select("id").single();
     if(error){setError(error.message);return;}
     const {error:stepError}=await (supabase as any).from("employee_checklist_steps").insert(steps.map(t=>({instance_id:instance.id,template_id:t.id,title_snapshot:t.title,position:t.position})));
     if(stepError){setError(stepError.message);return;}setNotice("Checklist criado com uma cópia das etapas atuais.");await load();
