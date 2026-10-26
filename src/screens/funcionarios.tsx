@@ -57,7 +57,7 @@ export function Employees() {
   function openNew() {
     setError("");
     setEditingId(null);
-    setForm({ name: "", role: "", department: "", salary: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
+    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
     setOpen(true);
   }
 
