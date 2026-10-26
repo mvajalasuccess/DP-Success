@@ -169,8 +169,8 @@ function AppShell({
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 shadow-sm backdrop-blur lg:hidden">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Clock3 className="h-4 w-4" /></span>
-          <span className="truncate font-display text-sm font-bold tracking-tight">DP SUCCESS</span>
+          <Clock3 className="h-5 w-5 shrink-0 text-primary-strong" strokeWidth={1.8} aria-hidden="true" />
+          <span className="truncate font-display text-sm font-semibold tracking-tight">DP <span className="text-primary-strong">SUCCESS</span></span>
         </div>
         <button type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-haspopup="dialog" className="inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Menu className="h-4 w-4" /> Menu
@@ -179,7 +179,7 @@ function AppShell({
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-[70] bg-foreground/40 lg:hidden">
           <button type="button" className="absolute inset-0 h-full w-full cursor-default" onClick={() => setMobileMenuOpen(false)} aria-label="Fechar menu de navegação" />
-          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="dp-sidebar relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl">
+          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="dp-sidebar relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
             <div className="dp-sidebar-header flex h-[76px] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
               <div className="flex min-w-0 items-center gap-3">
                 <Clock3 className="h-5 w-5 shrink-0 text-sidebar-primary" strokeWidth={1.8} aria-hidden="true" />
@@ -194,7 +194,7 @@ function AppShell({
                   <div className="space-y-0.5">
                     {group.items.map(([label, key, Icon]) => (
                       <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"}`}>
-                        <Icon className="h-4 w-4 shrink-0" /><span>{label}</span>
+                        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span>
                       </button>
                     ))}
                   </div>
@@ -217,10 +217,8 @@ function AppShell({
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Clock3 className="h-4 w-4" />
-            </div>
-            <span className="font-display text-base font-bold text-foreground">DP Success</span>
+            <Clock3 className="h-5 w-5 text-primary-strong" strokeWidth={1.8} aria-hidden="true" />
+            <span className="font-display text-base font-semibold text-foreground">DP <span className="text-primary-strong">SUCCESS</span></span>
           </div>
         </div>
       )}
@@ -302,7 +300,7 @@ function AppShell({
                 ["dashboard", LayoutDashboard, "Dashboard"], ["kpis", ChartColumn, "KPIs"], ["comparativos", UsersRound, "Comparativos"], ["relatorios", FileText, "Relatórios"],
                 ["fechamento-ponto", CalendarClock, "Fechamento"], ["importar-cartao-ponto", Upload, "Importar Cartão Ponto"], ["lancamentos", ClipboardList, "Lançamentos"], ["banco-horas", Clock3, "Banco de Horas"], ["pagamentos", BadgeDollarSign, "Pagamentos"], ["ocorrencias", CalendarX, "Faltas e Folgas"], ["atestados", ClipboardCheck, "Declarações e Atestados"],
                 ["empresas", Building2, "Empresas"], ["funcionarios", UsersRound, "Funcionários"], ["cargos", BriefcaseBusiness, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", CalendarDays, "Jornadas"], ["planejamento-mensal", CalendarRange, "Planejamento Mensal"], ["diario-ocorrencias", ClipboardList, "Diário de Ocorrências"], ["tarefas", FileText, "Tarefas"],
-              ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label}><Icon className="h-4 w-4 shrink-0" /></button>)}
+              ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label} aria-label={label} aria-current={screen === key ? "page" : undefined}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /></button>)}
             </>
           )}
         </nav>
@@ -333,7 +331,7 @@ function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavig
     await supabase.auth.signOut();
     window.location.href = "/login";
   };
-  const initials = name.trim().split(/\\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() ?? "").join("") || "DP";
+  const initials = name.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() ?? "").join("") || "DP";
 
   return (
     <div className="dp-sidebar-footer border-t border-sidebar-border p-3">
