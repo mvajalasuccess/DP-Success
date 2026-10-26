@@ -619,3 +619,53 @@ textarea:focus-visible {
   .kpis-page *, .kpis-page *::before, .kpis-page *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
   .kpis-page .kpi-skeleton { animation: none; }
 }
+
+
+/* DP Success — padrões compartilhados de interface para todas as telas */
+:root {
+  --radius: 0.625rem;
+  --dp-page-gap: 1.25rem;
+  --dp-control-height: 2.25rem;
+  --dp-border: oklch(0.89 0.008 165);
+  --dp-surface-muted: oklch(0.965 0.005 165);
+}
+
+/* Controles nativos e componentes seguem a mesma altura, borda e foco. */
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea, button) {
+  accent-color: var(--color-primary-strong);
+}
+:where(input:not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: var(--dp-control-height);
+}
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 1px;
+}
+:where(button, [role="button"], a) {
+  -webkit-tap-highlight-color: transparent;
+}
+:where(button, [role="button"]):focus-visible, a:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* Tabelas de dados: cabeçalho discreto, leitura numérica e separadores leves. */
+thead th {
+  background-color: var(--dp-surface-muted);
+  border-bottom: 1px solid var(--dp-border);
+  color: var(--color-muted-foreground);
+  font-size: 0.75rem;
+  letter-spacing: 0.025em;
+}
+tbody tr + tr td { border-top: 1px solid var(--dp-border); }
+tbody tr:hover td { background-color: oklch(0.975 0.006 165); }
+
+/* Evita animações de interface para quem prefere movimento reduzido. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
