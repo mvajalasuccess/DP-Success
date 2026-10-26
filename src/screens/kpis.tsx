@@ -1244,8 +1244,54 @@ export function Kpis() {
   const turnoverTone = metrics.turnover >= KPI_THRESHOLDS.turnoverCritical ? "critical" : metrics.turnover >= KPI_THRESHOLDS.turnoverAttention ? "warning" : "neutral";
   const bankTone = Math.abs(bankBalance) >= KPI_THRESHOLDS.bankCriticalMinutes ? "critical" : Math.abs(bankBalance) >= KPI_THRESHOLDS.bankAttentionMinutes ? "warning" : "neutral";
   const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0 || bankBalance !== 0;
+
+  const demographicKpiEmployees = employees.filter(e =>
+    (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
+    (appliedDepartment === "todos" || e.department === appliedDepartment) &&
+    (!appliedEmployees.length || appliedEmployees.includes(e.id)) &&
+    (demographicStatusFilter === "todos" || (demographicStatusFilter === "ativos"
+      ? (!e.terminationDate && ["ativo", "active"].includes((e.status || "").toLowerCase()))
+      : (Boolean(e.terminationDate) || ["inativo", "inactive"].includes((e.status || "").toLowerCase()))))
+  );
+  const demographicAges = demographicKpiEmployees.filter(e => e.birthDate).map(e => {
+    const birth = new Date(e.birthDate + "T00:00:00");
+    const today = new Date();
+    return today.getFullYear() - birth.getFullYear() - (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
+  }).filter(age => age >= 0 && age < 120);
+  const demographicTenures = demographicKpiEmployees.filter(e => e.hireDate).map(e => {
+    const today = new Date();
+    const end = new Date((e.terminationDate || today.toISOString().slice(0, 10)) + "T00:00:00");
+    const start = new Date(e.hireDate + "T00:00:00");
+    return Math.max(0, (end.getTime() - start.getTime()) / 86400000 / 365.25);
+  });
+  const salaryKpiEmployees = employees.filter(e =>
+    (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
+    (appliedDepartment === "todos" || e.department === appliedDepartment) &&
+    (!appliedEmployees.length || appliedEmployees.includes(e.id)) &&
+    (salaryStatusFilter === "todos" || (salaryStatusFilter === "ativos"
+      ? (!e.terminationDate && ["ativo", "active"].includes((e.status || "").toLowerCase()))
+      : (Boolean(e.terminationDate) || ["inativo", "inactive"].includes((e.status || "").toLowerCase()))))
+  );
+  const salaryKpiRows = salaryKpiEmployees.filter(e => e.salary != null && e.salary > 0);
+  const salaryKpiTotal = salaryKpiRows.reduce((sum, e) => sum + Number(e.salary || 0), 0);
+  const pensionKpiEmployees = salaryKpiEmployees.filter(e => e.pensionAmount > 0);
+  const kpiMoney = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const toneLabel = (tone: string) => tone === "critical" ? "Crítico · limite provisório" : tone === "warning" ? "Atenção · limite provisório" : "Dentro da faixa provisória";
-  const kpiItems: Array<{ label: string; value: string; support: string; tone: string; title: string; primary?: boolean; status?: string }> = activeSection === "horas-extras"
+  const kpiItems: Array<{ label: string; value: string; support: string; tone: string; title: string; primary?: boolean; status?: string }> = activeSection === "demograficos"
+    ? [
+        { label: "Funcionários na seleção", value: String(demographicKpiEmployees.length), support: "Conforme filtros e situação", tone: "neutral", title: "Quantidade de funcionários na seleção demográfica.", primary: true },
+        { label: "Idade média", value: demographicAges.length ? (demographicAges.reduce((sum, age) => sum + age, 0) / demographicAges.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados", support: `${demographicAges.length} cadastro(s) com nascimento`, tone: "neutral", title: "Idade média calculada a partir das datas de nascimento." },
+        { label: "Tempo médio de empresa", value: demographicTenures.length ? (demographicTenures.reduce((sum, years) => sum + years, 0) / demographicTenures.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados", support: `${demographicTenures.length} cadastro(s) com admissão`, tone: "neutral", title: "Tempo médio desde a admissão até hoje ou desligamento." },
+        { label: "Nascimento preenchido", value: demographicKpiEmployees.length ? Math.round(demographicAges.length / demographicKpiEmployees.length * 100) + "%" : "0%", support: `${demographicKpiEmployees.length - demographicAges.length} sem idade calculável`, tone: "neutral", title: "Percentual de funcionários com data de nascimento válida." },
+      ]
+    : activeSection === "salariais"
+    ? [
+        { label: "Salário médio", value: salaryKpiRows.length ? kpiMoney(salaryKpiTotal / salaryKpiRows.length) : "Sem dados", support: `Base de ${salaryKpiRows.length} salário(s)`, tone: "neutral", title: "Média dos salários cadastrados na seleção.", primary: true },
+        { label: "Folha mensal estimada", value: kpiMoney(salaryKpiTotal), support: "Soma dos salários, sem encargos", tone: "neutral", title: "Soma dos salários cadastrados, sem encargos." },
+        { label: "Funcionários com pensão", value: String(pensionKpiEmployees.length), support: "Com valor mensal maior que zero", tone: "neutral", title: "Quantidade de cadastros com pensão alimentícia." },
+        { label: "Total de pensões", value: kpiMoney(pensionKpiEmployees.reduce((sum, e) => sum + e.pensionAmount, 0)), support: "Soma dos valores cadastrados", tone: "neutral", title: "Soma dos valores de pensão cadastrados." },
+      ]
+    : activeSection === "horas-extras"
     ? [
         { label: "Horas extras", value: fmt(Math.max(0, totalOvertime - metrics.interjornada)), support: "Total de HE, sem interjornada", tone: "neutral", title: "Soma dos tipos de hora extra já apurados nesta seleção.", primary: true },
         { label: "Funcionários com HE", value: String(overtimeEmployees.filter(item => item.total - item.interjornada > 0).length), support: "Com horas extras no período", tone: "neutral", title: "Contagem de funcionários com horas extras na seleção." },
@@ -1798,12 +1844,7 @@ export function Kpis() {
                 <h2 className="mt-1 text-2xl font-bold">Turnover</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Calculado automaticamente pelas datas de desligamento cadastradas.</p>
               </div>
-              <div className="rounded-2xl border bg-card px-6 py-4 text-right shadow-sm">
-                <p className="text-xs text-muted-foreground">Turnover</p>
-                <p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{periodLabel}</p>
-              </div>
-            </div>
+</div>
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="p-6"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Admissões</p><p className="mt-1 text-3xl font-bold">{metrics.admissions}</p></Card>
               <Card className="p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Desligamentos</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
