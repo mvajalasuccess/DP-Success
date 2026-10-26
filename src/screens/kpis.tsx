@@ -1,4 +1,4 @@
-import { ArrowLeft, Users, Clock3, CalendarX2, Percent, UserMinus, Info, WalletCards, FileText, TrendingUp, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Users, Clock3, CalendarX2, Percent, UserMinus, Info, WalletCards, FileText, TrendingUp, AlertTriangle, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -124,6 +124,7 @@ export function Kpis() {
   const [source, setSource] = useState("");
   const [bankBalance, setBankBalance] = useState(0);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
   const [interjornadaStatus, setInterjornadaStatus] = useState<"ativo" | "inativo" | "todos">("todos");
   const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<Array<{ periodId: string; label: string; rate: number; expected: number; lost: number }>>([]);
@@ -145,6 +146,7 @@ export function Kpis() {
 
       if (periodError || employeeError || holidayError) {
         setError(periodError?.message ?? employeeError?.message ?? holidayError?.message ?? "Não foi possível carregar os KPIs.");
+        setIsLoadingPage(false);
         return;
       }
 
@@ -184,6 +186,7 @@ export function Kpis() {
       const years = [...new Set(parsedPeriods.map(p => p.reference_year))].sort((a, b) => b - a);
       const firstYear = years[0];
       if (firstYear !== undefined) { setSelectedYear(firstYear); setAppliedYear(firstYear); }
+      setIsLoadingPage(false);
     })();
   }, []);
 
@@ -1226,33 +1229,74 @@ export function Kpis() {
 
   const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
   const totalOvertime = metrics.he60 + metrics.he60Night + metrics.he100 + metrics.he100Night + metrics.he20 + metrics.interjornada;
+  const defaultKpiYear = periods.length ? Math.max(...periods.map(p => p.reference_year)) : new Date().getFullYear();
+
+  // Limites provisórios para sinalização visual; ajustar quando o DP definir metas oficiais.
+  const KPI_THRESHOLDS = {
+    absenteeismAttention: 5,
+    absenteeismCritical: 8,
+    turnoverAttention: 20,
+    turnoverCritical: 30,
+    bankAttentionMinutes: 8 * 60,
+    bankCriticalMinutes: 40 * 60,
+  };
+  const absenteeismTone = absenteeismRate >= KPI_THRESHOLDS.absenteeismCritical ? "critical" : absenteeismRate >= KPI_THRESHOLDS.absenteeismAttention ? "warning" : "neutral";
+  const turnoverTone = metrics.turnover >= KPI_THRESHOLDS.turnoverCritical ? "critical" : metrics.turnover >= KPI_THRESHOLDS.turnoverAttention ? "warning" : "neutral";
+  const bankTone = Math.abs(bankBalance) >= KPI_THRESHOLDS.bankCriticalMinutes ? "critical" : Math.abs(bankBalance) >= KPI_THRESHOLDS.bankAttentionMinutes ? "warning" : "neutral";
+  const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0 || bankBalance !== 0;
+  const toneLabel = (tone: string) => tone === "critical" ? "Crítico · limite provisório" : tone === "warning" ? "Atenção · limite provisório" : "Dentro da faixa provisória";
+  const kpiItems: Array<{ label: string; value: string; support: string; tone: string; title: string; primary?: boolean; status?: string }> = activeSection === "horas-extras"
+    ? [
+        { label: "Horas extras", value: fmt(Math.max(0, totalOvertime - metrics.interjornada)), support: "Total de HE, sem interjornada", tone: "neutral", title: "Soma dos tipos de hora extra já apurados nesta seleção.", primary: true },
+        { label: "Funcionários com HE", value: String(overtimeEmployees.filter(item => item.total - item.interjornada > 0).length), support: "Com horas extras no período", tone: "neutral", title: "Contagem de funcionários com horas extras na seleção." },
+        { label: "Interjornada", value: fmt(metrics.interjornada), support: "Exibida separadamente; não soma ao saldo", tone: "neutral", title: "Interjornada é exibida separadamente e não compõe o saldo." },
+        { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: bankTone, status: toneLabel(bankTone), title: "Saldo apurado pelo modelo atual de Banco de Horas." },
+      ]
+    : activeSection === "turnover"
+    ? [
+        { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: "[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100.", primary: true },
+        { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: "Ativos na competência selecionada", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
+        { label: "Admissões", value: String(metrics.admissions), support: "Dentro do período selecionado", tone: "neutral", title: "Admissões com data dentro do período selecionado." },
+        { label: "Desligamentos", value: String(metrics.terminations), support: "Dentro do período selecionado", tone: "neutral", title: "Desligamentos com data dentro do período selecionado." },
+      ]
+    : [
+        { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: `${fmt(metrics.absenceMinutes)} perdidas / ${fmt(metrics.expected)} previstas`, tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100.", primary: true },
+        { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: "Ativos na competência selecionada", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
+        { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: "[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100." },
+        { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: bankTone, status: toneLabel(bankTone), title: "Saldo acumulado no Banco de Horas até o fim do período selecionado." },
+      ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-background/95 px-6 py-4">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between">
-          <a href="/" className="text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="mr-1 inline h-4 w-4" />Voltar</a>
-          <b>DP Success · KPIs</b>
+    <div className="kpis-page min-h-screen">
+      <header className="border-b border-[var(--kpi-border)] bg-[var(--kpi-surface)] px-5 py-3 sm:px-7">
+        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
+          <a href="/" className="inline-flex min-h-8 items-center text-[13px] font-medium text-[var(--kpi-text-muted)] transition-colors hover:text-[var(--kpi-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]" aria-label="Voltar ao início">
+            <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />Voltar
+          </a>
+          <span className="font-display text-[13px] font-semibold tracking-[-0.02em] text-[var(--kpi-text)]">DP Success <span className="mx-1 text-[var(--kpi-text-muted)]">·</span> KPIs</span>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] px-6 py-7">
-        <div>
-          <p className="text-sm font-medium text-primary">Gestão</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight">KPIs de RH e DP</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{periodLabel || "Selecione os filtros para analisar os indicadores."}</p>
-        </div>
-
-        <section className="mt-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <Card className="p-5"><Users className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Funcionários no período</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.employees)}</p><p className="mt-1 text-xs text-muted-foreground">ativos na competência selecionada</p></Card>
-            <Card className="p-5"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Absenteísmo</p><p className="mt-1 text-3xl font-bold">{pct(absenteeismRate)}</p><p className="mt-1 text-xs text-muted-foreground">{fmt(metrics.absenceMinutes)} perdidas / {fmt(metrics.expected)} previstas</p></Card>
-            <Card className="p-5"><Percent className="h-5 w-5 text-primary" /><p className="mt-3 text-sm text-muted-foreground">Turnover</p><p className="mt-1 text-3xl font-bold">{pct(metrics.turnover)}</p><p className="mt-1 text-xs text-muted-foreground">{metrics.admissions} admissões · {metrics.terminations} desligamentos</p></Card>
+      <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-6 sm:px-7 sm:pt-8">
+        <section aria-labelledby="kpis-page-title">
+          <p className="kpi-eyebrow">Gestão</p>
+          <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+            <div>
+              <h1 id="kpis-page-title" className="font-display text-[clamp(27px,3vw,36px)] font-semibold leading-[1.08] tracking-[-0.045em] text-[var(--kpi-text)]">KPIs de RH e DP</h1>
+              <p className="mt-2 text-[13px] leading-5 text-[var(--kpi-text-muted)]">
+                {periodLabel || "Selecione os filtros para analisar os indicadores."}
+                <span className="mx-2 text-[var(--kpi-border)]">·</span>
+                {appliedMonth === "todos" ? "Todos os meses" : "Competência selecionada"}
+                <span className="mx-2 text-[var(--kpi-border)]">·</span>
+                {appliedCompanyFilter ? "Empresa filtrada" : "Todas as empresas"}
+              </p>
+            </div>
+            <p className="pb-0.5 text-[12px] font-medium tabular-nums text-[var(--kpi-text-muted)]">Dados da seleção aplicada</p>
           </div>
         </section>
 
-        <Card className="mt-4 border shadow-sm">
-          <div className="flex items-center gap-1 border-b px-3 pt-3">
+        <section className="mt-7" aria-label="Navegação e filtros dos indicadores">
+          <div role="tablist" aria-label="Categorias de KPIs" className="flex flex-wrap items-center gap-x-1 border-b border-[var(--kpi-border)]">
             {[
               ["absenteismo", "Absenteísmo"],
               ["horas-extras", "Hr Extra"],
@@ -1262,72 +1306,149 @@ export function Kpis() {
             ].map(([key, label]) => (
               <button
                 key={key}
+                id={`kpi-tab-${key}`}
                 type="button"
+                role="tab"
+                aria-selected={activeSection === key}
+                aria-controls={`kpi-panel-${key}`}
+                tabIndex={activeSection === key ? 0 : -1}
                 onClick={() => setActiveSection(key as typeof activeSection)}
-                className={`border-b-2 px-5 py-3 text-sm font-medium transition ${activeSection === key ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                onKeyDown={event => {
+                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                  event.preventDefault();
+                  const tabs = Array.from(event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? []);
+                  if (!tabs.length) return;
+                  const currentIndex = tabs.indexOf(event.currentTarget);
+                  const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+                  tabs[nextIndex]?.focus();
+                  tabs[nextIndex]?.click();
+                }}
+                className="kpi-tab"
               >
                 {label}
               </button>
             ))}
           </div>
 
-          <div className="grid gap-4 p-5 md:grid-cols-3 lg:grid-cols-5">
-            <label className="grid min-w-0 gap-1.5 text-sm font-medium">Empresa
-              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setSelectedEmployees([]); setSelectedDepartment("todos"); }} className="h-10 w-full min-w-0 max-w-full rounded-lg border bg-background px-3 text-ellipsis outline-none focus:ring-2 focus:ring-primary/20" />
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">Ano
-              <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
-                {[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}
-              </select>
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">Mês
-              <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
-                <option value="todos">Todos</option>
-                {periods.filter(p => p.reference_year === selectedYear).map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}
-              </select>
-            </label>
-            <label className="grid gap-1.5 text-sm font-medium">Setor
-              <select className="h-10 rounded-lg border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/20" value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}>
-                <option value="todos">Todos os setores</option>
-                {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </label>
-            <div className="relative grid gap-1.5 text-sm font-medium">
-              Funcionários da competência
-              <button type="button" className="flex h-10 items-center justify-between rounded-lg border bg-background px-3 text-left font-normal" onClick={() => setEmployeeFilterOpen(v => !v)}>
-                <span className="truncate">{selectedEmployees.length === 0 ? "Todos os funcionários" : `${selectedEmployees.length} selecionado(s)`}</span>
-                <span className="ml-2 text-muted-foreground">⌄</span>
-              </button>
-              {employeeFilterOpen && (
-                <div className="absolute left-0 right-0 top-[4.5rem] z-30 max-h-72 overflow-y-auto rounded-lg border bg-popover p-2 text-sm shadow-xl">
-                  <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
-                    <input type="checkbox" checked={selectedEmployees.length === 0} onChange={() => setSelectedEmployees([])} />
-                    <span>Todos os funcionários</span>
-                  </label>
-                  {employeeOptions.map(e => (
-                    <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-muted">
-                      <input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={() => setSelectedEmployees(current => current.includes(e.id) ? current.filter(id => id !== e.id) : [...current, e.id])} />
-                      <span className="truncate">{e.name}</span>
+          <div className="mt-4 border-y border-[var(--kpi-border)] bg-[var(--kpi-surface)] px-3 py-4 sm:px-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.2fr_0.62fr_1.15fr_1fr_1.55fr_auto] xl:items-end">
+              <label className="kpi-toolbar-label">
+                <span>Empresa</span>
+                <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setSelectedEmployees([]); setSelectedDepartment("todos"); }} className={`kpi-control ${companyFilter ? "is-filtered" : ""}`} />
+              </label>
+              <label className="kpi-toolbar-label">
+                <span>Ano</span>
+                <select aria-label="Ano" className={`kpi-control ${selectedYear !== defaultKpiYear ? "is-filtered" : ""}`} value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
+                  {[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}
+                </select>
+              </label>
+              <label className="kpi-toolbar-label">
+                <span>Mês</span>
+                <select aria-label="Mês ou competência" className={`kpi-control ${selectedMonth !== "todos" ? "is-filtered" : ""}`} value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+                  <option value="todos">Todos os meses</option>
+                  {periods.filter(p => p.reference_year === selectedYear).map(p => <option key={p.id} value={p.id}>{periodRangeLabel(p)}</option>)}
+                </select>
+              </label>
+              <label className="kpi-toolbar-label">
+                <span>Setor</span>
+                <select aria-label="Setor" className={`kpi-control ${selectedDepartment !== "todos" ? "is-filtered" : ""}`} value={selectedDepartment} onChange={e => setSelectedDepartment(e.target.value)}>
+                  <option value="todos">Todos os setores</option>
+                  {departmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </label>
+              <div className="relative grid min-w-0 gap-[5px]">
+                <label htmlFor="kpi-employee-filter" className="kpi-toolbar-label"><span>Funcionários da competência</span></label>
+                <button id="kpi-employee-filter" type="button" aria-haspopup="dialog" aria-expanded={employeeFilterOpen} aria-controls="kpi-employee-options" className={`kpi-control flex items-center justify-between text-left ${selectedEmployees.length ? "is-filtered" : ""}`} onClick={() => setEmployeeFilterOpen(v => !v)} onKeyDown={event => { if (event.key === "Escape") setEmployeeFilterOpen(false); }}>
+                  <span className="truncate">{selectedEmployees.length === 0 ? "Todos os funcionários" : `${selectedEmployees.length} selecionado(s)`}</span>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-[var(--kpi-text-muted)]" aria-hidden="true" />
+                </button>
+                {employeeFilterOpen && (
+                  <div id="kpi-employee-options" role="dialog" aria-label="Selecionar funcionários da competência" className="kpi-select-popover absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-72 overflow-y-auto p-2 text-[13px]">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-2 hover:bg-[var(--kpi-surface-muted)]">
+                      <input type="checkbox" checked={selectedEmployees.length === 0} onChange={() => setSelectedEmployees([])} />
+                      <span>Todos os funcionários</span>
                     </label>
-                  ))}
-                </div>
+                    {employeeOptions.map(e => (
+                      <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-2 hover:bg-[var(--kpi-surface-muted)]">
+                        <input type="checkbox" checked={selectedEmployees.includes(e.id)} onChange={() => setSelectedEmployees(current => current.includes(e.id) ? current.filter(id => id !== e.id) : [...current, e.id])} />
+                        <span className="truncate">{e.name}</span>
+                      </label>
+                    ))}
+                    {!employeeOptions.length && <p className="px-2 py-3 text-[12px] text-[var(--kpi-text-muted)]">Nenhum funcionário disponível nesta competência.</p>}
+                  </div>
+                )}
+              </div>
+              {(
+                companyFilter || selectedMonth !== "todos" || selectedDepartment !== "todos" || selectedEmployees.length > 0 ||
+                selectedYear !== Math.max(...periods.map(p => p.reference_year), new Date().getFullYear())
+              ) && (
+                <button type="button" className="kpi-clear justify-self-start xl:justify-self-end" onClick={() => {
+                  const defaultYear = Math.max(...periods.map(p => p.reference_year), new Date().getFullYear());
+                  setSelectedYear(defaultYear); setAppliedYear(defaultYear);
+                  setSelectedMonth("todos"); setAppliedMonth("todos");
+                  setSelectedDepartment("todos"); setAppliedDepartment("todos");
+                  setCompanyFilter(""); setAppliedCompanyFilter("");
+                  setSelectedEmployees([]); setAppliedEmployees([]);
+                  setEmployeeFilterOpen(false);
+                  setRefreshToken(value => value + 1);
+                }}>Limpar filtros</button>
               )}
             </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--kpi-border)] pt-3">
+              <p className="text-[12px] leading-5 text-[var(--kpi-text-muted)]">
+                {selectedEmployees.length ? `${selectedEmployees.length} funcionário(s) selecionado(s)` : "Todos os funcionários da competência"}
+                {companyFilter ? " · Empresa específica" : " · Todas as empresas"}
+                {selectedDepartment !== "todos" ? ` · Setor: ${selectedDepartment}` : ""}
+              </p>
+              <button type="button" onClick={() => { setAppliedYear(selectedYear); setAppliedMonth(selectedMonth); setAppliedDepartment(selectedDepartment); setAppliedCompanyFilter(companyFilter); setAppliedEmployees(selectedEmployees); setRefreshToken(value => value + 1); }} disabled={isCalculating} className="inline-flex min-h-[38px] min-w-40 items-center justify-center gap-2 rounded-[3px] bg-[var(--kpi-accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)] focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+                {isCalculating ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Atualizando…</> : "Atualizar KPIs"}
+              </button>
+            </div>
           </div>
-          <div className="flex justify-end border-t px-5 py-3">
-            <button type="button" onClick={() => { setAppliedYear(selectedYear); setAppliedMonth(selectedMonth); setAppliedDepartment(selectedDepartment); setAppliedCompanyFilter(companyFilter); setAppliedEmployees(selectedEmployees); setRefreshToken(value => value + 1); }} disabled={isCalculating} className="inline-flex min-w-40 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:cursor-wait disabled:opacity-70">
-              {isCalculating ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" /> Pensando…</> : "Atualizar KPIs"}
-            </button>
-          </div>
-        </Card>
+        </section>
 
-        <div className="mt-3 flex min-h-8 items-center justify-end gap-2 text-xs text-muted-foreground" aria-live="polite">
-          {isCalculating ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" /> Pensando… atualizando os indicadores com os filtros selecionados</> : <span>Indicadores atualizados para os filtros selecionados</span>}
+        <section className="mt-6" aria-label="Indicadores principais">
+          {isCalculating || isLoadingPage ? (
+            <div className="kpi-band" aria-label="Carregando indicadores" aria-live="polite">
+              {["principal", "secundario-1", "secundario-2", "secundario-3"].map((key, index) => (
+                <div key={key} className={index === 0 ? "kpi-primary" : "kpi-secondary"}>
+                  <div className="kpi-skeleton h-3 w-28" />
+                  <div className="kpi-skeleton mt-4 h-9 w-32" />
+                  <div className="kpi-skeleton mt-3 h-3 w-full max-w-48" />
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="border-y border-[var(--kpi-border)] bg-[var(--kpi-critical-soft)] px-5 py-5" role="alert">
+              <p className="text-sm font-semibold text-[var(--kpi-critical)]">Não foi possível carregar os indicadores</p>
+              <p className="mt-1 break-words text-[13px] text-[var(--kpi-text)]">{error}</p>
+              <p className="mt-2 text-[12px] text-[var(--kpi-text-muted)]">Confira os filtros e tente atualizar novamente. Os cálculos não foram alterados.</p>
+            </div>
+          ) : !hasKpiData ? (
+            <div className="border-y border-[var(--kpi-border)] bg-[var(--kpi-surface)] px-5 py-7" role="status">
+              <p className="text-sm font-semibold text-[var(--kpi-text)]">Sem dados para a seleção</p>
+              <p className="mt-1 text-[13px] text-[var(--kpi-text-muted)]">Escolha outro ano, mês ou conjunto de filtros e clique em “Atualizar KPIs”.</p>
+            </div>
+          ) : (
+            <div className="kpi-band">
+              {kpiItems.map((item, index) => (
+                <div key={item.label} className={index === 0 ? "kpi-primary" : "kpi-secondary"} title={item.title} aria-label={`${item.label}. ${item.title}`}>
+                  <p className="text-[12px] font-semibold leading-5 text-[var(--kpi-text-muted)]">{item.label}</p>
+                  <p className={`kpi-value ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : ""}`}>{item.value}</p>
+                  <p className="kpi-support">{item.support}</p>
+                  {item.status && <span className={`kpi-status ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : "is-neutral"}`}>{item.status}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-2 text-[11px] leading-4 text-[var(--kpi-text-muted)]">As faixas de atenção são provisórias e visuais; não alteram os cálculos nem os dados.</p>
+        </section>
+
+        <div className="mt-3 flex min-h-7 items-center justify-end gap-2 text-[12px] text-[var(--kpi-text-muted)]" aria-live="polite">
+          {isCalculating || isLoadingPage ? <><span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--kpi-border)] border-t-[var(--kpi-accent)]" /> Atualizando indicadores para os filtros selecionados</> : <span>Indicadores atualizados para os filtros aplicados</span>}
         </div>
-        {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
-
         {activeSection === "demograficos" && (
-          <section className="mt-6 space-y-4">
+          <section id="kpi-panel-demograficos" role="tabpanel" aria-labelledby="kpi-tab-demograficos" tabIndex={0} className="mt-6 space-y-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             {(() => {
               const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)) && (demographicStatusFilter === "todos" || (demographicStatusFilter === "ativos" ? (!e.terminationDate && ["ativo","active"].includes((e.status || "").toLowerCase())) : (Boolean(e.terminationDate) || ["inativo","inactive"].includes((e.status || "").toLowerCase())))));
               const today = new Date();
@@ -1373,7 +1494,7 @@ export function Kpis() {
         )}
 
         {activeSection === "salariais" && (
-          <section className="mt-6 space-y-4">
+          <section id="kpi-panel-salariais" role="tabpanel" aria-labelledby="kpi-tab-salariais" tabIndex={0} className="mt-6 space-y-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             {(() => {
               const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)) && (salaryStatusFilter === "todos" || (salaryStatusFilter === "ativos" ? (!e.terminationDate && ["ativo","active"].includes((e.status || "").toLowerCase())) : (Boolean(e.terminationDate) || ["inativo","inactive"].includes((e.status || "").toLowerCase())))));
               const salaries = base.filter(e => e.salary != null && e.salary > 0).map(e => ({...e, salary: Number(e.salary)}));
@@ -1414,7 +1535,7 @@ export function Kpis() {
           </section>
         )}
         {activeSection === "absenteismo" && (
-          <section className="mt-6">
+          <section id="kpi-panel-absenteismo" role="tabpanel" aria-labelledby="kpi-tab-absenteismo" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
@@ -1518,7 +1639,7 @@ export function Kpis() {
           )}
 
         {activeSection === "horas-extras" && (
-          <section className="mt-6">
+          <section id="kpi-panel-horas-extras" role="tabpanel" aria-labelledby="kpi-tab-horas-extras" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 02</p>
@@ -1672,7 +1793,7 @@ export function Kpis() {
         )}
 
         {activeSection === "turnover" && (
-          <section className="mt-6">
+          <section id="kpi-panel-turnover" role="tabpanel" aria-labelledby="kpi-tab-turnover" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 03</p>
