@@ -207,14 +207,14 @@ export function Atestados() {
     else await load();
   }
 
-  return <div className="min-h-screen bg-background">
-    <header className="border-b px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between">
+  return <div className="dp-screen min-h-screen bg-background">
+    <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5"><div className="mx-auto flex max-w-[1500px] items-center justify-between">
       <a href="/" className="flex gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a>
       <b>DP Success · Declarações e Atestados</b>
     </div></header>
-    <main className="mx-auto max-w-[1500px] px-6 py-7">
-      <div className="flex items-end justify-between gap-4"><div><p className="text-sm text-primary">Ponto</p><h1 className="text-3xl font-bold">Declarações e Atestados</h1><p className="text-sm text-muted-foreground">Registre atestados e declarações com as horas efetivamente abonadas.</p></div>
-        <div className="flex gap-2"><button onClick={() => { startNew(); setMode("atestado"); }} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="mr-2 inline h-4 w-4" />Novo atestado</button><button onClick={() => { setMode("declaracao"); setEditing(null); setEditingDeclaration(null); setError(""); setDeclarationForm({ employee_id: "", occurrence_date: "", quantity: "", reason: "Acompanhante", notes: "" }); setOpen(true); }} className="rounded-lg border px-4 py-2.5 text-sm"><Plus className="mr-2 inline h-4 w-4" />Nova declaração</button></div>
+    <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
+      <div className="flex items-end justify-between gap-4"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Ponto</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Declarações e Atestados</h1><p className="text-sm text-muted-foreground">Registre atestados e declarações com as horas efetivamente abonadas.</p></div>
+        <div className="flex gap-2"><button onClick={() => { startNew(); setMode("atestado"); }} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="mr-2 inline h-4 w-4" />Novo atestado</button><button onClick={() => { setMode("declaracao"); setEditing(null); setEditingDeclaration(null); setError(""); setDeclarationForm({ employee_id: "", occurrence_date: "", quantity: "", reason: "Acompanhante", notes: "" }); setOpen(true); }} className="rounded-lg border px-4 py-2.5 text-sm"><Plus className="mr-2 inline h-4 w-4" />Nova declaração</button></div>
       </div>
       <Card className="mt-6 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-medium"><span>Filtros</span><span className="text-xs font-normal text-muted-foreground">Aplicados às duas listas</span></div>

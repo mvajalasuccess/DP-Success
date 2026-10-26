@@ -363,16 +363,16 @@ export function ImportacaoHistorico() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b px-6 py-4">
+    <div className="dp-screen min-h-screen bg-background">
+      <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between">
           <a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4" />Voltar</a>
           <b>DP Success · Importação</b>
         </div>
       </header>
       <main className="mx-auto max-w-[1200px] px-6 py-7">
-        <p className="text-sm text-primary">Importação</p>
-        <h1 className="text-3xl font-bold">Importar histórico</h1>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Importação</p>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Importar histórico</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
           Importe a aba BASE do Power BI para continuar os KPIs de 2026 sem transformar o histórico consolidado em lançamentos fictícios.
         </p>

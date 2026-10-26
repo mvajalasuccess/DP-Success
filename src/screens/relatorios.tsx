@@ -990,8 +990,8 @@ export function Relatorios() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b px-6 py-4">
+    <div className="dp-screen min-h-screen bg-background">
+      <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between">
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground">
             <ArrowLeft className="h-4 w-4" /> Voltar
@@ -999,8 +999,8 @@ export function Relatorios() {
           <span className="font-semibold">DP Success · Relatórios</span>
         </div>
       </header>
-      <main className="mx-auto max-w-[1500px] px-6 py-7">
-        <p className="text-sm font-medium text-primary">Gestão</p>
+      <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Gestão</p>
         <h1 className="mt-1 text-3xl font-bold">Relatórios</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {loading

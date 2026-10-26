@@ -82,11 +82,11 @@ export function Companies() {
   }
 
   const filtered = companies.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.cnpj.includes(normalizeCnpj(search)));
-  return <div className="min-h-screen bg-background">
+  return <div className="dp-screen min-h-screen bg-background">
     <header className="border-b bg-background px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground">← Voltar</a><div className="text-sm font-semibold">DP Success · Cadastros</div></div></header>
-    <main className="mx-auto max-w-[1500px] px-6 py-7">
+    <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div><p className="text-sm font-medium text-primary">Cadastro base</p><h1 className="mt-1 text-3xl font-bold">Empresas</h1><p className="mt-1 text-sm text-muted-foreground">Cadastre as empresas do grupo para depois vinculá-las aos funcionários e usar os filtros do sistema.</p></div>
+        <div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Cadastro base</p><h1 className="mt-1 text-3xl font-bold">Empresas</h1><p className="mt-1 text-sm text-muted-foreground">Cadastre as empresas do grupo para depois vinculá-las aos funcionários e usar os filtros do sistema.</p></div>
         <button type="button" onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground"><Plus className="h-4 w-4"/> Nova empresa</button>
       </div>
       {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}

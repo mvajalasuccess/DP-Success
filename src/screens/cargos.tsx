@@ -80,8 +80,8 @@ export function Positions() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b px-6 py-4">
+    <div className="dp-screen min-h-screen bg-background">
+      <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5">
         <div className="mx-auto flex max-w-[1500px] justify-between">
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground">
             <ArrowLeft className="h-4 w-4" /> Voltar
@@ -90,16 +90,16 @@ export function Positions() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] px-6 py-7">
+      <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-sm font-medium text-primary">Empresas</p>
-            <h1 className="text-3xl font-bold">Cargos</h1>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Empresas</p>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Cargos</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Cadastre os cargos utilizados pelos funcionários.
             </p>
           </div>
-          <button type="button" onClick={openNew} className="rounded-lg bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+          <button type="button" onClick={openNew} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             <Plus className="mr-2 inline h-4 w-4" /> Novo cargo
           </button>
         </div>

@@ -77,9 +77,9 @@ export function Tarefas(){
   const emp=(id:string|null)=>employees.find(x=>x.id===id)?.full_name;
   const prof=(id:string|null)=>{const p=profiles.find(x=>x.id===id);return p?.full_name||p?.email};
 
-  return <div className="min-h-screen bg-background">
+  return <div className="dp-screen min-h-screen bg-background">
     <header className="border-b px-6 py-5"><div className="mx-auto max-w-[1250px] flex flex-wrap items-center justify-between gap-4">
-      <div><p className="text-sm text-primary">Organização do RH</p><h1 className="text-3xl font-bold">Tarefas e Agenda</h1><p className="mt-1 text-sm text-muted-foreground">Centralize suas pendências, prazos e lembretes.</p></div>
+      <div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Organização do RH</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Tarefas e Agenda</h1><p className="mt-1 text-sm text-muted-foreground">Centralize suas pendências, prazos e lembretes.</p></div>
       <button onClick={newTask} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="h-4 w-4"/>Nova tarefa</button>
     </div></header>
     <main className="mx-auto max-w-[1250px] space-y-6 px-6 py-6">
