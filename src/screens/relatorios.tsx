@@ -82,6 +82,51 @@ function downloadCsv(name: string, rows: any[]) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function escapeReportHtml(value: unknown) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function downloadReportPdf(title: string, rows: any[], subtitle: string) {
+  if (!rows.length) throw new Error("Não há dados para gerar o PDF.");
+  const columns = Object.keys(rows[0]);
+  const headers: Record<string, string> = {
+    employee: "Funcionário", employee_name: "Funcionário", date: "Data", end_date: "Data final",
+    start_date: "Data inicial", type: "Tipo", quantity: "Quantidade", unit: "Unidade",
+    description: "Observações", registration: "Matrícula", department: "Departamento",
+    department_name: "Departamento", days: "Dias", tipo: "Tipo", horas_abonadas: "Horas abonadas",
+    motivo: "Motivo", certificate_type: "Tipo de atestado", cid: "CID",
+  };
+  const showValue = (key: string, value: unknown) => {
+    if (value == null || value === "") return "—";
+    const raw = String(value);
+    if (/(date|_date|start_date|end_date)/i.test(key) && /^\\d{4}-\\d{2}-\\d{2}/.test(raw)) return formatDate(raw.slice(0, 10));
+    if (typeof value === "number" && /value|valor/i.test(key)) return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    return raw;
+  };
+  const html = '<html lang="pt-BR"><head><meta charset="utf-8"><title>' + escapeReportHtml(title) + '</title><style>' +
+    '@page{size:A4 landscape;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#183735;font-size:10px;margin:0}' +
+    '.brand{background:#123b3a;color:#fff;padding:22px 26px}.eyebrow{font-size:9px;letter-spacing:2px;color:#9debd8;font-weight:bold}h1{font-size:22px;margin:8px 0}.subtitle{font-size:10px;color:#d9f4ed}' +
+    '.meta{display:flex;justify-content:space-between;padding:12px 16px;background:#f0faf7;border:1px solid #d8eee7;color:#365b56}table{width:100%;border-collapse:collapse;margin-top:18px}thead{display:table-header-group}tr{break-inside:avoid}' +
+    'th{background:#dff7f0;color:#123b3a;text-align:left;font-size:9px;text-transform:uppercase}th,td{padding:8px 7px;border-bottom:1px solid #e1ece8;vertical-align:top;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f6faf9}.footer{margin-top:16px;padding-top:8px;border-top:1px solid #d8e8e3;color:#64817b;font-size:9px}@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>' +
+    '<header class="brand"><div class="eyebrow">DP SUCCESS · GESTÃO DE PESSOAS</div><h1>' + escapeReportHtml(title) + '</h1><div class="subtitle">' + escapeReportHtml(subtitle) + '</div></header>' +
+    '<div class="meta"><strong>Registros: ' + rows.length + '</strong><span>Gerado em ' + new Date().toLocaleString("pt-BR") + '</span></div><table><thead><tr>' +
+    columns.map(key => '<th>' + escapeReportHtml(headers[key] || key.replace(/_/g, " ")) + '</th>').join("") + '</tr></thead><tbody>' +
+    rows.map(row => '<tr>' + columns.map(key => '<td>' + escapeReportHtml(showValue(key, row[key])) + '</td>').join("") + '</tr>').join("") +
+    '</tbody></table><div class="footer">DP SUCCESS · Relatório gerencial · Documento para conferência interna</div><script>window.onload=function(){setTimeout(function(){window.print()},300)};</script></body></html>';
+  const frame = document.createElement("iframe");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(frame);
+  if (!frame.contentDocument) { frame.remove(); throw new Error("Não foi possível preparar o PDF."); }
+  frame.contentDocument.open();
+  frame.contentDocument.write(html);
+  frame.contentDocument.close();
+  frame.onload = () => {
+    frame.contentWindow?.focus();
+    frame.contentWindow?.print();
+    window.setTimeout(() => frame.remove(), 60000);
+  };
+}
+
 function formatDate(value: string) {
   if (!value) return "-";
   const [year, month, day] = value.split("-");
