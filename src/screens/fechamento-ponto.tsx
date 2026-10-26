@@ -120,14 +120,14 @@ export function PointClosing() {
       const nameMatches = (employeeLookup ?? []).filter((employee: any) =>
         normalizeIdentity(employee.full_name) === historicalName
       );
-      if (nameMatches.length === 1) return String(nameMatches[0].id);
+      if (nameMatches.length === 1) return String(nameMatches[0]!.id);
 
       const registration = String(row.registration ?? "").trim();
       if (registration) {
         const registrationMatches = (employeeLookup ?? []).filter((employee: any) =>
           String(employee.registration ?? "").trim() === registration
         );
-        if (registrationMatches.length === 1) return String(registrationMatches[0].id);
+        if (registrationMatches.length === 1) return String(registrationMatches[0]!.id);
       }
       return null;
     };

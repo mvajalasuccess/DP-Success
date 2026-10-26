@@ -1178,7 +1178,7 @@ export function Kpis() {
             const override = overrides.get(String(row.employee_id));
             const isDeclaration = code === "declaracao_horas" || code === "declaracao";
             if (overrides.has(String(row.employee_id)) && !isDeclaration) continue;
-            if (isDeclaration && Number(override?.declaration_minutes || 0) > 0) continue;
+            if (isDeclaration && Number((override as any)?.declaration_minutes || 0) > 0) continue;
             const quantity = Number(row.quantity || 0);
             const unit = String(row.unit ?? "dias").toLowerCase();
             const minutes = unit.startsWith("dia") ? quantity * dailyMinutesFromSchedule(employee) : unit.startsWith("hor") ? quantity * 60 : quantity;
