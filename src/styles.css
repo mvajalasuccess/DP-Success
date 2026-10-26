@@ -791,19 +791,22 @@ main h2 {
 }
 
 
-/* KPIs — prioridade de risco nos cards principais (vence os fundos de .kpi-primary/.kpi-secondary). */
-.kpis-page .kpi-band > .kpi-primary.kpi-tone-neutral,
-.kpis-page .kpi-band > .kpi-secondary.kpi-tone-neutral {
-  background: #f0fdf4 !important;
-  border-left: 4px solid #16a34a !important;
+/* KPIs — o estado do indicador prevalece também no primeiro card principal. */
+.kpis-page .kpi-band > div.kpi-primary.kpi-tone-neutral,
+.kpis-page .kpi-band > div.kpi-secondary.kpi-tone-neutral {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-left: 4px solid #d1d5db !important;
 }
-.kpis-page .kpi-band > .kpi-primary.kpi-tone-warning,
-.kpis-page .kpi-band > .kpi-secondary.kpi-tone-warning {
+.kpis-page .kpi-band > div.kpi-primary.kpi-tone-warning,
+.kpis-page .kpi-band > div.kpi-secondary.kpi-tone-warning {
   background: #fff7ed !important;
+  background-color: #fff7ed !important;
   border-left: 4px solid #ea580c !important;
 }
-.kpis-page .kpi-band > .kpi-primary.kpi-tone-critical,
-.kpis-page .kpi-band > .kpi-secondary.kpi-tone-critical {
+.kpis-page .kpi-band > div.kpi-primary.kpi-tone-critical,
+.kpis-page .kpi-band > div.kpi-secondary.kpi-tone-critical {
   background: #fef2f2 !important;
+  background-color: #fef2f2 !important;
   border-left: 4px solid #dc2626 !important;
 }
