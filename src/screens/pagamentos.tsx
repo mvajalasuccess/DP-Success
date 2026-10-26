@@ -38,9 +38,10 @@ export function Payments() {
   const [confirmPayment, setConfirmPayment] = useState(false);
   const [confirmReversal, setConfirmReversal] = useState<PaymentRow | null>(null);
 
-  const period = periods.find(p => p.id === periodId) ?? null;
+  const allCompetencies = periodId === "todos";
+  const period = periods.find(p => p.id === periodId) ?? (allCompetencies ? [...periods].sort((a, b) => b.end_date.localeCompare(a.end_date))[0] ?? null : null);
   const employee = employees.find(e => e.id === employeeId) ?? null;
-  const activePayment = payments.find(p => p.employee_id === employeeId && p.period_id === periodId && !isReversed(p));
+  const activePayment = payments.find(p => p.employee_id === employeeId && p.period_id === period?.id && !isReversed(p));
   // O total de horas do pagamento deve refletir o saldo mensal distribuído entre as categorias.
   // O adicional noturno compõe as horas pagáveis quando ele é a categoria usada para abater o saldo.
   const totalMinutes = details.reduce((sum, item) => sum + item.minutes, 0);
@@ -92,7 +93,10 @@ export function Payments() {
       const [historicalResult, overrideResult, paymentResult, balanceResult, launchResult] = await Promise.all([
         supabase.from("historical_kpi_data").select("employee_id,period_id,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes").eq("employee_id", employeeId).eq("period_id", period.id).maybeSingle(),
         (supabase as any).from("point_closing_overrides").select("employee_id,period_id,he_60_minutes,he_60_night_minutes,he_100_minutes,he_20_minutes").eq("employee_id", employeeId).eq("period_id", period.id).maybeSingle(),
-        supabase.from("bank_hours").select("id,employee_id,period_id,entry_date,minutes,justification,created_at").eq("period_id", period.id).eq("kind", "pagamento_he").order("created_at", { ascending: false }),
+        (allCompetencies
+          ? supabase.from("bank_hours").select("id,employee_id,period_id,entry_date,minutes,justification,created_at").eq("kind", "pagamento_he")
+          : supabase.from("bank_hours").select("id,employee_id,period_id,entry_date,minutes,justification,created_at").eq("period_id", period.id).eq("kind", "pagamento_he")
+        ).order("created_at", { ascending: false }),
         balancesByEmployee(employeeId),
         fetchLaunches({ employeeId, start: period.start_date, end: period.end_date }),
       ]);
@@ -117,13 +121,28 @@ export function Payments() {
         return;
       }
       const composition = periodBalance?.composition;
-      const nightMinutes = Math.max(0, hasHistorical
-        ? Number(source.he_20_minutes || 0)
+      const aggregateComposition = allCompetencies ? balanceResult.reduce((total, row) => ({
+        HE_60: total.HE_60 + Number(row.composition.HE_60 || 0),
+        HE_60_NOTURNO: total.HE_60_NOTURNO + Number(row.composition.HE_60_NOTURNO || 0),
+        HE_100: total.HE_100 + Number(row.composition.HE_100 || 0),
+        ADICIONAL_NOTURNO: total.ADICIONAL_NOTURNO + Number(row.composition.ADICIONAL_NOTURNO || 0),
+      }), { HE_60: 0, HE_60_NOTURNO: 0, HE_100: 0, ADICIONAL_NOTURNO: 0 }) : null;
+      const nightMinutes = Math.max(0, allCompetencies
+        ? Number(aggregateComposition?.ADICIONAL_NOTURNO || 0)
+        : hasHistorical ? Number(source.he_20_minutes || 0)
         : (composition?.ADICIONAL_NOTURNO ?? sumType("ADICIONAL_NOTURNO")));
-      const gross60 = Math.max(0, hasHistorical ? Number(source.he_60_minutes || 0) : (composition?.HE_60 ?? sumType("HE_60")));
-      const gross60Night = Math.max(0, hasHistorical ? Number(source.he_60_night_minutes || 0) : (composition?.HE_60_NOTURNO ?? sumType("HE_60_NOTURNO")));
-      const gross100 = Math.max(0, hasHistorical ? Number(source.he_100_minutes || 0) : (composition?.HE_100 ?? sumType("HE_100")));
-      const targetPayable = Math.max(0, Number(periodBalance?.monthBalance ?? 0));
+      const gross60 = Math.max(0, allCompetencies
+        ? Number(aggregateComposition?.HE_60 || 0)
+        : hasHistorical ? Number(source.he_60_minutes || 0) : (composition?.HE_60 ?? sumType("HE_60")));
+      const gross60Night = Math.max(0, allCompetencies
+        ? Number(aggregateComposition?.HE_60_NOTURNO || 0)
+        : hasHistorical ? Number(source.he_60_night_minutes || 0) : (composition?.HE_60_NOTURNO ?? sumType("HE_60_NOTURNO")));
+      const gross100 = Math.max(0, allCompetencies
+        ? Number(aggregateComposition?.HE_100 || 0)
+        : hasHistorical ? Number(source.he_100_minutes || 0) : (composition?.HE_100 ?? sumType("HE_100")));
+      const targetPayable = Math.max(0, Number(allCompetencies
+        ? balanceResult[balanceResult.length - 1]?.accumulated ?? 0
+        : periodBalance?.monthBalance ?? 0));
       // Regra da tela: HE 60% parte do saldo mensal. Se houver HE 60% + 20%,
       // desconta essa categoria; caso contrário, desconta o adicional noturno de 20%.
       // HE 100% também fica separado, para não misturar categorias nem duplicar horas.
@@ -224,7 +243,7 @@ export function Payments() {
 
   const companyEmployeeIds = useMemo(() => new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id)), [employees, companyFilter]);
   const visibleEmployees = useMemo(() => employees.filter(e => companyEmployeeIds.has(e.id)), [employees, companyEmployeeIds]);
-  const history = useMemo(() => payments.filter(p => p.period_id === periodId && companyEmployeeIds.has(p.employee_id)), [payments, periodId, companyEmployeeIds]);
+  const history = useMemo(() => payments.filter(p => (allCompetencies || p.period_id === period?.id) && companyEmployeeIds.has(p.employee_id)), [payments, allCompetencies, period?.id, companyEmployeeIds]);
 
   return (
     <ScreenShell section="Fechamento de Ponto" title="Pagamentos" name="Pagamentos" subtitle="Calcule o valor das horas extras, registre o pagamento e desconte somente o total de horas do saldo geral." error={error}>
@@ -232,22 +251,23 @@ export function Payments() {
         <Card className="p-5 sm:p-6">
           <div className="mb-5 flex items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-5 w-5" /></div>
-            <div><h2 className="font-display text-base font-semibold">Dados do pagamento</h2><p className="mt-1 text-sm text-muted-foreground">Selecione a competência e o funcionário para consultar as horas e os valores.</p></div>
+            <div><h2 className="font-display text-base font-semibold">Dados do pagamento</h2><p className="mt-1 text-sm text-muted-foreground">Selecione uma competência ou todas para consultar o saldo acumulado disponível para pagamento.</p></div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="grid gap-1.5 text-sm font-medium">Empresa
               <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(e => (!value || e.company_id === value) && (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Competência
-              <select className={inputCls} value={periodId} onChange={e => { const nextPeriodId = e.target.value; setPeriodId(nextPeriodId); const nextPeriod = periods.find(item => item.id === nextPeriodId); const first = employees.find(person => (!companyFilter || person.company_id === companyFilter) && (!nextPeriod || !person.hire_date || person.hire_date <= nextPeriod.end_date) && (!nextPeriod || !person.termination_date || person.termination_date >= nextPeriod.start_date)); setEmployeeId(first?.id ?? ""); }} disabled={loading}>
+              <select className={inputCls} value={periodId} onChange={e => { const nextPeriodId = e.target.value; setPeriodId(nextPeriodId); const nextPeriod = periods.find(item => item.id === nextPeriodId); const first = employees.find(person => (!companyFilter || person.company_id === companyFilter) && (nextPeriodId === "todos" || !nextPeriod || !person.hire_date || person.hire_date <= nextPeriod.end_date) && (nextPeriodId === "todos" || !nextPeriod || !person.termination_date || person.termination_date >= nextPeriod.start_date)); setEmployeeId(first?.id ?? ""); }} disabled={loading}>
                 <option value="">Selecione a competência</option>
+                <option value="todos">Todas as competências</option>
                 {periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}
               </select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Funcionário
               <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={loading}>
                 <option value="">Selecione o funcionário</option>
-                {visibleEmployees.filter(e => (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)).map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                {visibleEmployees.filter(e => allCompetencies || (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)).map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
               </select>
             </label>
           </div>
@@ -266,7 +286,7 @@ export function Payments() {
           </div>
           {employee && hasPositiveGeneralBalance && <div className="mt-4 rounded-lg border p-3 text-sm"><p className="font-semibold">Memória de cálculo</p><p className="mt-1 text-muted-foreground">Hora normal: {money(hourlyRate)} ({money(Number(employee.salary || 0))} ÷ {divisor}h). HE 60%: hora normal × 1,60. HE 60% + 20% noturno: hora normal × 1,60 × 1,20 = fator 1,92. Os valores são calculados com precisão decimal e exibidos em reais com duas casas decimais.</p><p className="mt-1 text-xs text-muted-foreground">A categoria noturna deve ser usada somente para horas elegíveis conforme a jornada e a convenção coletiva aplicável.</p></div>}
           {employee && balances.length > 0 && balances[balances.length - 1]!.accumulated <= 0 && <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p className="font-semibold">Pagamento indisponível</p><p className="mt-1 text-muted-foreground">O funcionário não possui saldo positivo no Banco de Horas geral. Nenhuma hora ou valor será calculado para pagamento.</p></div>}
-          {employee && balanceForPeriod && balances.length > 0 && balances[balances.length - 1]!.accumulated > 0 && <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><span className="font-semibold">Saldo do mês (líquido):</span> <span className="font-mono">{hhmm(balanceForPeriod.monthBalance)}</span><p className="mt-1 text-xs text-muted-foreground">O cálculo usa o saldo mensal como base de HE 60%, descontando a categoria especial aplicável sem duplicar horas.</p></div></div>}
+          {employee && balanceForPeriod && balances.length > 0 && balances[balances.length - 1]!.accumulated > 0 && <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><span className="font-semibold">Saldo do mês (líquido):</span> <span className="font-mono">{hhmm(balanceForPeriod.monthBalance)}</span><p className="mt-1 text-xs text-muted-foreground">{allCompetencies ? "Considera o saldo geral acumulado de todas as competências, já descontados os pagamentos registrados." : "O cálculo usa o saldo mensal como base de HE 60%, descontando a categoria especial aplicável sem duplicar horas."}</p></div></div>}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4 text-primary" />O histórico será mantido; o saldo será debitado pelo total de horas.</div>
             <button type="button" onClick={() => setConfirmPayment(true)} disabled={!period || !employee || totalMinutes <= 0 || loadingDetails || saving || Boolean(activePayment) || balances.length === 0 || balances[balances.length - 1]!.accumulated <= 0 || isConsultaOnly()} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><CircleDollarSign className="h-4 w-4" />{activePayment ? "Pagamento já registrado" : "Confirmar pagamento"}</button>
@@ -276,7 +296,7 @@ export function Payments() {
         </Card>
         <div className="space-y-4">
           <Card className="p-5">
-            <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Resumo</h2><p className="text-xs text-muted-foreground">Visão consolidada deste pagamento</p></div></div>
+            <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Resumo</h2><p className="text-xs text-muted-foreground">{allCompetencies ? "Visão consolidada do saldo acumulado" : "Visão consolidada deste pagamento"}</p></div></div>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Total de horas</p><p className="mt-2 text-2xl font-bold tabular-nums">{hasPositiveGeneralBalance ? hhmm(totalMinutes) : "—"}</p></div>
               <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Valor total</p><p className="mt-2 text-xl font-bold tabular-nums">{hasPositiveGeneralBalance ? money(totalValue) : "—"}</p></div>
@@ -284,9 +304,9 @@ export function Payments() {
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">O sistema mantém o detalhamento por tipo de hora, mas lança apenas um débito equivalente ao total pago no Banco de Horas.</p>
           </Card>
           <Card className="p-5">
-            <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground"><BadgeCheck className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Histórico de pagamentos</h2><p className="text-xs text-muted-foreground">{period ? periodLabel(period) : "Selecione uma competência"}</p></div></div>
+            <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground"><BadgeCheck className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Histórico de pagamentos</h2><p className="text-xs text-muted-foreground">{allCompetencies ? "Todas as competências" : period ? periodLabel(period) : "Selecione uma competência"}</p></div></div>
             <div className="mt-4 space-y-3">
-              {!history.length ? <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhum pagamento registrado nesta competência.</p> : history.map(payment => <div key={payment.id} className="rounded-xl border p-3">
+              {!history.length ? <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhum pagamento registrado {allCompetencies ? "nas competências selecionadas" : "nesta competência"}.</p> : history.map(payment => <div key={payment.id} className="rounded-xl border p-3">
                 <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{employees.find(e => e.id === payment.employee_id)?.full_name ?? "Funcionário"}</p><p className="mt-1 text-xs text-muted-foreground">{dateBR(payment.entry_date)} · {hhmm(payment.minutes)}</p><p className="mt-1 text-sm font-semibold tabular-nums">{payment.justification?.match(/Valor: (R\$\s*[\d.,]+)/)?.[1] ?? "Valor não informado"}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${isReversed(payment) ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>{isReversed(payment) ? "Estornado" : "Pago"}</span></div>
                 {payment.employee_id === employeeId && !isReversed(payment) && <button type="button" onClick={() => setConfirmReversal(payment)} disabled={saving || isConsultaOnly()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Estornar pagamento</button>}
               </div>)}
