@@ -21,6 +21,7 @@ const Relatorios = lazy(() => import("@/screens/relatorios").then(m => ({ defaul
 const Parametros = lazy(() => import("@/screens/parametros").then(m => ({ default: m.Parametros })));
 const Tarefas = lazy(() => import("@/screens/tarefas").then(m => ({ default: m.Tarefas })));
 const PlanejamentoMensal = lazy(() => import("@/screens/planejamento-mensal").then(m => ({ default: m.PlanejamentoMensal })));
+const DiarioOcorrencias = lazy(() => import("@/screens/diario-ocorrencias").then(m => ({ default: m.DiarioOcorrencias })));
 const ImportacaoHistorico = lazy(() => import("@/screens/importacao-historico").then(m => ({ default: m.ImportacaoHistorico })));
 const ImportarCartaoPonto = lazy(() => import("@/screens/importar-cartao-ponto").then(m => ({ default: m.ImportarCartaoPonto })));
 import { countWorkingWeekdays } from "@/lib/feriados";
@@ -28,13 +29,13 @@ import { balancesByEmployees } from "@/lib/dp-model";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
-type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "importacao-historico" | "importar-cartao-ponto";
+type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importacao-historico" | "importar-cartao-ponto";
 
 const screenComponents = {
   empresas: Companies, funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours, pagamentos: Payments,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
-  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto,
+  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto,
 };
 
 
@@ -47,7 +48,7 @@ function fmt(minutes: number) {
 function getScreenFromUrl(): ScreenKey {
   if (typeof window === "undefined") return "dashboard";
   const value = new URLSearchParams(window.location.search).get("tela") as ScreenKey | null;
-  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "importacao-historico", "importar-cartao-ponto"];
+  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importacao-historico", "importar-cartao-ponto"];
   return value && validScreens.includes(value) ? value : "dashboard";
 }
 
@@ -140,7 +141,7 @@ function AppShell({
     { label: "Gestão", items: [["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText]] },
     { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck]] },
     { label: "Cadastro", items: [["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays]] },
-    { label: "Organização", items: [["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Tarefas", "tarefas", ListChecks]] },
+    { label: "Organização", items: [["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Diário de Ocorrências", "diario-ocorrencias", FileClock], ["Tarefas", "tarefas", ListChecks]] },
   ];
 
   useEffect(() => {
