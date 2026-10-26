@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Check, ClipboardList, FileClock, FileText, Plus, RefreshCw, Star, Trash2, Pencil, BookOpen, ShieldCheck } from "lucide-react";
+import { CalendarClock, ClipboardList, FileClock, FileText, Plus, RefreshCw, Star, Trash2, Pencil, BookOpen, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
