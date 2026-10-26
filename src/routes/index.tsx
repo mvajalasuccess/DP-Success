@@ -378,6 +378,7 @@ function DashboardHome() {
   const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
   const [individualDebits, setIndividualDebits] = useState<Array<{ name: string; minutes: number }>>([]);
+  const [occurrenceHours, setOccurrenceHours] = useState<Array<{ name: string; minutes: number }>>([]);
   const [absencePeople, setAbsencePeople] = useState<Array<{ name: string; count: number }>>([]);
   const [folgaPeople, setFolgaPeople] = useState<Array<{ name: string; count: number }>>([]);
   const [declarationPeople, setDeclarationPeople] = useState<Array<{ name: string; count: number }>>([]);
@@ -555,6 +556,31 @@ function DashboardHome() {
         if (!competence) return false;
         return x.start_date <= competence.end_date && x.end_date >= competence.start_date && activeEmployeeIds.has(x.employee_id);
       });
+      const minutesForOccurrence = (row: any) => {
+        const unit = String(row.unit ?? "dias").toLowerCase();
+        const quantity = Number(row.quantity || 0);
+        return Math.round(unit.startsWith("dia") ? quantity * dailyMinutes(String(row.employee_id)) : unit.startsWith("hor") ? quantity * 60 : quantity);
+      };
+      const overriddenIds = new Set(overrides.map((row: any) => String(row.employee_id)));
+      const occurrenceAbsenceMinutes = absenceRows
+        .filter((row: any) => !overriddenIds.has(String(row.employee_id)))
+        .reduce((sum: number, row: any) => sum + minutesForOccurrence(row), 0)
+        + overrides.reduce((sum: number, row: any) => sum + Math.round(Number(row.absence_quantity || 0) * dailyMinutes(String(row.employee_id))), 0);
+      const occurrenceFolgaMinutes = folgaRows.reduce((sum: number, row: any) => sum + minutesForOccurrence(row), 0);
+      const occurrenceCertificateMinutes = certificateRows
+        .filter((row: any) => !overriddenIds.has(String(row.employee_id)))
+        .reduce((sum: number, row: any) => sum + Math.round(Number(row.days || 0) * dailyMinutes(String(row.employee_id))), 0)
+        + overrides.reduce((sum: number, row: any) => sum + Number(row.certificate_minutes || 0), 0);
+      const occurrenceDeclarationMinutes = declarationRows
+        .filter((row: any) => !overriddenIds.has(String(row.employee_id)))
+        .reduce((sum: number, row: any) => sum + minutesForOccurrence(row), 0)
+        + overrides.reduce((sum: number, row: any) => sum + Number(row.declaration_minutes || 0), 0);
+      setOccurrenceHours([
+        { name: "Faltas", minutes: occurrenceAbsenceMinutes },
+        { name: "Folgas", minutes: occurrenceFolgaMinutes },
+        { name: "Atestados", minutes: occurrenceCertificateMinutes },
+        { name: "Declarações de horas", minutes: occurrenceDeclarationMinutes },
+      ]);
       const certificateDays = certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0), 0);
       setCertificatePeople(countByEmployee(certificateRows));
       const currentTime = (timeRows.data ?? []).filter((x: any) => (!periodId || x.period_id === periodId) && activeEmployeeIds.has(x.employee_id));
@@ -978,6 +1004,31 @@ function DashboardHome() {
             </Card>
           </section>
 
+          <section className="mt-6">
+            <Card className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Ocorrências da competência</p>
+              <h2 className="mt-1 text-xl font-bold">Horas por tipo de ocorrência</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Comparativo de horas de faltas, folgas, atestados e declarações, considerando a competência e a empresa selecionadas.</p>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {occurrenceHours.map(item => {
+                  const maxMinutes = Math.max(1, ...occurrenceHours.map(value => value.minutes));
+                  const width = Math.min(100, (item.minutes / maxMinutes) * 100);
+                  return (
+                    <div key={item.name} className="min-w-0 rounded-xl border bg-background p-4">
+                      <div className="flex min-h-10 items-start justify-between gap-2">
+                        <span className="text-sm font-medium">{item.name}</span>
+                        <span className="shrink-0 text-sm font-bold tabular-nums">{fmt(item.minutes)}</span>
+                      </div>
+                      <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary/75 transition-all" style={{ width: width + "%" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </section>
+
           <section className="mt-6 grid items-stretch gap-4 lg:grid-cols-2">
             <Card className="flex h-[390px] min-h-0 flex-col p-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Visão rápida</p>
@@ -1007,12 +1058,21 @@ function DashboardHome() {
               <h2 className="mt-1 text-xl font-bold">Débitos individuais na competência</h2>
               <p className="mt-1 text-xs text-muted-foreground">Débitos registrados por funcionário na competência selecionada.</p>
               <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-2">
-                {individualDebits.map(item => (
-                  <div key={item.name} className="flex items-center justify-between gap-3 border-b pb-2 text-sm last:border-0">
-                    <span className="min-w-0 truncate font-medium">{item.name}</span>
-                    <span className="shrink-0 font-semibold tabular-nums">{fmt(item.minutes)}</span>
-                  </div>
-                ))}
+                {individualDebits.map(item => {
+                  const maxMinutes = Math.max(1, ...individualDebits.map(value => value.minutes));
+                  const width = Math.min(100, (item.minutes / maxMinutes) * 100);
+                  return (
+                    <div key={item.name} className="border-b pb-2 last:border-0">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="min-w-0 truncate font-medium">{item.name}</span>
+                        <span className="shrink-0 font-semibold tabular-nums">{fmt(item.minutes)}</span>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-amber-500/80" style={{ width: width + "%" }} />
+                      </div>
+                    </div>
+                  );
+                })}
                 {!individualDebits.length && <p className="py-5 text-sm text-muted-foreground">Nenhum débito individual registrado nesta competência.</p>}
               </div>
               <div className="mt-4 border-t pt-3">
