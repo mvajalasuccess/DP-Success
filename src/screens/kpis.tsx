@@ -292,7 +292,7 @@ export function Kpis() {
           : Promise.resolve({ data: [], error: null }),
         currentPeriodIds.length
           ? db.from("overtime_records")
-              .select("employee_id,period_id,minutes,launch_type")
+              .select("employee_id,period_id,minutes,launch_type,notes")
               .in("period_id", currentPeriodIds)
           : Promise.resolve({ data: [], error: null }),
         periodIds.length
@@ -533,6 +533,10 @@ export function Kpis() {
       for (const row of overtime ?? []) {
         if (!row.employee_id || !allowedIds.has(row.employee_id)) continue;
         if (hasOverride(row.employee_id, row.period_id)) continue;
+        // "Crédito total do período" é o crédito bruto importado do cartão,
+        // não uma categoria adicional de HE. Somá-lo como HE_60 duplica/inflaciona
+        // o total quando o mesmo PDF também contém HE noturna/interjornada.
+        if (String(row.notes ?? "").toLowerCase().includes("crédito total do período")) continue;
         addOvertime(
           row,
           employees.find(e => e.id === row.employee_id),
@@ -924,6 +928,8 @@ export function Kpis() {
 
         for (const row of overtime ?? []) {
           if (String(row.period_id) !== String(period.id) || !row.employee_id || !allowedIds.has(row.employee_id)) continue;
+          // Crédito total importado é exibido separadamente e não é categoria de HE.
+          if (String(row.notes ?? "").toLowerCase().includes("crédito total do período")) continue;
           // Se há ajuste manual, a composição corrigida abaixo substitui os lançamentos originais.
           if ((overrideRows ?? []).some((override: any) =>
             String(override.period_id) === String(row.period_id) &&
