@@ -1539,7 +1539,6 @@ export function Kpis() {
           <section id="kpi-panel-absenteismo" role="tabpanel" aria-labelledby="kpi-tab-absenteismo" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
           <div className="flex items-end justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
               <h2 className="mt-1 text-2xl font-bold">Absenteísmo</h2>
               <p className="mt-1 text-sm text-muted-foreground">Horas perdidas consideradas ÷ horas previstas × 100.</p>
             </div>
@@ -1643,7 +1642,6 @@ export function Kpis() {
           <section id="kpi-panel-horas-extras" role="tabpanel" aria-labelledby="kpi-tab-horas-extras" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 02</p>
                 <h2 className="mt-1 text-2xl font-bold">Horas Extras</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Visão consolidada das horas extras do período.</p>
               </div>
@@ -1797,7 +1795,6 @@ export function Kpis() {
           <section id="kpi-panel-turnover" role="tabpanel" aria-labelledby="kpi-tab-turnover" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 03</p>
                 <h2 className="mt-1 text-2xl font-bold">Turnover</h2>
                 <p className="mt-1 text-sm text-muted-foreground">Calculado automaticamente pelas datas de desligamento cadastradas.</p>
               </div>
