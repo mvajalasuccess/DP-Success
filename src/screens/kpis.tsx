@@ -383,11 +383,14 @@ export function Kpis() {
       };
 
       const next = { ...emptyMetrics };
-      // Créditos são os lançamentos explicitamente importados do campo "Crédito total do período".
-      // Não inferir créditos pela diferença entre horas trabalhadas e previstas.
+      // Créditos vêm exclusivamente dos lançamentos que a importação identificou
+      // como "Crédito total do período". Não inferir pela diferença entre trabalhadas
+      // e previstas, nem transformar ajustes negativos em créditos positivos.
+      // Competências sem esse lançamento não têm crédito histórico disponível nesta fonte.
       next.creditsMinutes = (creditRows ?? []).reduce((sum: number, row: any) => {
         if (!row.employee_id || !allowedIds.has(String(row.employee_id))) return sum;
-        return sum + Math.abs(Number(row.minutes || 0));
+        const minutes = Number(row.minutes);
+        return Number.isFinite(minutes) ? sum + minutes : sum;
       }, 0);
       let historicalCount = 0;
       let operationalCount = 0;
