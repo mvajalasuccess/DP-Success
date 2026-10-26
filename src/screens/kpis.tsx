@@ -1231,17 +1231,21 @@ export function Kpis() {
   const totalOvertime = metrics.he60 + metrics.he60Night + metrics.he100 + metrics.he100Night + metrics.he20 + metrics.interjornada;
   const defaultKpiYear = periods.length ? Math.max(...periods.map(p => p.reference_year)) : new Date().getFullYear();
 
-  // Limites provisórios para sinalização visual; ajustar quando o DP definir metas oficiais.
+  // Faixas gerenciais de referência, não limites oficiais universais.
+  // Absenteísmo: até 3% dentro da faixa; 3% a <5% atenção; a partir de 5% crítico.
+  // Turnover: para uma competência mensal, 1% atenção e 2% crítico; para o ano selecionado,
+  // 5% atenção e 10% crítico, alinhado como referência geral a pesquisas de mercado.
+  const turnoverThresholds = appliedMonth === "todos"
+    ? { attention: 5, critical: 10 }
+    : { attention: 1, critical: 2 };
   const KPI_THRESHOLDS = {
-    absenteeismAttention: 5,
-    absenteeismCritical: 8,
-    turnoverAttention: 20,
-    turnoverCritical: 30,
+    absenteeismAttention: 3,
+    absenteeismCritical: 5,
     bankAttentionMinutes: 8 * 60,
     bankCriticalMinutes: 40 * 60,
   };
   const absenteeismTone = absenteeismRate >= KPI_THRESHOLDS.absenteeismCritical ? "critical" : absenteeismRate >= KPI_THRESHOLDS.absenteeismAttention ? "warning" : "neutral";
-  const turnoverTone = metrics.turnover >= KPI_THRESHOLDS.turnoverCritical ? "critical" : metrics.turnover >= KPI_THRESHOLDS.turnoverAttention ? "warning" : "neutral";
+  const turnoverTone = metrics.turnover >= turnoverThresholds.critical ? "critical" : metrics.turnover >= turnoverThresholds.attention ? "warning" : "neutral";
   const bankTone = Math.abs(bankBalance) >= KPI_THRESHOLDS.bankCriticalMinutes ? "critical" : Math.abs(bankBalance) >= KPI_THRESHOLDS.bankAttentionMinutes ? "warning" : "neutral";
   const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0 || bankBalance !== 0;
 
@@ -1276,7 +1280,7 @@ export function Kpis() {
   const salaryKpiTotal = salaryKpiRows.reduce((sum, e) => sum + Number(e.salary || 0), 0);
   const pensionKpiEmployees = salaryKpiEmployees.filter(e => e.pensionAmount > 0);
   const kpiMoney = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const toneLabel = (tone: string) => tone === "critical" ? "Crítico · limite provisório" : tone === "warning" ? "Atenção · limite provisório" : "Dentro da faixa provisória";
+  const toneLabel = (tone: string) => tone === "critical" ? "Crítico" : tone === "warning" ? "Atenção" : "Dentro da faixa";
   const kpiItems: Array<{ label: string; value: string; support: string; tone: string; title: string; primary?: boolean; status?: string }> = activeSection === "demograficos"
     ? [
         { label: "Funcionários na seleção", value: String(demographicKpiEmployees.length), support: "Conforme filtros e situação", tone: "neutral", title: "Quantidade de funcionários na seleção demográfica.", primary: true },
@@ -1300,15 +1304,15 @@ export function Kpis() {
       ]
     : activeSection === "turnover"
     ? [
-        { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: "[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100.", primary: true },
+        { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: `[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100. Faixas gerenciais: atenção a partir de ${turnoverThresholds.attention}% e crítico a partir de ${turnoverThresholds.critical}%.`, primary: true },
         { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: "Ativos na competência selecionada", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
         { label: "Admissões", value: String(metrics.admissions), support: "Dentro do período selecionado", tone: "neutral", title: "Admissões com data dentro do período selecionado." },
         { label: "Desligamentos", value: String(metrics.terminations), support: "Dentro do período selecionado", tone: "neutral", title: "Desligamentos com data dentro do período selecionado." },
       ]
     : [
-        { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: `${fmt(metrics.absenceMinutes)} perdidas / ${fmt(metrics.expected)} previstas`, tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100.", primary: true },
+        { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: `${fmt(metrics.absenceMinutes)} perdidas / ${fmt(metrics.expected)} previstas`, tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100. Referência gerencial: atenção a partir de 3% e crítico a partir de 5%.", primary: true },
         { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: "Ativos na competência selecionada", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
-        { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: "[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100." },
+        { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: `[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100. Faixas gerenciais: atenção a partir de ${turnoverThresholds.attention}% e crítico a partir de ${turnoverThresholds.critical}%.` },
         { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: bankTone, status: toneLabel(bankTone), title: "Saldo acumulado no Banco de Horas até o fim do período selecionado." },
       ];
 
