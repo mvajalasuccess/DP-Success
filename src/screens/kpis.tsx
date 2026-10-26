@@ -111,7 +111,7 @@ export function Kpis() {
   const [employeeFilterOpen, setEmployeeFilterOpen] = useState(false);
   const [periodLabel, setPeriodLabel] = useState("");
   const [error, setError] = useState("");
-  const [activeSection, setActiveSection] = useState<"absenteismo" | "horas-extras" | "turnover">("absenteismo");
+  const [activeSection, setActiveSection] = useState<"absenteismo" | "horas-extras" | "turnover" | "demograficos" | "salariais">("absenteismo");
   const [overtimeEmployees, setOvertimeEmployees] = useState<OvertimeEmployee[]>([]);
   const [source, setSource] = useState("");
   const [bankBalance, setBankBalance] = useState(0);
@@ -1246,6 +1246,8 @@ export function Kpis() {
               ["absenteismo", "Absenteísmo"],
               ["horas-extras", "Hr Extra"],
               ["turnover", "Turnover"],
+              ["demograficos", "Demográficos"],
+              ["salariais", "Salariais"],
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -1313,16 +1315,27 @@ export function Kpis() {
         </div>
         {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
 
-        <section className="mt-6">
-          <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-xl font-bold">Indicadores demográficos e salariais</h2><p className="mt-1 text-sm text-muted-foreground">Aplicam os filtros de empresa, setor e funcionários selecionados.</p></div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Card className="p-5"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.birthDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => { const d = new Date(e.birthDate + "T00:00:00"); const now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }).filter(n => n >= 0 && n < 120); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
+        {activeSection === "demograficos" && (
+          <section className="mt-6">
+            <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Idade, tempo de empresa e distribuição por sexo. Aplicam os filtros selecionados.</p></div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+<Card className="p-5"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.birthDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => { const d = new Date(e.birthDate + "T00:00:00"); const now = new Date(); return now.getFullYear() - d.getFullYear() - (now < new Date(now.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); }).filter(n => n >= 0 && n < 120); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
             <Card className="p-5"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-2xl font-bold">{(() => { const now = new Date(); const values = employees.filter(e => e.hireDate && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => Math.max(0, Math.floor(((e.terminationDate ? new Date(e.terminationDate + "T00:00:00") : now).getTime() - new Date(e.hireDate + "T00:00:00").getTime()) / 86400000))); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length / 365.25).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados"; })()}</p></Card>
-            <Card className="p-5"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.salary != null && e.salary > 0 && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => e.salary as number); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Sem dados"; })()}</p></Card>
             <Card className="p-5"><p className="text-sm text-muted-foreground">Distribuição por sexo</p><div className="mt-2 space-y-1.5 text-sm">{(() => { const base = employees.filter(e => (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))); const counts = new Map<string, number>(); base.forEach(e => { const label = e.gender === "feminino" ? "Feminino" : e.gender === "masculino" ? "Masculino" : e.gender === "outro" ? "Outro" : e.gender === "prefere_nao_informar" ? "Prefere não informar" : "Não informado"; counts.set(label, (counts.get(label) ?? 0) + 1); }); return [...counts.entries()].map(([label, count]) => <div key={label} className="flex justify-between gap-3"><span>{label}</span><strong>{count}</strong></div>); })()}</div></Card>
-            <Card className="p-5"><p className="text-sm text-muted-foreground">Total mensal de pensão</p><p className="mt-2 text-2xl font-bold">{employees.filter(e => (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).reduce((sum, e) => sum + (e.pensionAmount || 0), 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p><p className="mt-1 text-xs text-muted-foreground">Soma dos valores cadastrados para os funcionários filtrados.</p></Card>
-          </div>
-        </section>
+            
+            </div>
+          </section>
+        )}
+
+        {activeSection === "salariais" && (
+          <section className="mt-6">
+            <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Média salarial e valores mensais de pensão cadastrados, conforme os filtros selecionados.</p></div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+<Card className="p-5"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.salary != null && e.salary > 0 && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => e.salary as number); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Sem dados"; })()}</p></Card>
+            
+            </div>
+          </section>
+        )}
         {activeSection === "absenteismo" && (
           <section className="mt-6">
           <div className="flex items-end justify-between gap-4">
