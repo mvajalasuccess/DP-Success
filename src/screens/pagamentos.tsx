@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BadgeCheck, CalendarDays, CircleDollarSign, Clock3, RotateCcw, ShieldCheck, WalletCards } from "lucide-react";
+import { BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, RotateCcw, ShieldCheck, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { ScreenShell, inputCls } from "@/components/screen-shell";
@@ -243,6 +243,14 @@ export function Payments() {
 
   const companyEmployeeIds = useMemo(() => new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id)), [employees, companyFilter]);
   const visibleEmployees = useMemo(() => employees.filter(e => companyEmployeeIds.has(e.id)), [employees, companyEmployeeIds]);
+  const selectableEmployees = useMemo(() => visibleEmployees.filter(e => allCompetencies || (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)), [visibleEmployees, allCompetencies, period]);
+  const selectedEmployeeIndex = selectableEmployees.findIndex(e => e.id === employeeId);
+  const navigateEmployee = (direction: -1 | 1) => {
+    if (!selectableEmployees.length) return;
+    const currentIndex = selectedEmployeeIndex < 0 ? 0 : selectedEmployeeIndex;
+    const nextIndex = (currentIndex + direction + selectableEmployees.length) % selectableEmployees.length;
+    setEmployeeId(selectableEmployees[nextIndex]!.id);
+  };
   const history = useMemo(() => payments.filter(p => (allCompetencies || p.period_id === period?.id) && companyEmployeeIds.has(p.employee_id)), [payments, allCompetencies, period?.id, companyEmployeeIds]);
 
   return (
@@ -265,10 +273,14 @@ export function Payments() {
               </select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Funcionário
-              <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={loading}>
-                <option value="">Selecione o funcionário</option>
-                {visibleEmployees.filter(e => allCompetencies || (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)).map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-              </select>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <button type="button" aria-label="Funcionário anterior" title="Funcionário anterior" onClick={() => navigateEmployee(-1)} disabled={loading || selectableEmployees.length < 2 || selectedEmployeeIndex <= 0} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
+                <select className={inputCls + " min-w-0 flex-1"} value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={loading}>
+                  <option value="">Selecione o funcionário</option>
+                  {selectableEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                </select>
+                <button type="button" aria-label="Próximo funcionário" title="Próximo funcionário" onClick={() => navigateEmployee(1)} disabled={loading || selectableEmployees.length < 2 || selectedEmployeeIndex < 0 || selectedEmployeeIndex >= selectableEmployees.length - 1} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button>
+              </div>
             </label>
           </div>
           {employee && <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 p-4">
