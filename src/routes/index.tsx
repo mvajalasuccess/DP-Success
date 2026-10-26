@@ -133,10 +133,17 @@ function AppShell({
   const [tasksOpen, setTasksOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const buttonClass = (key: ScreenKey) =>
-    `flex w-full items-center rounded-lg py-2.5 text-left text-sm transition-colors ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
+  useEffect(() => {
+    if (["dashboard", "kpis", "comparativos", "relatorios"].includes(screen)) setManagementOpen(true);
+    if (["fechamento-ponto", "importar-cartao-ponto", "lancamentos", "banco-horas", "pagamentos", "ocorrencias", "atestados"].includes(screen)) setClosingMenuOpen(true);
+    if (["empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas"].includes(screen)) setCompanyMenuOpen(true);
+    if (["planejamento-mensal", "diario-ocorrencias", "tarefas"].includes(screen)) setTasksOpen(true);
+  }, [screen]);
 
-  const sectionButtonClass = "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/45 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground";
+  const buttonClass = (key: ScreenKey) =>
+    `dp-sidebar-item group relative flex min-h-10 w-full items-center py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
+
+  const sectionButtonClass = "dp-sidebar-group-label flex min-h-9 w-full items-center justify-between px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring";
   const mobileGroups: { label: string; items: [string, ScreenKey, LucideIcon][] }[] = [
     { label: "Gestão", items: [["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText]] },
     { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck]] },
@@ -172,21 +179,21 @@ function AppShell({
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-[70] bg-foreground/40 lg:hidden">
           <button type="button" className="absolute inset-0 h-full w-full cursor-default" onClick={() => setMobileMenuOpen(false)} aria-label="Fechar menu de navegação" />
-          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl">
-            <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground"><Clock3 className="h-5 w-5" /></span>
-                <div><p className="font-display text-base font-bold">DP SUCCESS</p><p className="text-[10px] uppercase tracking-[0.18em] text-sidebar-foreground/50">RH · DP · Gestão</p></div>
+          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="dp-sidebar relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl">
+            <div className="dp-sidebar-header flex h-[76px] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Clock3 className="h-5 w-5 shrink-0 text-sidebar-primary" strokeWidth={1.8} aria-hidden="true" />
+                <div className="min-w-0"><p className="font-display text-base font-bold tracking-tight">DP <span className="text-sidebar-primary">SUCCESS</span></p><p className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/80">RH · DP · GESTÃO</p></div>
               </div>
-              <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground" aria-label="Fechar menu"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center text-sidebar-foreground/80 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Fechar menu"><X className="h-5 w-5" strokeWidth={1.8} /></button>
             </div>
-            <nav className="sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3">
+            <nav aria-label="Navegação principal" className="dp-sidebar-nav sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3">
               {mobileGroups.map(group => (
-                <section key={group.label} className="mb-4">
-                  <p className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/45">{group.label}</p>
+                <section key={group.label} className="dp-sidebar-mobile-group mb-5">
+                  <p className="dp-sidebar-group-label px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/80">{group.label}</p>
                   <div className="space-y-0.5">
                     {group.items.map(([label, key, Icon]) => (
-                      <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={`flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}>
+                      <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"}`}>
                         <Icon className="h-4 w-4 shrink-0" /><span>{label}</span>
                       </button>
                     ))}
@@ -217,88 +224,77 @@ function AppShell({
           </div>
         </div>
       )}
-      <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r bg-sidebar transition-[transform,width] duration-200 lg:flex lg:flex-col ${collapsed ? "-translate-x-full w-64" : "translate-x-0 w-64"}`}>
-        <div className={`relative flex h-[82px] shrink-0 items-center border-b border-sidebar-border/70 bg-gradient-to-r from-sidebar-primary/10 via-sidebar to-sidebar ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-sidebar-primary/80" />
+      <aside aria-label="Barra lateral principal" className={`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r bg-sidebar transition-[transform,width] duration-200 lg:flex lg:flex-col ${collapsed ? "-translate-x-full w-64" : "translate-x-0 w-64"}`}>
+        <div className={`dp-sidebar-header flex h-[82px] shrink-0 items-center border-b border-sidebar-border ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
           {!collapsed && (
             <div className="flex min-w-0 items-center gap-3">
-              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_0_22px_rgba(6,202,160,0.24)]">
-                <div className="absolute inset-1 rounded-xl border border-white/20" />
-                <Clock3 className="relative h-5 w-5" strokeWidth={2.2} />
-              </div>
+              <Clock3 className="h-5 w-5 shrink-0 text-sidebar-primary" strokeWidth={1.8} aria-hidden="true" />
               <div className="min-w-0">
                 <div className="flex items-baseline gap-1.5 leading-none">
-                  <span className="font-display text-[20px] font-extrabold tracking-[-0.04em] text-sidebar-foreground">DP</span>
-                  <span className="font-display text-[20px] font-extrabold tracking-[-0.04em] text-sidebar-primary">SUCCESS</span>
+                  <span className="font-display text-[20px] font-semibold tracking-[-0.035em] text-sidebar-foreground">DP</span>
+                  <span className="font-display text-[20px] font-semibold tracking-[-0.035em] text-sidebar-primary">SUCCESS</span>
                 </div>
-                <div className="mt-2 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-sidebar-foreground/45">
-                  <span>RH</span><span className="text-sidebar-primary/70">•</span><span>DP</span><span className="text-sidebar-primary/70">•</span><span>GESTÃO</span>
-                </div>
+                <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/80">RH · DP · GESTÃO</div>
               </div>
-            </div>
-          )}
-          {collapsed && (
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_0_18px_rgba(6,202,160,0.22)]">
-              <Clock3 className="h-5 w-5" />
             </div>
           )}
           <button
             type="button"
             onClick={onToggleCollapsed}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sidebar-foreground/55 transition-all hover:bg-sidebar-primary/10 hover:text-sidebar-primary"
+            className="flex h-10 w-10 shrink-0 items-center justify-center text-sidebar-foreground/80 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
             title={collapsed ? "Expandir menu" : "Minimizar menu"}
             aria-label={collapsed ? "Expandir menu" : "Minimizar menu"}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-5 w-5" strokeWidth={1.8} />
           </button>
         </div>
 
-        <nav className={`flex-1 overflow-y-auto sidebar-scrollbar-hidden p-3 ${collapsed ? "space-y-2" : "space-y-2"}`}>
+        <nav aria-label="Navegação principal" className={`dp-sidebar-nav sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3 ${collapsed ? "space-y-2" : "space-y-2"}`}>
           {!collapsed ? (
             <>
-              <div>
-                <button type="button" onClick={() => setManagementOpen(v => !v)} className={sectionButtonClass} aria-expanded={managementOpen}>
-                  <span>Gestão</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${managementOpen ? "rotate-0" : "-rotate-90"}`} />
+              <section className="dp-sidebar-group">
+                <button type="button" onClick={() => setManagementOpen(v => !v)} className={sectionButtonClass} aria-expanded={managementOpen} aria-controls="dp-sidebar-management">
+                  <span>Gestão</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${managementOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
                 </button>
-                {managementOpen && <div className="mt-1 space-y-0.5">
+                {managementOpen && <div id="dp-sidebar-management" className="mt-1 space-y-1">
                   {([
                     ["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText],
-                  ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
+                  ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={buttonClass(key)}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span></button>)}
                 </div>}
-              </div>
+              </section>
 
-              <div>
-                <button type="button" onClick={() => setClosingMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={closingMenuOpen}>
-                  <span>Fechamento de Ponto</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${closingMenuOpen ? "rotate-0" : "-rotate-90"}`} />
+              <section className="dp-sidebar-group">
+                <button type="button" onClick={() => setClosingMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={closingMenuOpen} aria-controls="dp-sidebar-closing">
+                  <span>Fechamento de Ponto</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${closingMenuOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
                 </button>
-                {closingMenuOpen && <div className="mt-1 space-y-0.5">
+                {closingMenuOpen && <div id="dp-sidebar-closing" className="mt-1 space-y-1">
                   {([
                     ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck],
-                  ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>)}
+                  ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={buttonClass(key)}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span></button>)}
                 </div>}
-              </div>
+              </section>
 
-              <div>
-                <button type="button" onClick={() => setCompanyMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={companyMenuOpen}>
-                  <span>Cadastro</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${companyMenuOpen ? "rotate-0" : "-rotate-90"}`} />
+              <section className="dp-sidebar-group">
+                <button type="button" onClick={() => setCompanyMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={companyMenuOpen} aria-controls="dp-sidebar-cadastro">
+                  <span>Cadastro</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${companyMenuOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
                 </button>
-                {companyMenuOpen && <div className="mt-1 space-y-0.5">
+                {companyMenuOpen && <div id="dp-sidebar-cadastro" className="mt-1 space-y-1">
                   {[
                     ["Empresas", "empresas"], ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
-                  ].map(([label, key]) => { const Icon = key === "empresas" || key === "departamentos" ? Building2 : key === "funcionarios" ? UsersRound : key === "cargos" ? BriefcaseBusiness : CalendarDays; return <button key={key} type="button" onClick={() => go(key as ScreenKey)} className={buttonClass(key as ScreenKey)}><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></button>; })}
+                  ].map(([label, key]) => { const Icon = key === "empresas" || key === "departamentos" ? Building2 : key === "funcionarios" ? UsersRound : key === "cargos" ? BriefcaseBusiness : CalendarDays; return <button key={key} type="button" onClick={() => go(key as ScreenKey)} aria-current={screen === key ? "page" : undefined} className={buttonClass(key as ScreenKey)}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span></button>; })}
                 </div>}
-              </div>
+              </section>
 
-              <div>
-                <button type="button" onClick={() => setTasksOpen(v => !v)} className={sectionButtonClass} aria-expanded={tasksOpen}>
-                  <span>Organização</span><ChevronDown className={`h-3.5 w-3.5 transition-transform ${tasksOpen ? "rotate-0" : "-rotate-90"}`} />
+              <section className="dp-sidebar-group">
+                <button type="button" onClick={() => setTasksOpen(v => !v)} className={sectionButtonClass} aria-expanded={tasksOpen} aria-controls="dp-sidebar-organization">
+                  <span>Organização</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${tasksOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
                 </button>
-                {tasksOpen && <div className="mt-1 space-y-0.5">
-                  <button type="button" onClick={() => go("planejamento-mensal")} className={buttonClass("planejamento-mensal")}><CalendarRange className="h-4 w-4 shrink-0" /><span>Planejamento Mensal</span></button>
-                  <button type="button" onClick={() => go("diario-ocorrencias")} className={buttonClass("diario-ocorrencias")}><ClipboardList className="h-4 w-4 shrink-0" /><span>Diário de Ocorrências</span></button>
-                  <button type="button" onClick={() => go("tarefas")} className={buttonClass("tarefas")}><FileText className="h-4 w-4 shrink-0" /><span>Tarefas</span></button>
+                {tasksOpen && <div id="dp-sidebar-organization" className="mt-1 space-y-1">
+                  <button type="button" onClick={() => go("planejamento-mensal")} aria-current={screen === "planejamento-mensal" ? "page" : undefined} className={buttonClass("planejamento-mensal")}><CalendarRange className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Planejamento Mensal</span></button>
+                  <button type="button" onClick={() => go("diario-ocorrencias")} aria-current={screen === "diario-ocorrencias" ? "page" : undefined} className={buttonClass("diario-ocorrencias")}><ClipboardList className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Diário de Ocorrências</span></button>
+                  <button type="button" onClick={() => go("tarefas")} aria-current={screen === "tarefas" ? "page" : undefined} className={buttonClass("tarefas")}><ListChecks className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Tarefas</span></button>
                 </div>}
-              </div>
+              </section>
             </>
           ) : (
             <>
@@ -337,37 +333,41 @@ function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavig
     await supabase.auth.signOut();
     window.location.href = "/login";
   };
+  const initials = name.trim().split(/\\s+/).slice(0, 2).map(part => part[0]?.toUpperCase() ?? "").join("") || "DP";
 
   return (
-    <div className="border-t border-sidebar-border/60 p-3">
+    <div className="dp-sidebar-footer border-t border-sidebar-border p-3">
       <div className={`flex items-center ${collapsed ? "flex-col gap-2" : "gap-2"}`}>
-        <button
-          type="button"
-          onClick={() => onNavigate("parametros")}
-          className={`flex min-w-0 flex-1 items-center rounded-xl p-2 text-left hover:bg-sidebar-accent ${collapsed ? "justify-center" : "gap-3"}`}
-          title={collapsed ? "Configurações" : undefined}
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-accent text-sidebar-foreground/75">
-            <Settings className="h-4 w-4" />
-          </div>
+        <div className={`flex min-w-0 flex-1 items-center ${collapsed ? "flex-col gap-2" : "gap-3"}`}>
+          <div className="dp-sidebar-avatar flex h-10 w-10 shrink-0 items-center justify-center text-sm font-semibold" aria-hidden="true">{initials}</div>
           {!collapsed && (
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-sidebar-foreground">{name}</p>
-              <p className="truncate text-[10px] text-sidebar-foreground/45">{role}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-sidebar-foreground">{name}</p>
+              <p className="mt-0.5 truncate text-xs text-sidebar-foreground/80">{role}</p>
             </div>
           )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => void handleLogout()}
-          className={`flex shrink-0 items-center rounded-xl p-2 text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground ${collapsed ? "" : "px-2"}`}
-          title="Sair do sistema"
-          aria-label="Sair do sistema"
-        >
-          <LogOut className="h-4 w-4" />
-          {!collapsed && <span className="ml-1 text-[11px] font-medium">Sair</span>}
-        </button>
+        </div>
+        <div className={`flex shrink-0 items-center ${collapsed ? "flex-col gap-1" : "gap-1"}`}>
+          <button
+            type="button"
+            onClick={() => onNavigate("parametros")}
+            className="flex h-10 w-10 items-center justify-center text-sidebar-foreground/80 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            title="Configurações"
+            aria-label="Configurações"
+          >
+            <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className={`dp-sidebar-logout flex min-h-10 items-center justify-center gap-2 px-2 text-sm font-medium transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${collapsed ? "w-10" : ""}`}
+            title="Sair do sistema"
+            aria-label="Sair do sistema"
+          >
+            <LogOut className="h-[18px] w-[18px]" strokeWidth={1.8} />
+            {!collapsed && <span>Sair</span>}
+          </button>
+        </div>
       </div>
     </div>
   );
