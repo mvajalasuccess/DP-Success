@@ -47,6 +47,7 @@ type Metrics = {
   declaracoesMinutes: number;
   abonosMinutes: number;
   worked: number;
+  creditsMinutes: number;
   he60: number;
   he60Night: number;
   he100: number;
@@ -60,7 +61,7 @@ type Metrics = {
 };
 
 const emptyMetrics: Metrics = {
-  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, faltasDays: 0, folgasDays: 0, atestadosMinutes: 0, atestadosDays: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0,
+  employees: 0, expected: 0, absenceMinutes: 0, faltasMinutes: 0, faltasDays: 0, folgasDays: 0, atestadosMinutes: 0, atestadosDays: 0, declaracoesMinutes: 0, abonosMinutes: 0, worked: 0, creditsMinutes: 0,
   he60: 0, he60Night: 0, he100: 0, he100Night: 0, he20: 0,
   interjornada: 0, turnover: 0, admissions: 0, terminations: 0, activeHeadcount: 0,
 };
@@ -269,6 +270,7 @@ export function Kpis() {
       const [
         { data: historical, error: historicalError },
         { data: overtime, error: overtimeError },
+        { data: creditRows, error: creditError },
         { data: timeRecords, error: timeError },
         { data: currentOccurrences, error: occurrenceError },
         { data: currentDebits, error: debitError },
@@ -292,6 +294,12 @@ export function Kpis() {
           ? db.from("overtime_records")
               .select("employee_id,period_id,minutes,launch_type")
               .in("period_id", currentPeriodIds)
+          : Promise.resolve({ data: [], error: null }),
+        periodIds.length
+          ? db.from("overtime_records")
+              .select("employee_id,period_id,minutes,notes")
+              .in("period_id", periodIds)
+              .ilike("notes", "%Crédito total do período%")
           : Promise.resolve({ data: [], error: null }),
         currentPeriodIds.length
           ? db.from("time_records")
@@ -321,8 +329,8 @@ export function Kpis() {
           .in("period_id", periodIds),
       ]);
 
-      if (historicalError || overtimeError || timeError || occurrenceError || debitError || certificateError || scheduleError) {
-        setError(historicalError?.message ?? overtimeError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
+      if (historicalError || overtimeError || creditError || timeError || occurrenceError || debitError || certificateError || scheduleError) {
+        setError(historicalError?.message ?? overtimeError?.message ?? creditError?.message ?? timeError?.message ?? occurrenceError?.message ?? debitError?.message ?? certificateError?.message ?? scheduleError?.message ?? "Não foi possível carregar os indicadores.");
         setIsCalculating(false);
         return;
       }
@@ -375,6 +383,12 @@ export function Kpis() {
       };
 
       const next = { ...emptyMetrics };
+      // Créditos são os lançamentos explicitamente importados do campo "Crédito total do período".
+      // Não inferir créditos pela diferença entre horas trabalhadas e previstas.
+      next.creditsMinutes = (creditRows ?? []).reduce((sum: number, row: any) => {
+        if (!row.employee_id || !allowedIds.has(String(row.employee_id))) return sum;
+        return sum + Math.abs(Number(row.minutes || 0));
+      }, 0);
       let historicalCount = 0;
       let operationalCount = 0;
       const scheduleMinutes = new Map<string, number>(
@@ -1036,6 +1050,7 @@ export function Kpis() {
         { data: timeRows },
         { data: occurrenceRows },
         { data: debitRows },
+        { data: creditRows },
         { data: certificateRows },
         { data: overrideRows },
         { data: scheduleRows },
@@ -1051,6 +1066,9 @@ export function Kpis() {
           : Promise.resolve({ data: [] }),
         currentIds.length
           ? db.from("bank_hours").select("employee_id,period_id,minutes,kind").eq("kind","debito").in("period_id", currentIds)
+          : Promise.resolve({ data: [] }),
+        yearPeriods.length
+          ? db.from("overtime_records").select("employee_id,period_id,minutes,notes").in("period_id", yearPeriods.map(p => p.id)).ilike("notes", "%Crédito total do período%")
           : Promise.resolve({ data: [] }),
         currentIds.length
           ? db.from("medical_certificates").select("employee_id,start_date,end_date,days").lte("start_date", yearPeriods[yearPeriods.length - 1]?.end_date ?? "9999-12-31").gte("end_date", yearPeriods[0]?.start_date ?? "0001-01-01")
@@ -1121,6 +1139,10 @@ export function Kpis() {
         let expected = 0;
         let lost = 0;
         let debits = 0;
+        const periodCredits = (creditRows ?? []).filter((row: any) => {
+          const employee = employees.find(e => e.id === row.employee_id);
+          return row.period_id === period.id && employee && employeeIncludedForSelectedFilters(employee);
+        }).reduce((sum: number, row: any) => sum + Math.abs(Number(row.minutes || 0)), 0);
 
         for (const row of (historicalRows ?? []).filter((x: any) => x.period_id === period.id)) {
           if (!historicalRowIncluded(row)) continue;
@@ -1649,12 +1671,12 @@ export function Kpis() {
               <p className="text-xs text-muted-foreground">Mostra o que está gerando o indicador.</p>
               <div className="mt-5 space-y-3">
                 {[
-                  ["Créditos", Math.max(0, metrics.worked - metrics.expected)],
+                  ["Créditos", metrics.creditsMinutes],
                   ["Débitos", Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)],
                 ].map(([label, value]) => (
                   <div key={String(label)}>
                     <div className="flex justify-between text-sm"><span>{label}</span><strong>{fmt(Number(value))}</strong></div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${(Math.max(0, metrics.worked - metrics.expected) + Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)) ? Math.min(100, Number(value) / (Math.max(0, metrics.worked - metrics.expected) + Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)) * 100) : 0}%` }} /></div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${(metrics.creditsMinutes + Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)) ? Math.min(100, Number(value) / (metrics.creditsMinutes + Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)) * 100) : 0}%` }} /></div>
                   </div>
                 ))}
               </div>
