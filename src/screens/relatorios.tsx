@@ -108,17 +108,17 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
     return raw;
   };
   const html = '<html lang="pt-BR"><head><meta charset="utf-8"><title>' + escapeReportHtml(title) + '</title><style>' +
-    '@page{size:A4 landscape;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#183735;font-size:10px;margin:0}' +
-    '.brand{background:#123b3a;color:#fff;padding:22px 26px}.eyebrow{font-size:9px;letter-spacing:2px;color:#9debd8;font-weight:bold}h1{font-size:22px;margin:8px 0}.subtitle{font-size:10px;color:#d9f4ed}' +
-    '.meta{display:flex;justify-content:space-between;padding:12px 16px;background:#f0faf7;border:1px solid #d8eee7;color:#365b56}table{width:100%;border-collapse:collapse;margin-top:18px}thead{display:table-header-group}tr{break-inside:avoid}' +
-    'th{background:#dff7f0;color:#123b3a;text-align:left;font-size:9px;text-transform:uppercase}th,td{padding:8px 7px;border-bottom:1px solid #e1ece8;vertical-align:top;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f6faf9}.footer{margin-top:16px;padding-top:8px;border-top:1px solid #d8e8e3;color:#64817b;font-size:9px}@media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>' +
+    '@page{size:A4 landscape;margin:7mm}*{box-sizing:border-box}html,body{width:100%;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#183735;font-size:7px;print-color-adjust:exact;-webkit-print-color-adjust:exact}' +
+    '.brand{background:#123b3a;color:#fff;padding:10px 14px;break-inside:avoid}.eyebrow{font-size:7px;letter-spacing:1.2px;color:#9debd8;font-weight:bold}h1{font-size:16px;margin:4px 0}.subtitle{font-size:8px;color:#d9f4ed;overflow-wrap:anywhere}' +
+    '.meta{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;background:#f0faf7;border:1px solid #d8eee7;color:#365b56;font-size:7px}table{width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse;margin-top:8px}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}' +
+    'th{background:#dff7f0;color:#123b3a;text-align:left;font-size:6.5px;text-transform:uppercase}th,td{padding:3px 3px;border-bottom:1px solid #e1ece8;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;white-space:normal;line-height:1.2}tbody tr:nth-child(even){background:#f6faf9}.footer{margin-top:7px;padding-top:4px;border-top:1px solid #d8e8e3;color:#64817b;font-size:7px}@media print{html,body{width:100%;height:auto}table{width:100%}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>' +
     '<header class="brand"><div class="eyebrow">DP SUCCESS · GESTÃO DE PESSOAS</div><h1>' + escapeReportHtml(title) + '</h1><div class="subtitle">' + escapeReportHtml(subtitle) + '</div></header>' +
     '<div class="meta"><strong>Registros: ' + rows.length + '</strong><span>Gerado em ' + new Date().toLocaleString("pt-BR") + '</span></div><table><thead><tr>' +
     columns.map(key => '<th>' + escapeReportHtml(headers[key] || key.replace(/_/g, " ")) + '</th>').join("") + '</tr></thead><tbody>' +
     rows.map(row => '<tr>' + columns.map(key => '<td>' + escapeReportHtml(showValue(key, row[key])) + '</td>').join("") + '</tr>').join("") +
     '</tbody></table><div class="footer">DP SUCCESS · Relatório gerencial · Documento para conferência interna</div></body></html>';
   const frame = document.createElement("iframe");
-  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  frame.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;opacity:0;z-index:-1";
   document.body.appendChild(frame);
   if (!frame.contentDocument) { frame.remove(); throw new Error("Não foi possível preparar o PDF."); }
   frame.onload = () => {
