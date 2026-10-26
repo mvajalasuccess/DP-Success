@@ -114,6 +114,8 @@ export function Kpis() {
   const [appliedDepartment, setAppliedDepartment] = useState("todos");
   const [appliedCompanyFilter, setAppliedCompanyFilter] = useState("");
   const [appliedEmployees, setAppliedEmployees] = useState<string[]>([]);
+  const [demographicStatusFilter, setDemographicStatusFilter] = useState<"todos" | "ativos" | "inativos">("ativos");
+  const [salaryStatusFilter, setSalaryStatusFilter] = useState<"todos" | "ativos" | "inativos">("ativos");
   const [employeeFilterOpen, setEmployeeFilterOpen] = useState(false);
   const [periodLabel, setPeriodLabel] = useState("");
   const [error, setError] = useState("");
@@ -1327,7 +1329,7 @@ export function Kpis() {
         {activeSection === "demograficos" && (
           <section className="mt-6 space-y-4">
             {(() => {
-              const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)));
+              const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)) && (demographicStatusFilter === "todos" || (demographicStatusFilter === "ativos" ? (!e.terminationDate && ["ativo","active"].includes((e.status || "").toLowerCase())) : (Boolean(e.terminationDate) || ["inativo","inactive"].includes((e.status || "").toLowerCase())))));
               const today = new Date();
               const ageOf = (birth: string) => { const d = new Date(birth + "T00:00:00"); return today.getFullYear() - d.getFullYear() - (today < new Date(today.getFullYear(), d.getMonth(), d.getDate()) ? 1 : 0); };
               const ages = base.filter(e => e.birthDate).map(e => ageOf(e.birthDate as string)).filter(n => n >= 0 && n < 120);
@@ -1343,6 +1345,7 @@ export function Kpis() {
               const tenureAverage = average(tenure);
               return <>
                 <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Explore a composição do quadro por sexo, idade, tempo de empresa e setor. Passe o cursor nos gráficos para ver os detalhes.</p></div>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="text-sm font-semibold">Situação dos funcionários</p><p className="text-xs text-muted-foreground">Filtra todos os indicadores e gráficos desta seção.</p></div><select aria-label="Filtrar situação dos funcionários nos indicadores demográficos" className="h-10 min-w-44 rounded-lg border bg-background px-3 text-sm" value={demographicStatusFilter} onChange={e => setDemographicStatusFilter(e.target.value as "todos" | "ativos" | "inativos")}><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-background p-5 dark:from-pink-950/30"><p className="text-sm text-muted-foreground">Funcionários na seleção</p><p className="mt-2 text-3xl font-bold">{base.length}</p><p className="mt-1 text-xs text-muted-foreground">Conforme os filtros aplicados</p></Card>
                   <Card className="border-violet-200 bg-gradient-to-br from-violet-50 to-background p-5 dark:from-violet-950/30"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-3xl font-bold">{ages.length ? ageAverage.toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos" : "Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">{ages.length} cadastro(s) com nascimento</p></Card>
@@ -1372,7 +1375,7 @@ export function Kpis() {
         {activeSection === "salariais" && (
           <section className="mt-6 space-y-4">
             {(() => {
-              const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)));
+              const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)) && (salaryStatusFilter === "todos" || (salaryStatusFilter === "ativos" ? (!e.terminationDate && ["ativo","active"].includes((e.status || "").toLowerCase())) : (Boolean(e.terminationDate) || ["inativo","inactive"].includes((e.status || "").toLowerCase())))));
               const salaries = base.filter(e => e.salary != null && e.salary > 0).map(e => ({...e, salary: Number(e.salary)}));
               const avg = salaries.length ? salaries.reduce((s,e)=>s+(e.salary||0),0)/salaries.length : 0;
               const totalPayroll = salaries.reduce((s,e)=>s+(e.salary||0),0);
@@ -1385,6 +1388,7 @@ export function Kpis() {
               const salaryColors = ["#06b6d4","#8b5cf6","#f97316","#22c55e","#ec4899"];
               return <>
                 <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Visão interativa da folha cadastrada, faixas salariais, diferenças entre setores e pensões alimentícias. Valores respeitam os filtros aplicados.</p></div>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="text-sm font-semibold">Situação dos funcionários</p><p className="text-xs text-muted-foreground">Filtra todos os indicadores e gráficos desta seção.</p></div><select aria-label="Filtrar situação dos funcionários nos indicadores salariais" className="h-10 min-w-44 rounded-lg border bg-background px-3 text-sm" value={salaryStatusFilter} onChange={e => setSalaryStatusFilter(e.target.value as "todos" | "ativos" | "inativos")}><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <Card className="border-cyan-200 bg-gradient-to-br from-cyan-50 to-background p-5 dark:from-cyan-950/30"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{salaries.length?money(avg):"Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">Base de {salaries.length} salário(s) cadastrado(s)</p></Card>
                   <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50 to-background p-5 dark:from-indigo-950/30"><p className="text-sm text-muted-foreground">Folha mensal estimada</p><p className="mt-2 text-2xl font-bold">{money(totalPayroll)}</p><p className="mt-1 text-xs text-muted-foreground">Soma dos salários cadastrados, sem encargos</p></Card>
