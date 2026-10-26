@@ -1326,10 +1326,10 @@ export function Kpis() {
         { label: "Desligamentos", value: String(metrics.terminations), support: "Dentro do período selecionado", tone: "neutral", title: "Desligamentos com data dentro do período selecionado." },
       ]
     : [
-        { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: `${fmt(metrics.absenceMinutes)} perdidas / ${fmt(metrics.expected)} previstas`, tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100. Referência gerencial: atenção a partir de 3% e crítico a partir de 5%.", primary: true },
-        { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: appliedMonth === "todos" ? "Pessoas distintas no período selecionado" : "Quadro ativo da competência", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
-        { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: `[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100. Faixas gerenciais: atenção a partir de ${turnoverThresholds.attention}% e crítico a partir de ${turnoverThresholds.critical}%.` },
-
+        { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: "(Débitos + Faltas + Abonos) ÷ horas previstas", tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100. Referência gerencial: atenção a partir de 3% e crítico a partir de 5%.", primary: true },
+        { label: "Horas previstas", value: fmt(metrics.expected), support: "Carga horária prevista no período selecionado", tone: "neutral", title: "Total de horas previstas para os funcionários considerados na seleção." },
+        { label: "Horas perdidas", value: fmt(metrics.absenceMinutes), support: "Débitos + faltas + abonos considerados no absenteísmo", tone: "neutral", title: "Total de horas perdidas usadas no cálculo do absenteísmo." },
+        { label: "Horas trabalhadas", value: fmt(metrics.worked), support: "Total registrado ou apurado no período selecionado", tone: "neutral", title: "Total de horas trabalhadas conforme os registros e a base histórica já existente." },
       ];
 
   return (
