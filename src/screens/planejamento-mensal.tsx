@@ -32,7 +32,7 @@ export function PlanejamentoMensal() {
       (supabase as any).from("employees").select("*").order("full_name"),
       (supabase as any).from("holidays").select("*"),
       (supabase as any).from("tasks").select("id,title,category,due_date,status").neq("status","done").not("due_date","is",null),
-      (supabase as any).from("employee_document_records").select("id,employee_id,document_name,due_date,status,employees(full_name)").not("due_date","is",null).eq("status","active")
+      (supabase as any).from("employee_document_records").select("id,employee_id,document_name,due_date,status,employees(full_name),employee_document_catalog(alert_days,category)").not("due_date","is",null).eq("status","active")
     ]);
     if(emp.error || hol.error || tasks.error || docs.error) setError("Algumas informações não puderam ser carregadas. Verifique os cadastros e as permissões.");
     const all:EventItem[]=[];
@@ -59,9 +59,9 @@ export function PlanejamentoMensal() {
       const label=String(doc.document_name||"Documento");
       const normalized=label.toLocaleLowerCase("pt-BR");
       const kind:EventItem["kind"]=normalized.includes("trein")||normalized.includes("curso")? "training" : normalized.includes("exame")||normalized.includes("aso")? "exam" : "task";
-      const days=Math.ceil((new Date(d+"T00:00:00").getTime()-new Date(dateKey(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())+"T00:00:00").getTime())/86400000);
+      const days=Math.ceil((new Date(d+"T00:00:00").getTime()-new Date(dateKey(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())+"T00:00:00").getTime())/86400000);\n      const alertDays=Number(doc.employee_document_catalog?.alert_days??30);
       const person=doc.employees?.full_name ? " · "+doc.employees.full_name : "";
-      all.push({id:"doc-"+doc.id,date:d,title:"Vencimento: "+label,detail:(days<0?"Vencido":days<=30?"Próximo do vencimento":"Vencimento agendado")+person,kind});
+      all.push({id:"doc-"+doc.id,date:d,title:"Vencimento: "+label,detail:(days<0?"Vencido":days<=alertDays?"Próximo do vencimento":"Vencimento agendado")+person,kind});
     });
     setEvents(all.sort((a,b)=>a.date.localeCompare(b.date)||a.title.localeCompare(b.title)));
     setLoading(false);
