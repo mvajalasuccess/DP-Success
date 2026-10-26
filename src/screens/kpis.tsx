@@ -1364,7 +1364,7 @@ export function Kpis() {
         <section className="mt-6" aria-label="Indicadores principais">
           {isCalculating || isLoadingPage ? (
             <div className="kpi-band" aria-label="Carregando indicadores" aria-live="polite">
-              {(activeSection === "absenteismo" ? ["principal", "secundario-1", "secundario-2"] : ["principal", "secundario-1", "secundario-2", "secundario-3"]).map((key, index) => (
+              {(["principal", "secundario-1", "secundario-2", "secundario-3"]).map((key, index) => (
                 <div key={key} className={index === 0 ? "kpi-primary" : "kpi-secondary"}>
                   <div className="kpi-skeleton h-3 w-28" />
                   <div className="kpi-skeleton mt-4 h-9 w-32" />
