@@ -23,13 +23,13 @@ CREATE INDEX IF NOT EXISTS idx_employee_life_events_employee_date ON public.empl
 CREATE INDEX IF NOT EXISTS idx_employee_life_events_date ON public.employee_life_events(event_date);
 ALTER TABLE public.employee_life_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS employee_life_events_select ON public.employee_life_events;
-CREATE POLICY employee_life_events_select ON public.employee_life_events FOR SELECT TO authenticated USING (private.has_app_access());
+CREATE POLICY employee_life_events_select ON public.employee_life_events FOR SELECT TO authenticated USING (public.has_app_access((select auth.uid())));
 DROP POLICY IF EXISTS employee_life_events_insert ON public.employee_life_events;
 CREATE POLICY employee_life_events_insert ON public.employee_life_events FOR INSERT TO authenticated WITH CHECK (private.has_app_access());
 DROP POLICY IF EXISTS employee_life_events_update ON public.employee_life_events;
 CREATE POLICY employee_life_events_update ON public.employee_life_events FOR UPDATE TO authenticated USING (private.has_app_access()) WITH CHECK (private.has_app_access());
 DROP POLICY IF EXISTS employee_life_events_delete ON public.employee_life_events;
-CREATE POLICY employee_life_events_delete ON public.employee_life_events FOR DELETE TO authenticated USING (private.has_role('administrador'::public.app_role));
+CREATE POLICY employee_life_events_delete ON public.employee_life_events FOR DELETE TO authenticated USING (public.can_manage((select auth.uid())));
 
 CREATE TABLE IF NOT EXISTS public.employee_document_catalog (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
