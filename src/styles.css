@@ -789,3 +789,21 @@ main h2 {
     border-radius: 10px !important;
   }
 }
+
+
+/* KPIs — prioridade de risco nos cards principais (vence os fundos de .kpi-primary/.kpi-secondary). */
+.kpis-page .kpi-band > .kpi-primary.kpi-tone-neutral,
+.kpis-page .kpi-band > .kpi-secondary.kpi-tone-neutral {
+  background: #f0fdf4 !important;
+  border-left: 4px solid #16a34a !important;
+}
+.kpis-page .kpi-band > .kpi-primary.kpi-tone-warning,
+.kpis-page .kpi-band > .kpi-secondary.kpi-tone-warning {
+  background: #fff7ed !important;
+  border-left: 4px solid #ea580c !important;
+}
+.kpis-page .kpi-band > .kpi-primary.kpi-tone-critical,
+.kpis-page .kpi-band > .kpi-secondary.kpi-tone-critical {
+  background: #fef2f2 !important;
+  border-left: 4px solid #dc2626 !important;
+}
