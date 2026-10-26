@@ -595,15 +595,14 @@ textarea:focus-visible {
   border: 1px solid var(--kpi-border);
   border-radius: var(--kpi-radius);
   background: var(--kpi-surface);
-  box-shadow: 0 8px 24px rgb(22 39 31 / 10%);
+
 }
 .kpis-page .kpi-skeleton {
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--kpi-surface-muted), oklch(0.93 0.012 160), var(--kpi-surface-muted));
-  background-size: 200% 100%;
+  background: var(--kpi-surface-muted);
   animation: kpi-skeleton-pulse 1.25s ease-in-out infinite;
 }
-@keyframes kpi-skeleton-pulse { to { background-position: -200% 0; } }
+@keyframes kpi-skeleton-pulse { 50% { opacity: 0.55; } }
 @media (max-width: 1100px) {
   .kpis-page .kpi-band { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpis-page .kpi-primary { border-bottom: 1px solid var(--kpi-border); }
