@@ -1464,12 +1464,7 @@ export function Kpis() {
               </div>
             </div>
 
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3 rounded-xl border p-4">
-              <label className="grid gap-1.5 text-sm font-medium">Situação na lista de interjornada
-                <select value={interjornadaStatus} onChange={e => setInterjornadaStatus(e.target.value as "ativo" | "inativo" | "todos")} className="h-10 min-w-44 rounded-lg border bg-background px-3 text-sm"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select>
-              </label>
-              <p className="max-w-xl text-xs text-muted-foreground">Valores conforme os lançamentos e a base histórica importada, sem recalcular competências fechadas.</p>
-            </div>
+            <p className="mb-4 text-xs text-muted-foreground">Valores conforme os lançamentos e a base histórica importada, sem recalcular competências fechadas.</p>
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
               {[
                 ["HE 60%", metrics.he60],
@@ -1577,8 +1572,15 @@ export function Kpis() {
               </Card>
 
               <Card className="p-5">
-                <h3 className="font-bold">Interjornada por competência</h3>
-                <p className="text-xs text-muted-foreground">Funcionários que possuem interjornada no período selecionado.</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold">Interjornada</h3>
+                    <p className="text-xs text-muted-foreground">Funcionários que possuem interjornada no período selecionado.</p>
+                  </div>
+                  <label className="grid gap-1.5 text-sm font-medium">Situação
+                    <select value={interjornadaStatus} onChange={e => setInterjornadaStatus(e.target.value as "ativo" | "inativo" | "todos")} className="h-9 min-w-36 rounded-lg border bg-background px-3 text-sm"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select>
+                  </label>
+                </div>
                 <div className="mt-5 overflow-hidden rounded-xl border">
                   <div className="grid grid-cols-[1fr_auto] gap-4 border-b bg-muted/30 px-4 py-3 text-xs font-semibold text-muted-foreground">
                     <span>Funcionário</span>
