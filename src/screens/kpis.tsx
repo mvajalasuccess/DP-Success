@@ -1636,7 +1636,7 @@ export function Kpis() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false}/>
                     <XAxis dataKey="label" tick={{ fontSize: 10 }}/>
                     <YAxis tickFormatter={(value:number) => `${value}%`} tick={{ fontSize: 10 }}/>
-                    <Tooltip formatter={(value:number, name:string, props:any) => [`${pct(value)} · ${fmt(props.payload.lost)} perdidas / ${fmt(props.payload.expected)} previstas`, "Absenteísmo"]}/>
+                    <Tooltip formatter={(value:number) => [pct(value), "Absenteísmo"]}/>
                     <Area type="monotone" dataKey="rate" name="Absenteísmo" stroke="#ea580c" strokeWidth={3} fill="url(#absenteeismFill)" activeDot={{ r: 6 }}/>
                   </AreaChart>
                 </ResponsiveContainer>
