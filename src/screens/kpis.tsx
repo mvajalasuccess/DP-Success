@@ -983,6 +983,7 @@ export function Kpis() {
 
     const selectedEmployeeSet = new Set(appliedEmployees);
     const allowedEmployees = employees.filter(e =>
+      (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
       employeeMatches(e, [], appliedDepartment) &&
       (!appliedEmployees.length || selectedEmployeeSet.has(e.id)) &&
       targetPeriods.some(period =>
@@ -1004,7 +1005,7 @@ export function Kpis() {
         setBankBalance(0);
       }
     })();
-  }, [periods, employees, appliedYear, appliedMonth, appliedDepartment, appliedEmployees]);
+  }, [periods, employees, appliedYear, appliedMonth, appliedDepartment, appliedEmployees, appliedCompanyFilter]);
 
   useEffect(() => {
     if (!periods.length || !employees.length) return;
@@ -1218,7 +1219,7 @@ export function Kpis() {
 
       setMonthlyAbsenteeism(result);
     })();
-  }, [periods, employees, appliedYear, appliedDepartment, appliedEmployees, additionalHolidayDateSet]);
+  }, [periods, employees, appliedYear, appliedDepartment, appliedEmployees, appliedCompanyFilter, additionalHolidayDateSet]);
 
   const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
   const totalOvertime = metrics.he60 + metrics.he60Night + metrics.he100 + metrics.he100Night + metrics.he20 + metrics.interjornada;
@@ -1338,8 +1339,8 @@ export function Kpis() {
           <section className="mt-6">
             <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Média salarial e valores mensais de pensão cadastrados, conforme os filtros selecionados.</p></div>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-<Card className="p-5"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.salary != null && e.salary > 0 && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).map(e => e.salary as number); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Sem dados"; })()}</p></Card>
-              <Card className="p-5"><p className="text-sm text-muted-foreground">Funcionários com pensão</p><p className="mt-2 text-2xl font-bold">{employees.filter(e => e.pensionAmount > 0 && (!companyFilter || e.companyId === companyFilter) && (selectedDepartment === "todos" || e.department === selectedDepartment) && (!selectedEmployees.length || selectedEmployees.includes(e.id))).length}</p><p className="mt-1 text-xs text-muted-foreground">Quantidade de funcionários com pensão alimentícia cadastrada.</p></Card>
+<Card className="p-5"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{(() => { const values = employees.filter(e => e.salary != null && e.salary > 0 && (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))).map(e => e.salary as number); return values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : "Sem dados"; })()}</p></Card>
+              <Card className="p-5"><p className="text-sm text-muted-foreground">Funcionários com pensão</p><p className="mt-2 text-2xl font-bold">{employees.filter(e => e.pensionAmount > 0 && (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id))).length}</p><p className="mt-1 text-xs text-muted-foreground">Quantidade de funcionários com pensão alimentícia cadastrada.</p></Card>
             
             </div>
           </section>
@@ -1377,7 +1378,7 @@ export function Kpis() {
             <Card className="p-5">
               <div className="flex items-center justify-between gap-3">
                 <div><h3 className="font-bold">Evolução mensal</h3><p className="text-xs text-muted-foreground">Percentual de horas perdidas consideradas em cada competência.</p></div>
-                <span className="text-xs text-muted-foreground">{selectedYear}</span>
+                <span className="text-xs text-muted-foreground">{appliedYear}</span>
               </div>
               <div className="mt-5 flex h-48 items-end gap-2 overflow-x-auto pb-6">
                 {monthlyAbsenteeism.map(item => {
