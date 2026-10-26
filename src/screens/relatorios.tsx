@@ -755,9 +755,10 @@ export function Relatorios() {
     })();
   }, []);
 
-  const competence = periods.find(period => period.id === selectedPeriodId) ?? periods[0] ?? null;
+  const allCompetencies = selectedPeriodId === "todos";
+  const competence = allCompetencies ? null : periods.find(period => period.id === selectedPeriodId) ?? periods[0] ?? null;
 
-  async function exportReport(kind: string) {
+  async function exportReport(kind: string, format: "excel" | "pdf" = "excel") {
     setBusy(kind);
     setError("");
     const db = supabase as any;
@@ -926,7 +927,7 @@ export function Relatorios() {
           .eq("launch_type", "INTERJORNADA_50")
           .order("reference_date", { ascending: false })
           .range(from, to));
-        rows = data.filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => ({
+        rows = data.filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || (x.reference_date >= competence.start_date && x.reference_date <= competence.end_date))).map((x: any) => ({
           employee_id: x.employee_id,
           registration: x.employees?.registration ?? "",
           employee: x.employees?.full_name ?? "",
@@ -944,17 +945,17 @@ export function Relatorios() {
           fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code)").eq("occurrence_types.code", "declaracao_horas").order("occurrence_date", { ascending: false }).range(from, to)),
         ]);
         rows = [
-          ...(certificates ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => ({
+          ...(certificates ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || (x.start_date <= competence.end_date && x.end_date >= competence.start_date))).map((x: any) => ({
             tipo: "Atestado", employee: x.employees?.full_name ?? "", start_date: x.start_date,
             end_date: x.end_date, days: x.days, horas_abonadas: "", motivo: "",
             certificate_type: x.certificate_type, cid: x.cid, notes: x.notes ?? "",
           })),
-          ...(leaves ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => ({
+          ...(leaves ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || ((x.occurrence_date ?? "") <= competence.end_date && (x.end_date ?? x.occurrence_date ?? "") >= competence.start_date))).map((x: any) => ({
             tipo: "Afastamento", employee: x.employees?.full_name ?? "", start_date: x.occurrence_date,
             end_date: x.end_date ?? x.occurrence_date, days: x.quantity, horas_abonadas: "", motivo: "",
             certificate_type: "", cid: "", notes: x.notes ?? "",
           })),
-          ...(declarations ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => {
+          ...(declarations ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || (x.occurrence_date >= competence.start_date && x.occurrence_date <= competence.end_date))).map((x: any) => {
             const parts = String(x.notes ?? "").split(" — ");
             const minutes = Math.round(Number(x.quantity ?? 0) * 60);
             return {
@@ -969,7 +970,7 @@ export function Relatorios() {
 
       if (kind === "ocorrencias") {
         const data = await fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,end_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code,name)").in("occurrence_types.code", ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"]).order("occurrence_date", { ascending: false }).range(from, to));
-        rows = data.filter((x: any) => allowedEmployeeIds.has(String(x.employee_id))).map((x: any) => ({
+        rows = data.filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || ((x.occurrence_date ?? "") <= competence.end_date && (x.end_date ?? x.occurrence_date ?? "") >= competence.start_date))).map((x: any) => ({
           date: x.occurrence_date,
           end_date: x.end_date ?? "",
           type: x.occurrence_types?.name ?? "",
@@ -1010,25 +1011,30 @@ export function Relatorios() {
               : "Nenhuma competência cadastrada."}
         </p>
 
-        <div className="mt-5 max-w-xl">
-          <label htmlFor="report-period" className="mb-1.5 block text-sm font-medium">Competência dos relatórios de Fechamento, Banco de Horas e Horas a Pagar</label>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <label className="grid gap-1.5 text-sm font-medium">Empresa
+            <CompanyFilter value={companyFilter} onChange={setCompanyFilter} className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm" />
+          </label>
+          <label htmlFor="report-period" className="grid gap-1.5 text-sm font-medium">Competência dos relatórios
           <select
             id="report-period"
-            value={competence?.id ?? ""}
+            value={selectedPeriodId || periods[0]?.id || ""}
             onChange={event => setSelectedPeriodId(event.target.value)}
             disabled={loading || !periods.length || !!busy}
             className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm"
           >
+            <option value="todos">Todas as competências</option>
             {periods.map(period => (
               <option key={period.id} value={period.id}>
                 {formatDate(period.start_date)} a {formatDate(period.end_date)} · Ref. {String(period.reference_month).padStart(2, "0")}/{period.reference_year} · {period.status}
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-muted-foreground">
-            A competência selecionada também é aplicada ao relatório Horas a Pagar. Interjornada, Declarações e Atestados e Faltas e Folgas incluem todos os registros disponíveis.
-          </p>
+          </label>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Empresa e competência são aplicadas aos relatórios. Faltas e Folgas, Interjornada, Declarações e Atestados respeitam o período selecionado; “Todas as competências” inclui todo o histórico. Horas a Pagar exige competência específica para evitar somar saldos acumulados entre períodos.
+        </p>
 
         {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
 
