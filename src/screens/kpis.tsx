@@ -127,7 +127,7 @@ export function Kpis() {
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
   const [interjornadaStatus, setInterjornadaStatus] = useState<"ativo" | "inativo" | "todos">("todos");
-  const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<Array<{ periodId: string; label: string; rate: number; expected: number; lost: number }>>([]);
+  const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<Array<{ periodId: string; label: string; rate: number; expected: number; lost: number; debits: number }>>([]);
   const [monthlyOvertime, setMonthlyOvertime] = useState<Array<{ periodId: string; label: string; total: number; interjornada: number; employees: number }>>([]);
   const [showAbsenceCalculation, setShowAbsenceCalculation] = useState(false);
 
@@ -1120,6 +1120,7 @@ export function Kpis() {
       const result = yearPeriods.map(period => {
         let expected = 0;
         let lost = 0;
+        let debits = 0;
 
         for (const row of (historicalRows ?? []).filter((x: any) => x.period_id === period.id)) {
           if (!historicalRowIncluded(row)) continue;
@@ -1130,9 +1131,11 @@ export function Kpis() {
             : undefined;
           const sourceRow = override ? { ...row, ...override } : row;
           expected += Number(sourceRow.expected_minutes || 0);
+          const rowDebit = Number(sourceRow.debit_minutes || 0);
+          debits += Math.max(0, rowDebit);
           lost += Math.round(Number(sourceRow.absence_quantity || 0) * 528)
             + Number(sourceRow.allowance_minutes || 0)
-            + Number(sourceRow.debit_minutes || 0);
+            + rowDebit;
         }
 
         if (period.end_date > HISTORICAL_CUTOFF) {
@@ -1163,10 +1166,12 @@ export function Kpis() {
             const employee = employees.find(e => e.id === String(row.employee_id));
             if (!employee || !employeeIncludedForSelectedFilters(employee)) continue;
             expected += Number(row.expected_minutes || 0);
+            const rowDebit = Number(row.debit_minutes || 0);
+            debits += Math.max(0, rowDebit);
             lost += Math.round(Number(row.absence_quantity || 0) * dailyMinutesFromSchedule(employee))
               + Number(row.allowance_minutes || 0)
               + (period.end_date > HISTORICAL_CUTOFF ? Number(row.declaration_minutes || 0) : 0)
-              + Number(row.debit_minutes || 0)
+              + rowDebit
               + Number(row.certificate_minutes || 0);
           }
 
@@ -1190,7 +1195,11 @@ export function Kpis() {
           for (const row of (debitRows ?? []).filter((x: any) => x.period_id === period.id)) {
             if (!row.employee_id || overrides.has(String(row.employee_id))) continue;
             const employee = employees.find(e => e.id === row.employee_id);
-            if (employee && employeeIncludedForSelectedFilters(employee)) lost += Math.abs(Number(row.minutes || 0));
+            if (employee && employeeIncludedForSelectedFilters(employee)) {
+              const rowDebit = Math.abs(Number(row.minutes || 0));
+              debits += rowDebit;
+              lost += rowDebit;
+            }
           }
 
           // Atestados cadastrados em dias também compõem Abonos no gráfico:
@@ -1220,6 +1229,7 @@ export function Kpis() {
           rate: expected > 0 ? (lost / expected) * 100 : 0,
           expected,
           lost,
+          debits,
         };
       });
 
@@ -1644,7 +1654,7 @@ export function Kpis() {
                 ].map(([label, value]) => (
                   <div key={String(label)}>
                     <div className="flex justify-between text-sm"><span>{label}</span><strong>{fmt(Number(value))}</strong></div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${metrics.absenceMinutes ? Math.min(100, Number(value) / metrics.absenceMinutes * 100) : 0}%` }} /></div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${(Math.max(0, metrics.worked - metrics.expected) + Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)) ? Math.min(100, Number(value) / (Math.max(0, metrics.worked - metrics.expected) + Math.max(0, metrics.absenceMinutes - metrics.faltasMinutes - metrics.abonosMinutes)) * 100) : 0}%` }} /></div>
                   </div>
                 ))}
               </div>
@@ -1687,7 +1697,7 @@ export function Kpis() {
             </Card>
             <Card className="p-5">
               <div className="flex items-center justify-between gap-3">
-                <div><h3 className="font-bold">Evolução dos débitos</h3><p className="text-xs text-muted-foreground">Horas perdidas por competência ao longo do ano selecionado.</p></div>
+                <div><h3 className="font-bold">Evolução dos débitos</h3><p className="text-xs text-muted-foreground">Horas de débito registradas no ponto por competência.</p></div>
                 <span className="text-xs text-muted-foreground">{appliedYear}</span>
               </div>
               <div className="mt-5 h-56"><ResponsiveContainer width="100%" height="100%">
@@ -1696,8 +1706,8 @@ export function Kpis() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false}/>
                   <XAxis dataKey="label" tick={{fontSize:10}}/>
                   <YAxis tickFormatter={(value:number) => fmt(value)} tick={{fontSize:10}}/>
-                  <Tooltip formatter={(value:number, name:string, props:any) => [`${fmt(props.payload.lost)} perdidas · ${pct(props.payload.rate)} absenteísmo`, "Horas perdidas"]}/>
-                  <Bar dataKey="lost" name="Horas perdidas" fill="#0D9488" radius={[6,6,0,0]} activeBar={{ fill: "#0F766E" }}/>
+                  <Tooltip formatter={(value:number) => [fmt(value), "Débitos do ponto"]}/>
+                  <Bar dataKey="debits" name="Débitos do ponto" fill="#0D9488" radius={[6,6,0,0]} activeBar={{ fill: "#0F766E" }}/>
                 </BarChart>
               </ResponsiveContainer></div>
               {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados históricos para o ano selecionado.</p>}
