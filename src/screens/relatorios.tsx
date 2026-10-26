@@ -121,7 +121,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   const totalWeight = columns.reduce((sum, key) => sum + columnWeight(key), 0);
   const colgroup = '<colgroup>' + columns.map(key => '<col style="width:' + (columnWeight(key) / totalWeight * 100).toFixed(3) + '%">').join("") + '</colgroup>';
   const pageStyle = wideTable
-    ? '@page{size:A3 landscape;margin:5mm}body{font-size:7px}.brand{padding:6px 9px}h1{font-size:14px;margin:2px 0}.subtitle,.meta,.footer{font-size:7px}.meta{padding:3px 5px}table{margin-top:4px}th{font-size:9px}td{font-size:7px;padding:0.5px 2px;line-height:1}'
+    ? '@page{size:A3 landscape;margin:5mm}body{font-size:7px}.brand{padding:6px 9px}h1{font-size:14px;margin:2px 0}.subtitle,.meta,.footer{font-size:7px}.meta{padding:3px 5px}table{margin-top:4px}th{font-size:11px;padding:2px 2px;line-height:1.1}td{font-size:7px;padding:0.5px 2px;line-height:1}'
     : '@page{size:A4 landscape;margin:7mm}body{font-size:7px}.brand{padding:10px 14px}h1{font-size:16px;margin:4px 0}.subtitle{font-size:8px}.meta{font-size:7px;padding:6px 8px}table{margin-top:8px}th{font-size:6.5px}th,td{padding:3px 3px;line-height:1.2}';
   const html = '<html lang="pt-BR"><head><meta charset="utf-8"><title>' + escapeReportHtml(title) + '</title><style>' +
     '*{box-sizing:border-box}html,body{width:100%;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#183735;print-color-adjust:exact;-webkit-print-color-adjust:exact}' +
