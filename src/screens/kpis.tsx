@@ -1226,6 +1226,7 @@ export function Kpis() {
 
   const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
   const totalOvertime = metrics.he60 + metrics.he60Night + metrics.he100 + metrics.he100Night + metrics.he20 + metrics.interjornada;
+  const defaultKpiYear = periods.length ? Math.max(...periods.map(p => p.reference_year)) : new Date().getFullYear();
 
   // Limites provisórios para sinalização visual; ajustar quando o DP definir metas oficiais.
   const KPI_THRESHOLDS = {
@@ -1241,7 +1242,7 @@ export function Kpis() {
   const bankTone = Math.abs(bankBalance) >= KPI_THRESHOLDS.bankCriticalMinutes ? "critical" : Math.abs(bankBalance) >= KPI_THRESHOLDS.bankAttentionMinutes ? "warning" : "neutral";
   const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0 || bankBalance !== 0;
   const toneLabel = (tone: string) => tone === "critical" ? "Crítico · limite provisório" : tone === "warning" ? "Atenção · limite provisório" : "Dentro da faixa provisória";
-  const kpiItems = activeSection === "horas-extras"
+  const kpiItems: Array<{ label: string; value: string; support: string; tone: string; title: string; primary?: boolean; status?: string }> = activeSection === "horas-extras"
     ? [
         { label: "Horas extras", value: fmt(Math.max(0, totalOvertime - metrics.interjornada)), support: "Total de HE, sem interjornada", tone: "neutral", title: "Soma dos tipos de hora extra já apurados nesta seleção.", primary: true },
         { label: "Funcionários com HE", value: String(overtimeEmployees.filter(item => item.total - item.interjornada > 0).length), support: "Com horas extras no período", tone: "neutral", title: "Contagem de funcionários com horas extras na seleção." },
@@ -1365,7 +1366,7 @@ export function Kpis() {
               </label>
               <label className="kpi-toolbar-label">
                 <span>Ano</span>
-                <select aria-label="Ano" className={`kpi-control ${selectedYear !== Math.max(...periods.map(p => p.reference_year), new Date().getFullYear()) ? "is-filtered" : ""}`} value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
+                <select aria-label="Ano" className={`kpi-control ${selectedYear !== defaultKpiYear ? "is-filtered" : ""}`} value={selectedYear} onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedMonth("todos"); }}>
                   {[...new Set(periods.map(p => p.reference_year))].sort((a,b) => b-a).map(year => <option key={year} value={year}>{year}</option>)}
                 </select>
               </label>
@@ -1440,7 +1441,7 @@ export function Kpis() {
         {error && <Card className="mt-4 border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</Card>}
 
         {activeSection === "demograficos" && (
-          <section className="mt-6 space-y-4">
+          <section id="kpi-panel-demograficos" role="tabpanel" aria-labelledby="kpi-tab-demograficos" tabIndex={0} className="mt-6 space-y-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             {(() => {
               const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)) && (demographicStatusFilter === "todos" || (demographicStatusFilter === "ativos" ? (!e.terminationDate && ["ativo","active"].includes((e.status || "").toLowerCase())) : (Boolean(e.terminationDate) || ["inativo","inactive"].includes((e.status || "").toLowerCase())))));
               const today = new Date();
@@ -1486,7 +1487,7 @@ export function Kpis() {
         )}
 
         {activeSection === "salariais" && (
-          <section className="mt-6 space-y-4">
+          <section id="kpi-panel-salariais" role="tabpanel" aria-labelledby="kpi-tab-salariais" tabIndex={0} className="mt-6 space-y-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             {(() => {
               const base = employees.filter(e => (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) && (appliedDepartment === "todos" || e.department === appliedDepartment) && (!appliedEmployees.length || appliedEmployees.includes(e.id)) && (salaryStatusFilter === "todos" || (salaryStatusFilter === "ativos" ? (!e.terminationDate && ["ativo","active"].includes((e.status || "").toLowerCase())) : (Boolean(e.terminationDate) || ["inativo","inactive"].includes((e.status || "").toLowerCase())))));
               const salaries = base.filter(e => e.salary != null && e.salary > 0).map(e => ({...e, salary: Number(e.salary)}));
@@ -1527,7 +1528,7 @@ export function Kpis() {
           </section>
         )}
         {activeSection === "absenteismo" && (
-          <section className="mt-6">
+          <section id="kpi-panel-absenteismo" role="tabpanel" aria-labelledby="kpi-tab-absenteismo" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 01</p>
@@ -1631,7 +1632,7 @@ export function Kpis() {
           )}
 
         {activeSection === "horas-extras" && (
-          <section className="mt-6">
+          <section id="kpi-panel-horas-extras" role="tabpanel" aria-labelledby="kpi-tab-horas-extras" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 02</p>
@@ -1785,7 +1786,7 @@ export function Kpis() {
         )}
 
         {activeSection === "turnover" && (
-          <section className="mt-6">
+          <section id="kpi-panel-turnover" role="tabpanel" aria-labelledby="kpi-tab-turnover" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-primary">Indicador 03</p>
