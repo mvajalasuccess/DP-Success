@@ -25,9 +25,9 @@ ALTER TABLE public.employee_life_events ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS employee_life_events_select ON public.employee_life_events;
 CREATE POLICY employee_life_events_select ON public.employee_life_events FOR SELECT TO authenticated USING (public.has_app_access((select auth.uid())));
 DROP POLICY IF EXISTS employee_life_events_insert ON public.employee_life_events;
-CREATE POLICY employee_life_events_insert ON public.employee_life_events FOR INSERT TO authenticated WITH CHECK (private.has_app_access());
+CREATE POLICY employee_life_events_insert ON public.employee_life_events FOR INSERT TO authenticated WITH CHECK (public.can_manage((select auth.uid())));
 DROP POLICY IF EXISTS employee_life_events_update ON public.employee_life_events;
-CREATE POLICY employee_life_events_update ON public.employee_life_events FOR UPDATE TO authenticated USING (private.has_app_access()) WITH CHECK (private.has_app_access());
+CREATE POLICY employee_life_events_update ON public.employee_life_events FOR UPDATE TO authenticated USING (public.has_app_access((select auth.uid()))) WITH CHECK (public.can_manage((select auth.uid())));
 DROP POLICY IF EXISTS employee_life_events_delete ON public.employee_life_events;
 CREATE POLICY employee_life_events_delete ON public.employee_life_events FOR DELETE TO authenticated USING (public.can_manage((select auth.uid())));
 
@@ -57,9 +57,9 @@ CREATE INDEX IF NOT EXISTS idx_employee_document_records_employee ON public.empl
 ALTER TABLE public.employee_document_catalog ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_document_records ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS employee_document_catalog_access ON public.employee_document_catalog;
-CREATE POLICY employee_document_catalog_access ON public.employee_document_catalog FOR ALL TO authenticated USING (private.has_app_access()) WITH CHECK (private.has_app_access());
+CREATE POLICY employee_document_catalog_access ON public.employee_document_catalog FOR ALL TO authenticated USING (public.has_app_access((select auth.uid()))) WITH CHECK (public.can_manage((select auth.uid())));
 DROP POLICY IF EXISTS employee_document_records_access ON public.employee_document_records;
-CREATE POLICY employee_document_records_access ON public.employee_document_records FOR ALL TO authenticated USING (private.has_app_access()) WITH CHECK (private.has_app_access());
+CREATE POLICY employee_document_records_access ON public.employee_document_records FOR ALL TO authenticated USING (public.has_app_access((select auth.uid()))) WITH CHECK (public.can_manage((select auth.uid())));
 
 CREATE TABLE IF NOT EXISTS public.employee_checklist_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -95,11 +95,11 @@ ALTER TABLE public.employee_checklist_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_checklist_instances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employee_checklist_steps ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS employee_checklist_templates_access ON public.employee_checklist_templates;
-CREATE POLICY employee_checklist_templates_access ON public.employee_checklist_templates FOR ALL TO authenticated USING (private.has_app_access()) WITH CHECK (private.has_app_access());
+CREATE POLICY employee_checklist_templates_access ON public.employee_checklist_templates FOR ALL TO authenticated USING (public.has_app_access((select auth.uid()))) WITH CHECK (public.can_manage((select auth.uid())));
 DROP POLICY IF EXISTS employee_checklist_instances_access ON public.employee_checklist_instances;
-CREATE POLICY employee_checklist_instances_access ON public.employee_checklist_instances FOR ALL TO authenticated USING (private.has_app_access()) WITH CHECK (private.has_app_access());
+CREATE POLICY employee_checklist_instances_access ON public.employee_checklist_instances FOR ALL TO authenticated USING (public.has_app_access((select auth.uid()))) WITH CHECK (public.can_manage((select auth.uid())));
 DROP POLICY IF EXISTS employee_checklist_steps_access ON public.employee_checklist_steps;
-CREATE POLICY employee_checklist_steps_access ON public.employee_checklist_steps FOR ALL TO authenticated USING (private.has_app_access()) WITH CHECK (private.has_app_access());
+CREATE POLICY employee_checklist_steps_access ON public.employee_checklist_steps FOR ALL TO authenticated USING (public.has_app_access((select auth.uid()))) WITH CHECK (public.can_manage((select auth.uid())));
 
 CREATE TABLE IF NOT EXISTS public.employee_audit_history (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -117,4 +117,4 @@ CREATE TABLE IF NOT EXISTS public.employee_audit_history (
 CREATE INDEX IF NOT EXISTS idx_employee_audit_history_employee_date ON public.employee_audit_history(employee_id, event_date DESC);
 ALTER TABLE public.employee_audit_history ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS employee_audit_history_access ON public.employee_audit_history;
-CREATE POLICY employee_audit_history_access ON public.employee_audit_history FOR ALL TO authenticated USING (private.has_app_access()) WITH CHECK (private.has_app_access());
+CREATE POLICY employee_audit_history_access ON public.employee_audit_history FOR ALL TO authenticated USING (public.has_app_access((select auth.uid()))) WITH CHECK (public.can_manage((select auth.uid())));
