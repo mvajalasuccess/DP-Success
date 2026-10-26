@@ -959,7 +959,21 @@ export function Relatorios() {
           formatDate(competence.end_date) + "  |  Referência: " +
           String(competence.reference_month).padStart(2, "0") + "/" + competence.reference_year +
           "  |  Valores por categoria e total a pagar seguem a composição da tela Pagamentos.";
-        await downloadStandardReportExcel("horas_pagar", payableRows, subtitle);
+        if (format === "pdf") {
+          const pdfRows = payableRows.map(row => ({
+            Funcionário: row.employee,
+            "HE 60%": Math.floor(row.he60_minutes / 60) + ":" + String(row.he60_minutes % 60).padStart(2, "0"),
+            "Valor HE 60%": row.he60_value,
+            "HE 60% + 20%": Math.floor(row.he60night_minutes / 60) + ":" + String(row.he60night_minutes % 60).padStart(2, "0"),
+            "Valor HE 60% + 20%": row.he60night_value,
+            "HE 100%": Math.floor(row.he100_minutes / 60) + ":" + String(row.he100_minutes % 60).padStart(2, "0"),
+            "Valor HE 100%": row.he100_value,
+            "Adicional noturno 20%": Math.floor(row.night20_minutes / 60) + ":" + String(row.night20_minutes % 60).padStart(2, "0"),
+            "Valor adicional noturno": row.night20_value,
+            "Total (R$)": row.total_value,
+          }));
+          downloadReportPdf("Horas a pagar", pdfRows, subtitle);
+        } else await downloadStandardReportExcel("horas_pagar", payableRows, subtitle);
         return;
       }
 
@@ -1026,8 +1040,14 @@ export function Relatorios() {
         }));
       }
 
-      if (!rows.length) throw new Error("Não há dados para exportar nesse relatório.");
-      await downloadStandardReportExcel(kind, rows);
+      if (!rows.length) throw new Error("Não há dados para exportar nesse relatório para os filtros selecionados.");
+      if (format === "pdf") {
+        const reportTitle = reports.find(([key]) => key === kind)?.[1] ?? "Relatório";
+        const subtitle = (allCompetencies ? "Todas as competências" : competence ? "Competência: " + formatDate(competence.start_date) + " a " + formatDate(competence.end_date) : "Todas as competências") + (companyFilter ? " · Empresa selecionada" : " · Todas as empresas");
+        downloadReportPdf(reportTitle, rows, subtitle);
+      } else {
+        await downloadStandardReportExcel(kind, rows);
+      }
     } catch (e: any) {
       setError(e.message ?? "Não foi possível gerar o relatório.");
     } finally {
@@ -1101,14 +1121,14 @@ export function Relatorios() {
                           ? "Excel com declarações e atestados, período, dias, horas abonadas, motivo, CID e observações."
                           : "Excel de faltas e folgas com funcionário, período, tipo, quantidade e observações."}
               </p>
-              <button
-                onClick={() => void exportReport(key)}
-                disabled={!!busy || loading || ((key === "fechamento" || key === "banco" || key === "horas_pagar") && !competence)}
-                className="mt-4 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
-              >
-                <Download className="h-4 w-4" />
-                {busy === key ? "Gerando…" : "Exportar Excel"}
-              </button>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button onClick={() => void exportReport(key, "excel")} disabled={!!busy || loading} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm disabled:opacity-50">
+                  <Download className="h-4 w-4" /> {busy === key ? "Gerando…" : "Exportar Excel"}
+                </button>
+                <button onClick={() => void exportReport(key, "pdf")} disabled={!!busy || loading} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+                  <FileBarChart className="h-4 w-4" /> Exportar PDF
+                </button>
+              </div>
             </Card>
           ))}
         </div>
