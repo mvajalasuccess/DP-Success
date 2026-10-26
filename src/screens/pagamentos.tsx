@@ -48,7 +48,7 @@ export function Payments() {
   const divisor = employee?.work_schedules?.weekly_minutes ? (Number(employee.work_schedules.weekly_minutes) / 60) * 5 : 220;
   const hourlyRate = Number((Number(employee?.salary || 0) / divisor).toFixed(4));
   const totalValue = details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0);
-  const balanceForPeriod = balances.find(b => b.period.id === periodId);
+  const balanceForPeriod = balances.find(b => b.period.id === period?.id);
   const hasPositiveGeneralBalance = balances.length > 0 && Number(balances[balances.length - 1]!.accumulated ?? 0) > 0;
 
   const loadBase = useCallback(async () => {
@@ -255,7 +255,7 @@ export function Payments() {
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="grid gap-1.5 text-sm font-medium">Empresa
-              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(e => (!value || e.company_id === value) && (!period || !e.hire_date || e.hire_date <= period.end_date) && (!period || !e.termination_date || e.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
+              <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(e => (!value || e.company_id === value) && (allCompetencies || !period || !e.hire_date || e.hire_date <= period.end_date) && (allCompetencies || !period || !e.termination_date || e.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Competência
               <select className={inputCls} value={periodId} onChange={e => { const nextPeriodId = e.target.value; setPeriodId(nextPeriodId); const nextPeriod = periods.find(item => item.id === nextPeriodId); const first = employees.find(person => (!companyFilter || person.company_id === companyFilter) && (nextPeriodId === "todos" || !nextPeriod || !person.hire_date || person.hire_date <= nextPeriod.end_date) && (nextPeriodId === "todos" || !nextPeriod || !person.termination_date || person.termination_date >= nextPeriod.start_date)); setEmployeeId(first?.id ?? ""); }} disabled={loading}>
