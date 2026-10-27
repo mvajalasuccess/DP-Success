@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, CalendarRange, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, CalendarRange, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, Palmtree, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
@@ -24,18 +24,19 @@ const PlanejamentoMensal = lazy(() => import("@/screens/planejamento-mensal").th
 const DiarioOcorrencias = lazy(() => import("@/screens/diario-ocorrencias").then(m => ({ default: m.DiarioOcorrencias })));
 const ImportacaoHistorico = lazy(() => import("@/screens/importacao-historico").then(m => ({ default: m.ImportacaoHistorico })));
 const ImportarCartaoPonto = lazy(() => import("@/screens/importar-cartao-ponto").then(m => ({ default: m.ImportarCartaoPonto })));
+const Ferias = lazy(() => import("@/screens/ferias").then(m => ({ default: m.Ferias })));
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees } from "@/lib/dp-model";
 
 export const Route = createFileRoute("/")({ component: Dashboard });
 
-type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importacao-historico" | "importar-cartao-ponto";
+type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importacao-historico" | "importar-cartao-ponto" | "ferias";
 
 const screenComponents = {
   empresas: Companies, funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours, pagamentos: Payments,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
-  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto,
+  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto, ferias: Ferias,
 };
 
 
@@ -48,7 +49,7 @@ function fmt(minutes: number) {
 function getScreenFromUrl(): ScreenKey {
   if (typeof window === "undefined") return "dashboard";
   const value = new URLSearchParams(window.location.search).get("tela") as ScreenKey | null;
-  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importacao-historico", "importar-cartao-ponto"];
+  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importacao-historico", "importar-cartao-ponto", "ferias"];
   return value && validScreens.includes(value) ? value : "dashboard";
 }
 
@@ -131,6 +132,7 @@ function AppShell({
   const [closingMenuOpen, setClosingMenuOpen] = useState(true);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -138,6 +140,7 @@ function AppShell({
     if (["fechamento-ponto", "importar-cartao-ponto", "lancamentos", "banco-horas", "pagamentos", "ocorrencias", "atestados"].includes(screen)) setClosingMenuOpen(true);
     if (["empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas"].includes(screen)) setCompanyMenuOpen(true);
     if (["planejamento-mensal", "diario-ocorrencias", "tarefas"].includes(screen)) setTasksOpen(true);
+    if (screen === "ferias") setPeopleOpen(true);
   }, [screen]);
 
   const buttonClass = (key: ScreenKey) =>
@@ -149,6 +152,7 @@ function AppShell({
     { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck]] },
     { label: "Cadastro", items: [["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays]] },
     { label: "Organização", items: [["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Diário de Ocorrências", "diario-ocorrencias", ClipboardList], ["Tarefas", "tarefas", ListChecks]] },
+    { label: "Pessoas", items: [["Férias", "ferias", Palmtree]] },
   ];
 
   useEffect(() => {
@@ -287,6 +291,14 @@ function AppShell({
                 <button type="button" onClick={() => setTasksOpen(v => !v)} className={sectionButtonClass} aria-expanded={tasksOpen} aria-controls="dp-sidebar-organization">
                   <span>Organização</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${tasksOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
                 </button>
+              <section className="dp-sidebar-group">
+                <button type="button" onClick={() => setPeopleOpen(v => !v)} className={sectionButtonClass} aria-expanded={peopleOpen} aria-controls="dp-sidebar-people">
+                  <span>Pessoas</span><ChevronDown className={"h-4 w-4 transition-transform duration-150 " + (peopleOpen ? "rotate-0" : "-rotate-90")} strokeWidth={1.8} />
+                </button>
+                {peopleOpen && <div id="dp-sidebar-people" className="mt-1 space-y-1">
+                  <button type="button" onClick={() => go("ferias")} aria-current={screen === "ferias" ? "page" : undefined} className={buttonClass("ferias")}><Palmtree className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Férias</span></button>
+                </div>}
+              </section>
                 {tasksOpen && <div id="dp-sidebar-organization" className="mt-1 space-y-1">
                   <button type="button" onClick={() => go("planejamento-mensal")} aria-current={screen === "planejamento-mensal" ? "page" : undefined} className={buttonClass("planejamento-mensal")}><CalendarRange className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Planejamento Mensal</span></button>
                   <button type="button" onClick={() => go("diario-ocorrencias")} aria-current={screen === "diario-ocorrencias" ? "page" : undefined} className={buttonClass("diario-ocorrencias")}><ClipboardList className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Diário de Ocorrências</span></button>
@@ -299,7 +311,7 @@ function AppShell({
               {([
                 ["dashboard", LayoutDashboard, "Dashboard"], ["kpis", ChartColumn, "KPIs"], ["comparativos", UsersRound, "Comparativos"], ["relatorios", FileText, "Relatórios"],
                 ["fechamento-ponto", CalendarClock, "Fechamento"], ["importar-cartao-ponto", Upload, "Importar Cartão Ponto"], ["lancamentos", ClipboardList, "Lançamentos"], ["banco-horas", Clock3, "Banco de Horas"], ["pagamentos", BadgeDollarSign, "Pagamentos"], ["ocorrencias", CalendarX, "Faltas e Folgas"], ["atestados", ClipboardCheck, "Declarações e Atestados"],
-                ["empresas", Building2, "Empresas"], ["funcionarios", UsersRound, "Funcionários"], ["cargos", BriefcaseBusiness, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", CalendarDays, "Jornadas"], ["planejamento-mensal", CalendarRange, "Planejamento Mensal"], ["diario-ocorrencias", ClipboardList, "Diário de Ocorrências"], ["tarefas", FileText, "Tarefas"],
+                ["empresas", Building2, "Empresas"], ["funcionarios", UsersRound, "Funcionários"], ["cargos", BriefcaseBusiness, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", CalendarDays, "Jornadas"], ["planejamento-mensal", CalendarRange, "Planejamento Mensal"], ["diario-ocorrencias", ClipboardList, "Diário de Ocorrências"], ["tarefas", FileText, "Tarefas"], ["ferias", Palmtree, "Férias"],
               ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label} aria-label={label} aria-current={screen === key ? "page" : undefined}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /></button>)}
             </>
           )}
