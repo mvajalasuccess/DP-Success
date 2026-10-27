@@ -1096,15 +1096,18 @@ export function Relatorios() {
         </div>
       </header>
       <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Gestão</p>
-        <h1 className="mt-1 text-3xl font-bold">Relatórios</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {loading
-            ? "Carregando competências…"
-            : competence
-              ? `Competência selecionada: ${String(competence.reference_month).padStart(2, "0")}/${competence.reference_year} (${formatDate(competence.start_date)} a ${formatDate(competence.end_date)})`
-              : allCompetencies ? "Todas as competências selecionadas" : "Nenhuma competência cadastrada."}
-        </p>
+        <section className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
+          <div className="pointer-events-none absolute -right-10 -top-20 -z-10 h-56 w-56 rounded-full bg-[#06CAA0]/20 blur-3xl" />
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7cebd0]">ANÁLISE • DP SUCCESS</p>
+          <h1 style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }} className="!text-white text-3xl font-semibold tracking-tight">Relatórios</h1>
+          <p className="mt-2 text-sm text-slate-200">
+            {loading
+              ? "Carregando competências…"
+              : competence
+                ? `Competência selecionada: ${String(competence.reference_month).padStart(2, "0")}/${competence.reference_year} (${formatDate(competence.start_date)} a ${formatDate(competence.end_date)})`
+                : allCompetencies ? "Todas as competências selecionadas" : "Nenhuma competência cadastrada."}
+          </p>
+        </section>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <label className="grid gap-1.5 text-sm font-medium">Empresa
