@@ -1319,9 +1319,10 @@ export function Kpis() {
       ]
     : activeSection === "salariais"
     ? [
-        { label: "Salário médio", value: salaryKpiRows.length ? kpiMoney(salaryKpiTotal / salaryKpiRows.length) : "Sem dados", support: `Base de ${salaryKpiRows.length} salário(s)`, tone: "neutral", title: "Média dos salários cadastrados na seleção.", primary: true },
-        { label: "Folha mensal estimada", value: kpiMoney(salaryKpiTotal), support: "Soma dos salários, sem encargos", tone: "neutral", title: "Soma dos salários cadastrados, sem encargos." },
-        { label: "Funcionários com pensão", value: String(pensionKpiEmployees.length), support: "Com valor mensal maior que zero", tone: "neutral", title: "Quantidade de cadastros com pensão alimentícia." },
+        { label: "Menor salário", value: salaryKpiRows.length ? kpiMoney(Math.min(...salaryKpiRows.map(e => Number(e.salary || 0)))) : "Sem dados", support: "Menor salário cadastrado na seleção", tone: "neutral", title: "Menor salário entre os funcionários considerados pelos filtros.", primary: true },
+        { label: "Maior salário", value: salaryKpiRows.length ? kpiMoney(Math.max(...salaryKpiRows.map(e => Number(e.salary || 0)))) : "Sem dados", support: "Maior salário cadastrado na seleção", tone: "neutral", title: "Maior salário entre os funcionários considerados pelos filtros." },
+        { label: "Quantidade de homens", value: String(salaryKpiEmployees.filter(e => ["m", "masculino", "masc", "homem", "male"].includes(String(e.gender ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase())).length), support: "Conforme gênero informado no cadastro", tone: "neutral", title: "Quantidade de funcionários cadastrados como homens." },
+        { label: "Quantidade de mulheres", value: String(salaryKpiEmployees.filter(e => ["f", "feminino", "fem", "mulher", "female"].includes(String(e.gender ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase())).length), support: "Conforme gênero informado no cadastro", tone: "neutral", title: "Quantidade de funcionárias cadastradas como mulheres." },
       ]
     : activeSection === "horas-extras"
     ? [
