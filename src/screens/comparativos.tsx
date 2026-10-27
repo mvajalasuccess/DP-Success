@@ -290,17 +290,20 @@ export function Comparativos() {
       </div>
     </header>
     <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:py-8">
-      <div className="mb-7 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#06CAA0]/30 bg-[#06CAA0]/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300"><TrendingUp className="h-3.5 w-3.5" />ANÁLISE DE RH</div>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Comparativos</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Analise horas extras e ocorrências por colaborador nas competências selecionadas.</p>
+      <section className="relative isolate mb-7 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
+        <div className="pointer-events-none absolute -right-10 -top-20 -z-10 h-56 w-56 rounded-full bg-[#06CAA0]/20 blur-3xl" />
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7cebd0]">ANÁLISE • DP SUCCESS</p>
+            <h1 style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }} className="!text-white text-3xl font-semibold tracking-tight sm:text-4xl">Comparativos</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-200">Analise horas extras e ocorrências por colaborador nas competências selecionadas.</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs text-slate-200">
+            <span className="rounded-lg border border-white/15 bg-white/[0.08] px-3 py-2">{selectedEmployeeRows.length} funcionário(s)</span>
+            <span className="rounded-lg border border-white/15 bg-white/[0.08] px-3 py-2">{selectedPeriods.length} competência(s)</span>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <span className="rounded-lg border bg-card px-3 py-2">{selectedEmployeeRows.length} funcionário(s)</span>
-          <span className="rounded-lg border bg-card px-3 py-2">{selectedPeriods.length} competência(s)</span>
-        </div>
-      </div>
+      </section>
 
       {error && <div className="mb-5 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
