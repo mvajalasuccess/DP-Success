@@ -867,7 +867,7 @@ function DashboardHome() {
                 <span className="h-1.5 w-1.5 rounded-full bg-[#06CAA0] shadow-[0_0_12px_rgba(6,202,160,0.9)]" />
                 Painel de gestão
               </div>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Dashboard</h1>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">Dashboard</h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">Uma visão clara da competência para acompanhar pessoas, ocorrências e resultados do RH e Departamento Pessoal.</p>
             </div>
             <div className="min-w-[210px] rounded-2xl border border-white/15 bg-white/[0.08] px-5 py-4 shadow-inner backdrop-blur-sm">
