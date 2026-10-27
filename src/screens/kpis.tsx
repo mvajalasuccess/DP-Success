@@ -205,7 +205,7 @@ export function Kpis() {
             id: String(e.id),
             name: String(e.full_name ?? ""),
             registration: String(e.registration ?? "").trim(),
-            department: String(e.departments?.name ?? departmentById.get(String(e.department_id)) ?? previous?.department ?? "").trim(),
+            department: String(e.departments?.name ?? departmentById.get(String(e.department_id)) ?? "").trim(),
             hireDate: e.hire_date ?? null,
             terminationDate: e.termination_date ?? ({
               "ANILEI APARECIDO ALVES": "2026-05-22",
