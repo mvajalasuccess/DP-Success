@@ -850,62 +850,45 @@ function DashboardHome() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-[#07151d]">
-      <header className="dp-screen-topbar flex h-14 items-center border-b border-white/10 bg-[#0b1c25]/90 px-4 text-slate-200 shadow-[0_8px_30px_-18px_rgba(6,202,160,0.28)] backdrop-blur-xl sm:px-6">
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-          <span className="h-2 w-2 rounded-full bg-[#06CAA0]" />
-          DP SUCCESS <span className="text-slate-300">/</span> Gestão <span className="text-slate-300">/</span> Visão geral
-        </div>
-      </header>
-      <div className="dp-screen-content mx-auto max-w-[1600px] space-y-7 px-4 py-6 sm:px-6 sm:py-8 xl:px-8">
-        <section className="relative isolate min-h-[250px] overflow-hidden rounded-[30px] border border-[#2b615b]/50 bg-gradient-to-br from-[#102b35] via-[#0b202a] to-[#123f3a] px-6 py-8 text-white shadow-[0_28px_75px_-32px_rgba(6,202,160,0.38)] sm:px-10 sm:py-10 lg:px-12">
-          <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-80 w-80 rounded-full bg-[#06CAA0]/25 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-[-110px] right-[22%] -z-10 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <div className="max-w-2xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#91f2d9]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#06CAA0] shadow-[0_0_12px_rgba(6,202,160,0.9)]" />
-                Painel de gestão
-              </div>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">Dashboard</h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300 sm:text-base">Uma visão clara da competência para acompanhar pessoas, ocorrências e resultados do RH e Departamento Pessoal.</p>
+    <div className="min-h-screen bg-background">
+        <header className="dp-screen-topbar flex h-14 items-center border-b bg-background px-4 sm:px-6">
+          <span className="text-xs text-muted-foreground">RH / Visão geral</span>
+        </header>
+        <div className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Gestão</p>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-[30px]">Dashboard</h1>
+              <p className="mt-1 text-sm text-muted-foreground">Resumo executivo de RH e DP da competência atual.</p>
             </div>
-            <div className="min-w-[210px] rounded-2xl border border-white/15 bg-white/[0.08] px-5 py-4 shadow-inner backdrop-blur-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">Competência atual</p>
-              <p className="mt-2 text-xl font-semibold tracking-tight text-white">{metrics.period}</p>
-              <div className="mt-3 flex items-center gap-2 text-xs text-[#91f2d9]"><CalendarDays className="h-3.5 w-3.5" /> Período de referência</div>
+            <div className="rounded-lg border bg-card px-5 py-3 text-sm shadow-none">
+              <p className="text-xs text-muted-foreground">Competência atual</p>
+              <strong>{metrics.period}</strong>
             </div>
           </div>
-        </section>
-        <section className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-[#10232c] p-4 shadow-[0_16px_35px_-24px_rgba(0,0,0,0.8)] sm:flex-row sm:items-center sm:px-5">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white">Filtrar visão do Dashboard</p>
-            <p className="mt-1 text-xs leading-5 text-slate-400">O filtro afeta somente os indicadores e listas exibidos aqui; não altera lançamentos nem competências fechadas.</p>
-          </div>
-          <label className="grid w-full gap-1.5 text-sm font-medium text-slate-200 sm:max-w-[340px]"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label>
-        </section>
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="mt-6 p-4"><label className="grid max-w-sm gap-1.5 text-sm font-medium"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label><p className="mt-2 text-xs text-muted-foreground">O filtro afeta somente os indicadores e listas exibidos no Dashboard; não altera lançamentos nem competências fechadas.</p></Card>
+          <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {cards.map(([label, value, Icon, detail]) => (
-              <Card key={label} className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_28px_-22px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#06CAA0]/40 hover:shadow-[0_16px_32px_-22px_rgba(6,120,103,0.35)]">
+              <Card key={label} className="p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-500">{label}</p>
-                    <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-900 tabular-nums">{value}</p>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">{detail}</p>
+                    <p className="text-sm text-muted-foreground">{label}</p>
+                    <p className="mt-2 text-2xl font-bold tracking-tight tabular-nums">{value}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
                   </div>
-                  <div className="rounded-2xl border border-[#06CAA0]/15 bg-[#e8fbf5] p-3 text-[#087e68] transition-colors group-hover:bg-[#d8f8ee]"><Icon className="h-5 w-5" /></div>
+                  <div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Icon className="h-5 w-5" /></div>
                 </div>
               </Card>
             ))}
           </section>
-          <section className="mt-1">
+          <section className="mt-6">
             <div className="mb-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#50e5c1]">Resumo da competência</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">Ocorrências por funcionário</h2>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">Resumo da competência</p>
+              <h2 className="mt-1 text-xl font-bold">Ocorrências por funcionário</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
-                <Card className="h-full rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_28px_-22px_rgba(15,23,42,0.45)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#06CAA0]/40 hover:shadow-lg sm:p-5">
+                <Card className="h-full p-3.5 transition-shadow hover:shadow-md">
                   <CalendarX className="h-4 w-4 text-primary" />
                   <p className="mt-2 text-xs text-muted-foreground">Faltas</p>
                   <p className="mt-1 text-lg font-bold">{absencePeople.reduce((sum, item) => sum + item.count, 0)} registros</p>
@@ -952,12 +935,12 @@ function DashboardHome() {
           </section>
 
           <section className="mt-6">
-            <Card className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_28px_-22px_rgba(15,23,42,0.4)] sm:p-6">
+            <Card className="p-5">
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-primary">Registro da competência</p>
                   <h2 className="mt-1 text-xl font-bold">Comentários da competência</h2>
-                  <p className="mt-1 text-sm leading-5 text-slate-500">Registre observações importantes sobre o fechamento desta competência.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Registre observações importantes sobre o fechamento desta competência.</p>
                 </div>
                 {competenceNotes.length > 0 && <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary"><ClipboardCheck className="h-4 w-4" />{competenceNotes.length} {competenceNotes.length === 1 ? "comentário salvo" : "comentários salvos"}</span>}
               </div>
@@ -1025,7 +1008,7 @@ function DashboardHome() {
             <Card className="p-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Ocorrências da competência</p>
               <h2 className="mt-1 text-xl font-bold">Horas por tipo de ocorrência</h2>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Comparativo de horas de faltas, folgas, atestados e declarações, considerando a competência e a empresa selecionadas.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Comparativo de horas de faltas, folgas, atestados e declarações, considerando a competência e a empresa selecionadas.</p>
               <div className="mt-5 grid items-center gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
                 <div className="relative mx-auto h-52 w-52">
                   <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90" role="img" aria-label="Gráfico de rosca das horas por tipo de ocorrência">
@@ -1065,7 +1048,7 @@ function DashboardHome() {
           </section>
 
           <section className="mt-6 grid items-stretch gap-4 lg:grid-cols-2">
-            <Card className="flex h-[390px] min-h-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_28px_-22px_rgba(15,23,42,0.4)] sm:p-6">
+            <Card className="flex h-[390px] min-h-0 flex-col p-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Visão rápida</p>
               <h2 className="mt-1 text-xl font-bold">Horas extras por departamento</h2>
               <p className="mt-1 text-xs text-muted-foreground">Onde estão concentradas as horas extras da competência.</p>
