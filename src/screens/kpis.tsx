@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { balancesByEmployee, periodRangeLabel, type Period } from "@/lib/dp-model";
 import { countWorkingWeekdays } from "@/lib/feriados";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from "recharts";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, ScatterChart, Scatter, ZAxis } from "recharts";
 
 type Employee = {
   id: string;
@@ -1606,6 +1606,21 @@ export function Kpis() {
                 const rows = base.filter(e => (e.department || "Sem setor") === item.setor);
                 return { setor: item.setor, feminino: rows.filter(e => ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: rows.filter(e => ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length, outros: rows.filter(e => String(e.gender ?? "").toLowerCase() === "outro").length };
               });
+              const ageTenurePoints = base.flatMap(e => {
+                if (!e.birthDate || !e.hireDate) return [];
+                const age = ageOf(e.birthDate);
+                if (age < 0 || age >= 120) return [];
+                const endDate = e.terminationDate || today.toISOString().slice(0,10);
+                const years = Math.max(0, (new Date(endDate + "T00:00:00").getTime() - new Date(e.hireDate + "T00:00:00").getTime()) / 86400000 / 365.25);
+                if (!Number.isFinite(years)) return [];
+                const g = String(e.gender ?? "").toLowerCase();
+                const group = ["feminino","fem","f","mulher","female"].includes(g) ? "Feminino" : ["masculino","masc","m","homem","male"].includes(g) ? "Masculino" : "Outro / não informado";
+                return [{ nome: e.name, idade: age, tempo: Number(years.toFixed(2)), sexo: group, setor: e.department || "Sem setor" }];
+              });
+              const tenureByAgeData = ageData.map(item => {
+                const values = ageTenurePoints.filter(e => item.faixa === "Até 25" ? e.idade <= 25 : item.faixa === "26–35" ? e.idade >= 26 && e.idade <= 35 : item.faixa === "36–45" ? e.idade >= 36 && e.idade <= 45 : item.faixa === "46–55" ? e.idade >= 46 && e.idade <= 55 : e.idade >= 56);
+                return { faixa: item.faixa, media: values.length ? values.reduce((sum,e)=>sum+e.tempo,0)/values.length : 0, quantidade: values.length };
+              });
               const average = (values: number[]) => values.length ? values.reduce((a,b)=>a+b,0)/values.length : 0;
               const ageAverage = average(ages);
               const tenureAverage = average(tenure);
@@ -1640,6 +1655,16 @@ export function Kpis() {
                     <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptGenderData} layout="vertical" margin={{top:4,right:16,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip/><Legend/><Bar dataKey="feminino" name="Feminino" stackId="a" fill="#ec4899"/><Bar dataKey="masculino" name="Masculino" stackId="a" fill="#3b82f6"/><Bar dataKey="outros" name="Outro" stackId="a" fill="#8b5cf6"/></BarChart></ResponsiveContainer></div>
                   </Card>
                 </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <Card className="p-5"><h3 className="font-bold">Mapa de perfil: idade × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Encontre perfis mais jovens com longa permanência, pessoas experientes recém-admitidas e concentrações por sexo.</p>
+                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:12,right:16,bottom:18,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis type="number" dataKey="idade" name="Idade" unit=" anos" domain={[0, "dataMax"]} tick={{fontSize:10}} label={{value:"Idade (anos)",position:"insideBottom",offset:-12,fontSize:11}}/><YAxis type="number" dataKey="tempo" name="Tempo de empresa" unit=" anos" tick={{fontSize:10}} label={{value:"Tempo de empresa (anos)",angle:-90,position:"insideLeft",fontSize:11}}/><ZAxis range={[55,55]}/><Tooltip cursor={{strokeDasharray:"3 3"}} formatter={(value:number,name:string)=>[name==="Idade"?value+" anos":Number(value).toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos",name]} labelFormatter={(_,payload)=>payload?.[0]?.payload?.nome || ""}/><Legend/><Scatter name="Feminino" data={ageTenurePoints.filter(e=>e.sexo==="Feminino")} fill="#ec4899"/><Scatter name="Masculino" data={ageTenurePoints.filter(e=>e.sexo==="Masculino")} fill="#3b82f6"/><Scatter name="Outro / não informado" data={ageTenurePoints.filter(e=>e.sexo==="Outro / não informado")} fill="#8b5cf6"/></ScatterChart></ResponsiveContainer></div>
+                    <p className="text-xs text-muted-foreground">Considera somente funcionários com nascimento e admissão preenchidos. Para inativos, o tempo vai até a data de desligamento cadastrada.</p>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Tempo médio de empresa por faixa etária</h3><p className="text-xs text-muted-foreground">Ajuda a perceber se o quadro mais jovem tem menor permanência ou se há retenção em faixas etárias específicas.</p>
+                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={tenureByAgeData} margin={{top:12,right:8,left:0,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>v.toLocaleString("pt-BR",{maximumFractionDigits:1})+" a"} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[Number(v).toLocaleString("pt-BR",{maximumFractionDigits:2})+" anos","Tempo médio"]}/><Bar dataKey="media" name="Tempo médio (anos)" fill="#14b8a6" radius={[7,7,0,0]}/></BarChart></ResponsiveContainer></div>
+                    <p className="text-xs text-muted-foreground">A quantidade de pessoas em cada faixa é mostrada abaixo do gráfico.</p><div className="mt-2 flex flex-wrap gap-2">{tenureByAgeData.map(e=><span key={e.faixa} className="rounded-full bg-muted px-3 py-1 text-xs">{e.faixa}: {e.quantidade} pessoa(s)</span>)}</div>
+                  </Card>
+                </div>
                 <p className="text-xs text-muted-foreground">Os gráficos usam os dados cadastrados dos funcionários e respeitam empresa, setor e seleção de funcionários após clicar em “Atualizar KPIs”.</p>
               </>;
             })()}
@@ -1671,6 +1696,30 @@ export function Kpis() {
                 { faixa: "R$ 5–8 mil", feminino: salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
                 { faixa: "Acima de R$ 8 mil", feminino: salaries.filter(e=>(e.salary||0)>8000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>8000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
               ];
+              const salaryAgeData = [
+                { faixa: "Até 25", min: 0, max: 25 },
+                { faixa: "26–35", min: 26, max: 35 },
+                { faixa: "36–45", min: 36, max: 45 },
+                { faixa: "46–55", min: 46, max: 55 },
+                { faixa: "56+", min: 56, max: 119 },
+              ].map(range => {
+                const values = salaries.filter(e => {
+                  if (!e.birthDate) return false;
+                  const birth = new Date(e.birthDate + "T00:00:00");
+                  const now = new Date();
+                  const age = now.getFullYear() - birth.getFullYear() - (now < new Date(now.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
+                  return age >= range.min && age <= range.max;
+                });
+                return { faixa: range.faixa, media: values.length ? values.reduce((sum,e)=>sum+(e.salary||0),0)/values.length : 0, quantidade: values.length };
+              });
+              const salaryTenurePoints = salaries.flatMap(e => {
+                if (!e.hireDate) return [];
+                const endDate = e.terminationDate || new Date().toISOString().slice(0,10);
+                const years = Math.max(0,(new Date(endDate+"T00:00:00").getTime()-new Date(e.hireDate+"T00:00:00").getTime())/86400000/365.25);
+                const gender = String(e.gender ?? "").toLowerCase();
+                const sexo = ["feminino","fem","f","mulher","female"].includes(gender) ? "Feminino" : ["masculino","masc","m","homem","male"].includes(gender) ? "Masculino" : "Outro / não informado";
+                return Number.isFinite(years) ? [{ nome:e.name, tempo:Number(years.toFixed(2)), salario:Number(e.salary||0), sexo, setor:e.department||"Sem setor" }] : [];
+              });
               const salaryColors = ["#06b6d4","#8b5cf6","#f97316","#22c55e","#ec4899"];
               return <>
                 <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Visão interativa da folha cadastrada, faixas salariais, diferenças entre setores e pensões alimentícias. Valores respeitam os filtros aplicados.</p></div>
@@ -1701,6 +1750,16 @@ export function Kpis() {
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Faixas salariais por sexo</h3><p className="text-xs text-muted-foreground">Compara a quantidade de homens e mulheres em cada intervalo salarial.</p>
                     <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={salaryRangeGenderData} margin={{top:12,right:8,left:0,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:9}} interval={0} angle={-10} textAnchor="end" height={55}/><YAxis allowDecimals={false} tick={{fontSize:10}}/><Tooltip/><Legend/><Bar dataKey="feminino" name="Feminino" fill="#ec4899" radius={[5,5,0,0]}/><Bar dataKey="masculino" name="Masculino" fill="#3b82f6" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>
+                  </Card>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <Card className="p-5"><h3 className="font-bold">Remuneração × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Permite observar como os salários se distribuem conforme a permanência e comparar padrões por sexo, sem assumir que funções diferentes são equivalentes.</p>
+                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:12,right:16,bottom:18,left:8}}><CartesianGrid strokeDasharray="3 3"/><XAxis type="number" dataKey="tempo" name="Tempo de empresa" unit=" anos" tick={{fontSize:10}} label={{value:"Tempo de empresa (anos)",position:"insideBottom",offset:-12,fontSize:11}}/><YAxis type="number" dataKey="salario" name="Salário" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><ZAxis range={[55,55]}/><Tooltip formatter={(value:number,name:string)=>[name==="Salário"?money(value):Number(value).toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos",name]} labelFormatter={(_,payload)=>payload?.[0]?.payload?.nome || ""}/><Legend/><Scatter name="Feminino" data={salaryTenurePoints.filter(e=>e.sexo==="Feminino")} fill="#ec4899"/><Scatter name="Masculino" data={salaryTenurePoints.filter(e=>e.sexo==="Masculino")} fill="#3b82f6"/><Scatter name="Outro / não informado" data={salaryTenurePoints.filter(e=>e.sexo==="Outro / não informado")} fill="#8b5cf6"/></ScatterChart></ResponsiveContainer></div>
+                    <p className="text-xs text-muted-foreground">Usa salário cadastrado e tempo desde a admissão (até hoje ou até o desligamento). Não inclui encargos, benefícios ou adicionais.</p>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Salário médio por faixa etária</h3><p className="text-xs text-muted-foreground">Mostra como a média salarial varia entre faixas de idade; considere também função, jornada, senioridade e setor ao interpretar.</p>
+                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={salaryAgeData} margin={{top:12,right:8,left:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[money(Number(v)),"Salário médio"]}/><Bar dataKey="media" name="Salário médio" fill="#8b5cf6" radius={[7,7,0,0]}/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-2 flex flex-wrap gap-2">{salaryAgeData.map(e=><span key={e.faixa} className="rounded-full bg-muted px-3 py-1 text-xs">{e.faixa}: {e.quantidade} pessoa(s)</span>)}</div>
                   </Card>
                 </div>
                 <p className="text-xs text-muted-foreground">A folha mensal estimada é apenas a soma dos salários cadastrados: não inclui encargos, benefícios, adicionais ou descontos. Os gráficos exibem dados de cadastro, não recalculam fechamentos nem alteram pagamentos.</p>
