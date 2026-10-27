@@ -190,6 +190,47 @@ export function Kpis() {
     })();
   }, []);
 
+  // Mantém os dados demográficos sincronizados com o cadastro, inclusive quando
+  // o gênero ou a data de desligamento forem editados enquanto a tela está aberta.
+  useEffect(() => {
+    const db = supabase as any;
+    const reloadEmployeeDemographics = async () => {
+      const { data, error } = await db.from("employees")
+        .select("id,full_name,registration,department_id,birth_date,salary,gender,pension_amount,hire_date,termination_date,status,work_schedule_id,company_id,departments(name)")
+        .order("full_name");
+      if (error || !data) return;
+      const { data: departmentRows } = await db.from("departments").select("id,name");
+      const departmentById = new Map((departmentRows ?? []).map((d: any) => [String(d.id), String(d.name ?? "")]));
+      setEmployees((current) => {
+        const currentById = new Map(current.map((employee) => [employee.id, employee]));
+        return data.map((e: any) => {
+          const previous = currentById.get(String(e.id));
+          return {
+            id: String(e.id),
+            name: String(e.full_name ?? ""),
+            registration: String(e.registration ?? "").trim(),
+            department: String(e.departments?.name ?? departmentById.get(String(e.department_id)) ?? previous?.department ?? "").trim(),
+            hireDate: e.hire_date ?? null,
+            terminationDate: e.termination_date ?? previous?.terminationDate ?? null,
+            status: e.status ?? "ativo",
+            birthDate: e.birth_date ?? null,
+            salary: e.salary == null ? null : Number(e.salary),
+            gender: e.gender ?? null,
+            pensionAmount: Number(e.pension_amount ?? 0),
+            workScheduleId: e.work_schedule_id ?? null,
+            companyId: e.company_id ?? null,
+          };
+        });
+      });
+    };
+    const channel = db.channel("kpis-employee-demographics")
+      .on("postgres_changes", { event: "*", schema: "public", table: "employees" }, () => {
+        void reloadEmployeeDemographics();
+      })
+      .subscribe();
+    return () => { void db.removeChannel(channel); };
+  }, []);
+
   const departmentOptions = useMemo(
     () => [...new Set(employees.map(e => e.department).filter(Boolean))].sort(),
     [employees],
