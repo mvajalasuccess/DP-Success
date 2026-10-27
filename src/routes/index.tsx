@@ -860,7 +860,7 @@ function DashboardHome() {
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
               <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7cebd0]">Gestão • DP SUCCESS</p>
-                <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-[30px]">Dashboard</h1>
+                <h1 style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }} className="!text-white text-2xl font-semibold tracking-tight sm:text-[30px]">Dashboard</h1>
                 <p className="mt-2 text-sm text-slate-200">Resumo executivo de RH e DP da competência atual.</p>
               </div>
               <div className="min-w-[190px] rounded-xl border border-white/15 bg-white/[0.08] px-5 py-3 backdrop-blur-sm">
