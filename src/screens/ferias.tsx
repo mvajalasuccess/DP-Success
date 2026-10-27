@@ -67,14 +67,16 @@ export function Ferias() {
   // Agrupa todos os blocos salvos do mesmo funcionário e período aquisitivo em um único card.
   const visibleGroups=useMemo(()=>{
     const groups=new Map<string,Vacation[]>();
-    visible.forEach(p=>{
+    periods.forEach(p=>{
       const key=p.acquisition_start_date
         ? p.employee_id+"::"+p.acquisition_start_date
         : p.employee_id+"::sem-periodo::"+(p.title||p.id);
       groups.set(key,[...(groups.get(key)||[]),p]);
     });
-    return [...groups.entries()].map(([key,blocks])=>({key,blocks:blocks.sort((a,b)=>a.start_date.localeCompare(b.start_date))}));
-  },[visible]);
+    return [...groups.entries()]
+      .filter(([,blocks])=>blocks.some(p=>visible.some(v=>v.id===p.id)))
+      .map(([key,blocks])=>({key,blocks:blocks.sort((a,b)=>a.start_date.localeCompare(b.start_date))}));
+  },[periods,visible]);
 
   function openNew(){setEditing(null);setForm({...blank});setModal(true);setError("")}
   function openEdit(p:Vacation){setEditing(p);setForm({employee_id:p.employee_id,title:p.title||"",start_date:p.start_date,end_date:p.end_date,notes:p.notes||"",completed:p.completed,acquisition_start_date:p.acquisition_start_date||"",acquisition_end_date:p.acquisition_end_date||"",concession_start_date:p.concession_start_date||"",concession_end_date:p.concession_end_date||""});setModal(true);setError("")}
