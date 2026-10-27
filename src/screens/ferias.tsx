@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Palmtree, Plus, Search, CheckCircle2, Circle, Pencil, Trash2, X, Users, Clock3, CalendarCheck, AlertCircle } from "lucide-react";
+import { CalendarDays, Palmtree, Plus, Search, CheckCircle2, Circle, Pencil, Trash2, X, Clock3, CalendarCheck, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Vacation = { id:string; employee_id:string; title:string|null; start_date:string; end_date:string; notes:string|null; completed:boolean; completed_at:string|null; created_at:string; employees?:{full_name:string}|null };
