@@ -307,7 +307,7 @@ function AppShell({
         <SidebarProfile collapsed={collapsed} onNavigate={go} />
       </aside>
 
-      <main className={`transition-[padding] duration-200 ${collapsed ? "lg:pl-0 lg:pt-16" : "lg:pl-64"}`}>
+      <main className={`dp-app-main transition-[padding] duration-200 ${collapsed ? "lg:pl-0 lg:pt-16" : "lg:pl-64"}`}>
         {children}
       </main>
     </div>
