@@ -15,7 +15,7 @@ export function Employees() {
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("ativo");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ name: string; role: string; department: string; salary: string; birth_date: string; gender: string; pension_amount: string; admission: string; termination: string; bank: string; work_schedule_id: string; status: "ativo" | "inativo"; company_id: string }>({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "0", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
+  const [form, setForm] = useState<{ name: string; role: string; department: string; salary: string; birth_date: string; gender: string; pension_amount: "sim" | "nao"; admission: string; termination: string; bank: string; work_schedule_id: string; status: "ativo" | "inativo"; company_id: string }>({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -57,7 +57,7 @@ export function Employees() {
   function openNew() {
     setError("");
     setEditingId(null);
-    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "0", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
+    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
     setOpen(true);
   }
 
@@ -71,7 +71,7 @@ export function Employees() {
       salary: employee.salary != null ? String(employee.salary) : "",
       birth_date: employee.birth_date ?? "",
       gender: employee.gender ?? "",
-      pension_amount: employee.pension_amount != null ? String(employee.pension_amount) : "0",
+      pension_amount: Number(employee.pension_amount ?? 0) > 0 ? "sim" : "nao",
       admission: employee.hire_date ?? "",
       termination: employee.termination_date ?? "",
       bank: "",
@@ -103,7 +103,7 @@ export function Employees() {
         full_name: form.name.trim(),
         birth_date: form.birth_date || null,
         gender: form.gender || null,
-        pension_amount: Number(form.pension_amount.replace(",", ".")) || 0,
+        pension_amount: form.pension_amount === "sim" ? 1 : 0,
         department_id: form.department,
         position_id: form.role,
         hire_date: form.admission,
@@ -141,7 +141,7 @@ export function Employees() {
       full_name: form.name.trim(),
       birth_date: form.birth_date || null,
       gender: form.gender || null,
-      pension_amount: Number(form.pension_amount.replace(",", ".")) || 0,
+      pension_amount: form.pension_amount === "sim" ? 1 : 0,
       department_id: form.department,
       position_id: form.role,
       hire_date: form.admission,
@@ -171,7 +171,7 @@ export function Employees() {
       if (bank.error) setError("Funcionário criado, mas o saldo inicial não pôde ser lançado: " + bank.error.message);
     }
 
-    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "0", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
+    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
     setOpen(false);
     setSaving(false);
     await loadEmployees();
@@ -280,7 +280,7 @@ export function Employees() {
             <label className="grid gap-1 text-sm font-medium">Salário<input type="number" min="0" step="0.01" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="3000,00" /></label>
             <label className="grid gap-1 text-sm font-medium">Data de nascimento<input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
             <label className="grid gap-1 text-sm font-medium">Sexo<select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione o sexo</option><option value="feminino">Feminino</option><option value="masculino">Masculino</option><option value="outro">Outro</option></select></label>
-            <label className="grid gap-1 text-sm font-medium">Pensão mensal (R$)<input type="number" min="0" step="0.01" value={form.pension_amount} onChange={(e) => setForm({ ...form, pension_amount: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="0,00" /></label>
+            <label className="grid gap-1 text-sm font-medium">Paga pensão?<select value={form.pension_amount} onChange={(e) => setForm({ ...form, pension_amount: e.target.value === "sim" ? "sim" : "nao" })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
             <label className="grid gap-1 text-sm font-medium">Data de admissão<input type="date" value={form.admission} onChange={(e) => setForm({ ...form, admission: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
             <label className="grid gap-1 text-sm font-medium">Situação<select value={form.status} onChange={(e) => { const status = e.target.value === "inativo" ? "inativo" : "ativo"; setForm({ ...form, status, termination: status === "ativo" ? "" : form.termination }); }} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>
             <label className="grid gap-1 text-sm font-medium">Data de desligamento<input type="date" value={form.termination} onChange={(e) => setForm({ ...form, termination: e.target.value })} disabled={form.status !== "inativo"} className="rounded-lg border bg-background px-3 py-2 font-normal disabled:bg-muted disabled:text-muted-foreground" /></label>
