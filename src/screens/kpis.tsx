@@ -1430,7 +1430,6 @@ export function Kpis() {
             </div>
             <p className="pb-0.5 text-[12px] font-medium tabular-nums text-slate-200">Dados da seleção aplicada</p>
           </div>
-        </section>
 
         <section className="mt-6 rounded-xl border border-white/15 bg-white/[0.08] px-4 py-4 backdrop-blur-sm sm:px-5" aria-label="Indicadores principais">
           {isCalculating || isLoadingPage ? (
