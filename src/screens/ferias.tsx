@@ -100,17 +100,22 @@ export function Ferias() {
     const payload={employee_id:form.employee_id,title:((!form.title||form.title.startsWith("Período aquisitivo ·")||/^Férias\\s*[·-]\\s*período aquisitivo/i.test(form.title))&&form.acquisition_start_date&&form.acquisition_end_date?"Período aquisitivo · "+dateLabel(form.acquisition_start_date)+" a "+dateLabel(form.acquisition_end_date):(form.title.trim()||null)),start_date:form.start_date,end_date:form.end_date,notes:form.notes.trim()||null,completed:form.completed,completed_at:form.completed?(editing?.completed_at||new Date().toISOString()):null,acquisition_start_date:form.acquisition_start_date||null,acquisition_end_date:form.acquisition_end_date||null,concession_start_date:form.concession_start_date||null,concession_end_date:form.concession_end_date||null,official_gozo_start_date:form.official_gozo_start_date||null,official_gozo_end_date:form.official_gozo_end_date||null};
     const result=editing?await(supabase as any).from("vacation_periods").update(payload).eq("id",editing.id):await(supabase as any).from("vacation_periods").insert({...payload,created_by:(await supabase.auth.getSession()).data.session?.user.id||null});
     if(result.error){setError(result.error.message);setSaving(false);return}
-    // Ao ajustar as datas de um período existente, mantém os demais blocos desse mesmo período sincronizados.
-    if(editing&&editing.acquisition_start_date&&form.acquisition_start_date){
-      const siblingIds=periods.filter(p=>p.employee_id===editing.employee_id&&p.acquisition_start_date===editing.acquisition_start_date&&p.id!==editing.id).map(p=>p.id);
+    // Mantém os metadados e o gozo oficial iguais em todos os blocos do mesmo período.
+    if(form.acquisition_start_date){
+      const siblingIds=[...new Set(periods.filter(p=>p.employee_id===form.employee_id&&p.id!==editing?.id&&(
+        p.acquisition_start_date===form.acquisition_start_date||
+        (editing?.acquisition_start_date&&p.employee_id===editing.employee_id&&p.acquisition_start_date===editing.acquisition_start_date)
+      )).map(p=>p.id))];
       if(siblingIds.length){
         const {error:syncError}=await(supabase as any).from("vacation_periods").update({
           acquisition_start_date:form.acquisition_start_date,
           acquisition_end_date:form.acquisition_end_date||null,
           concession_start_date:form.concession_start_date||null,
-          concession_end_date:form.concession_end_date||null
+          concession_end_date:form.concession_end_date||null,
+          official_gozo_start_date:form.official_gozo_start_date||null,
+          official_gozo_end_date:form.official_gozo_end_date||null
         }).in("id",siblingIds);
-        if(syncError){setError("O bloco foi salvo, mas não foi possível atualizar as datas dos outros blocos: "+syncError.message);setSaving(false);await load();return}
+        if(syncError){setError("O bloco foi salvo, mas não foi possível sincronizar os dados do período: "+syncError.message);setSaving(false);await load();return}
       }
     }
     setSaving(false);setModal(false);await load();
@@ -183,7 +188,7 @@ export function Ferias() {
           return <article key={group.key} className={`p-4 transition-colors hover:bg-muted/20 sm:p-5 ${allCompleted?"opacity-80":""}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 items-start gap-4"><div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${allCompleted?"bg-emerald-100 text-emerald-700":"bg-[#e7f8f2] text-[#087a62]"}`}>{allCompleted?<CheckCircle2 className="h-6 w-6"/>:<Palmtree className="h-6 w-6"/>}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{employeeName(first)}</h3><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${allCompleted?"bg-emerald-100 text-emerald-800":blocks.some(p=>p.completed)?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800"}`}>{allCompleted?"Concluído":blocks.some(p=>p.completed)?"Parcialmente concluído":"Em aberto"}</span><span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{blocks.length} bloco(s)</span></div>
-                {first.acquisition_start_date&&<><p className="mt-1 text-sm text-muted-foreground">Período aquisitivo: {dateLabel(first.acquisition_start_date)} a {dateLabel(first.acquisition_end_date)}</p>{first.concession_start_date&&first.concession_end_date&&<p className="text-sm text-muted-foreground">Período concessivo: {dateLabel(first.concession_start_date)} a {dateLabel(first.concession_end_date)}</p>}<p className="mt-1 text-sm font-medium text-emerald-800">Período de Gozo Oficial: {first.official_gozo_start_date&&first.official_gozo_end_date?dateLabel(first.official_gozo_start_date)+" a "+dateLabel(first.official_gozo_end_date):"Não informado"}</p></>}
+                {first.acquisition_start_date&&<><p className="mt-1 text-sm text-muted-foreground">Período aquisitivo: {dateLabel(first.acquisition_start_date)} a {dateLabel(first.acquisition_end_date)}</p>{first.concession_start_date&&first.concession_end_date&&<p className="text-sm text-muted-foreground">Período concessivo: {dateLabel(first.concession_start_date)} a {dateLabel(first.concession_end_date)}</p>}<p className="mt-1 text-sm font-medium text-emerald-800">Período de Gozo Oficial: {officialBlock?.official_gozo_start_date&&officialBlock?.official_gozo_end_date?dateLabel(officialBlock.official_gozo_start_date)+" a "+dateLabel(officialBlock.official_gozo_end_date):"Não informado"}</p></>}
                 {first.title&&!/^Férias\s*[·-]\s*período aquisitivo\b/i.test(first.title)&&<p className="mt-1 text-sm text-muted-foreground">{first.title}</p>}
                 <p className="mt-2 text-sm text-muted-foreground">{totalDays} dias considerados pelo gozo oficial · {Math.max(0,30-totalDays)} dias restantes</p>
               </div></div>
