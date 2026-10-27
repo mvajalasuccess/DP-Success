@@ -74,7 +74,7 @@ export function Ferias() {
         const raw=makeEntitlement(employee,n);
         if(raw.acquisitionStart>addYears(current,1)) break;
         const vacation=periods.find(p=>p.employee_id===employee.id&&p.acquisition_start_date===raw.acquisitionStart);
-        const status:Entitlement["status"]=vacation?.completed?"completed":vacation?"scheduled":current<raw.acquisitionEnd?"acquisition":current<=raw.concessionEnd?"available":"overdue";
+        const status:Entitlement["status"]=vacation?.completed?"completed":vacation?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
         cycles.push({...raw,status,vacation});
       }
       const pending=cycles.find(x=>x.status!=="completed");
