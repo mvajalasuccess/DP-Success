@@ -1412,7 +1412,7 @@ export function Kpis() {
           ) : (
             <div className="kpi-band">
               {kpiItems.map((item, index) => (
-                <div key={item.label} className={`${index === 0 ? "kpi-primary" : "kpi-secondary"} ${item.label === "Absenteísmo" || item.label === "Turnover" ? `kpi-tone-${item.tone}` : `kpi-color-${index % 4}`}`} title={item.title} aria-label={`${item.label}. ${item.title}`}>
+                <div key={item.label} className={`${index === 0 ? "kpi-primary" : "kpi-secondary"} ${item.label === "Absenteísmo" || item.label === "Turnover" ? `kpi-tone-${item.tone}` : ""}`} title={item.title} aria-label={`${item.label}. ${item.title}`}>
                   <p className="text-[12px] font-semibold leading-5 text-[var(--kpi-text-muted)]">{item.label}</p>
                   <p className={`kpi-value ${item.tone === "critical" ? "is-critical" : item.tone === "warning" ? "is-warning" : ""}`}>{item.value}</p>
                   <p className="kpi-support">{item.support}</p>
@@ -1768,10 +1768,10 @@ export function Kpis() {
           </div>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p></Card>
-            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Folgas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.folgasDays)}</p></Card>
-            <Card className="p-5"><FileText className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p></Card>
-            <Card className="p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações de horas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
+            <Card className="kpi-metric-card kpi-metric-blue p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p></Card>
+            <Card className="kpi-metric-card kpi-metric-purple p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Folgas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.folgasDays)}</p></Card>
+            <Card className="kpi-metric-card kpi-metric-green p-5"><FileText className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p></Card>
+            <Card className="kpi-metric-card kpi-metric-amber p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações de horas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -1810,7 +1810,7 @@ export function Kpis() {
                 ["HE 20%", metrics.he20],
                 ["Interjornada", metrics.interjornada],
               ].map(([label, value]) => (
-                <Card key={String(label)} className="p-5">
+                <Card key={String(label)} className={`kpi-metric-card ${["kpi-metric-blue", "kpi-metric-purple", "kpi-metric-green", "kpi-metric-amber", "kpi-metric-cyan", "kpi-metric-rose"][["HE 60%", "HE 60% + 20%", "HE 100%", "HE 100% + 20%", "HE 20%", "Interjornada"].indexOf(String(label))]} p-5`}>
                   <p className="text-sm text-muted-foreground">{label}</p>
                   <p className="mt-2 text-2xl font-bold">{fmt(Number(value))}</p>
                 </Card>
@@ -1949,9 +1949,9 @@ export function Kpis() {
               </div>
 </div>
             <div className="grid gap-4 md:grid-cols-3">
-              <Card className="p-6"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Admissões</p><p className="mt-1 text-3xl font-bold">{metrics.admissions}</p></Card>
-              <Card className="p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Desligamentos</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
-              <Card className="p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários ativos</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.activeHeadcount).toLocaleString("pt-BR")}</p></Card>
+              <Card className="kpi-metric-card kpi-metric-cyan p-6"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Admissões</p><p className="mt-1 text-3xl font-bold">{metrics.admissions}</p></Card>
+              <Card className="kpi-metric-card kpi-metric-rose p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Desligamentos</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
+              <Card className="kpi-metric-card kpi-metric-violet p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários ativos</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.activeHeadcount).toLocaleString("pt-BR")}</p></Card>
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
