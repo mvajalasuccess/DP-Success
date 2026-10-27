@@ -64,7 +64,7 @@ export function Ferias() {
       .map(([key,blocks])=>({key,blocks:blocks.sort((a,b)=>a.start_date.localeCompare(b.start_date))}));
   },[periods,visible]);
 
-  function openNew(){setEditing(null);setForm({...blank});setExtraBlocks([]);setBlocksExpanded(false);setModal(true);setError("")}
+  function openNew(){setEditing(null);setForm({...blank});setExtraBlocks([]);setBlocksExpanded(true);setModal(true);setError("")}
   function openEdit(p:Vacation){setEditing(p);setForm({employee_id:p.employee_id,title:p.title||"",start_date:p.start_date,end_date:p.end_date,notes:p.notes||"",completed:p.completed,acquisition_start_date:p.acquisition_start_date||"",acquisition_end_date:p.acquisition_end_date||"",concession_start_date:p.concession_start_date||"",concession_end_date:p.concession_end_date||"",official_gozo_start_date:p.official_gozo_start_date||"",official_gozo_end_date:p.official_gozo_end_date||"",termination_paid:Boolean(p.termination_paid)});setExtraBlocks([]);setBlocksExpanded(false);setModal(true);setError("")}
   async function save(){
     if(!form.employee_id||!form.start_date||!form.end_date){setError("Preencha funcionário, início e fim do período.");return}
