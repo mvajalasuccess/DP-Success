@@ -20,6 +20,19 @@ export function Employees() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const formatSalary = (value: string | number) => {
+    const parsed = typeof value === "number" ? value : parseSalary(value);
+    if (!Number.isFinite(parsed)) return "";
+    return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed);
+  };
+  const parseSalary = (value: string) => {
+    const cleaned = value.trim().replace(/R\\$\\s?/gi, "").replace(/\\s/g, "");
+    if (!cleaned) return 0;
+    const normalized = cleaned.includes(",")
+      ? cleaned.replace(/\\./g, "").replace(",", ".")
+      : cleaned.replace(/\\./g, "");
+    return Number(normalized);
+  };
 
   async function loadEmployees() {
     setLoading(true);
@@ -68,7 +81,7 @@ export function Employees() {
       name: employee.full_name ?? "",
       role: employee.position_id ?? "",
       department: employee.department_id ?? "",
-      salary: employee.salary != null ? String(employee.salary) : "",
+      salary: employee.salary != null ? formatSalary(Number(employee.salary)) : "",
       birth_date: employee.birth_date ?? "",
       gender: employee.gender ?? "",
       pension_amount: Number(employee.pension_amount ?? 0) > 0 ? "sim" : "nao",
@@ -111,7 +124,7 @@ export function Employees() {
         status: form.status,
         work_schedule_id: form.work_schedule_id || null,
         company_id: form.company_id || null,
-        salary: Number(form.salary.replace(",", ".")),
+        salary: parseSalary(form.salary),
       }).eq("id", editingId);
       if (result.error) {
         setError(result.error.message);
@@ -125,7 +138,7 @@ export function Employees() {
       return;
     }
 
-    const salary = Number(form.salary.replace(",", "."));
+    const salary = parseSalary(form.salary);
     const match = form.bank.trim().match(/^([+-])?(\d{1,3}):(\d{2})$/);
     const bankMinutes = match
       ? Number(match[1] === "-" ? -1 : 1) * (Number(match[2]) * 60 + Number(match[3]))
@@ -277,7 +290,7 @@ export function Employees() {
             <label className="grid min-w-0 gap-1 text-sm font-medium">Empresa<select value={form.company_id} onChange={(e) => setForm({ ...form, company_id: e.target.value })} className="h-10 w-full min-w-0 max-w-full rounded-lg border bg-background px-3 py-2 font-normal text-ellipsis"><option value="">Sem empresa vinculada</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
             <label className="grid gap-1 text-sm font-medium">Cargo<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione o cargo</option>{positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
             <label className="grid gap-1 text-sm font-medium">Departamento<select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione o departamento</option>{departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
-            <label className="grid gap-1 text-sm font-medium">Salário<input type="number" min="0" step="0.01" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="3000,00" /></label>
+            <label className="grid gap-1 text-sm font-medium">Salário (R$)<input type="text" inputMode="decimal" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} onBlur={() => setForm((current) => ({ ...current, salary: current.salary.trim() ? formatSalary(current.salary) : "" }))} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="3.000,00" /></label>
             <label className="grid gap-1 text-sm font-medium">Data de nascimento<input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
             <label className="grid gap-1 text-sm font-medium">Sexo<select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione o sexo</option><option value="feminino">Feminino</option><option value="masculino">Masculino</option><option value="outro">Outro</option></select></label>
             <label className="grid gap-1 text-sm font-medium">Paga pensão?<select value={form.pension_amount} onChange={(e) => setForm({ ...form, pension_amount: e.target.value === "sim" ? "sim" : "nao" })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="nao">Não</option><option value="sim">Sim</option></select></label>
