@@ -37,6 +37,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   rh: "RH/DP",
   gestor: "Gestor",
   consulta: "Consulta",
+  convidado: "Convidado",
 };
 
 export const PERIOD_STATUS_LABELS: Record<PeriodStatus, string> = {

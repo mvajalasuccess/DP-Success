@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
 
     const patch: { role?: string; active?: boolean } = {};
     if (hasRole) {
-      if (!["administrador", "rh", "consulta"].includes(body.role)) {
+      if (!["administrador", "rh", "consulta", "convidado"].includes(body.role)) {
         return new Response(JSON.stringify({ error: "Perfil inválido." }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

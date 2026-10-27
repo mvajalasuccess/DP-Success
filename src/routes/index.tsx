@@ -67,7 +67,7 @@ function Dashboard() {
         .select("role")
         .eq("id", sessionData.session.user.id)
         .maybeSingle();
-      if (active) setIsConsulta(profile?.role === "consulta");
+      if (active) setIsConsulta(profile?.role === "consulta" || profile?.role === "convidado");
     })();
     return () => { active = false; };
   }, []);
@@ -324,7 +324,7 @@ function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavig
     if (!userId) return;
     const { data: profile } = await (supabase as any).from("profiles").select("full_name,role").eq("id", userId).maybeSingle();
     if (profile?.full_name) setName(profile.full_name);
-    setRole(profile?.role === "consulta" ? "Consulta" : "Usuário RH");
+    setRole(profile?.role === "consulta" ? "Consulta" : profile?.role === "convidado" ? "Convidado" : "Usuário RH");
   })(); }, []);
 
   const handleLogout = async () => {
@@ -406,7 +406,7 @@ function DashboardHome() {
         .select("role")
         .eq("id", sessionData.session.user.id)
         .maybeSingle();
-      setUserRoleLabel(profile?.role === "consulta" ? "Consulta" : "Usuário RH");
+      setUserRoleLabel(profile?.role === "consulta" ? "Consulta" : profile?.role === "convidado" ? "Convidado" : "Usuário RH");
       // Carrega primeiro apenas o contexto necessário para a primeira pintura.
       // Os dados operacionais são buscados depois, já filtrados pela competência.
       const [emps, comp] = await Promise.all([

@@ -9,6 +9,7 @@ export const Route = createFileRoute("/login")({ component: Login });
 function Login() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -17,6 +18,10 @@ function Login() {
   const [saving, setSaving] = useState(false);
 
   async function submit() {
+    if (mode === "signup" && !fullName.trim()) {
+      setError("Informe seu nome completo.");
+      return;
+    }
     if (!email.trim() || password.length < 6) {
       setError("Informe um e-mail e uma senha com pelo menos 6 caracteres.");
       return;
@@ -53,6 +58,7 @@ function Login() {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: { data: { full_name: fullName.trim() } },
     });
 
     if (error) {
@@ -64,7 +70,7 @@ function Login() {
     setSaving(false);
 
     if (data.session) {
-      const { error: setupError } = await supabase.rpc("ensure_user_setup", { _email: email.trim() });
+      const { error: setupError } = await supabase.rpc("ensure_user_setup", { _full_name: fullName.trim(), _email: email.trim() });
       if (setupError) {
         setError(setupError.message);
         return;
@@ -87,6 +93,12 @@ function Login() {
         </div>
 
         <div className="mt-6 grid gap-4">
+          {mode === "signup" && (
+            <label className="grid gap-1 text-sm font-medium">
+              Nome completo
+              <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="Seu nome" />
+            </label>
+          )}
           <label className="grid gap-1 text-sm font-medium">
             E-mail
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="seuemail@empresa.com" />
@@ -112,6 +124,12 @@ function Login() {
           <button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setMessage(""); }} className="text-sm text-muted-foreground hover:text-foreground">
             {mode === "login" ? "Ainda não tenho acesso" : "Já tenho acesso"}
           </button>
+
+          {mode === "signup" && (
+            <p className="text-xs text-muted-foreground">
+              Novos cadastros entram como Convidado, com permissão somente para visualização. Um administrador pode alterar o perfil depois em Configurações.
+            </p>
+          )}
         </div>
       </Card>
     </div>

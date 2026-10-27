@@ -221,7 +221,7 @@ export function Kpis() {
             pensionAmount: Number(e.pension_amount ?? 0),
             workScheduleId: e.work_schedule_id ?? null,
             companyId: e.company_id ?? null,
-          }));
+          })));
     };
     const channel = db.channel("kpis-employee-demographics")
       .on("postgres_changes", { event: "*", schema: "public", table: "employees" }, () => {
