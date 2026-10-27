@@ -1096,7 +1096,7 @@ function DashboardHome() {
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-xs text-muted-foreground">Total débitos</span>
-                    <span className="text-lg font-bold tabular-nums">{fmt(individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
+                    <span className="text-lg font-bold tabular-nums">{fmt(-individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
                   </div>
                 </div>
                 <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
@@ -1109,7 +1109,7 @@ function DashboardHome() {
                     return values.map((item, index) => <div key={item.name} className="flex items-center gap-2 border-b pb-2 text-sm last:border-0">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />
                       <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                      <span className="shrink-0 font-semibold tabular-nums">{fmt(item.minutes)}</span>
+                      <span className="shrink-0 font-semibold tabular-nums">{fmt(-item.minutes)}</span>
                       <span className="w-9 text-right text-xs text-muted-foreground">{total > 0 ? Math.round(item.minutes / total * 100) : 0}%</span>
                     </div>);
                   })()}
@@ -1119,7 +1119,7 @@ function DashboardHome() {
               <div className="mt-4 border-t pt-3">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="font-medium">Total de débitos</span>
-                  <span className="font-bold tabular-nums">{fmt(individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
+                  <span className="font-bold tabular-nums">{fmt(-individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
                 </div>
               </div>
             </Card>
