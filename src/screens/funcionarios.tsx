@@ -26,10 +26,10 @@ export function Employees() {
     return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parsed);
   };
   const parseSalary = (value: string) => {
-    const cleaned = value.trim().replace(/R\\$\\s?/gi, "").replace(/\\s/g, "");
+    const cleaned = value.trim().replace(/R\$\s?/gi, "").replace(/\s/g, "");
     if (!cleaned) return 0;
     const normalized = cleaned.includes(",")
-      ? cleaned.replace(/\\./g, "").replace(",", ".")
+      ? cleaned.replace(/\./g, "").replace(",", ".")
       : cleaned.replace(/\\./g, "");
     return Number(normalized);
   };
