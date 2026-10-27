@@ -855,17 +855,20 @@ function DashboardHome() {
           <span className="text-xs text-muted-foreground">RH / Visão geral</span>
         </header>
         <div className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
-          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-            <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Gestão</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-[30px]">Dashboard</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Resumo executivo de RH e DP da competência atual.</p>
+          <section className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
+            <div className="pointer-events-none absolute -right-10 -top-20 -z-10 h-56 w-56 rounded-full bg-[#06CAA0]/20 blur-3xl" />
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7cebd0]">Gestão • DP SUCCESS</p>
+                <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-[30px]">Dashboard</h1>
+                <p className="mt-2 text-sm text-slate-200">Resumo executivo de RH e DP da competência atual.</p>
+              </div>
+              <div className="min-w-[190px] rounded-xl border border-white/15 bg-white/[0.08] px-5 py-3 backdrop-blur-sm">
+                <p className="text-xs font-medium text-slate-200">Competência atual</p>
+                <p className="mt-1 text-lg font-semibold text-white">{metrics.period}</p>
+              </div>
             </div>
-            <div className="rounded-lg border bg-card px-5 py-3 text-sm shadow-none">
-              <p className="text-xs text-muted-foreground">Competência atual</p>
-              <strong>{metrics.period}</strong>
-            </div>
-          </div>
+          </section>
           <Card className="mt-6 p-4"><label className="grid max-w-sm gap-1.5 text-sm font-medium"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label><p className="mt-2 text-xs text-muted-foreground">O filtro afeta somente os indicadores e listas exibidos no Dashboard; não altera lançamentos nem competências fechadas.</p></Card>
           <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {cards.map(([label, value, Icon, detail]) => (
