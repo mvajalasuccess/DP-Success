@@ -1598,6 +1598,14 @@ export function Kpis() {
               const ageData = [{ faixa: "Até 25", total: ages.filter(n => n <= 25).length }, { faixa: "26–35", total: ages.filter(n => n >= 26 && n <= 35).length }, { faixa: "36–45", total: ages.filter(n => n >= 36 && n <= 45).length }, { faixa: "46–55", total: ages.filter(n => n >= 46 && n <= 55).length }, { faixa: "56+", total: ages.filter(n => n >= 56).length }];
               const tenureData = [{ faixa: "Menos de 1 ano", total: tenure.filter(n => n < 1).length }, { faixa: "1–3 anos", total: tenure.filter(n => n >= 1 && n < 3).length }, { faixa: "3–5 anos", total: tenure.filter(n => n >= 3 && n < 5).length }, { faixa: "5+ anos", total: tenure.filter(n => n >= 5).length }];
               const deptData = [...new Set(base.map(e => e.department || "Sem setor"))].map(name => ({ setor: name, total: base.filter(e => (e.department || "Sem setor") === name).length })).sort((a,b) => b.total-a.total).slice(0,8);
+              const genderByAgeData = ageData.map(item => {
+                const matchingAges = base.filter(e => e.birthDate && (() => { const age = ageOf(e.birthDate as string); return item.faixa === "Até 25" ? age <= 25 : item.faixa === "26–35" ? age >= 26 && age <= 35 : item.faixa === "36–45" ? age >= 36 && age <= 45 : item.faixa === "46–55" ? age >= 46 && age <= 55 : age >= 56; })());
+                return { faixa: item.faixa, feminino: matchingAges.filter(e => ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: matchingAges.filter(e => ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length, outros: matchingAges.filter(e => String(e.gender ?? "").toLowerCase() === "outro").length };
+              });
+              const deptGenderData = deptData.map(item => {
+                const rows = base.filter(e => (e.department || "Sem setor") === item.setor);
+                return { setor: item.setor, feminino: rows.filter(e => ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: rows.filter(e => ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length, outros: rows.filter(e => String(e.gender ?? "").toLowerCase() === "outro").length };
+              });
               const average = (values: number[]) => values.length ? values.reduce((a,b)=>a+b,0)/values.length : 0;
               const ageAverage = average(ages);
               const tenureAverage = average(tenure);
@@ -1624,6 +1632,14 @@ export function Kpis() {
                     <div className="mt-3 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptData} layout="vertical" margin={{top:4,right:16,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar dataKey="total" name="Funcionários" fill="#8b5cf6" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
                   </Card>
                 </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <Card className="p-5"><h3 className="font-bold">Faixa etária por sexo</h3><p className="text-xs text-muted-foreground">Compara quantos funcionários de cada sexo existem em cada faixa etária.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={genderByAgeData} margin={{top:12,right:8,left:-18,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Legend/><Bar dataKey="feminino" name="Feminino" stackId="a" fill="#ec4899"/><Bar dataKey="masculino" name="Masculino" stackId="a" fill="#3b82f6"/><Bar dataKey="outros" name="Outro" stackId="a" fill="#8b5cf6"/></BarChart></ResponsiveContainer></div>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Composição por sexo nos principais setores</h3><p className="text-xs text-muted-foreground">Compara a distribuição por sexo nos até 8 setores com mais funcionários.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptGenderData} layout="vertical" margin={{top:4,right:16,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip/><Legend/><Bar dataKey="feminino" name="Feminino" stackId="a" fill="#ec4899"/><Bar dataKey="masculino" name="Masculino" stackId="a" fill="#3b82f6"/><Bar dataKey="outros" name="Outro" stackId="a" fill="#8b5cf6"/></BarChart></ResponsiveContainer></div>
+                  </Card>
+                </div>
                 <p className="text-xs text-muted-foreground">Os gráficos usam os dados cadastrados dos funcionários e respeitam empresa, setor e seleção de funcionários após clicar em “Atualizar KPIs”.</p>
               </>;
             })()}
@@ -1643,6 +1659,18 @@ export function Kpis() {
               const salaryRanges = [{faixa:"Até R$ 2 mil",total:salaries.filter(e=>(e.salary||0)<=2000).length},{faixa:"R$ 2–3 mil",total:salaries.filter(e=>(e.salary||0)>2000&&(e.salary||0)<=3000).length},{faixa:"R$ 3–5 mil",total:salaries.filter(e=>(e.salary||0)>3000&&(e.salary||0)<=5000).length},{faixa:"R$ 5–8 mil",total:salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000).length},{faixa:"Acima de R$ 8 mil",total:salaries.filter(e=>(e.salary||0)>8000).length}];
               const deptSalaries = [...new Set(salaries.map(e=>e.department||"Sem setor"))].map(setor=>{const values=salaries.filter(e=>(e.department||"Sem setor")===setor);return {setor,media:values.reduce((s,e)=>s+(e.salary||0),0)/values.length,quantidade:values.length};}).sort((a,b)=>b.media-a.media).slice(0,10);
               const topSalaries = [...salaries].sort((a,b)=>(b.salary||0)-(a.salary||0)).slice(0,8).map(e=>({funcionario:e.name,salario:e.salary||0}));
+              const genderSalaryRows = [
+                { genero: "Feminino", valores: salaries.filter(e => ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())) },
+                { genero: "Masculino", valores: salaries.filter(e => ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())) },
+                { genero: "Outro / não informado", valores: salaries.filter(e => !["feminino","fem","f","mulher","female","masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())) },
+              ].map(g => ({ genero: g.genero, quantidade: g.valores.length, media: g.valores.length ? g.valores.reduce((sum,e)=>sum+(e.salary||0),0)/g.valores.length : 0, folha: g.valores.reduce((sum,e)=>sum+(e.salary||0),0) }));
+              const salaryRangeGenderData = [
+                { faixa: "Até R$ 2 mil", feminino: salaries.filter(e=>(e.salary||0)<=2000 && ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)<=2000 && ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
+                { faixa: "R$ 2–3 mil", feminino: salaries.filter(e=>(e.salary||0)>2000&&(e.salary||0)<=3000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>2000&&(e.salary||0)<=3000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
+                { faixa: "R$ 3–5 mil", feminino: salaries.filter(e=>(e.salary||0)>3000&&(e.salary||0)<=5000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>3000&&(e.salary||0)<=5000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
+                { faixa: "R$ 5–8 mil", feminino: salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
+                { faixa: "Acima de R$ 8 mil", feminino: salaries.filter(e=>(e.salary||0)>8000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>8000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
+              ];
               const salaryColors = ["#06b6d4","#8b5cf6","#f97316","#22c55e","#ec4899"];
               return <>
                 <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Visão interativa da folha cadastrada, faixas salariais, diferenças entre setores e pensões alimentícias. Valores respeitam os filtros aplicados.</p></div>
@@ -1664,6 +1692,15 @@ export function Kpis() {
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Composição salarial da seleção</h3><p className="text-xs text-muted-foreground">Distribuição dos salários por setor, considerando os 8 maiores totais.</p>
                     <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><PieChart margin={{top:4,right:4,bottom:4,left:4}}><Pie data={[...new Set(salaries.map(e=>e.department||"Sem setor"))].map(setor=>({name:setor,value:salaries.filter(e=>(e.department||"Sem setor")===setor).reduce((s,e)=>s+(e.salary||0),0)})).sort((a,b)=>b.value-a.value).slice(0,8)} dataKey="value" nameKey="name" cx="50%" cy="42%" outerRadius={76} label={false}><Cell fill="#06b6d4"/><Cell fill="#8b5cf6"/><Cell fill="#f97316"/><Cell fill="#22c55e"/><Cell fill="#ec4899"/><Cell fill="#eab308"/><Cell fill="#3b82f6"/><Cell fill="#14b8a6"/></Pie><Tooltip formatter={(value:number)=>[money(value),"Total salarial"]}/><Legend verticalAlign="bottom" align="center" wrapperStyle={{fontSize:"11px",paddingTop:"8px"}}/></PieChart></ResponsiveContainer></div>
+                  </Card>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <Card className="p-5"><h3 className="font-bold">Salário médio por sexo</h3><p className="text-xs text-muted-foreground">Compara salário médio, total de salários e quantidade de pessoas em cada categoria.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={genderSalaryRows} margin={{top:12,right:8,left:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="genero" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[money(v),"Salário médio"]}/><Bar dataKey="media" name="Salário médio" fill="#06b6d4" radius={[7,7,0,0]}/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">{genderSalaryRows.map(item=><div key={item.genero} className="rounded-lg bg-muted/40 p-2"><p className="text-xs text-muted-foreground">{item.genero}</p><p className="text-sm font-semibold">{item.quantidade} pessoa(s)</p><p className="text-xs text-muted-foreground">{money(item.folha)} de folha</p></div>)}</div>
+                  </Card>
+                  <Card className="p-5"><h3 className="font-bold">Faixas salariais por sexo</h3><p className="text-xs text-muted-foreground">Compara a quantidade de homens e mulheres em cada intervalo salarial.</p>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={salaryRangeGenderData} margin={{top:12,right:8,left:0,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:9}} interval={0} angle={-10} textAnchor="end" height={55}/><YAxis allowDecimals={false} tick={{fontSize:10}}/><Tooltip/><Legend/><Bar dataKey="feminino" name="Feminino" fill="#ec4899" radius={[5,5,0,0]}/><Bar dataKey="masculino" name="Masculino" fill="#3b82f6" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>
                   </Card>
                 </div>
                 <p className="text-xs text-muted-foreground">A folha mensal estimada é apenas a soma dos salários cadastrados: não inclui encargos, benefícios, adicionais ou descontos. Os gráficos exibem dados de cadastro, não recalculam fechamentos nem alteram pagamentos.</p>
