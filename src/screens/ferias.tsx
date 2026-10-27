@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Palmtree, Plus, Search, CheckCircle2, Circle, Pencil, Trash2, X, Clock3, CalendarCheck, AlertCircle } from "lucide-react";
+import { CalendarDays, Palmtree, Plus, Search, CheckCircle2, Pencil, Trash2, X, Clock3, CalendarCheck, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Vacation = { id:string; employee_id:string; title:string|null; start_date:string; end_date:string; notes:string|null; completed:boolean; completed_at:string|null; created_at:string; acquisition_start_date?:string|null; acquisition_end_date?:string|null; concession_start_date?:string|null; concession_end_date?:string|null; official_gozo_start_date?:string|null; official_gozo_end_date?:string|null; employees?:{full_name:string}|null };
@@ -111,11 +111,6 @@ export function Ferias() {
       }
     }
     setSaving(false);setModal(false);await load();
-  }
-  async function toggleComplete(p:Vacation){
-    setError("");
-    const {error:e}=await(supabase as any).from("vacation_periods").update({completed:!p.completed,completed_at:!p.completed?new Date().toISOString():null}).eq("id",p.id);
-    if(e)setError(e.message);else await load();
   }
   async function remove(){
     if(!confirmDelete)return;
