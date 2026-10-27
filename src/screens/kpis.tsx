@@ -1262,6 +1262,19 @@ export function Kpis() {
   };
   const absenteeismTone = absenteeismRate >= KPI_THRESHOLDS.absenteeismCritical ? "critical" : absenteeismRate >= KPI_THRESHOLDS.absenteeismAttention ? "warning" : "neutral";
   const turnoverTone = metrics.turnover >= turnoverThresholds.critical ? "critical" : metrics.turnover >= turnoverThresholds.attention ? "warning" : "neutral";
+  const monthlyTurnover = Array.from({ length: 12 }, (_, index) => {
+    const month = String(index + 1).padStart(2, "0");
+    const monthEmployees = employees.filter(e =>
+      (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
+      (appliedDepartment === "todos" || e.department === appliedDepartment) &&
+      (!appliedEmployees.length || appliedEmployees.includes(e.id))
+    );
+    return {
+      month: new Date(appliedYear, index, 1).toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
+      admissions: monthEmployees.filter(e => e.hireDate?.startsWith(`${appliedYear}-${month}-`)).length,
+      terminations: monthEmployees.filter(e => e.terminationDate?.startsWith(`${appliedYear}-${month}-`)).length,
+    };
+  });
   const bankTone = Math.abs(bankBalance) >= KPI_THRESHOLDS.bankCriticalMinutes ? "critical" : Math.abs(bankBalance) >= KPI_THRESHOLDS.bankAttentionMinutes ? "warning" : "neutral";
   const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0;
 
@@ -1928,18 +1941,18 @@ export function Kpis() {
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
-                <h3 className="font-bold">Movimentações na competência</h3>
-                <p className="text-xs text-muted-foreground">Comparativo entre admissões e desligamentos no período selecionado.</p>
+                <h3 className="font-bold">Evolução mensal de admissões e desligamentos</h3>
+                <p className="text-xs text-muted-foreground">Compare mês a mês e identifique quando houve mais entradas e saídas em {appliedYear}. Considera as datas de admissão e desligamento cadastradas e os filtros aplicados.</p>
                 <div className="mt-4 h-60">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={[{ tipo: "Admissões", quantidade: metrics.admissions }, { tipo: "Desligamentos", quantidade: metrics.terminations }]} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                    <BarChart data={monthlyTurnover} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-                      <XAxis dataKey="tipo" tick={{ fontSize: 11 }}/>
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }}/>
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }}/>
-                      <Tooltip formatter={(value:number) => [value, "Funcionários"]}/>
-                      <Bar dataKey="quantidade" name="Funcionários" radius={[7,7,0,0]} activeBar={{ fill: "#0d9488" }}>
-                        <Cell fill="#06b6d4"/><Cell fill="#f43f5e"/>
-                      </Bar>
+                      <Tooltip formatter={(value:number, name:string) => [value, name]}/>
+                      <Legend/>
+                      <Bar dataKey="admissions" name="Admissões" fill="#06b6d4" radius={[5,5,0,0]} activeBar={{ fill: "#0891b2" }}/>
+                      <Bar dataKey="terminations" name="Desligamentos" fill="#f43f5e" radius={[5,5,0,0]} activeBar={{ fill: "#e11d48" }}/>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
