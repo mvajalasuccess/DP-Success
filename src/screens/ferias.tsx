@@ -19,7 +19,10 @@ const dayCount = (a:string,b:string,holidayDates:ReadonlySet<string> = new Set<s
   const end=new Date(b+"T12:00:00");
   while(cursor<=end){
     const date=cursor.getFullYear()+"-"+String(cursor.getMonth()+1).padStart(2,"0")+"-"+String(cursor.getDate()).padStart(2,"0");
-    if(!holidayDates.has(date)) total++;
+    // Natal e Ano-Novo são feriados fixos: considerar em qualquer ano,
+    // mesmo que não existam como registros na tabela de feriados.
+    const fixedHoliday = date.slice(5) === "12-25" || date.slice(5) === "01-01";
+    if(!holidayDates.has(date) && !fixedHoliday) total++;
     cursor.setDate(cursor.getDate()+1);
   }
   return total;
