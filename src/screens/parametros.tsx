@@ -124,7 +124,7 @@ export function Parametros(){
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div><p className="text-sm font-medium">{p.full_name||"Usuário"}</p><p className="text-xs text-muted-foreground">{p.email}</p></div>
             <div className="flex items-center gap-2">
-              <select disabled={!isAdmin || p.id === currentProfile?.id} value={p.role||"consulta"} onChange={e=>void updateProfile(p.id,{role:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="rh">RH</option><option value="consulta">Consulta</option></select>
+              <select disabled={!isAdmin || p.id === currentProfile?.id} value={p.role||"consulta"} onChange={e=>void updateProfile(p.id,{role:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="rh">RH</option><option value="consulta">Consulta</option><option value="convidado">Convidado</option></select>
               <label className="flex items-center gap-2 text-sm"><input disabled={!isAdmin} type="checkbox" checked={p.active!==false} onChange={e=>void updateProfile(p.id,{active:e.target.checked})}/>Ativo</label>
               {isAdmin && p.id !== currentProfile?.id && <button onClick={()=>void deleteProfile(p.id,p.email)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir usuário"><Trash2 className="h-4 w-4"/></button>}
             </div>
@@ -133,11 +133,11 @@ export function Parametros(){
             <div className="flex items-center justify-between gap-4">
               <span className="text-sm font-medium">Acesso aos módulos</span>
               <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                {p.role === "consulta" ? "Somente visualização" : "Acesso total · visualizar e editar"}
+                {p.role === "consulta" || p.role === "convidado" ? "Somente visualização" : "Acesso total · visualizar e editar"}
               </span>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              {p.role === "consulta"
+              {p.role === "consulta" || p.role === "convidado"
                 ? "Este usuário pode consultar as informações, mas não pode criar, editar ou excluir registros."
                 : "Este usuário pode visualizar, criar, editar e excluir os registros do sistema."}
             </p>
