@@ -1319,6 +1319,9 @@ export function Kpis() {
       : (Boolean(e.terminationDate) || ["inativo", "inactive"].includes((e.status || "").toLowerCase()))))
   );
   const salaryKpiRows = salaryKpiEmployees.filter(e => e.salary != null && e.salary > 0);
+  const normalizeKpiGender = (gender: unknown) => String(gender ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  const maleSalaryRows = salaryKpiRows.filter(e => ["m", "masculino", "masc", "homem", "male"].includes(normalizeKpiGender(e.gender)));
+  const femaleSalaryRows = salaryKpiRows.filter(e => ["f", "feminino", "fem", "mulher", "female"].includes(normalizeKpiGender(e.gender)));
   const salaryKpiTotal = salaryKpiRows.reduce((sum, e) => sum + Number(e.salary || 0), 0);
   const pensionKpiEmployees = salaryKpiEmployees.filter(e => e.pensionAmount > 0);
   const kpiMoney = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1332,10 +1335,10 @@ export function Kpis() {
       ]
     : activeSection === "salariais"
     ? [
-        { label: "Menor salário", value: salaryKpiRows.length ? kpiMoney(Math.min(...salaryKpiRows.map(e => Number(e.salary || 0)))) : "Sem dados", support: "Menor salário cadastrado na seleção", tone: "neutral", title: "Menor salário entre os funcionários considerados pelos filtros.", primary: true },
-        { label: "Maior salário", value: salaryKpiRows.length ? kpiMoney(Math.max(...salaryKpiRows.map(e => Number(e.salary || 0)))) : "Sem dados", support: "Maior salário cadastrado na seleção", tone: "neutral", title: "Maior salário entre os funcionários considerados pelos filtros." },
-        { label: "Quantidade de homens", value: String(salaryKpiEmployees.filter(e => ["m", "masculino", "masc", "homem", "male"].includes(String(e.gender ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase())).length), support: "Conforme gênero informado no cadastro", tone: "neutral", title: "Quantidade de funcionários cadastrados como homens." },
-        { label: "Quantidade de mulheres", value: String(salaryKpiEmployees.filter(e => ["f", "feminino", "fem", "mulher", "female"].includes(String(e.gender ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase())).length), support: "Conforme gênero informado no cadastro", tone: "neutral", title: "Quantidade de funcionárias cadastradas como mulheres." },
+        { label: "Menor salário Masculino", value: maleSalaryRows.length ? kpiMoney(Math.min(...maleSalaryRows.map(e => Number(e.salary || 0)))) : "Sem dados", support: "Menor salário entre os homens na seleção", tone: "neutral", title: "Menor salário cadastrado entre funcionários do gênero masculino, respeitando os filtros.", primary: true },
+        { label: "Maior salário Masculino", value: maleSalaryRows.length ? kpiMoney(Math.max(...maleSalaryRows.map(e => Number(e.salary || 0)))) : "Sem dados", support: "Maior salário entre os homens na seleção", tone: "neutral", title: "Maior salário cadastrado entre funcionários do gênero masculino, respeitando os filtros." },
+        { label: "Menor salário Feminino", value: femaleSalaryRows.length ? kpiMoney(Math.min(...femaleSalaryRows.map(e => Number(e.salary || 0)))) : "Sem dados", support: "Menor salário entre as mulheres na seleção", tone: "neutral", title: "Menor salário cadastrado entre funcionárias do gênero feminino, respeitando os filtros." },
+        { label: "Maior salário Feminino", value: femaleSalaryRows.length ? kpiMoney(Math.max(...femaleSalaryRows.map(e => Number(e.salary || 0)))) : "Sem dados", support: "Maior salário entre as mulheres na seleção", tone: "neutral", title: "Maior salário cadastrado entre funcionárias do gênero feminino, respeitando os filtros." },
       ]
     : activeSection === "horas-extras"
     ? [
