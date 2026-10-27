@@ -145,7 +145,7 @@ function AppShell({
 
   const sectionButtonClass = "dp-sidebar-group-label flex min-h-9 w-full items-center justify-between px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring";
   const mobileGroups: { label: string; items: [string, ScreenKey, LucideIcon][] }[] = [
-    { label: "Gestão", items: [["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText]] },
+    { label: "Análise", items: [["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText]] },
     { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck]] },
     { label: "Cadastro", items: [["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays]] },
     { label: "Organização", items: [["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Diário de Ocorrências", "diario-ocorrencias", ClipboardList], ["Tarefas", "tarefas", ListChecks]] },
@@ -183,7 +183,7 @@ function AppShell({
             <div className="dp-sidebar-header flex h-[76px] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
               <div className="flex min-w-0 items-center gap-3">
                 <Clock3 className="h-5 w-5 shrink-0 text-sidebar-primary" strokeWidth={1.8} aria-hidden="true" />
-                <div className="min-w-0"><p className="font-display text-base font-bold tracking-tight">DP <span className="text-sidebar-primary">SUCCESS</span></p><p className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/80">RH · DP · GESTÃO</p></div>
+                <div className="min-w-0"><p className="font-display text-base font-bold tracking-tight">DP <span className="text-sidebar-primary">SUCCESS</span></p><p className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/80">RH · DP · ANÁLISE</p></div>
               </div>
               <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center text-sidebar-foreground/80 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Fechar menu"><X className="h-5 w-5" strokeWidth={1.8} /></button>
             </div>
@@ -252,7 +252,7 @@ function AppShell({
             <>
               <section className="dp-sidebar-group">
                 <button type="button" onClick={() => setManagementOpen(v => !v)} className={sectionButtonClass} aria-expanded={managementOpen} aria-controls="dp-sidebar-management">
-                  <span>Gestão</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${managementOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
+                  <span>Análise</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${managementOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
                 </button>
                 {managementOpen && <div id="dp-sidebar-management" className="mt-1 space-y-1">
                   {([
@@ -859,7 +859,7 @@ function DashboardHome() {
             <div className="pointer-events-none absolute -right-10 -top-20 -z-10 h-56 w-56 rounded-full bg-[#06CAA0]/20 blur-3xl" />
             <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7cebd0]">Gestão • DP SUCCESS</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7cebd0]">ANÁLISE • DP SUCCESS</p>
                 <h1 style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }} className="!text-white text-2xl font-semibold tracking-tight sm:text-[30px]">Dashboard</h1>
                 <p className="mt-2 text-sm text-slate-200">Resumo executivo de RH e DP da competência atual.</p>
               </div>
