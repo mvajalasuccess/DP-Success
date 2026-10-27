@@ -845,3 +845,91 @@ main h2 {
   background: #f5f3ff !important;
   border-color: #ddd6fe !important;
 }
+
+
+/* DP SUCCESS — camada visual transversal v1 (somente apresentação; sem lógica de negócio) */
+:root {
+  --dp-surface: oklch(0.998 0.002 160);
+  --dp-surface-raised: oklch(1 0 0);
+  --dp-shadow-soft: 0 1px 2px oklch(0.20 0.02 160 / 0.04), 0 8px 24px oklch(0.20 0.02 160 / 0.035);
+  --dp-shadow-hover: 0 2px 5px oklch(0.20 0.02 160 / 0.06), 0 12px 30px oklch(0.20 0.02 160 / 0.06);
+}
+
+/* Conteúdo: fundo leve e superfícies brancas com hierarquia discreta. */
+body {
+  background: var(--background);
+}
+main {
+  min-width: 0;
+}
+main > * {
+  min-width: 0;
+}
+
+/* Cards compartilhados: elevação sutil, bordas suaves e transição discreta.
+   Não altera valores, dados, filtros ou eventos dos componentes. */
+:where(.rounded-lg.border.bg-card, .rounded-xl.border.bg-card, [data-slot="card"]) {
+  border-color: color-mix(in oklab, var(--color-border) 84%, white);
+  box-shadow: var(--dp-shadow-soft);
+}
+:where(.rounded-lg.border.bg-card, .rounded-xl.border.bg-card, [data-slot="card"]):hover {
+  border-color: color-mix(in oklab, var(--color-border) 72%, var(--color-primary) 28%);
+}
+:where(.rounded-lg.border.bg-card, .rounded-xl.border.bg-card, [data-slot="card"]) :is(h2, h3) {
+  text-wrap: pretty;
+}
+
+/* Formulários: aparência consistente entre telas antigas e novas. */
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-radius: 8px;
+}
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):not(:disabled):hover {
+  border-color: color-mix(in oklab, var(--color-input) 65%, var(--color-primary) 35%);
+}
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea)::placeholder {
+  color: color-mix(in oklab, var(--color-muted-foreground) 82%, transparent);
+}
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+  border-color: var(--color-primary-strong);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 16%, transparent);
+}
+
+/* Botões: interação mais suave sem trocar cores, tamanhos ou comportamento. */
+button, [role="button"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+:where(button, [role="button"]):not(:disabled):active {
+  filter: brightness(0.98);
+}
+:where(button.bg-primary, button[class*="bg-primary "], [role="button"].bg-primary):not(:disabled) {
+  box-shadow: 0 1px 2px oklch(0.20 0.02 160 / 0.08);
+}
+
+/* Tabelas: cabeçalho legível, linhas leves e realce ao passar o cursor. */
+table thead th {
+  background-color: color-mix(in oklab, var(--color-muted) 72%, white);
+  color: var(--color-foreground);
+}
+table tbody tr {
+  transition: background-color 120ms ease;
+}
+table tbody tr:hover {
+  background-color: color-mix(in oklab, var(--color-primary) 5%, transparent);
+}
+table tbody tr + tr td {
+  border-top-color: color-mix(in oklab, var(--color-border) 78%, white);
+}
+
+/* Em telas pequenas, evitar que o acabamento visual cause overflow. */
+@media (max-width: 640px) {
+  :where(.rounded-lg.border.bg-card, .rounded-xl.border.bg-card, [data-slot="card"]) {
+    min-width: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :where(button, [role="button"], table tbody tr) {
+    transition-duration: 0.01ms !important;
+  }
+}
