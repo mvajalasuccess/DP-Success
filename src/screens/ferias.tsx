@@ -167,7 +167,8 @@ export function Ferias() {
           const first=blocks[0];
           const officialBlock=blocks.find(p=>p.official_gozo_start_date&&p.official_gozo_end_date);
           const totalDays=officialBlock?dayCount(officialBlock.official_gozo_start_date!,officialBlock.official_gozo_end_date!):0;
-          const paidInTermination=blocks.some(p=>p.termination_paid);\n          const allCompleted=totalDays>=30;
+          const paidInTermination=blocks.some(p=>p.termination_paid);
+          const allCompleted=totalDays>=30;
           return <article key={group.key} className={`p-4 transition-colors hover:bg-muted/20 sm:p-5 ${allCompleted?"opacity-80":""}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 items-start gap-4"><div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${allCompleted?"bg-emerald-100 text-emerald-700":"bg-[#e7f8f2] text-[#087a62]"}`}>{allCompleted?<CheckCircle2 className="h-6 w-6"/>:<Palmtree className="h-6 w-6"/>}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{employeeName(first)}</h3><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${paidInTermination?"bg-amber-100 text-amber-900":allCompleted?"bg-emerald-100 text-emerald-800":blocks.some(p=>p.completed)?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800"}`}>{paidInTermination?"Pago em rescisão":allCompleted?"Concluído":blocks.some(p=>p.completed)?"Parcialmente concluído":"Em aberto"}</span><span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{blocks.length} bloco(s)</span>{blocks.some(p=>p.termination_paid)&&<span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-900">Proporcional pago em rescisão</span>}</div>
