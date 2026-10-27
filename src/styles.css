@@ -812,24 +812,36 @@ main h2 {
 }
 
 
-/* KPIs — cores suaves para diferenciar visualmente os indicadores em todas as seções. */
-.kpis-page .kpi-band > div.kpi-color-0 {
+/* KPIs — cores suaves nos cards de indicadores das seções, sem colorir a faixa fixa. */
+.kpis-page .kpi-metric-card {
+  border-width: 1px !important;
+  border-style: solid !important;
+}
+.kpis-page .kpi-metric-blue {
   background: #eff6ff !important;
-  background-color: #eff6ff !important;
-  border-left: 4px solid #3b82f6 !important;
+  border-color: #bfdbfe !important;
 }
-.kpis-page .kpi-band > div.kpi-color-1 {
+.kpis-page .kpi-metric-purple {
   background: #f5f3ff !important;
-  background-color: #f5f3ff !important;
-  border-left: 4px solid #8b5cf6 !important;
+  border-color: #ddd6fe !important;
 }
-.kpis-page .kpi-band > div.kpi-color-2 {
+.kpis-page .kpi-metric-green {
   background: #ecfdf5 !important;
-  background-color: #ecfdf5 !important;
-  border-left: 4px solid #10b981 !important;
+  border-color: #a7f3d0 !important;
 }
-.kpis-page .kpi-band > div.kpi-color-3 {
+.kpis-page .kpi-metric-amber {
   background: #fffbeb !important;
-  background-color: #fffbeb !important;
-  border-left: 4px solid #f59e0b !important;
+  border-color: #fde68a !important;
+}
+.kpis-page .kpi-metric-cyan {
+  background: #ecfeff !important;
+  border-color: #a5f3fc !important;
+}
+.kpis-page .kpi-metric-rose {
+  background: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+}
+.kpis-page .kpi-metric-violet {
+  background: #f5f3ff !important;
+  border-color: #ddd6fe !important;
 }
