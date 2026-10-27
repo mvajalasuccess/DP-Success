@@ -82,7 +82,7 @@ function Login() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 py-8 sm:px-6 lg:px-10">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#06CAA0] px-4 py-8 sm:px-6 lg:px-10">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-emerald-500/15 blur-3xl" />
         <div className="absolute -bottom-40 right-0 h-[30rem] w-[30rem] rounded-full bg-teal-400/10 blur-3xl" />
