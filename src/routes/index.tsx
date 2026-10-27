@@ -850,16 +850,16 @@ function DashboardHome() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-[#f3f7f7]">
-      <header className="dp-screen-topbar flex h-14 items-center border-b border-slate-200/70 bg-white/80 px-4 backdrop-blur sm:px-6">
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+    <div className="min-h-screen bg-[#07151d]">
+      <header className="dp-screen-topbar flex h-14 items-center border-b border-white/10 bg-[#0b1c25]/90 px-4 text-slate-200 shadow-[0_8px_30px_-18px_rgba(6,202,160,0.28)] backdrop-blur-xl sm:px-6">
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
           <span className="h-2 w-2 rounded-full bg-[#06CAA0]" />
           DP SUCCESS <span className="text-slate-300">/</span> Gestão <span className="text-slate-300">/</span> Visão geral
         </div>
       </header>
-      <div className="dp-screen-content mx-auto max-w-[1600px] space-y-6 px-4 py-5 sm:px-6 sm:py-7 xl:px-8">
-        <section className="relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b1c25] via-[#102c34] to-[#123d3b] px-6 py-7 text-white shadow-[0_20px_55px_-28px_rgba(6,40,43,0.65)] sm:px-8 sm:py-9">
-          <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-72 w-72 rounded-full bg-[#06CAA0]/20 blur-3xl" />
+      <div className="dp-screen-content mx-auto max-w-[1600px] space-y-7 px-4 py-6 sm:px-6 sm:py-8 xl:px-8">
+        <section className="relative isolate min-h-[250px] overflow-hidden rounded-[30px] border border-[#2b615b]/50 bg-gradient-to-br from-[#102b35] via-[#0b202a] to-[#123f3a] px-6 py-8 text-white shadow-[0_28px_75px_-32px_rgba(6,202,160,0.38)] sm:px-10 sm:py-10 lg:px-12">
+          <div className="pointer-events-none absolute -right-16 -top-24 -z-10 h-80 w-80 rounded-full bg-[#06CAA0]/25 blur-3xl" />
           <div className="pointer-events-none absolute bottom-[-110px] right-[22%] -z-10 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div className="max-w-2xl">
@@ -877,12 +877,12 @@ function DashboardHome() {
             </div>
           </div>
         </section>
-        <section className="flex flex-col justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.35)] sm:flex-row sm:items-center sm:px-5">
+        <section className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-[#10232c] p-4 shadow-[0_16px_35px_-24px_rgba(0,0,0,0.8)] sm:flex-row sm:items-center sm:px-5">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-800">Filtrar visão do Dashboard</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">O filtro afeta somente os indicadores e listas exibidos aqui; não altera lançamentos nem competências fechadas.</p>
+            <p className="text-sm font-semibold text-white">Filtrar visão do Dashboard</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">O filtro afeta somente os indicadores e listas exibidos aqui; não altera lançamentos nem competências fechadas.</p>
           </div>
-          <label className="grid w-full gap-1.5 text-sm font-medium text-slate-700 sm:max-w-[340px]"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label>
+          <label className="grid w-full gap-1.5 text-sm font-medium text-slate-200 sm:max-w-[340px]"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label>
         </section>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {cards.map(([label, value, Icon, detail]) => (
@@ -900,8 +900,8 @@ function DashboardHome() {
           </section>
           <section className="mt-1">
             <div className="mb-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#087e68]">Resumo da competência</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">Ocorrências por funcionário</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#50e5c1]">Resumo da competência</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-white">Ocorrências por funcionário</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("dp-success:navigate", { detail: "ocorrencias" }))} className="text-left">
