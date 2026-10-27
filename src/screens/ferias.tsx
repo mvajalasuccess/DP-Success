@@ -168,7 +168,7 @@ export function Ferias() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 items-start gap-4"><div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${allCompleted?"bg-emerald-100 text-emerald-700":"bg-[#e7f8f2] text-[#087a62]"}`}>{allCompleted?<CheckCircle2 className="h-6 w-6"/>:<Palmtree className="h-6 w-6"/>}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{employeeName(first)}</h3><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${allCompleted?"bg-emerald-100 text-emerald-800":blocks.some(p=>p.completed)?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800"}`}>{allCompleted?"Concluído":blocks.some(p=>p.completed)?"Parcialmente concluído":"Em aberto"}</span><span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{blocks.length} bloco(s)</span></div>
                 {first.acquisition_start_date&&<p className="mt-1 text-sm text-muted-foreground">Período aquisitivo: {dateLabel(first.acquisition_start_date)} a {dateLabel(first.acquisition_end_date)}</p>}
-                {first.title&&<p className="mt-1 text-sm text-muted-foreground">{first.title}</p>}
+                {first.title&&!/^Férias\s*[·-]\s*período aquisitivo\b/i.test(first.title)&&<p className="mt-1 text-sm text-muted-foreground">{first.title}</p>}
                 <p className="mt-2 text-sm text-muted-foreground">{totalDays} dias descontados do saldo · {completedDays} dias concluídos · {Math.max(0,30-totalDays)} dias restantes</p>
               </div></div>
               <div className="shrink-0 text-xs text-muted-foreground">Blocos reunidos neste período</div>
