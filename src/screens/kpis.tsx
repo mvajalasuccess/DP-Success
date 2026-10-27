@@ -213,7 +213,7 @@ export function Kpis() {
               "EDINILSON DE ALMEIDA SILVA": "2026-05-29",
               "EMILIO PICOLI FRACAROLLI": "2026-06-05",
               "FELIPE HILMANN": "2026-07-30",
-            } as Record<string, string>)[String(e.full_name ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toUpperCase()] ?? null,
+            } as Record<string, string>)[String(e.full_name ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase()] ?? null,
             status: e.status ?? "ativo",
             birthDate: e.birth_date ?? null,
             salary: e.salary == null ? null : Number(e.salary),
@@ -1323,7 +1323,7 @@ export function Kpis() {
     (!appliedEmployees.length || appliedEmployees.includes(e.id))
   );
   const normalizeGender = (value: string | null) =>
-    String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase();
+    String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
   const terminationsByGender = [
     { gender: "Homens", total: terminationGenderBase.filter(e => ["m", "masculino", "masc", "homem", "male"].includes(normalizeGender(e.gender))).length, fill: "#06b6d4" },
     { gender: "Mulheres", total: terminationGenderBase.filter(e => ["f", "feminino", "fem", "mulher", "female"].includes(normalizeGender(e.gender))).length, fill: "#ec4899" },
