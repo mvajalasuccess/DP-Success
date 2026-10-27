@@ -1309,7 +1309,6 @@ export function Kpis() {
         { label: "Salário médio", value: salaryKpiRows.length ? kpiMoney(salaryKpiTotal / salaryKpiRows.length) : "Sem dados", support: `Base de ${salaryKpiRows.length} salário(s)`, tone: "neutral", title: "Média dos salários cadastrados na seleção.", primary: true },
         { label: "Folha mensal estimada", value: kpiMoney(salaryKpiTotal), support: "Soma dos salários, sem encargos", tone: "neutral", title: "Soma dos salários cadastrados, sem encargos." },
         { label: "Funcionários com pensão", value: String(pensionKpiEmployees.length), support: "Com valor mensal maior que zero", tone: "neutral", title: "Quantidade de cadastros com pensão alimentícia." },
-        { label: "Total de pensões", value: kpiMoney(pensionKpiEmployees.reduce((sum, e) => sum + e.pensionAmount, 0)), support: "Soma dos valores cadastrados", tone: "neutral", title: "Soma dos valores de pensão cadastrados." },
       ]
     : activeSection === "horas-extras"
     ? [
