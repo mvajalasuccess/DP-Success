@@ -1742,16 +1742,14 @@ export function Kpis() {
                 <div className="mt-4 grid gap-4">
                   <Card className="p-5 xl:col-span-2"><h3 className="font-bold">Salário médio por setor</h3><p className="text-xs text-muted-foreground">Comparação da média salarial entre os setores da seleção.</p>
                     <div className="mt-3 h-[26rem]"><ResponsiveContainer width="100%" height="100%"><PieChart margin={{top:12,right:24,bottom:12,left:24}}><Pie data={deptSalaries} dataKey="media" nameKey="setor" cx="50%" cy="45%" outerRadius={150} label={({name,percent})=>`${name} ${(percent*100).toLocaleString("pt-BR",{maximumFractionDigits:1})}%`}><Cell fill="#06b6d4"/><Cell fill="#8b5cf6"/><Cell fill="#f97316"/><Cell fill="#22c55e"/><Cell fill="#ec4899"/><Cell fill="#eab308"/><Cell fill="#3b82f6"/><Cell fill="#14b8a6"/><Cell fill="#64748b"/><Cell fill="#a3e635"/></Pie><Tooltip formatter={(value:number)=>[money(value),"Salário médio"]}/><Legend verticalAlign="bottom" align="center" wrapperStyle={{fontSize:"12px",paddingTop:"10px"}}/></PieChart></ResponsiveContainer></div>
-                </div>
                   </Card>
+                </div>
                   <Card className="p-5"><h3 className="font-bold">Maiores salários cadastrados</h3><p className="text-xs text-muted-foreground">Até 8 registros de maior valor na seleção atual.</p>
                     <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={topSalaries} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><YAxis type="category" dataKey="funcionario" width={140} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[money(value),"Salário"]}/><Bar dataKey="salario" name="Salário" fill="#f97316" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Menores salários cadastrados</h3><p className="text-xs text-muted-foreground">Até 8 registros de menor valor na seleção atual.</p>
                     <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={[...salaries].sort((a,b)=>(a.salary||0)-(b.salary||0)).slice(0,8).map(e=>({funcionario:e.name,salario:e.salary||0}))} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><YAxis type="category" dataKey="funcionario" width={140} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[money(value),"Salário"]}/><Bar dataKey="salario" name="Salário" fill="#0d9488" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
                   </Card>
-                </div>
-                <div className="grid gap-4">
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Remuneração × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Permite observar como os salários se distribuem conforme a permanência e comparar padrões por sexo, sem assumir que funções diferentes são equivalentes.</p>
