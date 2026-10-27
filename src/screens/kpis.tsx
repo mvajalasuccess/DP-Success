@@ -1079,7 +1079,7 @@ export function Kpis() {
       // quando um funcionário/setor estava selecionado, causando divergência
       // entre o percentual do card e a coluna da competência.
       const normalizeHistoricalName = (value: unknown) =>
-        String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase();
+        String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
       const resolveHistoricalEmployee = (row: any): Employee | undefined => {
         if (row.employee_id) {
           const byId = employees.find(e => e.id === String(row.employee_id));
