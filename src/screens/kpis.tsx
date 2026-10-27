@@ -1414,12 +1414,13 @@ export function Kpis() {
       </header>
 
       <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-6 sm:px-7 sm:pt-8">
-        <section aria-labelledby="kpis-page-title">
-          <p className="kpi-eyebrow">Gestão</p>
+        <section className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7" aria-labelledby="kpis-page-title">
+          <div className="pointer-events-none absolute -right-10 -top-20 -z-10 h-56 w-56 rounded-full bg-[#06CAA0]/20 blur-3xl" />
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#7cebd0]">ANÁLISE • DP SUCCESS</p>
           <div className="mt-2 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
             <div>
-              <h1 id="kpis-page-title" className="font-display text-[clamp(27px,3vw,36px)] font-semibold leading-[1.08] tracking-[-0.045em] text-[var(--kpi-text)]">KPIs de RH e DP</h1>
-              <p className="mt-2 text-[13px] leading-5 text-[var(--kpi-text-muted)]">
+              <h1 id="kpis-page-title" style={{ color: "#ffffff", WebkitTextFillColor: "#ffffff" }} className="!text-white font-display text-[clamp(27px,3vw,36px)] font-semibold leading-[1.08] tracking-[-0.045em]">KPIs de RH e DP</h1>
+              <p className="mt-2 text-[13px] leading-5 text-slate-200">
                 {periodLabel || "Selecione os filtros para analisar os indicadores."}
                 <span className="mx-2 text-[var(--kpi-border)]">·</span>
                 {appliedMonth === "todos" ? "Todos os meses" : "Competência selecionada"}
@@ -1427,11 +1428,11 @@ export function Kpis() {
                 {appliedCompanyFilter ? "Empresa filtrada" : "Todas as empresas"}
               </p>
             </div>
-            <p className="pb-0.5 text-[12px] font-medium tabular-nums text-[var(--kpi-text-muted)]">Dados da seleção aplicada</p>
+            <p className="pb-0.5 text-[12px] font-medium tabular-nums text-slate-200">Dados da seleção aplicada</p>
           </div>
         </section>
 
-        <section className="mt-6" aria-label="Indicadores principais">
+        <section className="mt-6 rounded-xl border border-white/15 bg-white/[0.08] px-4 py-4 backdrop-blur-sm sm:px-5" aria-label="Indicadores principais">
           {isCalculating || isLoadingPage ? (
             <div className="kpi-band" aria-label="Carregando indicadores" aria-live="polite">
               {(["principal", "secundario-1", "secundario-2", "secundario-3"]).map((key, index) => (
@@ -1466,6 +1467,8 @@ export function Kpis() {
             </div>
           )}
           <p className="mt-2 text-[11px] leading-4 text-[var(--kpi-text-muted)]">As faixas de atenção são provisórias e visuais; não alteram os cálculos nem os dados.</p>
+        </section>
+
         </section>
 
         <div className="mt-3 flex min-h-7 items-center justify-end gap-2 text-[12px] text-[var(--kpi-text-muted)]" aria-live="polite">
