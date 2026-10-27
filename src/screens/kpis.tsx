@@ -201,11 +201,7 @@ export function Kpis() {
       if (error || !data) return;
       const { data: departmentRows } = await db.from("departments").select("id,name");
       const departmentById = new Map((departmentRows ?? []).map((d: any) => [String(d.id), String(d.name ?? "")]));
-      setEmployees((current) => {
-        const currentById = new Map(current.map((employee) => [employee.id, employee]));
-        return data.map((e: any) => {
-          const previous = currentById.get(String(e.id));
-          return {
+      setEmployees(() => data.map((e: any) => ({
             id: String(e.id),
             name: String(e.full_name ?? ""),
             registration: String(e.registration ?? "").trim(),
@@ -225,9 +221,7 @@ export function Kpis() {
             pensionAmount: Number(e.pension_amount ?? 0),
             workScheduleId: e.work_schedule_id ?? null,
             companyId: e.company_id ?? null,
-          };
-        });
-      });
+          }));
     };
     const channel = db.channel("kpis-employee-demographics")
       .on("postgres_changes", { event: "*", schema: "public", table: "employees" }, () => {
