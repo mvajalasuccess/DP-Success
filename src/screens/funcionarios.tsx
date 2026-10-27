@@ -30,7 +30,7 @@ export function Employees() {
     if (!cleaned) return 0;
     const normalized = cleaned.includes(",")
       ? cleaned.replace(/\./g, "").replace(",", ".")
-      : cleaned.replace(/\\./g, "");
+      : cleaned.replace(/\./g, "");
     return Number(normalized);
   };
 
