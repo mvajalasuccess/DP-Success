@@ -1033,17 +1033,23 @@ main h3 {
   letter-spacing: -0.02em;
 }
 
-/* Cartões com superfície branca, borda fina e sombra mais elegante. */
-:where(main [data-slot="card"], main .rounded-lg.border.bg-card, main .rounded-xl.border.bg-card, main .border.bg-card) {
-  background-color: color-mix(in oklab, white 96%, var(--dp-premium-green) 4%);
-  border-color: var(--dp-premium-line);
-  border-radius: 15px !important;
+/* Cartões de conteúdo: seletores explícitos para prevalecer sobre utilitários genéricos. */
+main [data-slot="card"],
+main .rounded-lg.border.bg-card,
+main .rounded-xl.border.bg-card,
+main .border.bg-card {
+  background-color: color-mix(in oklab, white 97%, var(--dp-premium-green) 3%);
+  border: 1px solid var(--dp-premium-line);
+  border-radius: 16px;
   box-shadow: var(--dp-premium-shadow);
-  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
 }
-:where(main [data-slot="card"], main .rounded-lg.border.bg-card, main .rounded-xl.border.bg-card, main .border.bg-card):hover {
-  border-color: color-mix(in oklab, var(--dp-premium-line) 70%, var(--dp-premium-green) 30%);
-  box-shadow: 0 3px 8px oklch(0.20 0.02 165 / 0.04), 0 18px 38px oklch(0.20 0.02 165 / 0.055);
+main [data-slot="card"]:hover,
+main .rounded-lg.border.bg-card:hover,
+main .rounded-xl.border.bg-card:hover,
+main .border.bg-card:hover {
+  border-color: color-mix(in oklab, var(--dp-premium-line) 65%, var(--dp-premium-green) 35%);
+  box-shadow: 0 4px 10px oklch(0.20 0.02 165 / 0.035), 0 14px 30px oklch(0.20 0.02 165 / 0.06);
 }
 
 /* Filtros e campos: altura e foco coerentes em todas as telas. */
@@ -1130,5 +1136,55 @@ main hr {
   :where(main [data-slot="card"], main .rounded-lg.border.bg-card, main .rounded-xl.border.bg-card, main .border.bg-card),
   main button {
     transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* Acabamento consistente do espaço de trabalho, sem tocar nos cálculos ou dados. */
+.dp-app-main {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 96% 0%, color-mix(in oklab, var(--dp-premium-green) 5%, transparent), transparent 30rem),
+    var(--dp-premium-canvas);
+}
+.dp-app-main > * {
+  position: relative;
+}
+.dp-sidebar {
+  box-shadow: 8px 0 32px oklch(0.12 0.025 165 / 0.10);
+}
+.dp-sidebar-header {
+  border-bottom-color: oklch(1 0 0 / 0.10);
+}
+.dp-sidebar-group {
+  margin-bottom: 8px;
+}
+.dp-sidebar-group-label {
+  color: oklch(0.76 0.025 165);
+}
+.dp-sidebar-item {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  margin-block: 2px;
+}
+.dp-sidebar-item-active {
+  font-weight: 600;
+}
+main table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+main table thead th:first-child {
+  border-top-left-radius: 8px;
+}
+main table thead th:last-child {
+  border-top-right-radius: 8px;
+}
+main :is(h1, h2, h3) {
+  text-wrap: balance;
+}
+@media (max-width: 1023px) {
+  .dp-app-main {
+    background: var(--dp-premium-canvas);
   }
 }
