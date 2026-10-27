@@ -11,7 +11,7 @@ const addYears = (iso:string, years:number) => { const [y,m,d]=iso.split("-").ma
 const makeEntitlement = (employee:Employee, cycle:number) => { const acquisitionStart=addYears(employee.hire_date!,cycle); const nextAnniversary=addYears(employee.hire_date!,cycle+1); const concessionEnd=shiftDate(addYears(employee.hire_date!,cycle+2),-1); return { employee, cycle:cycle+1, acquisitionStart, acquisitionEnd:shiftDate(nextAnniversary,-1), concessionStart:nextAnniversary, concessionEnd }; };
 const dateLabel = (v:string|null|undefined) => v ? v.slice(8,10)+"/"+v.slice(5,7)+"/"+v.slice(0,4) : "—";
 const calendarDayCount = (a:string,b:string) => Math.max(1,Math.round((new Date(b+"T00:00:00").getTime()-new Date(a+"T00:00:00").getTime())/86400000)+1);
-const dayCount = (a:string,b:string,_holidayDates?:ReadonlySet<string>) => {
+const dayCount = (a:string,b:string) => {
   if (b < a) return 0;
   return Math.round((new Date(b+"T00:00:00").getTime()-new Date(a+"T00:00:00").getTime())/86400000)+1;
 };
@@ -32,14 +32,13 @@ export function Ferias() {
 
   async function load() {
     setLoading(true); setError("");
-    const [v,e,h]=await Promise.all([
+    const [v,e]=await Promise.all([
       (supabase as any).from("vacation_periods").select("*,employees(full_name)").order("start_date",{ascending:true}),
       (supabase as any).from("employees").select("id,full_name,status,termination_date,hire_date").order("full_name"),
     ]);
     if(v.error){setError(v.error.message.includes("vacation_periods")||v.error.code==="42P01"?"A tabela de férias ainda não foi criada no banco de dados. A migração precisa ser aplicada.":v.error.message);}
     if(e.error && !v.error)setError(e.error.message);
-    if(h.error && !v.error && !e.error)setError("Não foi possível carregar os feriados cadastrados: "+h.error.message);
-    setPeriods(v.data??[]); setEmployees(e.data??[]); setHolidays(h.data??[]); setLoading(false);
+    setPeriods(v.data??[]); setEmployees(e.data??[]); setLoading(false);
   }
   useEffect(()=>{void load()},[]);
 
