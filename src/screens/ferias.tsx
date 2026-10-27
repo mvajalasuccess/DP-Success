@@ -81,7 +81,7 @@ export function Ferias() {
     const result=editing?await(supabase as any).from("vacation_periods").update(payload).eq("id",editing.id):await(supabase as any).from("vacation_periods").insert({...payload,created_by:(await supabase.auth.getSession()).data.session?.user.id||null});
     if(result.error){setError(result.error.message);setSaving(false);return}
     if(extraBlocks.length){
-      const sharedPayload={employee_id:form.employee_id,title:payload.title,completed:false,completed_at:null,acquisition_start_date:form.acquisition_start_date||null,acquisition_end_date:form.acquisition_end_date||null,concession_start_date:form.concession_start_date||null,concession_end_date:form.concession_end_date||null,official_gozo_start_date:form.official_gozo_start_date||null,official_gozo_end_date:form.official_gozo_end_date||null};
+      const sharedPayload={employee_id:form.employee_id,title:payload.title,completed:false,completed_at:null,acquisition_start_date:form.acquisition_start_date||null,acquisition_end_date:form.acquisition_end_date||null,concession_start_date:form.concession_start_date||null,concession_end_date:form.concession_end_date||null,official_gozo_start_date:form.official_gozo_start_date||null,official_gozo_end_date:form.official_gozo_end_date||null,termination_paid:Boolean(form.termination_paid)};
       const sessionUserId=(await supabase.auth.getSession()).data.session?.user.id||null;
       const {error:blocksError}=await(supabase as any).from("vacation_periods").insert(extraBlocks.map(b=>({...sharedPayload,start_date:b.start_date,end_date:b.end_date,notes:b.notes.trim()||null,created_by:sessionUserId})));
       if(blocksError){setError("O período principal foi salvo, mas houve erro ao adicionar os novos blocos: "+blocksError.message);setSaving(false);await load();return}
@@ -99,7 +99,8 @@ export function Ferias() {
           concession_start_date:form.concession_start_date||null,
           concession_end_date:form.concession_end_date||null,
           official_gozo_start_date:form.official_gozo_start_date||null,
-          official_gozo_end_date:form.official_gozo_end_date||null
+          official_gozo_end_date:form.official_gozo_end_date||null,
+          termination_paid:Boolean(form.termination_paid)
         }).in("id",siblingIds);
         if(syncError){setError("O bloco foi salvo, mas não foi possível sincronizar os dados do período: "+syncError.message);setSaving(false);await load();return}
       }
