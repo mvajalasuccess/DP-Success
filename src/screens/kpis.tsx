@@ -1275,6 +1275,19 @@ export function Kpis() {
       terminations: monthEmployees.filter(e => e.terminationDate?.startsWith(`${appliedYear}-${month}-`)).length,
     };
   });
+  const terminationGenderBase = employees.filter(e =>
+    e.terminationDate?.startsWith(`${appliedYear}-`) &&
+    (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
+    (appliedDepartment === "todos" || e.department === appliedDepartment) &&
+    (!appliedEmployees.length || appliedEmployees.includes(e.id))
+  );
+  const normalizeGender = (value: string | null) =>
+    String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim().toLowerCase();
+  const terminationsByGender = [
+    { gender: "Homens", total: terminationGenderBase.filter(e => ["m", "masculino", "masc", "homem", "male"].includes(normalizeGender(e.gender))).length, fill: "#06b6d4" },
+    { gender: "Mulheres", total: terminationGenderBase.filter(e => ["f", "feminino", "fem", "mulher", "female"].includes(normalizeGender(e.gender))).length, fill: "#ec4899" },
+    { gender: "Não informado", total: terminationGenderBase.filter(e => !["m", "masculino", "masc", "homem", "male", "f", "feminino", "fem", "mulher", "female"].includes(normalizeGender(e.gender))).length, fill: "#94a3b8" },
+  ];
   const bankTone = Math.abs(bankBalance) >= KPI_THRESHOLDS.bankCriticalMinutes ? "critical" : Math.abs(bankBalance) >= KPI_THRESHOLDS.bankAttentionMinutes ? "warning" : "neutral";
   const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0;
 
@@ -1976,6 +1989,24 @@ export function Kpis() {
                 </div>
               </Card>
             </div>
+            <Card className="mt-4 p-5">
+              <h3 className="font-bold">Desligamentos por gênero</h3>
+              <p className="text-xs text-muted-foreground">Quantidade de desligamentos registrados em {appliedYear}, conforme gênero informado no cadastro. Respeita os filtros aplicados.</p>
+              <div className="mt-4 h-60">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={terminationsByGender} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                    <XAxis dataKey="gender" tick={{ fontSize: 11 }}/>
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }}/>
+                    <Tooltip formatter={(value: number) => [value, "Desligamentos"]}/>
+                    <Bar dataKey="total" name="Desligamentos" radius={[6, 6, 0, 0]}>
+                      {terminationsByGender.map(item => <Cell key={item.gender} fill={item.fill}/>)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {!terminationGenderBase.length && <p className="py-2 text-center text-sm text-muted-foreground">Nenhum desligamento registrado em {appliedYear} para os filtros selecionados.</p>}
+            </Card>
             <Card className="mt-4 border-primary/20 bg-primary/5 p-5">
               <p className="font-semibold">Como o índice é calculado</p>
               <p className="mt-2 text-sm text-muted-foreground">
