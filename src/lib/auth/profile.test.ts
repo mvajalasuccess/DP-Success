@@ -12,7 +12,7 @@ mock.module("@/integrations/supabase/client", () => ({ supabase: {
   rpc: async (_name: string, args: Record<string, string>) => { savedArgs = args; return { error: null }; },
 } }));
 const { ensureAccountProfile } = await import("./profile");
-const user = { id: "B", email: "account@example.invalid", user_metadata: { full_name: "Carlos" } } as User;
+const user: User = { id: "B", email: "account@example.invalid", user_metadata: { full_name: "Carlos" }, app_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" };
 
 test("login recovers Carlos from his signup metadata when his own profile has no name", async () => {
   storedName = null;
