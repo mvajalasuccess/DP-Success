@@ -4,6 +4,7 @@ import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarC
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
+import { useAccountIdentity } from "@/hooks/use-account-identity";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
 const Companies = lazy(() => import("@/screens/empresas").then(m => ({ default: m.Companies })));
 const Positions = lazy(() => import("@/screens/cargos").then(m => ({ default: m.Positions })));
@@ -28,7 +29,17 @@ const Ferias = lazy(() => import("@/screens/ferias").then(m => ({ default: m.Fer
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees } from "@/lib/dp-model";
 
-export const Route = createFileRoute("/")({ component: Dashboard });
+export const Route = createFileRoute("/")({
+  head: () => ({ meta: [
+    { title: "Painel de RH e DP | DP SUCCESS" },
+    { name: "description", content: "Gestão de funcionários, ponto e competências no DP SUCCESS." },
+    { property: "og:title", content: "Painel de RH e DP | DP SUCCESS" },
+    { property: "og:description", content: "Gestão de funcionários, ponto e competências no DP SUCCESS." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
+  component: Dashboard,
+});
 
 type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importacao-historico" | "importar-cartao-ponto" | "ferias";
 
@@ -327,17 +338,8 @@ function AppShell({
 }
 
 function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: (screen: ScreenKey) => void }) {
-  const [name, setName] = useState("Mariana Ajala");
-  const [role, setRole] = useState("Usuário RH");
-
-  useEffect(() => { void (async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
-    if (!userId) return;
-    const { data: profile } = await (supabase as any).from("profiles").select("full_name,role").eq("id", userId).maybeSingle();
-    if (profile?.full_name) setName(profile.full_name);
-    setRole(profile?.role === "consulta" ? "Consulta" : profile?.role === "convidado" ? "Convidado" : "Usuário RH");
-  })(); }, []);
+  const { name, role: profileRole } = useAccountIdentity();
+  const role = profileRole === "consulta" ? "Consulta" : profileRole === "convidado" ? "Convidado" : profileRole ? "Usuário RH" : "Usuário";
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

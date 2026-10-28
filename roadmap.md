@@ -1,5 +1,8 @@
 # DP Success — roadmap
 
+## Solicitação atual
+- [ ] Corrigir identificação por conta autenticada, preservar nomes e permissões e validar persistência sem dados fictícios.
+
 ## Concluído
 - Backend (Lovable Cloud) ativo e saudável; autenticação, setores, cargos, jornadas, funcionários, ponto, ocorrências, atestados, banco de horas, fechamento, competências e lançamentos.
 - Configurações: feriados com adicionar/remover, usuários com perfil, ativação e exclusão de acesso.

@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Authenticated identity is loaded through the account-identity hook and account-scoped profile helpers; this invalidates stale reads on account changes and preserves stored names during login.
