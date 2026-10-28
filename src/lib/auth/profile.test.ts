@@ -1,3 +1,4 @@
+/// <reference types="bun" />
 import { test, expect, mock } from "bun:test";
 import type { User } from "@supabase/supabase-js";
 
