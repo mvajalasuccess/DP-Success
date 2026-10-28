@@ -3,8 +3,19 @@ import { useState } from "react";
 import { Eye, EyeOff, ShieldCheck, Clock3, UsersRound, ArrowRight, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureAccountProfile } from "@/lib/auth/profile";
 
-export const Route = createFileRoute("/login")({ component: Login });
+export const Route = createFileRoute("/login")({
+  head: () => ({ meta: [
+    { title: "Acesso | DP SUCCESS" },
+    { name: "description", content: "Entre ou crie seu acesso ao DP SUCCESS." },
+    { property: "og:title", content: "Acesso | DP SUCCESS" },
+    { property: "og:description", content: "Entre ou crie seu acesso ao DP SUCCESS." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
+  component: Login,
+});
 
 function Login() {
   const navigate = useNavigate();
@@ -32,7 +43,7 @@ function Login() {
     setMessage("");
 
     if (mode === "login") {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -43,9 +54,11 @@ function Login() {
         return;
       }
 
-      const { error: setupError } = await supabase.rpc("ensure_user_setup", { _email: email.trim() });
-      if (setupError) {
-        setError(setupError.message);
+      try {
+        if (!data.user) throw new Error("Não foi possível identificar sua conta.");
+        await ensureAccountProfile(data.user);
+      } catch (setupError) {
+        setError(setupError instanceof Error ? setupError.message : "Não foi possível carregar seu perfil.");
         setSaving(false);
         return;
       }
@@ -70,9 +83,10 @@ function Login() {
     setSaving(false);
 
     if (data.session) {
-      const { error: setupError } = await supabase.rpc("ensure_user_setup", { _full_name: fullName.trim(), _email: email.trim() });
-      if (setupError) {
-        setError(setupError.message);
+      try {
+        await ensureAccountProfile(data.session.user);
+      } catch (setupError) {
+        setError(setupError instanceof Error ? setupError.message : "Não foi possível carregar seu perfil.");
         return;
       }
       await navigate({ to: "/" });
