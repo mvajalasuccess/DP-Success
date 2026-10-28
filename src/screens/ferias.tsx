@@ -7,7 +7,7 @@ type Employee = { id:string; full_name:string; status?:string|null; termination_
 type Entitlement = { employee:Employee; acquisitionStart:string; acquisitionEnd:string; concessionStart:string; concessionEnd:string; cycle:number; status:"acquisition"|"available"|"overdue"|"scheduled"|"completed"; vacations?:Vacation[] };
 const today = () => new Date().toISOString().slice(0,10);
 const shiftDate = (iso:string, days:number) => { const d=new Date(iso+"T12:00:00"); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); };
-const addYears = (iso:string, years:number) => { const [y,m,d]=iso.split("-").map(Number); const targetYear=y+years; const last=new Date(targetYear,m,0).getDate(); return String(targetYear)+"-"+String(m).padStart(2,"0")+"-"+String(Math.min(d,last)).padStart(2,"0"); };
+const addYears = (iso:string, years:number) => { const [y,m,d]=iso.split("-").map(Number); if(y===undefined||m===undefined||d===undefined)return iso; const targetYear=y+years; const last=new Date(targetYear,m,0).getDate(); return String(targetYear)+"-"+String(m).padStart(2,"0")+"-"+String(Math.min(d,last)).padStart(2,"0"); };
 const makeEntitlement = (employee:Employee, cycle:number) => { const acquisitionStart=addYears(employee.hire_date!,cycle); const nextAnniversary=addYears(employee.hire_date!,cycle+1); const concessionEnd=shiftDate(addYears(employee.hire_date!,cycle+2),-1); return { employee, cycle:cycle+1, acquisitionStart, acquisitionEnd:shiftDate(nextAnniversary,-1), concessionStart:nextAnniversary, concessionEnd }; };
 const dateLabel = (v:string|null|undefined) => v ? v.slice(8,10)+"/"+v.slice(5,7)+"/"+v.slice(0,4) : "—";
 const calendarDayCount = (a:string,b:string) => Math.max(1,Math.round((new Date(b+"T00:00:00").getTime()-new Date(a+"T00:00:00").getTime())/86400000)+1);
@@ -49,7 +49,7 @@ export function Ferias() {
     const q=(name+" "+(p.title||"")+" "+(p.notes||"")).toLocaleLowerCase("pt-BR");
     return (!search||q.includes(search.toLocaleLowerCase("pt-BR")))&&(statusFilter==="all"||(statusFilter==="done"?(p.completed||p.termination_paid):(!p.completed&&!p.termination_paid)));
   }),[periods,employees,search,statusFilter]);
-  const counts={total:periods.length,open:periods.filter(p=>!p.completed&&!p.termination_paid).length,done:periods.filter(p=>p.completed||p.termination_paid).length,upcoming:periods.filter(p=>!p.completed&&!p.termination_paid&&Boolean(p.start_date)&&p.start_date>=today()).length};
+  const counts={total:periods.length,open:periods.filter(p=>!p.completed&&!p.termination_paid).length,done:periods.filter(p=>p.completed||p.termination_paid).length,upcoming:periods.filter(p=>!p.completed&&!p.termination_paid&&p.start_date!==null&&p.start_date>=today()).length};
   // Agrupa todos os blocos salvos do mesmo funcionário e período aquisitivo em um único card.
   const visibleGroups=useMemo(()=>{
     const groups=new Map<string,Vacation[]>();
@@ -205,6 +205,7 @@ export function Ferias() {
         {loading?<div className="p-12 text-center text-sm text-muted-foreground">Carregando períodos...</div>:visibleGroups.length===0?<div className="flex flex-col items-center px-6 py-14 text-center"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><CalendarDays className="h-7 w-7"/></div><h3 className="mt-4 font-semibold">{periods.length===0?"Vamos planejar as primeiras férias?":"Nenhum período encontrado"}</h3><p className="mt-1 max-w-md text-sm text-muted-foreground">{periods.length===0?"Adicione um período, escolha o funcionário e informe as datas para começar seu planejamento.":"Experimente alterar o filtro ou a busca."}</p>{periods.length===0&&<button onClick={openNew} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4"/>Cadastrar primeiro período</button>}</div>:<div className="divide-y">{visibleGroups.map(group=>{
           const blocks=group.blocks;
           const first=blocks[0];
+          if(!first)return null;
           const officialBlock=blocks.find(p=>p.official_gozo_start_date&&p.official_gozo_end_date);
           const totalDays=officialBlock?dayCount(officialBlock.official_gozo_start_date!,officialBlock.official_gozo_end_date!):0;
           const paidInTermination=blocks.some(p=>p.termination_paid);
