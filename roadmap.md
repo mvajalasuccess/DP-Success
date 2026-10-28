@@ -1,7 +1,8 @@
 # DP Success — roadmap
 
 ## Solicitação atual
-- [ ] Corrigir identificação por conta autenticada, preservar nomes e permissões e validar persistência sem dados fictícios.
+- [x] Corrigir identificação por conta autenticada e preservar nomes e permissões; testes automatizados Mariana/Carlos e verificação da conta própria após atualizar e sair.
+- [ ] Validar entrada e reentrada com duas contas reais nomeadas: depende de acesso autorizado à segunda conta; não criar usuários fictícios nem alterar nomes existentes.
 
 ## Concluído
 - Backend (Lovable Cloud) ativo e saudável; autenticação, setores, cargos, jornadas, funcionários, ponto, ocorrências, atestados, banco de horas, fechamento, competências e lançamentos.
