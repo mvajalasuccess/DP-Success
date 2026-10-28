@@ -1787,6 +1787,77 @@ export type Database = {
         }
         Relationships: []
       }
+      vacation_periods: {
+        Row: {
+          acquisition_end_date: string | null
+          acquisition_start_date: string | null
+          completed: boolean
+          completed_at: string | null
+          concession_end_date: string | null
+          concession_start_date: string | null
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          official_gozo_end_date: string | null
+          official_gozo_start_date: string | null
+          start_date: string | null
+          termination_paid: boolean
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          acquisition_end_date?: string | null
+          acquisition_start_date?: string | null
+          completed?: boolean
+          completed_at?: string | null
+          concession_end_date?: string | null
+          concession_start_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          official_gozo_end_date?: string | null
+          official_gozo_start_date?: string | null
+          start_date?: string | null
+          termination_paid?: boolean
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          acquisition_end_date?: string | null
+          acquisition_start_date?: string | null
+          completed?: boolean
+          completed_at?: string | null
+          concession_end_date?: string | null
+          concession_start_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          official_gozo_end_date?: string | null
+          official_gozo_start_date?: string | null
+          start_date?: string | null
+          termination_paid?: boolean
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_periods_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_schedules: {
         Row: {
           active: boolean
