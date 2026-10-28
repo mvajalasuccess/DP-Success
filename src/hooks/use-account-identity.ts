@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { createIdentityReader, EMPTY_IDENTITY } from "@/lib/auth/identity";
+import { ensureAccountProfile } from "@/lib/auth/profile";
 
 export function useAccountIdentity() {
   const [identity, setIdentity] = useState(EMPTY_IDENTITY);
@@ -8,6 +9,11 @@ export function useAccountIdentity() {
     let disposed = false;
     let authChanged = false;
     const reader = createIdentityReader(async (id) => {
+      // Existing sessions also need recovery: they may never revisit the login form.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+      if (!user || user.id !== id) return null;
+      await ensureAccountProfile(user);
       const { data, error } = await supabase.from("profiles")
         .select("id,full_name,role").eq("id", id).maybeSingle();
       if (error) throw new Error(error.message);
