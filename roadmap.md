@@ -1,6 +1,7 @@
 # DP Success — roadmap
 
 ## Solicitação atual
+- [ ] Recuperar nome ADM da conta adm5 também em sessões já abertas e validar na prévia.
 - [x] Corrigir identificação por conta autenticada e preservar nomes e permissões; testes automatizados Mariana/Carlos e verificação da conta própria após atualizar e sair.
 - [ ] Validar entrada e reentrada com duas contas reais nomeadas: depende de acesso autorizado à segunda conta; não criar usuários fictícios nem alterar nomes existentes.
 
