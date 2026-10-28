@@ -1,19 +1,17 @@
-/// <reference types="bun" />
 import { test, expect, mock } from "bun:test";
-import type { User } from "@supabase/supabase-js";
 
-let storedName: string | null = null;
+let storedName = null;
 let requestedId = "";
-let savedArgs: Record<string, string> = {};
+let savedArgs = {};
 mock.module("@/integrations/supabase/client", () => ({ supabase: {
-  from: () => ({ select: () => ({ eq: (_column: string, id: string) => {
+  from: () => ({ select: () => ({ eq: (_column, id) => {
     requestedId = id;
     return { maybeSingle: async () => ({ data: { id, full_name: storedName }, error: null }) };
   } }) }),
-  rpc: async (_name: string, args: Record<string, string>) => { savedArgs = args; return { error: null }; },
+  rpc: async (_name, args) => { savedArgs = args; return { error: null }; },
 } }));
 const { ensureAccountProfile } = await import("./profile");
-const user: User = { id: "B", email: "account@example.invalid", user_metadata: { full_name: "Carlos" }, app_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" };
+const user = { id: "B", email: "account@example.invalid", user_metadata: { full_name: "Carlos" }, app_metadata: {}, aud: "authenticated", created_at: "2026-10-28T00:00:00Z" };
 
 test("login recovers Carlos from his signup metadata when his own profile has no name", async () => {
   storedName = null;
