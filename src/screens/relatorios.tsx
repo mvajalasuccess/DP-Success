@@ -108,7 +108,8 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
     }
     return raw;
   };
-  const wideTable = /fechamento de ponto|banco de horas|interjornada/i.test(title);
+  // Todos os relatórios exportados em PDF devem usar orientação horizontal.
+  const wideTable = true;
   const columnWeight = (key: string) => {
     const name = key.toLowerCase();
     if (/employee|funcion.rio|employee_name/.test(name)) return 2.15;
