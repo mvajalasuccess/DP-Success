@@ -1218,3 +1218,46 @@ main :is(h1, h2, h3) {
 .dp-screen-topbar > div > span {
   color: #102b35;
 }
+
+/* Identificação à direita da faixa superior: tipografia única em todas as telas. */
+.dp-screen > header > div > :last-child,
+.dp-screen-topbar > div > :last-child {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #102b35;
+  font-size: 0.875rem !important;
+  font-weight: 650 !important;
+  line-height: 1.25rem !important;
+  letter-spacing: -0.01em;
+}
+.dp-screen > header > div > :last-child > span,
+.dp-screen-topbar > div > :last-child > span {
+  font-size: inherit !important;
+  font-weight: inherit;
+  line-height: inherit;
+}
+.dp-screen > header > div > :last-child > span span,
+.dp-screen-topbar > div > :last-child > span span {
+  color: #64748b;
+  font-size: inherit !important;
+  font-weight: 500;
+}
+.dp-screen > header > div > :last-child > span:first-child:has(svg),
+.dp-screen-topbar > div > :last-child > span:first-child:has(svg) {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: rgb(6 202 160 / 0.12);
+  color: #079a7b;
+}
+@media (max-width: 480px) {
+  .dp-screen > header > div > :last-child,
+  .dp-screen-topbar > div > :last-child {
+    gap: 0.375rem;
+    font-size: 0.8125rem !important;
+  }
+}
+
