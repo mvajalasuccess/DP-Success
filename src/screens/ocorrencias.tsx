@@ -198,7 +198,11 @@ export function Ocorrencias() {
       setHistoricalSaveError("Informe o tipo e uma quantidade válida igual ou maior que zero.");
       return;
     }
-    if (historicalForm.endDate && historicalForm.date && historicalForm.endDate < historicalForm.date) {\n      setHistoricalSaveError("A data final não pode ser anterior à data inicial.");\n      return;\n    }\n    if (!historicalAnnotationsReady) {
+    if (historicalForm.endDate && historicalForm.date && historicalForm.endDate < historicalForm.date) {
+      setHistoricalSaveError("A data final não pode ser anterior à data inicial.");
+      return;
+    }
+    if (!historicalAnnotationsReady) {
       setHistoricalSaveError("Execute o SQL complementar das faltas históricas antes de salvar. Os registros originais continuam preservados.");
       return;
     }
