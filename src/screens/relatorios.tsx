@@ -1037,11 +1037,46 @@ export function Relatorios() {
       }
 
       if (kind === "atestados") {
-        const [certificates, leaves, declarations] = await Promise.all([
+        const [certificates, leaves, declarations, historicalRows] = await Promise.all([
           fetchAll((from, to) => db.from("medical_certificates").select("employee_id,start_date,end_date,days,certificate_type,cid,notes,employees(full_name)").order("start_date", { ascending: false }).range(from, to)),
           fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,end_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code,name)").eq("occurrence_types.code", "afastamento").order("occurrence_date", { ascending: false }).range(from, to)),
           fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code)").eq("occurrence_types.code", "declaracao_horas").order("occurrence_date", { ascending: false }).range(from, to)),
+          fetchAll((from, to) => db.from("historical_kpi_data").select("id,employee_id,registration,employee_name,period_id,reference_year,reference_month,certificate_minutes,declaration_minutes").or("certificate_minutes.gt.0,declaration_minutes.gt.0").order("reference_year", { ascending: false }).range(from, to)),
         ]);
+
+        // O relatório também precisa incluir os totais históricos da BASE que aparecem
+        // na tela Declarações e Atestados. Esses totais são apenas informativos e não
+        // criam lançamentos operacionais nem alteram cálculos históricos.
+        const historicalIds = historicalRows.map((row: any) => row.id);
+        let historicalAnnotations: any[] = [];
+        if (historicalIds.length) {
+          const annotationResult = await db.from("historical_kpi_annotations")
+            .select("historical_kpi_data_id,certificate_type,certificate_cid,declaration_observation")
+            .in("historical_kpi_data_id", historicalIds);
+          if (!annotationResult.error) historicalAnnotations = annotationResult.data ?? [];
+        }
+        const annotationById = new Map(historicalAnnotations.map((row: any) => [String(row.historical_kpi_data_id), row]));
+        const periodById = new Map(periods.map((period: Period) => [String(period.id), period]));
+        const employeeByRegistration = new Map((companyEmployeeRows ?? [])
+          .filter((employee: any) => employee.registration)
+          .map((employee: any) => [String(employee.registration).trim().toLowerCase(), String(employee.id)]));
+        const employeeByName = new Map((companyEmployeeRows ?? [])
+          .map((employee: any) => [String(employee.full_name ?? "").trim().toLowerCase(), String(employee.id)]));
+        const resolveHistoricalEmployeeId = (row: any) => row.employee_id
+          ? String(row.employee_id)
+          : employeeByRegistration.get(String(row.registration ?? "").trim().toLowerCase()) ??
+            employeeByName.get(String(row.employee_name ?? "").trim().toLowerCase()) ?? "";
+        const matchesCompetence = (row: any) => {
+          if (allCompetencies || !competence) return true;
+          if (row.period_id && String(row.period_id) === String(competence.id)) return true;
+          const rowPeriod = periodById.get(String(row.period_id ?? ""));
+          return !!rowPeriod && rowPeriod.start_date <= competence.end_date && rowPeriod.end_date >= competence.start_date;
+        };
+        const toClock = (value: unknown) => {
+          const minutes = Math.max(0, Math.round(Number(value) || 0));
+          return String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0");
+        };
+
         rows = [
           ...(certificates ?? []).filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || (x.start_date <= competence.end_date && x.end_date >= competence.start_date))).map((x: any) => ({
             tipo: "Atestado", employee: x.employees?.full_name ?? "", start_date: x.start_date,
@@ -1059,9 +1094,34 @@ export function Relatorios() {
             return {
               tipo: "Declaração de horas", employee: x.employees?.full_name ?? "", start_date: x.occurrence_date,
               end_date: x.occurrence_date, days: "",
-              horas_abonadas: String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0"),
-              motivo: parts[0] ?? "", certificate_type: "", cid: "", notes: parts.slice(1).join(" — "),
+              horas_abonadas: toClock(minutes), motivo: parts[0] ?? "", certificate_type: "", cid: "", notes: parts.slice(1).join(" — "),
             };
+          }),
+          ...historicalRows.filter((row: any) => {
+            const employeeId = resolveHistoricalEmployeeId(row);
+            return (!companyFilter || allowedEmployeeIds.has(employeeId)) && matchesCompetence(row);
+          }).flatMap((row: any) => {
+            const annotation: any = annotationById.get(String(row.id)) ?? {};
+            const period = periodById.get(String(row.period_id ?? ""));
+            const isExceptionalJan2026 = Number(row.reference_year) === 2026 && Number(row.reference_month) === 1;
+            const fallbackStart = period?.start_date ?? (isExceptionalJan2026 ? "2025-12-11" : "");
+            const startDate = isExceptionalJan2026 ? "2025-12-11" : fallbackStart;
+            const endDate = period?.end_date ?? (isExceptionalJan2026 ? "2026-01-20" : "");
+            const employee = row.employee_name ?? (companyEmployeeRows ?? []).find((item: any) => String(item.id) === resolveHistoricalEmployeeId(row))?.full_name ?? "";
+            const output: any[] = [];
+            const certificateMinutes = Math.max(0, Number(row.certificate_minutes) || 0);
+            const declarationMinutes = Math.max(0, Number(row.declaration_minutes) || 0);
+            if (certificateMinutes > 0) output.push({
+              tipo: "Atestado (BASE)", employee, start_date: startDate, end_date: endDate, days: "",
+              horas_abonadas: toClock(certificateMinutes), motivo: "", certificate_type: annotation.certificate_type ?? "",
+              cid: annotation.certificate_cid ?? "", notes: "Total histórico importado da BASE",
+            });
+            if (declarationMinutes > 0) output.push({
+              tipo: "Declaração de horas (BASE)", employee, start_date: startDate, end_date: endDate, days: "",
+              horas_abonadas: toClock(declarationMinutes), motivo: annotation.declaration_observation ?? "",
+              certificate_type: "", cid: "", notes: "Total histórico importado da BASE",
+            });
+            return output;
           }),
         ];
       }
