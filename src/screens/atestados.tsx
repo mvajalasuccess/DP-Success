@@ -90,12 +90,17 @@ export function Atestados() {
       const historical = ((historicalResult.data ?? []) as HistoricalBaseRow[])
         .map(row => {
           const period = periodById.get(row.period_id);
-          // BASE usa competências de 21 do mês anterior a 20 do mês de referência.
-          // Se o período não estiver vinculado, reconstruímos somente a faixa da competência.
+          // A competência histórica excepcional de jan/2026 foi fechada de 11/12/2025 a 20/01/2026.
+          // Essa regra afeta apenas a identificação exibida nesta lista histórica, sem alterar períodos ou cálculos.
+          const isExceptionalJan2026 = Number(row.reference_year) === 2026 && Number(row.reference_month) === 1;
           const fallbackStart = new Date(row.reference_year, row.reference_month - 2, 21);
           const fallbackEnd = new Date(row.reference_year, row.reference_month - 1, 20);
           const toISO = (date: Date) => date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
-          return { ...row, period_start: period?.start_date ?? toISO(fallbackStart), period_end: period?.end_date ?? toISO(fallbackEnd) };
+          return {
+            ...row,
+            period_start: isExceptionalJan2026 ? "2025-12-11" : (period?.start_date ?? toISO(fallbackStart)),
+            period_end: isExceptionalJan2026 ? "2026-01-20" : (period?.end_date ?? toISO(fallbackEnd)),
+          };
         })
         .filter(row => (row.period_end ?? "") >= "2025-12-11");
       setHistoricalBaseRows(historical);
