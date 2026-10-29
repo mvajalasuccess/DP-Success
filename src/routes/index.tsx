@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, CalendarRange, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, Palmtree, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { ScreenBrand } from "@/components/screen-brand";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { useAccountIdentity } from "@/hooks/use-account-identity";
@@ -871,7 +872,7 @@ function DashboardHome() {
             <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
               <ChevronLeft className="h-4 w-4" />Voltar
             </a>
-            <span className="dp-brand">DP Success • Dashboard</span>
+            <ScreenBrand name="Dashboard" />
           </div>
         </header>
         <div className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
