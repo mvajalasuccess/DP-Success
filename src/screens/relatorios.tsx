@@ -91,7 +91,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   if (!rows.length) throw new Error("Não há dados para gerar o PDF.");
   const columns = Object.keys(rows[0]);
   const headers: Record<string, string> = {
-    employee: "Funcionário", employee_name: "Funcionário", date: "Data", end_date: "Data final",
+    employee: "Funcionário", employee_name: "Funcionário", competence: "Competência", horario: "Horário (hh:mm)", date: "Data", end_date: "Data final",
     start_date: "Data inicial", type: "Tipo", quantity: "Quantidade", unit: "Unidade",
     description: "Observações", registration: "Matrícula", department: "Departamento",
     department_name: "Departamento", days: "Dias", tipo: "Tipo", horas_abonadas: "Horas abonadas",
@@ -122,7 +122,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   const totalWeight = columns.reduce((sum, key) => sum + columnWeight(key), 0);
   const colgroup = '<colgroup>' + columns.map(key => '<col style="width:' + (columnWeight(key) / totalWeight * 100).toFixed(3) + '%">').join("") + '</colgroup>';
   const pageStyle = wideTable
-    ? '@page{size:A3 landscape;margin:5mm}body{font-size:7px}.brand{padding:6px 9px}h1{font-size:14px;margin:2px 0}.subtitle,.meta,.footer{font-size:7px}.meta{padding:3px 5px}table{margin-top:4px}th{font-size:11px;padding:2px 2px;line-height:1.1}td{font-size:7px;padding:0.5px 2px;line-height:1}'
+    ? '@page{size:A3 landscape;margin:5mm}body{font-size:7px}.brand{padding:6px 9px}h1{font-size:14px;margin:2px 0}.subtitle,.meta,.footer{font-size:7px}.meta{padding:3px 5px}table{margin-top:4px}th{font-size:11px;padding:2px 2px;line-height:1.1}td{font-size:7px;padding:2px 2px;line-height:1.15}'
     : '@page{size:A4 landscape;margin:7mm}body{font-size:7px}.brand{padding:10px 14px}h1{font-size:16px;margin:4px 0}.subtitle{font-size:8px}.meta{font-size:7px;padding:6px 8px}table{margin-top:8px}th{font-size:6.5px}th,td{padding:3px 3px;line-height:1.2}';
   const html = '<html lang="pt-BR"><head><meta charset="utf-8"><title>' + escapeReportHtml(title) + '</title><style>' +
     '*{box-sizing:border-box}html,body{width:100%;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#183735;print-color-adjust:exact;-webkit-print-color-adjust:exact}' +
@@ -1202,7 +1202,22 @@ export function Relatorios() {
       if (format === "pdf") {
         const reportTitle = reports.find(([key]) => key === kind)?.[1] ?? "Relatório";
         const subtitle = (allCompetencies ? "Todas as competências" : competence ? "Competência: " + formatDate(displayPeriodStart(competence.start_date, competence.end_date)) + " a " + formatDate(competence.end_date) : "Todas as competências") + (companyFilter ? " · Empresa selecionada" : " · Todas as empresas");
-        downloadReportPdf(reportTitle, rows, subtitle);
+        const pdfRows = kind === "interjornada"
+          ? rows.map((row: any) => {
+              const referenceDate = String(row.date ?? "");
+              const rowPeriod = periods.find((period: Period) => period.start_date <= referenceDate && period.end_date >= referenceDate);
+              const competenceLabel = rowPeriod
+                ? formatDate(displayPeriodStart(rowPeriod.start_date, rowPeriod.end_date)) + " a " + formatDate(rowPeriod.end_date)
+                : "Não identificada";
+              const minutes = Math.abs(Math.round(Number(row.minutes) || 0));
+              return {
+                employee: row.employee || "—",
+                competence: competenceLabel,
+                horario: String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0"),
+              };
+            })
+          : rows;
+        downloadReportPdf(reportTitle, pdfRows, subtitle);
       } else {
         await downloadStandardReportExcel(kind, rows);
       }
