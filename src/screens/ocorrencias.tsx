@@ -154,7 +154,7 @@ export function Ocorrencias() {
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
   const displayPeriodStart = (start: string, end: string) =>
-    start === "2025-12-21" && end === "2026-01-20" ? "2025-12-11" : start;
+    end === "2026-01-20" ? "2025-12-11" : start;
   const historicalDisplayStart = (row: HistoricalAbsence) =>
     row.absence_display_date || displayPeriodStart(row.period_start, row.period_end);
   const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
