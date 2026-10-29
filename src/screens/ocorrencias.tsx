@@ -185,11 +185,11 @@ export function Ocorrencias() {
     if (!historicalEditing) return;
     const quantity = Number(historicalForm.quantity);
     const selectedHistoricalType = visibleTypes.find(t => t.id === historicalForm.type);
-    if (!selectedHistoricalType || !Number.isInteger(quantity) || quantity < 0) {
+    if (!selectedHistoricalType || !Number.isInteger(quantity) || quantity <= 0) {
       setHistoricalSaveError("Informe o tipo e uma quantidade válida igual ou maior que zero.");
       return;
     }
-    if (!historicalAnnotationsReady) {
+    if (historicalForm.endDate && historicalForm.date && historicalForm.endDate < historicalForm.date) {\n      setHistoricalSaveError("A data final não pode ser anterior à data inicial.");\n      return;\n    }\n    if (!historicalAnnotationsReady) {
       setHistoricalSaveError("Execute o SQL complementar das faltas históricas antes de salvar. Os registros originais continuam preservados.");
       return;
     }
@@ -391,7 +391,7 @@ export function Ocorrencias() {
             ) : (
               <tr key={"historical-" + item.row.id} className="transition-colors hover:bg-muted/25">
                 <td className="px-5 py-4 font-medium">{item.row.employee_name}{item.row.registration ? <span className="ml-2 text-xs text-muted-foreground">({item.row.registration})</span> : null}</td>
-                <td className="px-5 py-4">{item.row.absence_display_date ? formatDate(item.row.absence_display_date) : "—"}{item.row.absence_display_end_date ? " → " + formatDate(item.row.absence_display_end_date) : ""}</td>
+                <td className="px-5 py-4">{formatDate(item.row.absence_display_date || item.row.period_start)}{(item.row.absence_display_end_date || item.row.period_end) ? " → " + formatDate(item.row.absence_display_end_date || item.row.period_end) : ""}</td>
                 <td className="px-5 py-4">{item.row.absence_display_type || "Falta importada da BASE"}</td>
                 <td className="px-5 py-4">{displayHistoricalQuantity(item.row)}</td>
                 <td className="px-5 py-4 text-right"><button onClick={() => startHistoricalEdit(item.row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><span className="inline-block px-2 text-xs text-muted-foreground" title="Registro histórico: não excluir dados originais">BASE</span></td>
