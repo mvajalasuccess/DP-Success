@@ -387,7 +387,7 @@ export function Ocorrencias() {
       if (/^[=+\-@]/.test(text)) text = "'" + text;
       return '"' + text.replaceAll('"', '""') + '"';
     };
-    const csv = ["\\ufeff" + Object.keys(reportRows[0]).map(escape).join(";"), ...reportRows.map(row => Object.values(row).map(escape).join(";"))].join("\\n");
+    const csv = ["\ufeff" + Object.keys(reportRows[0]).map(escape).join(";"), ...reportRows.map(row => Object.values(row).map(escape).join(";"))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
