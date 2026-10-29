@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 
+import { ScreenBrand } from "@/components/screen-brand";
 type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null; company_id?: string | null };
 type OccType = { id: string; code: string; name: string; unit: string; requires_justification: boolean; affects_balance: boolean };
 type Occ = {
@@ -236,7 +237,7 @@ export function Ocorrencias() {
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </a>
-          <b className="dp-brand">DP Success • Faltas e Folgas</b>
+          <ScreenBrand name="Faltas e Folgas" />
         </div>
       </header>
 
