@@ -1202,22 +1202,33 @@ export function Relatorios() {
       if (format === "pdf") {
         const reportTitle = reports.find(([key]) => key === kind)?.[1] ?? "Relatório";
         const subtitle = (allCompetencies ? "Todas as competências" : competence ? "Competência: " + formatDate(displayPeriodStart(competence.start_date, competence.end_date)) + " a " + formatDate(competence.end_date) : "Todas as competências") + (companyFilter ? " · Empresa selecionada" : " · Todas as empresas");
-        const pdfRows = kind === "interjornada"
-          ? rows.map((row: any) => {
-              const referenceDate = String(row.date ?? "");
-              const rowPeriod = periods.find((period: Period) => period.start_date <= referenceDate && period.end_date >= referenceDate);
-              const competenceLabel = rowPeriod
-                ? formatDate(displayPeriodStart(rowPeriod.start_date, rowPeriod.end_date)) + " a " + formatDate(rowPeriod.end_date)
-                : "Não identificada";
-              const minutes = Math.abs(Math.round(Number(row.minutes) || 0));
-              return {
-                employee: row.employee || "—",
-                competence: competenceLabel,
-                horario: String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0"),
-              };
-            })
-          : rows;
-        downloadReportPdf(reportTitle, pdfRows, subtitle);
+        if (kind === "interjornada") {
+          const grouped = new Map<string, { employee_name: string; competence: string; total_minutes: number }>();
+          for (const row of rows) {
+            const referenceDate = String(row.date ?? "");
+            const rowPeriod = periods.find((period: Period) => period.start_date <= referenceDate && period.end_date >= referenceDate);
+            const competenceLabel = rowPeriod
+              ? formatDate(displayPeriodStart(rowPeriod.start_date, rowPeriod.end_date)) + " a " + formatDate(rowPeriod.end_date)
+              : competence
+                ? formatDate(displayPeriodStart(competence.start_date, competence.end_date)) + " a " + formatDate(competence.end_date)
+                : "Competência não identificada";
+            const employeeName = String(row.employee || "Nome não identificado");
+            const groupKey = String(row.employee_id ?? employeeName) + "|" + competenceLabel;
+            const current = grouped.get(groupKey);
+            if (current) current.total_minutes += Math.abs(Math.round(Number(row.minutes) || 0));
+            else grouped.set(groupKey, { employee_name: employeeName, competence: competenceLabel, total_minutes: Math.abs(Math.round(Number(row.minutes) || 0)) });
+          }
+          const interjornadaPdfRows = [...grouped.values()]
+            .sort((a, b) => a.employee_name.localeCompare(b.employee_name, "pt-BR") || a.competence.localeCompare(b.competence, "pt-BR"))
+            .map(row => ({
+              employee_name: row.employee_name,
+              competence: row.competence,
+              horario: String(Math.floor(row.total_minutes / 60)).padStart(2, "0") + ":" + String(row.total_minutes % 60).padStart(2, "0"),
+            }));
+          downloadReportPdf("Interjornada por funcionário", interjornadaPdfRows, subtitle + " · Total de interjornada por funcionário e competência (hh:mm).");
+        } else {
+          downloadReportPdf(reportTitle, rows, subtitle);
+        }
       } else {
         await downloadStandardReportExcel(kind, rows);
       }
