@@ -135,7 +135,7 @@ export function Atestados() {
     const employee = employees.find(item => item.id === employeeId);
     if (!employeeId || !employee) { setError("Selecione o funcionário correto para vincular este registro histórico."); return; }
     setSavingHistoricalId(row.id); setError("");
-    const { error: updateError } = await (supabase as any).from("historical_kpi_data").update({ employee_id: employee.id, employee_name: employee.full_name }).eq("id", row.id);
+    const { error: updateError } = await (supabase as any).from("historical_kpi_data").update({ employee_id: employee.id }).eq("id", row.id);
     setSavingHistoricalId(null);
     if (updateError) { setError("Não foi possível corrigir o vínculo histórico: " + updateError.message); return; }
     await load();
@@ -282,7 +282,7 @@ export function Atestados() {
           <tbody className="divide-y">
             {filteredHistoricalBaseRows.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Nenhum total histórico da BASE encontrado para os filtros selecionados.</td></tr>}
             {filteredHistoricalBaseRows.map(row => <tr key={row.id} className="hover:bg-muted/25">
-              <td className="px-4 py-3 font-medium">{row.employee_name || "Nome não identificado"}{row.registration ? <span className="block text-xs text-muted-foreground">Matrícula: {row.registration}</span> : null}</td>
+              <td className="px-4 py-3 font-medium">{row.employee_name || "Nome não identificado"}{row.registration ? <span className="block text-xs text-muted-foreground">Matrícula: {row.registration}</span> : null}{row.employee_id && employees.find(employee => employee.id === row.employee_id) && employees.find(employee => employee.id === row.employee_id)?.full_name !== row.employee_name ? <span className="block text-xs text-primary">Vinculado a: {employees.find(employee => employee.id === row.employee_id)?.full_name}</span> : null}</td>
               <td className="whitespace-nowrap px-4 py-3">{row.period_start && row.period_end ? `${formatDate(row.period_start)} a ${formatDate(row.period_end)}` : `${row.reference_month}/${row.reference_year}`}</td>
               <td className="px-4 py-3">{formatHistoricalHours(row.certificate_minutes)}</td><td className="px-4 py-3">{formatHistoricalHours(row.declaration_minutes)}</td>
               <td className="min-w-[220px] px-4 py-3"><select value={historicalEmployeeChoices[row.id] ?? ""} onChange={e => setHistoricalEmployeeChoices(current => ({ ...current, [row.id]: e.target.value }))} className="w-full rounded-lg border bg-background px-2 py-2"><option value="">Selecionar funcionário</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.full_name}</option>)}</select></td>
