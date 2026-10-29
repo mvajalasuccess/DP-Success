@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { ScreenBrand } from "@/components/screen-brand";
 import type { ReactNode } from "react";
 
 export function ScreenShell({ section, title, subtitle, name, actions, error, children }: {
@@ -9,7 +10,7 @@ export function ScreenShell({ section, title, subtitle, name, actions, error, ch
       <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3">
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a>
-          <span className="dp-brand">DP Success • {name}</span>
+          <ScreenBrand name={name} />
         </div>
       </header>
       <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
