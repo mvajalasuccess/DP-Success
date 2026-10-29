@@ -7,6 +7,7 @@ import { balancesByEmployee, periodRangeLabel, type Period } from "@/lib/dp-mode
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, ScatterChart, Scatter, ZAxis } from "recharts";
 
+import { ScreenBrand } from "@/components/screen-brand";
 type Employee = {
   id: string;
   name: string;
@@ -1409,7 +1410,7 @@ export function Kpis() {
           <a href="/" className="inline-flex min-h-8 items-center text-[13px] font-medium text-[var(--kpi-text-muted)] transition-colors hover:text-[var(--kpi-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]" aria-label="Voltar ao início">
             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />Voltar
           </a>
-          <span className="dp-brand">DP Success • KPIs</span>
+          <ScreenBrand name="KPIs" />
         </div>
       </header>
 
