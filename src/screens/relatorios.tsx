@@ -367,7 +367,7 @@ async function downloadClosingExcel(period: Period, rows: any[]) {
   const lastColumn = closingColumns.length;
   sheet.mergeCells(1, 1, 1, lastColumn);
   const titleCell = sheet.getCell(1, 1);
-  titleCell.value = "DP SUCCESS | FECHAMENTO DE PONTO";
+  titleCell.value = "DP Success • FECHAMENTO DE PONTO";
   titleCell.font = { name: "Aptos Display", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
   titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF123B3A" } };
   titleCell.alignment = { vertical: "middle", horizontal: "left" };
@@ -469,7 +469,7 @@ async function downloadBankHoursExcel(period: Period, rows: any[]) {
   const lastColumn = bankColumns.length;
   sheet.mergeCells(1, 1, 1, lastColumn);
   const titleCell = sheet.getCell(1, 1);
-  titleCell.value = "DP SUCCESS | BANCO DE HORAS";
+  titleCell.value = "DP Success • BANCO DE HORAS";
   titleCell.font = { name: "Aptos Display", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
   titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF123B3A" } };
   titleCell.alignment = { vertical: "middle", horizontal: "left" };
@@ -589,25 +589,25 @@ const standardReportColumns: Record<string, StandardReportColumn[]> = {
 
 const standardReportTitles: Record<string, { title: string; subject: string; sheet: string; filename: string }> = {
   interjornada: {
-    title: "DP SUCCESS | INTERJORNADA POR FUNCIONÁRIO",
+    title: "DP Success • INTERJORNADA POR FUNCIONÁRIO",
     subject: "Interjornada por funcionário",
     sheet: "Resumo por funcionário",
     filename: "dp-success-interjornada-por-funcionario.xlsx",
   },
   horas_pagar: {
-    title: "DP SUCCESS | HORAS A PAGAR",
+    title: "DP Success • HORAS A PAGAR",
     subject: "Horas a pagar",
     sheet: "Horas a Pagar",
     filename: "dp-success-horas-a-pagar.xlsx",
   },
   atestados: {
-    title: "DP SUCCESS | DECLARAÇÕES E ATESTADOS",
+    title: "DP Success • DECLARAÇÕES E ATESTADOS",
     subject: "Declarações e atestados",
     sheet: "Declarações e Atestados",
     filename: "dp-success-declaracoes-e-atestados.xlsx",
   },
   ocorrencias: {
-    title: "DP SUCCESS | FALTAS E FOLGAS",
+    title: "DP Success • FALTAS E FOLGAS",
     subject: "Faltas e folgas",
     sheet: "Faltas e Folgas",
     filename: "dp-success-faltas-e-folgas.xlsx",
@@ -772,7 +772,7 @@ async function downloadStandardReportExcel(kind: string, rows: any[], subtitle?:
     );
     writeStyledSheet(
       "Detalhamento",
-      "DP SUCCESS | DETALHAMENTO DE INTERJORNADA",
+      "DP Success • DETALHAMENTO DE INTERJORNADA",
       "Lançamentos de interjornada  |  Exportado em: " + exportDate + "  |  Informativo; não altera o saldo do banco de horas.",
       detailColumns,
       detailRows,
@@ -1092,7 +1092,7 @@ export function Relatorios() {
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground">
             <ArrowLeft className="h-4 w-4" /> Voltar
           </a>
-          <span className="font-semibold">DP Success · Relatórios</span>
+          <span className="font-semibold">DP Success • Relatórios</span>
         </div>
       </header>
       <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
