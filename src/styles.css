@@ -1219,7 +1219,7 @@ main :is(h1, h2, h3) {
   color: #102b35;
 }
 
-/* Identificação à direita da faixa superior: tipografia única em todas as telas. */
+/* Identificação à direita da faixa superior: ícone, tipografia e tamanho únicos em todas as telas. */
 .dp-screen > header > div > :last-child,
 .dp-screen-topbar > div > :last-child {
   display: flex;
@@ -1231,6 +1231,21 @@ main :is(h1, h2, h3) {
   line-height: 1.25rem !important;
   letter-spacing: -0.01em;
 }
+
+.dp-screen > header > div > :last-child::before,
+.dp-screen-topbar > div > :last-child::before {
+  content: "";
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  border-radius: 0.75rem;
+  background-color: rgb(6 202 160 / 0.12);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23079a7b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
 .dp-screen > header > div > :last-child > span,
 .dp-screen-topbar > div > :last-child > span {
   font-size: inherit !important;
