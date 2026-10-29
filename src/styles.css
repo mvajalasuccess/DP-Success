@@ -1190,9 +1190,10 @@ main :is(h1, h2, h3) {
 }
 
 
-/* Cabeçalho superior padronizado em todas as telas internas. */
+/* Cabeçalhos internos: identidade única, ícone Clock3 igual ao da sidebar e tipografia consistente. */
 .dp-screen > header,
-.dp-screen-topbar {
+.dp-screen-topbar,
+.dp-app-main header.dp-page-header {
   background-color: #ffffff !important;
   border-bottom: 1px solid #e5e7eb !important;
   box-shadow: 0 2px 10px rgb(15 41 48 / 0.07);
@@ -1212,26 +1213,20 @@ main :is(h1, h2, h3) {
 .dp-screen-topbar a:hover {
   color: #075c50;
 }
-.dp-screen > header b,
-.dp-screen > header span,
-.dp-screen-topbar b,
-.dp-screen-topbar > div > span {
-  color: #102b35;
-}
-
-/* Identificação à direita da faixa superior: ícone, tipografia e tamanho únicos em todas as telas. */
+/* O alvo de branding deve ser sempre o último item do cabeçalho. */
 .dp-screen > header > div > :last-child,
 .dp-screen-topbar > div > :last-child {
-  display: flex;
+  display: inline-flex !important;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-  color: #102b35;
+  color: #102b35 !important;
   font-size: 0.875rem !important;
-  font-weight: 650 !important;
+  font-weight: 600 !important;
   line-height: 1.25rem !important;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
-
 .dp-screen > header > div > :last-child::before,
 .dp-screen-topbar > div > :last-child::before {
   content: "";
@@ -1241,32 +1236,21 @@ main :is(h1, h2, h3) {
   flex: 0 0 2rem;
   border-radius: 0.75rem;
   background-color: rgb(6 202 160 / 0.12);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23079a7b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23079a7b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6v6l4 2'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
 }
-
 .dp-screen > header > div > :last-child > span,
 .dp-screen-topbar > div > :last-child > span {
+  color: inherit !important;
   font-size: inherit !important;
-  font-weight: inherit;
-  line-height: inherit;
+  font-weight: inherit !important;
+  line-height: inherit !important;
 }
-.dp-screen > header > div > :last-child > span span,
-.dp-screen-topbar > div > :last-child > span span {
-  color: #64748b;
-  font-size: inherit !important;
-  font-weight: 500;
-}
-.dp-screen > header > div > :last-child > span:first-child:has(svg),
-.dp-screen-topbar > div > :last-child > span:first-child:has(svg) {
-  width: 2rem;
-  height: 2rem;
-  flex: 0 0 2rem;
-  justify-content: center;
-  border-radius: 0.75rem;
-  background: rgb(6 202 160 / 0.12);
-  color: #079a7b;
+/* Se a tela já tinha um ícone próprio no título, ocultá-lo para não duplicar a marca. */
+.dp-screen > header > div > :last-child svg,
+.dp-screen-topbar > div > :last-child svg {
+  display: none !important;
 }
 @media (max-width: 480px) {
   .dp-screen > header > div > :last-child,
@@ -1275,4 +1259,3 @@ main :is(h1, h2, h3) {
     font-size: 0.8125rem !important;
   }
 }
-
