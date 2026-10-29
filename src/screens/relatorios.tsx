@@ -1112,14 +1112,14 @@ export function Relatorios() {
             const certificateMinutes = Math.max(0, Number(row.certificate_minutes) || 0);
             const declarationMinutes = Math.max(0, Number(row.declaration_minutes) || 0);
             if (certificateMinutes > 0) output.push({
-              tipo: "Atestado (BASE)", employee, start_date: startDate, end_date: endDate, days: "",
+              tipo: "Atestado", employee, start_date: startDate, end_date: endDate, days: "",
               horas_abonadas: toClock(certificateMinutes), motivo: "", certificate_type: annotation.certificate_type ?? "",
-              cid: annotation.certificate_cid ?? "", notes: "Total histórico importado da BASE",
+              cid: annotation.certificate_cid ?? "", notes: "",
             });
             if (declarationMinutes > 0) output.push({
-              tipo: "Declaração de horas (BASE)", employee, start_date: startDate, end_date: endDate, days: "",
+              tipo: "Declaração de horas", employee, start_date: startDate, end_date: endDate, days: "",
               horas_abonadas: toClock(declarationMinutes), motivo: annotation.declaration_observation ?? "",
-              certificate_type: "", cid: "", notes: "Total histórico importado da BASE",
+              certificate_type: "", cid: "", notes: "",
             });
             return output;
           }),
@@ -1192,7 +1192,7 @@ export function Relatorios() {
               quantity: annotation.absence_display_quantity ?? row.absence_quantity,
               unit: "dias",
               employee: row.employee_name ?? "",
-              description: notes || "Registro histórico importado da BASE",
+              description: notes,
             };
           });
         rows = [...currentRows, ...historicalExportRows];
