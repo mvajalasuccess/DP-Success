@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 
 import { ScreenBrand } from "@/components/screen-brand";
-type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null; company_id?: string | null };
+type Employee = { id: string; full_name: string; registration?: string | null; status?: string; hire_date?: string | null; termination_date?: string | null; company_id?: string | null };
 type OccType = { id: string; code: string; name: string; unit: string; requires_justification: boolean; affects_balance: boolean };
 type HistoricalAbsence = {
   id: string;
@@ -137,7 +137,7 @@ export function Ocorrencias() {
 
   async function loadOptions() {
     const [e, t, p] = await Promise.all([
-      (supabase as any).from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name"),
+      (supabase as any).from("employees").select("id,full_name,registration,status,hire_date,termination_date,company_id").order("full_name"),
       supabase.from("occurrence_types").select("id,code,name,unit,requires_justification,affects_balance").eq("active", true).order("name"),
       supabase.from("time_periods").select("id,start_date,end_date").order("start_date", { ascending: false }),
     ]);
@@ -154,7 +154,15 @@ export function Ocorrencias() {
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
   const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
-  const companyEmployeeIds = new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id));
+  const companyEmployees = employees.filter(e => !companyFilter || e.company_id === companyFilter);
+  const companyEmployeeIds = new Set(companyEmployees.map(e => e.id));
+  const employeeIdByRegistration = new Map(employees.filter(e => e.registration).map(e => [String(e.registration).trim().toLowerCase(), e.id]));
+  const employeeIdByName = new Map(employees.map(e => [e.full_name.trim().toLowerCase(), e.id]));
+  const resolveHistoricalEmployeeId = (row: HistoricalAbsence) =>
+    row.employee_id ||
+    employeeIdByRegistration.get(String(row.registration ?? "").trim().toLowerCase()) ||
+    employeeIdByName.get(String(row.employee_name ?? "").trim().toLowerCase()) ||
+    null;
   const filteredRows = rows.filter(row =>
     companyEmployeeIds.has(row.employee_id) &&
     (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
@@ -162,11 +170,12 @@ export function Ocorrencias() {
   );
   const absenceRows = filteredRows.filter(row => ["falta_justificada", "falta_injustificada"].includes(String(row.occurrence_types?.code ?? "")));
   const daysOffRows = filteredRows.filter(row => ["folga_abonada", "folga_descontada"].includes(String(row.occurrence_types?.code ?? "")));
-  const filteredHistoricalAbsences = historicalAbsences.filter(row =>
-    (!companyFilter || (!!row.employee_id && companyEmployeeIds.has(row.employee_id))) &&
-    (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
-    (!selectedPeriod || (row.period_start <= selectedPeriod.end_date && row.period_end >= selectedPeriod.start_date))
-  );
+  const filteredHistoricalAbsences = historicalAbsences.filter(row => {
+    const resolvedEmployeeId = resolveHistoricalEmployeeId(row);
+    return (!companyFilter || (!!resolvedEmployeeId && companyEmployeeIds.has(resolvedEmployeeId))) &&
+      (filterEmployee === "todos" || resolvedEmployeeId === filterEmployee) &&
+      (!selectedPeriod || (row.period_start <= selectedPeriod.end_date && row.period_end >= selectedPeriod.start_date));
+  });
 
   function startHistoricalEdit(row: HistoricalAbsence) {
     setHistoricalEditing(row);
