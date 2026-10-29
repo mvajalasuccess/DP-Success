@@ -462,14 +462,34 @@ export function Ocorrencias() {
   function exportFilteredPdf() {
     const reportRows = getFilteredReportRows();
     if (!reportRows.length) { setError("Não há registros para exportar com os filtros selecionados."); return; }
+    setError("");
     const columns = Object.keys(reportRows[0]);
-    const escapeHtml = (value: unknown) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+    const escapeHtml = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const columnWeight = (key: string) => {
+      const name = key.toLowerCase();
+      if (/funcion.rio|employee/.test(name)) return 2.15;
+      if (/observa|justific|descri|motivo/.test(name)) return 1.8;
+      if (/data|in.cio|fim/.test(name)) return 0.9;
+      if (/quantidade|dias|horas/.test(name)) return 0.85;
+      return 1;
+    };
+    const totalWeight = columns.reduce((sum, key) => sum + columnWeight(key), 0);
+    const colgroup = '<colgroup>' + columns.map(key => '<col style="width:' + (columnWeight(key) / totalWeight * 100).toFixed(3) + '%">').join("") + '</colgroup>';
     const tableHead = columns.map(column => "<th>" + escapeHtml(column) + "</th>").join("");
-    const tableRows = reportRows.map(row => "<tr>" + columns.map(column => "<td>" + escapeHtml(row[column]) + "</td>").join("") + "</tr>").join("");
+    const tableRows = reportRows.map(row => "<tr>" + columns.map(column => {
+      const value = row[column];
+      if (value == null || value === "") return "<td>—</td>";
+      if (typeof value === "number" && ["Dias", "Quantidade"].includes(column)) return "<td>" + escapeHtml(Number.isInteger(value) ? String(value) : String(value)) + "</td>";
+      return "<td>" + escapeHtml(value) + "</td>";
+    }).join("") + "</tr>").join("");
     const printWindow = window.open("", "_blank");
     if (!printWindow) { setError("O navegador bloqueou a janela do PDF. Permita pop-ups para este site e tente novamente."); return; }
-    printWindow.document.write("<!doctype html><html lang='pt-BR'><head><meta charset='utf-8'><title>Faltas e Folgas</title><style>\
-      @page{size:landscape;margin:12mm}body{font-family:Arial,sans-serif;color:#17212b;font-size:10px}h1{font-size:18px;margin:0 0 6px}p{font-size:10px;color:#475569;margin:0 0 14px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#e8eef2;font-weight:700}tr{page-break-inside:avoid}thead{display:table-header-group}</style></head><body><h1>Faltas e Folgas</h1><p>Relatório gerado conforme os filtros selecionados · " + new Date().toLocaleString("pt-BR") + "</p><table><thead><tr>" + tableHead + "</tr></thead><tbody>" + tableRows + "</tbody></table></body></html>");
+    printWindow.document.write("<!doctype html><html lang='pt-BR'><head><meta charset='utf-8'><title>Faltas e Folgas</title><style>" +
+      "*{box-sizing:border-box}html,body{width:100%;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#183735;font-size:7px;print-color-adjust:exact;-webkit-print-color-adjust:exact}" +
+      "@page{size:A4 landscape;margin:7mm}.brand{background:#123b3a;color:#fff;padding:10px 14px;break-inside:avoid}.eyebrow{font-size:7px;letter-spacing:1.2px;color:#9debd8;font-weight:bold}h1{font-size:16px;margin:4px 0}.subtitle{font-size:8px;color:#d9f4ed;overflow-wrap:anywhere}.meta{display:flex;justify-content:space-between;gap:8px;background:#f0faf7;border:1px solid #d8eee7;color:#365b56;font-size:7px;padding:6px 8px;margin-top:5px}table{width:100%;max-width:100%;margin-top:8px;table-layout:fixed;border-collapse:collapse}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}th{background:#dff7f0;color:#123b3a;text-align:left;text-transform:uppercase;font-size:6.5px}th,td{border-bottom:1px solid #e1ece8;padding:3px 3px;line-height:1.2;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;white-space:normal}tbody tr:nth-child(even){background:#f6faf9}.footer{margin-top:5px;padding-top:3px;border-top:1px solid #d8e8e3;color:#64817b}@media print{html,body{width:100%;height:auto}table{width:100%}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>" +
+      "<header class='brand'><div class='eyebrow'>DP SUCCESS · GESTÃO DE PESSOAS</div><h1>Faltas e Folgas</h1><div class='subtitle'>Relatório conforme os filtros selecionados</div></header>" +
+      "<div class='meta'><strong>Registros: " + reportRows.length + "</strong><span>Gerado em " + new Date().toLocaleString("pt-BR") + "</span></div><table>" + colgroup + "<thead><tr>" + tableHead + "</tr></thead><tbody>" + tableRows + "</tbody></table>" +
+      "<div class='footer'>DP SUCCESS · Relatório gerencial · Documento para conferência interna</div></body></html>");
     printWindow.document.close();
     window.setTimeout(() => { printWindow.focus(); printWindow.print(); }, 700);
   }
