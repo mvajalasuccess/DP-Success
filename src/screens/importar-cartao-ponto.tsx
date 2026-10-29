@@ -1,4 +1,5 @@
-import { CheckCircle2, FileUp, Loader2, RotateCcw, Upload, AlertTriangle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileUp, Loader2, RotateCcw, Upload, AlertTriangle } from "lucide-react";
+import { ScreenBrand } from "@/components/screen-brand";
 import { useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -225,18 +226,26 @@ export function ImportarCartaoPonto() {
 
   return (
     <div className="dp-screen min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="mx-auto max-w-[1500px] relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex items-center justify-between px-6 py-5 [&_p]:!text-white/75 [&_h1]:!text-white">
-          <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Fechamento de Ponto</p>
-            <h1 className="text-2xl font-bold">Importar Cartão Ponto</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Envie o PDF do cartão ponto e importe somente Crédito, Débito, Saldo do mês, HE 60% + 20% noturno e Interjornada.</p>
-          </div>
-          {document && <button type="button" onClick={clear} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"><RotateCcw className="h-4 w-4" />Novo PDF</button>}
+      <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3">
+          <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> Voltar
+          </a>
+          <ScreenBrand name="Importar Cartão de Ponto" />
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1500px] space-y-6 px-6 py-7">
+      <main className="dp-screen-content mx-auto max-w-[1500px] space-y-6 px-4 py-5 sm:px-6 sm:py-6">
+        <div className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 [&_p]:!text-white/75 [&_h1]:!text-white">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-white/75">Fechamento de Ponto</p>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-[30px]">Importar Cartão Ponto</h1>
+              <p className="mt-1 max-w-3xl text-sm text-white/80">Envie o PDF do cartão ponto e importe somente Crédito, Débito, Saldo do mês, HE 60% + 20% noturno e Interjornada.</p>
+            </div>
+            {document && <button type="button" onClick={clear} className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white transition-colors hover:bg-white/15"><RotateCcw className="h-4 w-4" />Novo PDF</button>}
+          </div>
+        </div>
         <Card className="p-4"><label className="grid max-w-sm gap-1.5 text-sm font-medium"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label><p className="mt-2 text-xs text-muted-foreground">O filtro limita a prévia e a importação à empresa selecionada. “Todas as empresas” mantém todos os funcionários do PDF.</p></Card>
         <Card className="border-dashed p-8">
           <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-10 text-center hover:bg-muted/30">
