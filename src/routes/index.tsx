@@ -884,7 +884,7 @@ function DashboardHome() {
               </div>
             </div>
           </section>
-          <Card className="mt-6 p-4"><label className="grid max-w-sm gap-1.5 text-sm font-medium"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} /></label><p className="mt-2 text-xs text-muted-foreground">O filtro afeta somente os indicadores e listas exibidos no Dashboard; não altera lançamentos nem competências fechadas.</p></Card>
+          <Card className="mt-6 min-w-0 p-3 sm:p-4"><label className="grid w-full min-w-0 max-w-sm gap-1.5 text-sm font-medium"><span>Empresa</span><CompanyFilter value={companyFilter} onChange={setCompanyFilter} className="block w-full min-w-0 max-w-full box-border rounded-lg border bg-background px-3 py-2 text-sm" /></label><p className="mt-2 text-xs text-muted-foreground">O filtro afeta somente os indicadores e listas exibidos no Dashboard; não altera lançamentos nem competências fechadas.</p></Card>
           <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {cards.map(([label, value, Icon, detail]) => (
               <Card key={label} className="p-5">
