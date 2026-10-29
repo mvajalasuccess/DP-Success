@@ -399,7 +399,7 @@ export function Ocorrencias() {
               </tr>
             ) : (
               <tr key={"historical-" + item.row.id} className="transition-colors hover:bg-muted/25">
-                <td className="px-5 py-4 font-medium">{item.row.employee_name}{item.row.registration ? <span className="ml-2 text-xs text-muted-foreground">({item.row.registration})</span> : null}</td>
+                <td className="px-5 py-4 font-medium">{item.row.employee_name}</td>
                 <td className="px-5 py-4">{formatDate(item.row.absence_display_date || item.row.period_start)}{(item.row.absence_display_end_date || item.row.period_end) ? " → " + formatDate(item.row.absence_display_end_date || item.row.period_end) : ""}</td>
                 <td className="px-5 py-4">{item.row.absence_display_type || "Falta importada da BASE"}</td>
                 <td className="px-5 py-4">{displayHistoricalQuantity(item.row)}</td>
