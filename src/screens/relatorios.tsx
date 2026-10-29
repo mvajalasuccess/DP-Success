@@ -831,7 +831,7 @@ export function Relatorios() {
     const db = supabase as any;
 
     try {
-      const { data: companyEmployeeRows, error: companyEmployeeError } = await db.from("employees").select("id,company_id");
+      const { data: companyEmployeeRows, error: companyEmployeeError } = await db.from("employees").select("id,company_id,full_name,registration");
       if (companyEmployeeError) throw companyEmployeeError;
       const allowedEmployeeIds = new Set((companyEmployeeRows ?? []).filter((employee: any) => !companyFilter || employee.company_id === companyFilter).map((employee: any) => String(employee.id)));
       if (kind === "fechamento") {
@@ -1060,15 +1060,74 @@ export function Relatorios() {
 
       if (kind === "ocorrencias") {
         const data = await fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,end_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code,name)").in("occurrence_types.code", ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"]).order("occurrence_date", { ascending: false }).range(from, to));
-        rows = data.filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || ((x.occurrence_date ?? "") <= competence.end_date && (x.end_date ?? x.occurrence_date ?? "") >= competence.start_date))).map((x: any) => ({
-          date: x.occurrence_date,
-          end_date: x.end_date ?? "",
-          type: x.occurrence_types?.name ?? "",
-          quantity: x.quantity,
-          unit: x.unit,
-          employee: x.employees?.full_name ?? "",
-          description: x.notes ?? "",
-        }));
+        const currentRows = data
+          .filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || ((x.occurrence_date ?? "") <= competence.end_date && (x.end_date ?? x.occurrence_date ?? "") >= competence.start_date)))
+          .map((x: any) => ({
+            date: x.occurrence_date,
+            end_date: x.end_date ?? "",
+            type: x.occurrence_types?.name ?? "",
+            quantity: x.quantity,
+            unit: x.unit,
+            employee: x.employees?.full_name ?? "",
+            description: x.notes ?? "",
+          }));
+
+        // Inclui faltas históricas importadas da BASE na exportação, sem alterar
+        // a fonte histórica nem seus cálculos. As anotações são apenas visuais.
+        const historicalRows = await fetchAll((from, to) => db
+          .from("historical_kpi_data")
+          .select("id,employee_id,registration,employee_name,period_start,period_end,absence_quantity")
+          .gt("absence_quantity", 0)
+          .order("period_start", { ascending: false })
+          .range(from, to));
+        const historicalIds = historicalRows.map((row: any) => row.id);
+        let annotations: any[] = [];
+        if (historicalIds.length) {
+          const annotationResult = await db
+            .from("historical_kpi_annotations")
+            .select("historical_kpi_data_id,absence_display_date,absence_display_end_date,absence_display_type,absence_display_quantity,absence_display_justification,absence_display_notes")
+            .in("historical_kpi_data_id", historicalIds);
+          if (!annotationResult.error) annotations = annotationResult.data ?? [];
+        }
+        const annotationById = new Map(annotations.map((row: any) => [String(row.historical_kpi_data_id), row]));
+        const employeeByRegistration = new Map((companyEmployeeRows ?? [])
+          .filter((employee: any) => employee.registration)
+          .map((employee: any) => [String(employee.registration).trim().toLowerCase(), String(employee.id)]));
+        const employeeByName = new Map((companyEmployeeRows ?? [])
+          .map((employee: any) => [String(employee.full_name ?? "").trim().toLowerCase(), String(employee.id)]));
+        const resolvedHistoricalEmployeeId = (row: any) =>
+          row.employee_id
+            ? String(row.employee_id)
+            : employeeByRegistration.get(String(row.registration ?? "").trim().toLowerCase()) ??
+              employeeByName.get(String(row.employee_name ?? "").trim().toLowerCase()) ??
+              "";
+        const historicalExportRows = historicalRows
+          .filter((row: any) => {
+            const resolvedId = resolvedHistoricalEmployeeId(row);
+            const belongsToSelectedCompany = !companyFilter || allowedEmployeeIds.has(resolvedId);
+            const overlapsCompetence = allCompetencies || !competence ||
+              (String(row.period_start ?? "") <= competence.end_date && String(row.period_end ?? "") >= competence.start_date);
+            return belongsToSelectedCompany && overlapsCompetence;
+          })
+          .map((row: any) => {
+            const annotation: any = annotationById.get(String(row.id)) ?? {};
+            const startDate = annotation.absence_display_date ||
+              (row.period_start === "2025-12-21" && row.period_end === "2026-01-20" ? "2025-12-11" : row.period_start);
+            const endDate = annotation.absence_display_end_date || row.period_end || "";
+            const notes = [annotation.absence_display_justification, annotation.absence_display_notes]
+              .filter(Boolean)
+              .join(" — ");
+            return {
+              date: startDate,
+              end_date: endDate,
+              type: annotation.absence_display_type || "Falta importada da BASE",
+              quantity: annotation.absence_display_quantity ?? row.absence_quantity,
+              unit: "dias",
+              employee: row.employee_name ?? "",
+              description: notes || "Registro histórico importado da BASE",
+            };
+          });
+        rows = [...currentRows, ...historicalExportRows];
       }
 
       if (!rows.length) throw new Error("Não há dados para exportar nesse relatório para os filtros selecionados.");
