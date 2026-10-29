@@ -28,12 +28,16 @@ function countDays(start: string, end: string) {
 
 type Declaration = { id: string; employee_id: string; occurrence_date: string; quantity: number; notes: string | null; employees?: { full_name: string } | null };
 type Period = { id: string; start_date: string; end_date: string };
+type HistoricalBaseRow = { id: string; employee_id: string | null; employee_name: string; registration: string | null; period_id: string; reference_year: number; reference_month: number; certificate_minutes: number; declaration_minutes: number; period_start?: string; period_end?: string };
 
 const declarationReasons = ["Acompanhante", "Consulta", "Exame", "Outros"];
 
 export function Atestados() {
   const [rows, setRows] = useState<Certificate[]>([]);
   const [declarations, setDeclarations] = useState<Declaration[]>([]);
+  const [historicalBaseRows, setHistoricalBaseRows] = useState<HistoricalBaseRow[]>([]);
+  const [historicalEmployeeChoices, setHistoricalEmployeeChoices] = useState<Record<string, string>>({});
+  const [savingHistoricalId, setSavingHistoricalId] = useState<string | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [filterEmployee, setFilterEmployee] = useState("todos");
@@ -67,7 +71,28 @@ export function Atestados() {
     const decl = await supabase.from("occurrences").select("id,employee_id,occurrence_date,quantity,notes,employees(full_name),occurrence_types!inner(code)").eq("occurrence_types.code", "declaracao_horas").order("occurrence_date", { ascending: false });
     if (!decl.error) setDeclarations((decl.data ?? []) as unknown as Declaration[]);
     const { data: periodData } = await supabase.from("time_periods").select("id,start_date,end_date").order("start_date", { ascending: false });
-    setPeriods((periodData ?? []) as Period[]);
+    const loadedPeriods = (periodData ?? []) as Period[];
+    setPeriods(loadedPeriods);
+
+    // A BASE histórica contém totais por funcionário/competência, não lançamentos
+    // individuais com data, CID ou motivo. Exibimos esses totais separadamente,
+    // sem transformá-los em atestados/declarações operacionais nem afetar cálculos.
+    const historicalResult = await (supabase as any).from("historical_kpi_data")
+      .select("id,employee_id,employee_name,registration,period_id,reference_year,reference_month,certificate_minutes,declaration_minutes")
+      .or("certificate_minutes.gt.0,declaration_minutes.gt.0")
+      .order("reference_year", { ascending: false })
+      .order("reference_month", { ascending: false });
+    if (historicalResult.error) {
+      setError(previous => previous || "Não foi possível carregar os totais históricos da BASE: " + historicalResult.error.message);
+      setHistoricalBaseRows([]);
+    } else {
+      const periodById = new Map(loadedPeriods.map(p => [p.id, p]));
+      const historical = ((historicalResult.data ?? []) as HistoricalBaseRow[])
+        .map(row => { const period = periodById.get(row.period_id); return { ...row, period_start: period?.start_date, period_end: period?.end_date }; })
+        .filter(row => (row.period_end ?? (String(row.reference_year) + "-" + String(row.reference_month).padStart(2, "0") + "-28")) >= "2025-12-11");
+      setHistoricalBaseRows(historical);
+      setHistoricalEmployeeChoices(Object.fromEntries(historical.map(row => [row.id, row.employee_id ?? ""])));
+    }
   }
 
   async function loadEmployees() {
@@ -92,6 +117,28 @@ export function Atestados() {
   );
   function periodLabel(period: Period) {
     return `${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
+  }
+
+  function formatHistoricalHours(minutesValue: number | null | undefined) {
+    const minutes = Math.max(0, Math.round(Number(minutesValue ?? 0)));
+    return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  }
+
+  const filteredHistoricalBaseRows = historicalBaseRows.filter(row => {
+    const matchedEmployee = row.employee_id ? employees.find(employee => employee.id === row.employee_id) : null;
+    const rowCompanyId = matchedEmployee?.company_id ?? null;
+    return (!companyFilter || rowCompanyId === companyFilter) && (filterEmployee === "todos" || row.employee_id === filterEmployee) && (!selectedPeriod || row.period_id === selectedPeriod.id);
+  });
+
+  async function saveHistoricalEmployee(row: HistoricalBaseRow) {
+    const employeeId = historicalEmployeeChoices[row.id];
+    const employee = employees.find(item => item.id === employeeId);
+    if (!employeeId || !employee) { setError("Selecione o funcionário correto para vincular este registro histórico."); return; }
+    setSavingHistoricalId(row.id); setError("");
+    const { error: updateError } = await (supabase as any).from("historical_kpi_data").update({ employee_id: employee.id, employee_name: employee.full_name }).eq("id", row.id);
+    setSavingHistoricalId(null);
+    if (updateError) { setError("Não foi possível corrigir o vínculo histórico: " + updateError.message); return; }
+    await load();
   }
 
   function displayedDays(row: Certificate) {
@@ -226,6 +273,23 @@ export function Atestados() {
         </div>
       </Card>
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+      <Card className="mt-6 overflow-hidden">
+        <div className="border-b p-4"><h2 className="font-semibold">Histórico importado da BASE</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Totais históricos por funcionário e competência. A BASE não guarda, nesses registros, cada data individual de atestado ou declaração; por isso, eles são exibidos separadamente e não viram lançamentos operacionais.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{filteredHistoricalBaseRows.length} registro(s) histórico(s)</p></div>
+        <div className="max-h-[420px] overflow-auto"><table className="w-full text-left text-sm">
+          <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-4 py-3">Nome na BASE</th><th className="px-4 py-3">Competência</th><th className="px-4 py-3">Atestados (h)</th><th className="px-4 py-3">Declarações (h)</th><th className="px-4 py-3">Corrigir funcionário</th><th className="px-4 py-3">Ação</th></tr></thead>
+          <tbody className="divide-y">
+            {filteredHistoricalBaseRows.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Nenhum total histórico da BASE encontrado para os filtros selecionados.</td></tr>}
+            {filteredHistoricalBaseRows.map(row => <tr key={row.id} className="hover:bg-muted/25">
+              <td className="px-4 py-3 font-medium">{row.employee_name || "Nome não identificado"}{row.registration ? <span className="block text-xs text-muted-foreground">Matrícula: {row.registration}</span> : null}</td>
+              <td className="whitespace-nowrap px-4 py-3">{row.period_start && row.period_end ? `${formatDate(row.period_start)} a ${formatDate(row.period_end)}` : `${row.reference_month}/${row.reference_year}`}</td>
+              <td className="px-4 py-3">{formatHistoricalHours(row.certificate_minutes)}</td><td className="px-4 py-3">{formatHistoricalHours(row.declaration_minutes)}</td>
+              <td className="min-w-[220px] px-4 py-3"><select value={historicalEmployeeChoices[row.id] ?? ""} onChange={e => setHistoricalEmployeeChoices(current => ({ ...current, [row.id]: e.target.value }))} className="w-full rounded-lg border bg-background px-2 py-2"><option value="">Selecionar funcionário</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.full_name}</option>)}</select></td>
+              <td className="px-4 py-3"><button type="button" disabled={savingHistoricalId === row.id || !historicalEmployeeChoices[row.id]} onClick={() => void saveHistoricalEmployee(row)} className="whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50">{savingHistoricalId === row.id ? "Salvando..." : "Salvar vínculo"}</button></td>
+            </tr>)}
+          </tbody></table></div>
+      </Card>
       <Card className="mt-6 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Atestados</h2><p className="text-xs text-muted-foreground">{filteredRows.length} registro(s)</p></div><button type="button" onClick={() => setShowCertificates(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showCertificates ? "Ocultar atestados" : "Mostrar atestados"} aria-label={showCertificates ? "Ocultar atestados" : "Mostrar atestados"}>{showCertificates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
         {showCertificates && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
