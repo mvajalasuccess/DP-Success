@@ -3,6 +3,7 @@ import { Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, ArrowLeft } from 
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
+import { ScreenBrand } from "@/components/screen-brand";
 
 type Row = Record<string, unknown>;
 
@@ -367,7 +368,7 @@ export function ImportacaoHistorico() {
       <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between">
           <a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4" />Voltar</a>
-          <b>DP Success • Importação</b>
+          <ScreenBrand name="Importação" />
         </div>
       </header>
       <main className="mx-auto max-w-[1200px] px-6 py-7">
