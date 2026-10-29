@@ -194,7 +194,7 @@ function AppShell({
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-[70] bg-foreground/40 lg:hidden">
           <button type="button" className="absolute inset-0 h-full w-full cursor-default" onClick={() => setMobileMenuOpen(false)} aria-label="Fechar menu de navegação" />
-          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="dp-sidebar relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
+          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="dp-sidebar relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-white/15 bg-gradient-to-b from-[#102b35] via-[#123c40] to-[#075c50] text-white [&_.dp-sidebar-group-label]:!text-white/75 [&_.dp-sidebar-item]:!text-white [&_.dp-sidebar-item]:hover:!bg-white/10 [&_.dp-sidebar-item-active]:!bg-white/15 [&_.dp-sidebar-item-active]:!text-white [&_.dp-sidebar-header]:!border-white/15">
             <div className="dp-sidebar-header flex h-[76px] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
               <div className="flex min-w-0 items-center gap-3">
                 <Clock3 className="h-5 w-5 shrink-0 text-sidebar-primary" strokeWidth={1.8} aria-hidden="true" />
