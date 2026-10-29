@@ -367,7 +367,7 @@ export function ImportacaoHistorico() {
       <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between">
           <a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4" />Voltar</a>
-          <b>DP SUCCESS / Importação</b>
+          <b>DP Success • Importação</b>
         </div>
       </header>
       <main className="mx-auto max-w-[1200px] px-6 py-7">
