@@ -28,7 +28,8 @@ function countDays(start: string, end: string) {
 
 type Declaration = { id: string; employee_id: string; occurrence_date: string; quantity: number; notes: string | null; employees?: { full_name: string } | null };
 type Period = { id: string; start_date: string; end_date: string };
-type HistoricalBaseRow = { id: string; employee_id: string | null; employee_name: string; registration: string | null; period_id: string; reference_year: number; reference_month: number; certificate_minutes: number; declaration_minutes: number; period_start?: string; period_end?: string };
+type HistoricalBaseRow = { id: string; employee_id: string | null; employee_name: string; registration: string | null; period_id: string; reference_year: number; reference_month: number; certificate_minutes: number; declaration_minutes: number; period_start?: string; period_end?: string; certificate_type?: string | null; certificate_cid?: string | null; declaration_observation?: string | null };
+type HistoricalAnnotationForm = { row: HistoricalBaseRow; certificate_type: string; certificate_cid: string; declaration_observation: string };
 
 const declarationReasons = ["Acompanhante", "Consulta", "Exame", "Outros"];
 
@@ -36,6 +37,8 @@ export function Atestados() {
   const [rows, setRows] = useState<Certificate[]>([]);
   const [declarations, setDeclarations] = useState<Declaration[]>([]);
   const [historicalBaseRows, setHistoricalBaseRows] = useState<HistoricalBaseRow[]>([]);
+  const [historicalEdit, setHistoricalEdit] = useState<HistoricalAnnotationForm | null>(null);
+  const [savingHistoricalAnnotation, setSavingHistoricalAnnotation] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [filterEmployee, setFilterEmployee] = useState("todos");
@@ -84,9 +87,18 @@ export function Atestados() {
       setError(previous => previous || "Não foi possível carregar os totais históricos da BASE: " + historicalResult.error.message);
       setHistoricalBaseRows([]);
     } else {
+      const { data: annotationData, error: annotationError } = await (supabase as any)
+        .from("historical_kpi_annotations")
+        .select("historical_kpi_data_id,certificate_type,certificate_cid,declaration_observation");
+      if (annotationError) {
+        setError(previous => previous || "Os campos complementares do histórico ainda precisam ser habilitados no banco de dados: " + annotationError.message);
+      }
+      const annotationsByHistoricalId = new Map((annotationData ?? []).map((item: any) => [item.historical_kpi_data_id, item]));
       const periodById = new Map(loadedPeriods.map(p => [p.id, p]));
       const historical = ((historicalResult.data ?? []) as HistoricalBaseRow[])
         .map(row => {
+          const annotation = annotationsByHistoricalId.get(row.id) as any;
+
           const period = periodById.get(row.period_id);
           // A competência histórica excepcional de jan/2026 foi fechada de 11/12/2025 a 20/01/2026.
           // Essa regra afeta apenas a identificação exibida nesta lista histórica, sem alterar períodos ou cálculos.
@@ -96,6 +108,9 @@ export function Atestados() {
           const toISO = (date: Date) => date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
           return {
             ...row,
+            certificate_type: annotation?.certificate_type ?? null,
+            certificate_cid: annotation?.certificate_cid ?? null,
+            declaration_observation: annotation?.declaration_observation ?? null,
             period_start: isExceptionalJan2026 ? "2025-12-11" : (period?.start_date ?? toISO(fallbackStart)),
             period_end: isExceptionalJan2026 ? "2026-01-20" : (period?.end_date ?? toISO(fallbackEnd)),
           };
@@ -153,6 +168,41 @@ export function Atestados() {
   }
 
 
+
+  function startEditHistorical(row: HistoricalBaseRow, kind: "atestado" | "declaracao") {
+    setHistoricalEdit({
+      row,
+      certificate_type: row.certificate_type || "medico",
+      certificate_cid: row.certificate_cid || "",
+      declaration_observation: row.declaration_observation || "",
+    });
+    setMode(kind);
+    setError("");
+  }
+
+  async function saveHistoricalAnnotation() {
+    if (!historicalEdit) return;
+    setSavingHistoricalAnnotation(true);
+    setError("");
+    const row = historicalEdit.row;
+    const payload = {
+      historical_kpi_data_id: row.id,
+      certificate_type: Number(row.certificate_minutes ?? 0) > 0 ? historicalEdit.certificate_type : null,
+      certificate_cid: Number(row.certificate_minutes ?? 0) > 0 ? (historicalEdit.certificate_cid.trim() || null) : null,
+      declaration_observation: Number(row.declaration_minutes ?? 0) > 0 ? (historicalEdit.declaration_observation.trim() || null) : null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error: saveError } = await (supabase as any)
+      .from("historical_kpi_annotations")
+      .upsert(payload, { onConflict: "historical_kpi_data_id" });
+    setSavingHistoricalAnnotation(false);
+    if (saveError) {
+      setError("Não foi possível salvar os campos complementares do histórico. Verifique se a migração historical_kpi_annotations foi aplicada. " + saveError.message);
+      return;
+    }
+    setHistoricalEdit(null);
+    await load();
+  }
 
   function displayedDays(row: Certificate) {
     if (!selectedPeriod) return row.days;
@@ -309,11 +359,24 @@ export function Atestados() {
         </tr></thead><tbody className="divide-y">
           {filteredRows.length === 0 && historicalCertificates.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Nenhum atestado encontrado para os filtros selecionados.</td></tr>}
           {filteredRows.map(r => <tr key={r.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{r.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(r.start_date)}</td><td className="px-5 py-4">{formatDate(r.end_date)}</td><td className="px-5 py-4">{displayedDays(r)}</td><td className="px-5 py-4">{r.certificate_type}</td><td className="px-5 py-4">{r.cid ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => void startEdit(r)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(r)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
-          {historicalCertificates.map(r => <tr key={"base-cert-" + r.id} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}<span className="mt-1 block text-xs text-muted-foreground">Histórico consolidado da BASE{r.registration ? " · Matrícula: " + r.registration : ""}</span></td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_end || "")}</td><td className="px-5 py-4">—</td><td className="px-5 py-4">Histórico BASE ({formatHistoricalHours(r.certificate_minutes)} h)</td><td className="px-5 py-4">Não informado na BASE</td><td className="px-5 py-4 text-right text-xs text-muted-foreground">Somente histórico</td></tr>)}
+          {historicalCertificates.map(r => <tr key={"base-cert-" + r.id} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_end || "")}</td><td className="px-5 py-4">—</td><td className="px-5 py-4">Histórico BASE ({formatHistoricalHours(r.certificate_minutes)} h)</td><td className="px-5 py-4">{r.certificate_cid || "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditHistorical(r, "atestado")} className="rounded-md border p-2" title="Editar tipo e CID do histórico"><Pencil className="h-4 w-4" /></button></td></tr>)}
         </tbody></table></div>}
       </Card>
-      <Card className="mt-6 overflow-hidden"><div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Declarações</h2><p className="text-xs text-muted-foreground">{filteredDeclarations.length + historicalDeclarations.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowDeclarations(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"} aria-label={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"}>{showDeclarations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>{showDeclarations && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Horas abonadas</th><th className="px-5 py-3">Observação</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filteredDeclarations.length === 0 && historicalDeclarations.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">Nenhuma declaração encontrada para os filtros selecionados.</td></tr>}{filteredDeclarations.map(d => <tr key={d.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{d.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(d.occurrence_date)}</td><td className="px-5 py-4">{String(Math.floor(Number(d.quantity) || 0)).padStart(2,"0")}:{String(Math.round(((Number(d.quantity)||0)%1)*60)).padStart(2,"0")}</td><td className="px-5 py-4">{d.notes ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditDeclaration(d)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void removeDeclaration(d)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}{historicalDeclarations.map(r => <tr key={"base-decl-" + r.id} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}<span className="mt-1 block text-xs text-muted-foreground">Histórico consolidado da BASE{r.registration ? " · Matrícula: " + r.registration : ""}</span></td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_start || "")} a {formatDate(r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_minutes)}</td><td className="px-5 py-4">Total consolidado por competência; motivo e data individual não informados na BASE.</td><td className="px-5 py-4 text-xs text-muted-foreground">Somente histórico</td></tr>)}</tbody></table></div>}</Card>
+      <Card className="mt-6 overflow-hidden"><div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Declarações</h2><p className="text-xs text-muted-foreground">{filteredDeclarations.length + historicalDeclarations.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowDeclarations(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"} aria-label={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"}>{showDeclarations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>{showDeclarations && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Horas abonadas</th><th className="px-5 py-3">Observação</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filteredDeclarations.length === 0 && historicalDeclarations.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">Nenhuma declaração encontrada para os filtros selecionados.</td></tr>}{filteredDeclarations.map(d => <tr key={d.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{d.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(d.occurrence_date)}</td><td className="px-5 py-4">{String(Math.floor(Number(d.quantity) || 0)).padStart(2,"0")}:{String(Math.round(((Number(d.quantity)||0)%1)*60)).padStart(2,"0")}</td><td className="px-5 py-4">{d.notes ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditDeclaration(d)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void removeDeclaration(d)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}{historicalDeclarations.map(r => <tr key={"base-decl-" + r.id} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_start || "")} a {formatDate(r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_minutes)}</td><td className="px-5 py-4">{r.declaration_observation || "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditHistorical(r, "declaracao")} className="rounded-md border p-2" title="Editar observação do histórico"><Pencil className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>}</Card>
     </main>
+    {historicalEdit && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-6">
+      <h2 className="text-xl font-bold">{Number(historicalEdit.row.certificate_minutes ?? 0) > 0 && Number(historicalEdit.row.declaration_minutes ?? 0) > 0 ? "Editar dados complementares do histórico" : Number(historicalEdit.row.certificate_minutes ?? 0) > 0 ? "Editar atestado importado da BASE" : "Editar declaração de horas importada da BASE"}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Esses campos são apenas complementares. Não alteram as horas históricas, não criam lançamentos oficiais e não interferem nos cálculos.</p>
+      <div className="mt-4 grid gap-3">
+        {Number(historicalEdit.row.certificate_minutes ?? 0) > 0 && <>
+          <label className="grid gap-1 text-sm">Tipo do atestado<select value={historicalEdit.certificate_type} onChange={e => setHistoricalEdit(current => current ? { ...current, certificate_type: e.target.value } : current)} className="rounded-lg border bg-background px-3 py-2"><option value="medico">Médico</option><option value="odontologico">Odontológico</option><option value="acompanhamento">Acompanhamento</option><option value="outro">Outro</option></select></label>
+          <label className="grid gap-1 text-sm">CID<input value={historicalEdit.certificate_cid} onChange={e => setHistoricalEdit(current => current ? { ...current, certificate_cid: e.target.value } : current)} placeholder="Informe o CID" className="rounded-lg border bg-background px-3 py-2" /></label>
+        </>}
+        {Number(historicalEdit.row.declaration_minutes ?? 0) > 0 && <label className="grid gap-1 text-sm">Observação da declaração de horas<textarea value={historicalEdit.declaration_observation} onChange={e => setHistoricalEdit(current => current ? { ...current, declaration_observation: e.target.value } : current)} placeholder="Digite a observação" className="rounded-lg border bg-background px-3 py-2" /></label>}
+      </div>
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+      <div className="mt-5 flex justify-end gap-2"><button onClick={() => setHistoricalEdit(null)} className="rounded-lg border px-4 py-2">Cancelar</button><button disabled={savingHistoricalAnnotation} onClick={() => void saveHistoricalAnnotation()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{savingHistoricalAnnotation ? "Salvando..." : "Salvar alterações"}</button></div>
+    </Card></div>}
     {open && mode === "atestado" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-6">
       <h2 className="text-xl font-bold">{editing ? "Editar atestado" : "Novo atestado"}</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
