@@ -79,12 +79,12 @@ export function Tarefas(){
   const prof=(id:string|null)=>{const p=profiles.find(x=>x.id===id);return p?.full_name||p?.email};
 
   return <div className="dp-screen min-h-screen bg-background">
-    <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6"><div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4"><a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a><ScreenBrand name="Tarefas" /></div>
+    <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6"><div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4"><a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a><ScreenBrand name="Tarefas" /></div></header>
+    <main className="mx-auto max-w-[1250px] space-y-6 px-6 py-6">
     <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex flex-wrap items-center justify-between gap-4 [&_p]:!text-white/75 [&_h1]:!text-white">
       <div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Organização do RH</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Tarefas e Agenda</h1><p className="mt-1 text-sm text-muted-foreground">Centralize suas pendências, prazos e lembretes.</p></div>
       <button onClick={newTask} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="h-4 w-4"/>Nova tarefa</button>
-    </div></header>
-    <main className="mx-auto max-w-[1250px] space-y-6 px-6 py-6">
+    </div>
       {error&&<div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
       <div className="grid gap-3 md:grid-cols-4">{[["Pendentes",counts.todo,"todo"],["Em andamento",counts.in_progress,"in_progress"],["Atrasadas",counts.overdue,"all"],["Concluídas",counts.done,"done"]].map((x:any)=><button key={x[0]} onClick={()=>setStatus(x[2])} className="text-left"><Card className="p-4 hover:border-primary/40"><p className="text-xs text-muted-foreground">{x[0]}</p><p className="mt-1 text-2xl font-bold">{x[1]}</p></Card></button>)}</div>
       <Card className="p-4"><div className="flex flex-wrap items-center gap-2">
