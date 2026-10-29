@@ -45,6 +45,11 @@ function hhmmToMinutes(value: string) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 function periodName(p: Period) {
+  // Exibição excepcional do fechamento de janeiro/2026.
+  // Mantém os valores reais do registro e todos os cálculos intactos.
+  if (Number(p.reference_year) === 2026 && Number(p.reference_month) === 1 && p.end_date === "2026-01-20") {
+    return "Competência 11/12/2025 → 20/01/2026";
+  }
   return `Competência ${formatDate(p.start_date)} → ${formatDate(p.end_date)}`;
 }
 
