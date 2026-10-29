@@ -89,7 +89,8 @@ function escapeReportHtml(value: unknown) {
 
 function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   if (!rows.length) throw new Error("Não há dados para gerar o PDF.");
-  const columns = Object.keys(rows[0]);
+  // Matrícula não deve aparecer nos PDFs; os dados de origem e os arquivos Excel permanecem intactos.
+  const columns = Object.keys(rows[0]).filter(key => !/^(registration|matr[ií]cula)$/i.test(key.trim()));
   const headers: Record<string, string> = {
     employee: "Funcionário", employee_name: "Funcionário", competence: "Competência", horario: "Horário (hh:mm)", date: "Data", end_date: "Data final",
     start_date: "Data inicial", type: "Tipo", quantity: "Quantidade", unit: "Unidade",
