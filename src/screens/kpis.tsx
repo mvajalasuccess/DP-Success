@@ -1405,7 +1405,7 @@ export function Kpis() {
 
   return (
     <div className="kpis-page min-h-screen">
-      <header className="dp-screen-topbar border-b border-[var(--kpi-border)] bg-[var(--kpi-surface)] px-5 py-3 sm:px-7">
+      <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
           <a href="/" className="inline-flex min-h-8 items-center text-[13px] font-medium text-[var(--kpi-text-muted)] transition-colors hover:text-[var(--kpi-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]" aria-label="Voltar ao início">
             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />Voltar
