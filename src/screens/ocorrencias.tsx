@@ -19,8 +19,11 @@ type HistoricalAbsence = {
   reference_month: number;
   absence_quantity: number;
   absence_display_date?: string | null;
+  absence_display_end_date?: string | null;
   absence_display_type?: string | null;
   absence_display_quantity?: number | null;
+  absence_display_justification?: string | null;
+  absence_display_notes?: string | null;
 };
 
 type Occ = {
@@ -59,7 +62,7 @@ export function Ocorrencias() {
   const [rows, setRows] = useState<Occ[]>([]);
   const [historicalAbsences, setHistoricalAbsences] = useState<HistoricalAbsence[]>([]);
   const [historicalEditing, setHistoricalEditing] = useState<HistoricalAbsence | null>(null);
-  const [historicalForm, setHistoricalForm] = useState({ date: "", type: "Falta importada da BASE", quantity: "" });
+  const [historicalForm, setHistoricalForm] = useState({ date: "", endDate: "", type: "", quantity: "", justification: "", notes: "" });
   const [historicalSaveError, setHistoricalSaveError] = useState("");
   const [historicalSaving, setHistoricalSaving] = useState(false);
   const [historicalAnnotationsReady, setHistoricalAnnotationsReady] = useState(true);
@@ -120,7 +123,7 @@ export function Ocorrencias() {
     const baseRows = (historicalData ?? []) as HistoricalAbsence[];
     const { data: annotations, error: annotationsError } = await db
       .from("historical_kpi_annotations")
-      .select("historical_kpi_data_id,absence_display_date,absence_display_type,absence_display_quantity")
+      .select("historical_kpi_data_id,absence_display_date,absence_display_end_date,absence_display_type,absence_display_quantity,absence_display_justification,absence_display_notes")
       .in("historical_kpi_data_id", baseRows.map(row => row.id));
     setHistoricalAnnotationsReady(!annotationsError);
     const annotationById = new Map<string, any>(
@@ -169,8 +172,11 @@ export function Ocorrencias() {
     setHistoricalEditing(row);
     setHistoricalForm({
       date: row.absence_display_date ?? "",
-      type: row.absence_display_type ?? "Falta importada da BASE",
+      endDate: row.absence_display_end_date ?? "",
+      type: visibleTypes.find(t => t.name === row.absence_display_type)?.id ?? visibleTypes.find(t => t.code === "falta_injustificada")?.id ?? visibleTypes[0]?.id ?? "",
       quantity: String(row.absence_display_quantity ?? row.absence_quantity ?? ""),
+      justification: row.absence_display_justification ?? "",
+      notes: row.absence_display_notes ?? "",
     });
     setHistoricalSaveError("");
   }
@@ -178,7 +184,8 @@ export function Ocorrencias() {
   async function saveHistoricalDisplay() {
     if (!historicalEditing) return;
     const quantity = Number(historicalForm.quantity);
-    if (!historicalForm.type.trim() || !Number.isFinite(quantity) || quantity < 0) {
+    const selectedHistoricalType = visibleTypes.find(t => t.id === historicalForm.type);
+    if (!selectedHistoricalType || !Number.isInteger(quantity) || quantity < 0) {
       setHistoricalSaveError("Informe o tipo e uma quantidade válida igual ou maior que zero.");
       return;
     }
@@ -192,8 +199,11 @@ export function Ocorrencias() {
     const { error: saveError } = await db.from("historical_kpi_annotations").upsert({
       historical_kpi_data_id: historicalEditing.id,
       absence_display_date: historicalForm.date || null,
-      absence_display_type: historicalForm.type.trim(),
+      absence_display_end_date: historicalForm.endDate || null,
+      absence_display_type: selectedHistoricalType.name,
       absence_display_quantity: quantity,
+      absence_display_justification: historicalForm.justification.trim() || null,
+      absence_display_notes: historicalForm.notes.trim() || null,
       updated_at: new Date().toISOString(),
     }, { onConflict: "historical_kpi_data_id" });
     setHistoricalSaving(false);
@@ -369,35 +379,25 @@ export function Ocorrencias() {
         <Card className="mt-6 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Faltas</h2><p className="text-xs text-muted-foreground">{absenceRows.length} registro(s)</p></div><button type="button" onClick={() => setShowAbsences(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showAbsences ? "Ocultar faltas" : "Mostrar faltas"} aria-label={showAbsences ? "Ocultar faltas" : "Mostrar faltas"}>{showAbsences ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
           {showAbsences && <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Quantidade</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">
-            {absenceRows.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma falta encontrada para os filtros selecionados.</td></tr>}
-            {absenceRows.map(row => <tr key={row.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(row.occurrence_date)}{row.end_date ? " → " + formatDate(row.end_date) : ""}</td><td className="px-5 py-4">{row.occurrence_types?.name ?? "—"}</td><td className="px-5 py-4">{displayQuantity(row)}</td><td className="px-5 py-4 text-right"><button onClick={() => startEdit(row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(row)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
+            {absenceRows.length + filteredHistoricalAbsences.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma falta encontrada para os filtros selecionados.</td></tr>}
+            {[...absenceRows.map(row => ({ kind: "official" as const, row, sortDate: row.occurrence_date })), ...filteredHistoricalAbsences.map(row => ({ kind: "historical" as const, row, sortDate: row.absence_display_date || row.period_start }))].sort((a, b) => b.sortDate.localeCompare(a.sortDate)).map(item => item.kind === "official" ? (
+              <tr key={"official-" + item.row.id} className="transition-colors hover:bg-muted/25">
+                <td className="px-5 py-4 font-medium">{item.row.employees?.full_name ?? "—"}</td>
+                <td className="px-5 py-4">{formatDate(item.row.occurrence_date)}{item.row.end_date ? " → " + formatDate(item.row.end_date) : ""}</td>
+                <td className="px-5 py-4">{item.row.occurrence_types?.name ?? "—"}</td>
+                <td className="px-5 py-4">{displayQuantity(item.row)}</td>
+                <td className="px-5 py-4 text-right"><button onClick={() => startEdit(item.row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(item.row)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td>
+              </tr>
+            ) : (
+              <tr key={"historical-" + item.row.id} className="transition-colors hover:bg-muted/25">
+                <td className="px-5 py-4 font-medium">{item.row.employee_name}{item.row.registration ? <span className="ml-2 text-xs text-muted-foreground">({item.row.registration})</span> : null}</td>
+                <td className="px-5 py-4">{item.row.absence_display_date ? formatDate(item.row.absence_display_date) : "—"}{item.row.absence_display_end_date ? " → " + formatDate(item.row.absence_display_end_date) : ""}</td>
+                <td className="px-5 py-4">{item.row.absence_display_type || "Falta importada da BASE"}</td>
+                <td className="px-5 py-4">{displayHistoricalQuantity(item.row)}</td>
+                <td className="px-5 py-4 text-right"><button onClick={() => startHistoricalEdit(item.row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><span className="inline-block px-2 text-xs text-muted-foreground" title="Registro histórico: não excluir dados originais">BASE</span></td>
+              </tr>
+            ))}
           </tbody></table></div>}
-        </Card>
-
-        <Card className="mt-6 overflow-hidden">
-          <div className="flex items-center justify-between gap-3 border-b p-4">
-            <div>
-              <h2 className="font-semibold">Faltas importadas da BASE</h2>
-              <p className="text-xs text-muted-foreground">{filteredHistoricalAbsences.length} registro(s) histórico(s) · ajustes somente visuais</p>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur">
-                <tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data exibida</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Quantidade</th><th className="px-5 py-3 text-right">Ações</th></tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredHistoricalAbsences.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma falta histórica encontrada para os filtros selecionados.</td></tr>}
-                {filteredHistoricalAbsences.map(row => <tr key={row.id} className="transition-colors hover:bg-muted/25">
-                  <td className="px-5 py-4 font-medium">{row.employee_name}{row.registration ? <span className="ml-2 text-xs text-muted-foreground">({row.registration})</span> : null}<div className="text-xs text-muted-foreground">Competência: {formatDate(row.period_start)} a {formatDate(row.period_end)}</div></td>
-                  <td className="px-5 py-4">{row.absence_display_date ? formatDate(row.absence_display_date) : "—"}</td>
-                  <td className="px-5 py-4">{row.absence_display_type || "Falta importada da BASE"}</td>
-                  <td className="px-5 py-4">{displayHistoricalQuantity(row)}</td>
-                  <td className="px-5 py-4 text-right"><button onClick={() => startHistoricalEdit(row)} className="rounded-md border p-2" title="Editar somente visualização" aria-label="Editar somente visualização"><Pencil className="h-4 w-4" /></button></td>
-                </tr>)}
-              </tbody>
-            </table>
-          </div>
         </Card>
 
         <Card className="mt-6 overflow-hidden">
@@ -412,12 +412,25 @@ export function Ocorrencias() {
       {historicalEditing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <Card className="w-full max-w-xl p-6">
-            <h2 className="text-xl font-bold">Editar falta histórica</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Altere apenas a exibição. A BASE original, as competências, os cálculos, abonos e banco de horas não serão modificados.</p>
-            <div className="mt-5 grid gap-4">
-              <label className="grid gap-1 text-sm"><span>Data para exibição</span><input type="date" value={historicalForm.date} onChange={e => setHistoricalForm({ ...historicalForm, date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
-              <label className="grid gap-1 text-sm"><span>Tipo para exibição</span><input value={historicalForm.type} onChange={e => setHistoricalForm({ ...historicalForm, type: e.target.value })} className="rounded-lg border px-3 py-2" placeholder="Ex.: Falta justificada" /></label>
-              <label className="grid gap-1 text-sm"><span>Quantidade para exibição</span><input type="number" min="0" step="0.01" value={historicalForm.quantity} onChange={e => setHistoricalForm({ ...historicalForm, quantity: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+            <h2 className="text-xl font-bold">Editar registro</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Registro importado da BASE. As alterações abaixo são somente para visualização e não modificam a BASE original, os cálculos, abonos ou banco de horas.
+            </p>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm md:col-span-2">
+                <span className="text-muted-foreground">Funcionário: </span><strong>{historicalEditing.employee_name}</strong>
+              </div>
+              <select value={historicalForm.type} onChange={e => setHistoricalForm({ ...historicalForm, type: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2">
+                <option value="">Tipo de ocorrência</option>
+                {visibleTypes.filter(t => ["falta_justificada", "falta_injustificada"].includes(t.code)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <label className="grid gap-1 text-sm"><span>Data inicial</span><input type="date" value={historicalForm.date} onChange={e => setHistoricalForm({ ...historicalForm, date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+              <label className="grid gap-1 text-sm"><span>Data final</span><input type="date" value={historicalForm.endDate} onChange={e => setHistoricalForm({ ...historicalForm, endDate: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+              <input type="number" min="0" step="1" placeholder="Quantidade de dias" value={historicalForm.quantity} onChange={e => setHistoricalForm({ ...historicalForm, quantity: e.target.value })} className="rounded-lg border px-3 py-2" />
+              {visibleTypes.find(t => t.id === historicalForm.type)?.requires_justification && (
+                <textarea placeholder="Justificativa" value={historicalForm.justification} onChange={e => setHistoricalForm({ ...historicalForm, justification: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2" />
+              )}
+              <textarea placeholder="Observações" value={historicalForm.notes} onChange={e => setHistoricalForm({ ...historicalForm, notes: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2" />
             </div>
             {historicalSaveError && <p className="mt-3 text-sm text-destructive">{historicalSaveError}</p>}
             <div className="mt-5 flex justify-end gap-2">
