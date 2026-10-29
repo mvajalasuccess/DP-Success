@@ -867,7 +867,17 @@ function DashboardHome() {
   return (
     <div className="min-h-screen bg-background">
         <header className="dp-screen-topbar flex h-14 items-center border-b bg-background px-4 sm:px-6">
-          <span className="text-xs text-muted-foreground">RH / Visão geral</span>
+          <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4">
+            <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <ChevronLeft className="h-4 w-4" />Voltar
+            </a>
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#06CAA0]/15 text-[#079A7B]">
+                <LayoutDashboard className="h-4 w-4" />
+              </span>
+              <span>DP SUCCESS <span className="text-muted-foreground">/ Dashboard</span></span>
+            </div>
+          </div>
         </header>
         <div className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
           <section className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
