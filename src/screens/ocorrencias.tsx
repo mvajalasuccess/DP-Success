@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Download, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -344,6 +344,59 @@ export function Ocorrencias() {
     else await load();
   }
 
+
+  function exportFilteredReport() {
+    const reportRows: Record<string, unknown>[] = [
+      ...absenceRows.map(row => ({
+        "Funcionário": row.employees?.full_name ?? "",
+        "Data inicial": row.occurrence_date,
+        "Data final": row.end_date ?? "",
+        "Tipo": row.occurrence_types?.name ?? "",
+        "Quantidade": row.quantity ?? "",
+        "Unidade": row.unit ?? "dias",
+        "Justificativa": row.justification ?? "",
+        "Observações": row.notes ?? "",
+      })),
+      ...daysOffRows.map(row => ({
+        "Funcionário": row.employees?.full_name ?? "",
+        "Data inicial": row.occurrence_date,
+        "Data final": row.end_date ?? "",
+        "Tipo": row.occurrence_types?.name ?? "",
+        "Quantidade": row.quantity ?? "",
+        "Unidade": row.unit ?? "dias",
+        "Justificativa": row.justification ?? "",
+        "Observações": row.notes ?? "",
+      })),
+      ...filteredHistoricalAbsences.map(row => ({
+        "Funcionário": row.employee_name ?? "",
+        "Data inicial": historicalDisplayStart(row),
+        "Data final": row.absence_display_end_date || row.period_end || "",
+        "Tipo": row.absence_display_type || "Falta",
+        "Quantidade": row.absence_display_quantity ?? row.absence_quantity,
+        "Unidade": "dias",
+        "Justificativa": row.absence_display_justification ?? "",
+        "Observações": row.absence_display_notes ?? "",
+      })),
+    ];
+    if (!reportRows.length) {
+      setError("Não há registros para exportar com os filtros selecionados.");
+      return;
+    }
+    const escape = (value: unknown) => {
+      let text = String(value ?? "");
+      if (/^[=+\-@]/.test(text)) text = "'" + text;
+      return '"' + text.replaceAll('"', '""') + '"';
+    };
+    const csv = ["\\ufeff" + Object.keys(reportRows[0]).map(escape).join(";"), ...reportRows.map(row => Object.values(row).map(escape).join(";"))].join("\\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "faltas-e-folgas-filtradas.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function displayQuantity(row: Occ) {
     return row.quantity == null ? "—" : String(Math.round(Number(row.quantity)));
   }
@@ -392,6 +445,12 @@ export function Ocorrencias() {
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
           </div>
         </Card>
+
+        <div className="mt-4 flex justify-end">
+          <button type="button" onClick={exportFilteredReport} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            <Download className="h-4 w-4" /> Exportar relatório filtrado
+          </button>
+        </div>
 
         <Card className="mt-6 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Faltas</h2><p className="text-xs text-muted-foreground">{absenceRows.length + filteredHistoricalAbsences.length} registro(s)</p></div><button type="button" onClick={() => setShowAbsences(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showAbsences ? "Ocultar faltas" : "Mostrar faltas"} aria-label={showAbsences ? "Ocultar faltas" : "Mostrar faltas"}>{showAbsences ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
