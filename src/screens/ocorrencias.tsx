@@ -153,12 +153,11 @@ export function Ocorrencias() {
   }, []);
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
-  // Competência especial: ajuste apenas de exibição/filtro nesta tela; não altera a competência salva nem cálculos históricos.
-  const effectivePeriodStart = (period: { start_date: string; end_date: string }) =>
-    period.start_date === "2025-12-21" && period.end_date === "2026-01-20"
+  const historicalDisplayStart = (row: HistoricalAbsence) =>
+    row.period_start === "2025-12-21" && row.period_end === "2026-01-20"
       ? "2025-12-11"
-      : period.start_date;
-  const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= effectivePeriodStart(selectedPeriod)))));
+      : row.period_start;
+  const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
   const companyEmployees = employees.filter(e => !companyFilter || e.company_id === companyFilter);
   const companyEmployeeIds = new Set(companyEmployees.map(e => e.id));
   const employeeIdByRegistration = new Map(employees.filter(e => e.registration).map(e => [String(e.registration).trim().toLowerCase(), e.id]));
@@ -171,7 +170,7 @@ export function Ocorrencias() {
   const filteredRows = rows.filter(row =>
     companyEmployeeIds.has(row.employee_id) &&
     (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
-    (!selectedPeriod || (row.occurrence_date <= selectedPeriod.end_date && (row.end_date ?? row.occurrence_date) >= effectivePeriodStart(selectedPeriod)))
+    (!selectedPeriod || (row.occurrence_date <= selectedPeriod.end_date && (row.end_date ?? row.occurrence_date) >= selectedPeriod.start_date))
   );
   const absenceRows = filteredRows.filter(row => ["falta_justificada", "falta_injustificada"].includes(String(row.occurrence_types?.code ?? "")));
   const daysOffRows = filteredRows.filter(row => ["folga_abonada", "folga_descontada"].includes(String(row.occurrence_types?.code ?? "")));
@@ -179,7 +178,7 @@ export function Ocorrencias() {
     const resolvedEmployeeId = resolveHistoricalEmployeeId(row);
     return (!companyFilter || (!!resolvedEmployeeId && companyEmployeeIds.has(resolvedEmployeeId))) &&
       (filterEmployee === "todos" || resolvedEmployeeId === filterEmployee) &&
-      (!selectedPeriod || (row.period_start <= selectedPeriod.end_date && row.period_end >= effectivePeriodStart(selectedPeriod)));
+      (!selectedPeriod || (row.period_start <= selectedPeriod.end_date && row.period_end >= selectedPeriod.start_date));
   });
 
   function startHistoricalEdit(row: HistoricalAbsence) {
@@ -238,7 +237,7 @@ export function Ocorrencias() {
     return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   }
   function periodLabel(period: { id: string; start_date: string; end_date: string }) {
-    return `${formatDate(effectivePeriodStart(period))} a ${formatDate(period.end_date)}`;
+    return `${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
   }
 
   function startNew() {
@@ -398,7 +397,7 @@ export function Ocorrencias() {
           <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Faltas</h2><p className="text-xs text-muted-foreground">{absenceRows.length + filteredHistoricalAbsences.length} registro(s)</p></div><button type="button" onClick={() => setShowAbsences(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showAbsences ? "Ocultar faltas" : "Mostrar faltas"} aria-label={showAbsences ? "Ocultar faltas" : "Mostrar faltas"}>{showAbsences ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
           {showAbsences && <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Quantidade</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">
             {absenceRows.length + filteredHistoricalAbsences.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma falta encontrada para os filtros selecionados.</td></tr>}
-            {[...absenceRows.map(row => ({ kind: "official" as const, row, sortDate: row.occurrence_date })), ...filteredHistoricalAbsences.map(row => ({ kind: "historical" as const, row, sortDate: row.absence_display_date || row.period_start }))].sort((a, b) => b.sortDate.localeCompare(a.sortDate)).map(item => item.kind === "official" ? (
+            {[...absenceRows.map(row => ({ kind: "official" as const, row, sortDate: row.occurrence_date })), ...filteredHistoricalAbsences.map(row => ({ kind: "historical" as const, row, sortDate: row.absence_display_date || historicalDisplayStart(row) }))].sort((a, b) => b.sortDate.localeCompare(a.sortDate)).map(item => item.kind === "official" ? (
               <tr key={"official-" + item.row.id} className="transition-colors hover:bg-muted/25">
                 <td className="px-5 py-4 font-medium">{item.row.employees?.full_name ?? "—"}</td>
                 <td className="px-5 py-4">{formatDate(item.row.occurrence_date)}{item.row.end_date ? " → " + formatDate(item.row.end_date) : ""}</td>
@@ -409,7 +408,7 @@ export function Ocorrencias() {
             ) : (
               <tr key={"historical-" + item.row.id} className="transition-colors hover:bg-muted/25">
                 <td className="px-5 py-4 font-medium">{item.row.employee_name}</td>
-                <td className="px-5 py-4">{formatDate(item.row.absence_display_date || item.row.period_start)}{(item.row.absence_display_end_date || item.row.period_end) ? " → " + formatDate(item.row.absence_display_end_date || item.row.period_end) : ""}</td>
+                <td className="px-5 py-4">{formatDate(item.row.absence_display_date || historicalDisplayStart(item.row))}{(item.row.absence_display_end_date || item.row.period_end) ? " → " + formatDate(item.row.absence_display_end_date || item.row.period_end) : ""}</td>
                 <td className="px-5 py-4">{item.row.absence_display_type || "Falta importada da BASE"}</td>
                 <td className="px-5 py-4">{displayHistoricalQuantity(item.row)}</td>
                 <td className="px-5 py-4 text-right"><button onClick={() => startHistoricalEdit(item.row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><span className="inline-block px-2 text-xs text-muted-foreground" title="Registro histórico: não excluir dados originais">BASE</span></td>
