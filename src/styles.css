@@ -1188,3 +1188,33 @@ main :is(h1, h2, h3) {
     background: var(--dp-premium-canvas);
   }
 }
+
+
+/* Cabeçalho superior padronizado em todas as telas internas. */
+.dp-screen > header,
+.dp-screen-topbar {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  box-shadow: 0 2px 10px rgb(15 41 48 / 0.07);
+  position: relative;
+  z-index: 10;
+}
+.dp-screen > header > div,
+.dp-screen-topbar > div {
+  min-height: 2rem;
+}
+.dp-screen > header a,
+.dp-screen-topbar a {
+  color: #64748b;
+  transition: color 150ms ease;
+}
+.dp-screen > header a:hover,
+.dp-screen-topbar a:hover {
+  color: #075c50;
+}
+.dp-screen > header b,
+.dp-screen > header span,
+.dp-screen-topbar b,
+.dp-screen-topbar > div > span {
+  color: #102b35;
+}
