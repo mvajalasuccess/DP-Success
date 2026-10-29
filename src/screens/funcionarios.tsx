@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+import { ScreenBrand } from "@/components/screen-brand";
 export function Employees() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -226,7 +227,7 @@ export function Employees() {
       <header className="dp-screen-topbar border-b bg-background px-6 py-4">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between">
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a>
-          <div className="dp-brand">DP Success • Funcionários</div>
+          <ScreenBrand name="Funcionários" />
         </div>
       </header>
 
