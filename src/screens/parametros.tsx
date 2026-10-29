@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, Save, Shield, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
+import { ScreenBrand } from "@/components/screen-brand";
 type Setting = { id:string; setting_group:string; setting_key:string; setting_value:string; label:string; description:string|null };
 type Holiday = { id:string; holiday_date:string; name:string; scope:string; is_demo:boolean };
 const ACCESS_OPTIONS = [
@@ -110,7 +111,7 @@ export function Parametros(){
     void load();
   }
   return <div className="dp-screen min-h-screen bg-background">
-    <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5"><div className="mx-auto flex max-w-[1180px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4"/>Voltar</a><b className="dp-brand">DP Success • Configurações</b></div></header>
+    <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5"><div className="mx-auto flex max-w-[1180px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4"/>Voltar</a><ScreenBrand name="Configurações" /></div></header>
     <main className="mx-auto max-w-[1180px] px-6 py-7 space-y-6">
       <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 [&_p]:!text-white/75 [&_h1]:!text-white"><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Configurações</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Configurações do sistema</h1><p className="text-sm text-muted-foreground">Centralize dados da empresa e regras usadas pelo RH e pelo DP.</p></div>
       {error&&<div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}{saved&&<div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-primary">{saved}</div>}
