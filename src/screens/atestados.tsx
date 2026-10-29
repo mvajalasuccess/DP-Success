@@ -276,10 +276,10 @@ export function Atestados() {
     const escapeHtml = (value: unknown) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
     const tableHead = columns.map(column => "<th>" + escapeHtml(column) + "</th>").join("");
     const tableRows = reportRows.map(row => "<tr>" + columns.map(column => "<td>" + escapeHtml(row[column]) + "</td>").join("") + "</tr>").join("");
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    const printWindow = window.open("", "_blank");
     if (!printWindow) { setError("O navegador bloqueou a janela do PDF. Permita pop-ups para este site e tente novamente."); return; }
     printWindow.document.write("<!doctype html><html lang='pt-BR'><head><meta charset='utf-8'><title>Declarações e Atestados</title><style>\
-      @page{size:landscape;margin:12mm}body{font-family:Arial,sans-serif;color:#17212b;font-size:10px}h1{font-size:18px;margin:0 0 6px}p{font-size:10px;color:#475569;margin:0 0 14px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#e8eef2;font-weight:700}tr{page-break-inside:avoid}thead{display:table-header-group}</style></head><body><h1>Declarações e Atestados</h1><p>Relatório gerado conforme os filtros selecionados · 29/10/2026, 18:14:38</p><table><thead><tr>" + tableHead + "</tr></thead><tbody>" + tableRows + "</tbody></table><script>window.onload=function(){window.focus();window.print();};<\/script></body></html>");
+      @page{size:landscape;margin:12mm}body{font-family:Arial,sans-serif;color:#17212b;font-size:10px}h1{font-size:18px;margin:0 0 6px}p{font-size:10px;color:#475569;margin:0 0 14px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#e8eef2;font-weight:700}tr{page-break-inside:avoid}thead{display:table-header-group}</style></head><body><h1>Declarações e Atestados</h1><p>Relatório gerado conforme os filtros selecionados · " + new Date().toLocaleString("pt-BR") + "</p><table><thead><tr>" + tableHead + "</tr></thead><tbody>" + tableRows + "</tbody></table><script>window.onload=function(){window.focus();window.print();};<\/script></body></html>");
     printWindow.document.close();
   }
 
