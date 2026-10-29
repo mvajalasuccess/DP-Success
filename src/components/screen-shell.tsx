@@ -13,7 +13,7 @@ export function ScreenShell({ section, title, subtitle, name, actions, error, ch
         </div>
       </header>
       <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex flex-col justify-between gap-4 md:flex-row md:items-end [&_p]:!text-white/75 [&_h1]:!text-white">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{section}</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-[30px]">{title}</h1>
