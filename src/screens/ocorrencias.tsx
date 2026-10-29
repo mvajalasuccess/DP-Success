@@ -157,7 +157,7 @@ export function Ocorrencias() {
   const displayPeriodStart = (start: string, end: string) =>
     end === "2026-01-20" ? "2025-12-11" : start;
   const historicalDisplayStart = (row: HistoricalAbsence) =>
-    row.absence_display_date || displayPeriodStart(row.period_start, row.period_end);
+    row.absence_display_date || displayPeriodStart(row.period_start ?? "", row.period_end ?? "");
   const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
   const companyEmployees = employees.filter(e => !companyFilter || e.company_id === companyFilter);
   const companyEmployeeIds = new Set(companyEmployees.map(e => e.id));
@@ -179,7 +179,7 @@ export function Ocorrencias() {
     const resolvedEmployeeId = resolveHistoricalEmployeeId(row);
     return (!companyFilter || (!!resolvedEmployeeId && companyEmployeeIds.has(resolvedEmployeeId))) &&
       (filterEmployee === "todos" || resolvedEmployeeId === filterEmployee) &&
-      (!selectedPeriod || (row.period_start <= selectedPeriod.end_date && row.period_end >= selectedPeriod.start_date));
+      (!selectedPeriod || (String(row.period_start ?? "") <= selectedPeriod.end_date && String(row.period_end ?? "") >= selectedPeriod.start_date));
   });
 
   function startHistoricalEdit(row: HistoricalAbsence) {
@@ -394,7 +394,7 @@ export function Ocorrencias() {
       workbook.title = "Faltas e Folgas";
       workbook.created = new Date();
 
-      const columns = Object.keys(reportRows[0]).map(key => {
+      const columns = Object.keys(reportRows[0] ?? {}).map(key => {
         const values = reportRows.slice(0, 100).map(row => String(row[key] ?? ""));
         const width = Math.max(key.length + 4, ...values.map(value => Math.min(value.length + 2, 42)));
         return { header: key, key, width: Math.min(42, Math.max(12, width)) };
@@ -463,7 +463,7 @@ export function Ocorrencias() {
     const reportRows = getFilteredReportRows();
     if (!reportRows.length) { setError("Não há registros para exportar com os filtros selecionados."); return; }
     setError("");
-    const columns = Object.keys(reportRows[0]);
+    const columns = Object.keys(reportRows[0] ?? {});
     const escapeHtml = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const columnWeight = (key: string) => {
       const name = key.toLowerCase();
