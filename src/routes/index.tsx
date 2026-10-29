@@ -867,7 +867,7 @@ function DashboardHome() {
 
   return (
     <div className="min-h-screen bg-background">
-        <header className="dp-screen-topbar flex h-14 items-center border-b bg-background px-4 sm:px-6">
+        <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6">
           <div className="mx-auto flex w-full max-w-[1500px] items-center justify-between gap-4">
             <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
               <ChevronLeft className="h-4 w-4" />Voltar
