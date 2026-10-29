@@ -1190,32 +1190,8 @@ main :is(h1, h2, h3) {
 }
 
 
-/* Cabeçalhos internos: identidade única, ícone Clock3 igual ao da sidebar e tipografia consistente. */
-.dp-screen > header,
-.dp-screen-topbar,
-.dp-app-main header.dp-page-header {
-  background-color: #ffffff !important;
-  border-bottom: 1px solid #e5e7eb !important;
-  box-shadow: 0 2px 10px rgb(15 41 48 / 0.07);
-  position: relative;
-  z-index: 10;
-}
-.dp-screen > header > div,
-.dp-screen-topbar > div {
-  min-height: 2rem;
-}
-.dp-screen > header a,
-.dp-screen-topbar a {
-  color: #64748b;
-  transition: color 150ms ease;
-}
-.dp-screen > header a:hover,
-.dp-screen-topbar a:hover {
-  color: #075c50;
-}
-/* O alvo de branding deve ser sempre o último item do cabeçalho. */
-.dp-screen > header > div > :last-child,
-.dp-screen-topbar > div > :last-child {
+/* Marca de cabeçalho reutilizável em todas as telas: usa o mesmo Clock3 da sidebar. */
+.dp-brand {
   display: inline-flex !important;
   align-items: center;
   justify-content: flex-end;
@@ -1227,8 +1203,7 @@ main :is(h1, h2, h3) {
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
-.dp-screen > header > div > :last-child::before,
-.dp-screen-topbar > div > :last-child::before {
+.dp-brand::before {
   content: "";
   display: inline-block;
   width: 2rem;
@@ -1240,22 +1215,8 @@ main :is(h1, h2, h3) {
   background-repeat: no-repeat;
   background-position: center;
 }
-.dp-screen > header > div > :last-child > span,
-.dp-screen-topbar > div > :last-child > span {
-  color: inherit !important;
-  font-size: inherit !important;
-  font-weight: inherit !important;
-  line-height: inherit !important;
-}
-/* Se a tela já tinha um ícone próprio no título, ocultá-lo para não duplicar a marca. */
-.dp-screen > header > div > :last-child svg,
-.dp-screen-topbar > div > :last-child svg {
-  display: none !important;
-}
+.dp-brand svg { display: none !important; }
+.dp-brand > span { color: inherit !important; font-size: inherit !important; font-weight: inherit !important; line-height: inherit !important; }
 @media (max-width: 480px) {
-  .dp-screen > header > div > :last-child,
-  .dp-screen-topbar > div > :last-child {
-    gap: 0.375rem;
-    font-size: 0.8125rem !important;
-  }
+  .dp-brand { gap: 0.375rem; font-size: 0.8125rem !important; }
 }
