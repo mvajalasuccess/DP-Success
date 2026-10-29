@@ -142,7 +142,7 @@ export function Atestados() {
     (!selectedPeriod || (row.occurrence_date >= selectedPeriod.start_date && row.occurrence_date <= selectedPeriod.end_date))
   );
   function periodLabel(period: Period) {
-    const displayStart = period.start_date === "2025-12-21" && period.end_date === "2026-01-20"
+    const displayStart = period.end_date === "2026-01-20"
       ? "2025-12-11"
       : period.start_date;
     return `${formatDate(displayStart)} a ${formatDate(period.end_date)}`;
