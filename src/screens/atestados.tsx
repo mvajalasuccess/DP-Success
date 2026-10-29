@@ -259,14 +259,81 @@ export function Atestados() {
     return reportRows;
   }
 
-  function exportFilteredExcel() {
+  async function exportFilteredExcel() {
     const reportRows = getFilteredReportRows();
     if (!reportRows.length) { setError("Não há registros para exportar com os filtros selecionados."); return; }
-    const worksheet = XLSX.utils.json_to_sheet(reportRows);
-    worksheet["!cols"] = Object.keys(reportRows[0]).map(key => ({ wch: Math.min(36, Math.max(14, key.length + 4, ...reportRows.slice(0, 30).map(row => String(row[key] ?? "").length + 2))) }));
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Declarações e Atestados");
-    XLSX.writeFile(workbook, "declaracoes-e-atestados-filtrados.xlsx");
+    setError("");
+    try {
+      const ExcelJS = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "DP SUCCESS";
+      workbook.subject = "Declarações e Atestados";
+      workbook.title = "Declarações e Atestados";
+      workbook.created = new Date();
+
+      const columns = Object.keys(reportRows[0]).map(key => {
+        const values = reportRows.slice(0, 100).map(row => String(row[key] ?? ""));
+        const width = Math.max(key.length + 4, ...values.map(value => Math.min(value.length + 2, 42)));
+        return { header: key, key, width: Math.min(42, Math.max(12, width)) };
+      });
+      const worksheet = workbook.addWorksheet("Declarações e Atestados", {
+        views: [{ state: "frozen", ySplit: 5, xSplit: 1 }],
+      });
+      const lastColumn = columns.length;
+      worksheet.mergeCells(1, 1, 1, lastColumn);
+      const titleCell = worksheet.getCell(1, 1);
+      titleCell.value = "DP SUCCESS • DECLARAÇÕES E ATESTADOS";
+      titleCell.font = { name: "Aptos Display", size: 16, bold: true, color: { argb: "FFFFFFFF" } };
+      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF123B3A" } };
+      titleCell.alignment = { vertical: "middle", horizontal: "left" };
+      worksheet.getRow(1).height = 30;
+
+      worksheet.mergeCells(2, 1, 2, lastColumn);
+      worksheet.getCell(2, 1).value = "Relatório conforme os filtros selecionados  |  Registros: " + reportRows.length + "  |  Exportado em: " + new Date().toLocaleString("pt-BR");
+      worksheet.getCell(2, 1).font = { size: 11, bold: true, color: { argb: "FF123B3A" } };
+      worksheet.getCell(2, 1).alignment = { vertical: "middle", wrapText: true };
+      worksheet.getRow(2).height = 23;
+      worksheet.addRow([]);
+      worksheet.addRow([]);
+
+      const headerRow = worksheet.addRow(columns.map(column => column.header));
+      headerRow.height = 34;
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: "FF123B3A" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDF7F0" } };
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+        cell.border = { bottom: { style: "thin", color: { argb: "FF06CAA0" } } };
+      });
+
+      for (const source of reportRows) {
+        const row = worksheet.addRow(columns.map(column => source[column.key] ?? ""));
+        row.eachCell((cell, columnNumber) => {
+          cell.alignment = { vertical: "middle", horizontal: columnNumber >= 3 ? "center" : "left", wrapText: true };
+          if (row.number % 2 === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5FAF8" } };
+        });
+        columns.forEach((column, index) => {
+          const cell = row.getCell(index + 1);
+          if (["Dias", "Quantidade"].includes(column.key) && typeof source[column.key] === "number") cell.numFmt = "0.##";
+        });
+      }
+
+      columns.forEach((column, index) => { worksheet.getColumn(index + 1).width = column.width; });
+      worksheet.autoFilter = { from: { row: 5, column: 1 }, to: { row: Math.max(5, worksheet.rowCount), column: lastColumn } };
+      worksheet.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+      worksheet.properties.defaultRowHeight = 20;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "dp-success-declaracoes-e-atestados-filtrados.xlsx";
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error("Erro ao exportar Excel filtrado:", error);
+      setError("Não foi possível gerar o Excel. Tente novamente.");
+    }
   }
 
   function exportFilteredPdf() {
