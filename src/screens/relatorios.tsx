@@ -114,7 +114,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   const isEmployeeColumn = (key: string) => /employee|funcion.rio|employee_name/i.test(key);
   const columnWeight = (key: string) => {
     const name = key.toLowerCase();
-    if (isEmployeeColumn(name)) return pointClosing ? 3.2 : 2.15;
+    if (isEmployeeColumn(name)) return pointClosing ? 4.8 : 2.15;
     if (/position|cargo/.test(name)) return 1.65;
     if (/department|departamento/.test(name)) return 1.35;
     if (/registration|matr.cula/.test(name)) return 0.8;
@@ -130,7 +130,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   const html = '<html lang="pt-BR"><head><meta charset="utf-8"><title>' + escapeReportHtml(title) + '</title><style>' +
     '*{box-sizing:border-box}html,body{width:100%;margin:0;padding:0}body{font-family:Arial,sans-serif;color:#183735;print-color-adjust:exact;-webkit-print-color-adjust:exact}' +
     pageStyle +
-    '.brand{background:#123b3a;color:#fff;break-inside:avoid}.wide-table td{padding:5px 4px!important;line-height:1.35!important}.wide-table th{padding:4px!important;line-height:1.2!important}.point-closing td,.point-closing th{padding:3px 3px!important;line-height:1.2!important}.point-closing td.employee-col{white-space:nowrap;overflow-wrap:normal;word-break:normal}.wide-table thead{display:table-header-group}.wide-table tbody{page-break-inside:auto;break-inside:auto}.eyebrow{font-size:7px;letter-spacing:1.2px;color:#9debd8;font-weight:bold}' +
+    '.brand{background:#123b3a;color:#fff;break-inside:avoid}.wide-table td{padding:5px 4px!important;line-height:1.35!important}.wide-table th{padding:4px!important;line-height:1.2!important}.point-closing table{table-layout:auto}.point-closing th,.point-closing td{padding:2px 2px!important;line-height:1.15!important;font-size:8px!important}.point-closing th.employee-col,.point-closing td.employee-col{white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;width:1%;}.wide-table thead{display:table-header-group}.wide-table tbody{page-break-inside:auto;break-inside:auto}.eyebrow{font-size:7px;letter-spacing:1.2px;color:#9debd8;font-weight:bold}' +
     '.subtitle{color:#d9f4ed;overflow-wrap:anywhere}.meta{display:flex;justify-content:space-between;gap:8px;background:#f0faf7;border:1px solid #d8eee7;color:#365b56}table{width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}' +
     'th{background:#dff7f0;color:#123b3a;text-align:left;text-transform:uppercase}th,td{border-bottom:1px solid #e1ece8;vertical-align:top;overflow-wrap:anywhere;word-break:break-word;white-space:normal}tbody tr:nth-child(even){background:#f6faf9}.footer{margin-top:5px;padding-top:3px;border-top:1px solid #d8e8e3;color:#64817b}@media print{html,body{width:100%;height:auto}table{width:100%}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head>' +
     '<body class="' + (wideTable ? 'wide-table' : '') + (pointClosing ? ' point-closing' : '') + '"><header class="brand"><div class="eyebrow">DP SUCCESS · GESTÃO DE PESSOAS</div><h1>' + escapeReportHtml(title) + '</h1><div class="subtitle">' + escapeReportHtml(subtitle) + '</div></header>' +
