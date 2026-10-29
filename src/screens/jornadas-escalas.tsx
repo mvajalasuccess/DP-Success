@@ -60,7 +60,7 @@ export function Schedules() {
   }
 
   return <div className="dp-screen min-h-screen bg-background">
-    <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5"><div className="mx-auto flex max-w-[1500px] justify-between">
+    <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6"><div className="mx-auto flex max-w-[1500px] justify-between">
       <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" /> Voltar</a><ScreenBrand name="Jornadas / Escalas" />
     </div></header>
     <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
