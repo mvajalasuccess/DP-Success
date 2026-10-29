@@ -155,6 +155,14 @@ function formatDate(value: string) {
   return `${day}/${month}/${year}`;
 }
 
+function displayPeriodStart(start: string, end: string) {
+  return start === "2025-12-21" && end === "2026-01-20" ? "2025-12-11" : start;
+}
+
+function formatPeriodRange(period: Pick<Period, "start_date" | "end_date">) {
+  return `${formatDate(displayPeriodStart(period.start_date, period.end_date))} a ${formatDate(period.end_date)}`;
+}
+
 function minutesToExcelDuration(value: unknown) {
   return Math.round(Number(value || 0)) / 1440;
 }
@@ -359,7 +367,7 @@ async function downloadClosingExcel(period: Period, rows: any[]) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "DP SUCCESS";
   workbook.subject = "Fechamento de Ponto";
-  workbook.title = `Fechamento de Ponto - ${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
+  workbook.title = `Fechamento de Ponto - ${formatDate(displayPeriodStart(period.start_date, period.end_date))} a ${formatDate(period.end_date)}`;
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet("Fechamento", {
@@ -375,7 +383,7 @@ async function downloadClosingExcel(period: Period, rows: any[]) {
   sheet.getRow(1).height = 30;
 
   sheet.mergeCells(2, 1, 2, lastColumn);
-  sheet.getCell(2, 1).value = `Competência: ${formatDate(period.start_date)} a ${formatDate(period.end_date)}  |  Referência: ${String(period.reference_month).padStart(2, "0")}/${period.reference_year}  |  Status: ${period.status}`;
+  sheet.getCell(2, 1).value = `Competência: ${formatDate(displayPeriodStart(period.start_date, period.end_date))} a ${formatDate(period.end_date)}  |  Referência: ${String(period.reference_month).padStart(2, "0")}/${period.reference_year}  |  Status: ${period.status}`;
   sheet.getCell(2, 1).font = { size: 11, bold: true, color: { argb: "FF123B3A" } };
   sheet.getCell(2, 1).alignment = { vertical: "middle" };
   sheet.getRow(2).height = 23;
@@ -461,7 +469,7 @@ async function downloadBankHoursExcel(period: Period, rows: any[]) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "DP SUCCESS";
   workbook.subject = "Banco de Horas";
-  workbook.title = `Banco de Horas - ${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
+  workbook.title = `Banco de Horas - ${formatDate(displayPeriodStart(period.start_date, period.end_date))} a ${formatDate(period.end_date)}`;
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet("Banco de Horas", {
@@ -477,7 +485,7 @@ async function downloadBankHoursExcel(period: Period, rows: any[]) {
   sheet.getRow(1).height = 30;
 
   sheet.mergeCells(2, 1, 2, lastColumn);
-  sheet.getCell(2, 1).value = `Competência: ${formatDate(period.start_date)} a ${formatDate(period.end_date)}  |  Referência: ${String(period.reference_month).padStart(2, "0")}/${period.reference_year}  |  Status: ${period.status}`;
+  sheet.getCell(2, 1).value = `Competência: ${formatDate(displayPeriodStart(period.start_date, period.end_date))} a ${formatDate(period.end_date)}  |  Referência: ${String(period.reference_month).padStart(2, "0")}/${period.reference_year}  |  Status: ${period.status}`;
   sheet.getCell(2, 1).font = { size: 11, bold: true, color: { argb: "FF123B3A" } };
   sheet.getCell(2, 1).alignment = { vertical: "middle" };
   sheet.getRow(2).height = 23;
@@ -846,7 +854,7 @@ export function Relatorios() {
           if (format === "excel") await downloadClosingExcel(targetPeriod, rows);
         }
         if (!pdfRows.length) throw new Error("Não há funcionários ou lançamentos para exportar nas competências selecionadas.");
-        if (format === "pdf") downloadReportPdf("Fechamento de ponto", pdfRows, allCompetencies ? "Todas as competências" : "Competência: " + formatDate(competence!.start_date) + " a " + formatDate(competence!.end_date));
+        if (format === "pdf") downloadReportPdf("Fechamento de ponto", pdfRows, allCompetencies ? "Todas as competências" : "Competência: " + formatDate(displayPeriodStart(competence!.start_date, competence!.end_date)) + " a " + formatDate(competence!.end_date));
         return;
       }
 
@@ -893,7 +901,7 @@ export function Relatorios() {
           if (format === "excel" && bankRows.length) await downloadBankHoursExcel(targetPeriod, bankRows);
         }
         if (!pdfRows.length) throw new Error("Não há saldos calculados para exportar.");
-        if (format === "pdf") downloadReportPdf("Banco de horas", pdfRows, allCompetencies ? "Todas as competências" : "Competência: " + formatDate(competence!.start_date) + " a " + formatDate(competence!.end_date));
+        if (format === "pdf") downloadReportPdf("Banco de horas", pdfRows, allCompetencies ? "Todas as competências" : "Competência: " + formatDate(displayPeriodStart(competence!.start_date, competence!.end_date)) + " a " + formatDate(competence!.end_date));
         return;
       }
 
@@ -1112,7 +1120,7 @@ export function Relatorios() {
           .map((row: any) => {
             const annotation: any = annotationById.get(String(row.id)) ?? {};
             const startDate = annotation.absence_display_date ||
-              (row.period_start === "2025-12-21" && row.period_end === "2026-01-20" ? "2025-12-11" : row.period_start);
+              displayPeriodStart(String(row.period_start ?? ""), String(row.period_end ?? ""));
             const endDate = annotation.absence_display_end_date || row.period_end || "";
             const notes = [annotation.absence_display_justification, annotation.absence_display_notes]
               .filter(Boolean)
@@ -1133,7 +1141,7 @@ export function Relatorios() {
       if (!rows.length) throw new Error("Não há dados para exportar nesse relatório para os filtros selecionados.");
       if (format === "pdf") {
         const reportTitle = reports.find(([key]) => key === kind)?.[1] ?? "Relatório";
-        const subtitle = (allCompetencies ? "Todas as competências" : competence ? "Competência: " + formatDate(competence.start_date) + " a " + formatDate(competence.end_date) : "Todas as competências") + (companyFilter ? " · Empresa selecionada" : " · Todas as empresas");
+        const subtitle = (allCompetencies ? "Todas as competências" : competence ? "Competência: " + formatDate(displayPeriodStart(competence.start_date, competence.end_date)) + " a " + formatDate(competence.end_date) : "Todas as competências") + (companyFilter ? " · Empresa selecionada" : " · Todas as empresas");
         downloadReportPdf(reportTitle, rows, subtitle);
       } else {
         await downloadStandardReportExcel(kind, rows);
@@ -1184,7 +1192,7 @@ export function Relatorios() {
             <option value="todos">Todas as competências</option>
             {periods.map(period => (
               <option key={period.id} value={period.id}>
-                {formatDate(period.start_date)} a {formatDate(period.end_date)} · Ref. {String(period.reference_month).padStart(2, "0")}/{period.reference_year} · {period.status}
+                {formatPeriodRange(period)} · Ref. {String(period.reference_month).padStart(2, "0")}/{period.reference_year} · {period.status}
               </option>
             ))}
           </select>
