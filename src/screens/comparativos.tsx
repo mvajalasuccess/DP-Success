@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+import { ScreenBrand } from "@/components/screen-brand";
 type Employee = { id: string; full_name: string; company_id?: string | null; status?: string | null };
 type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string };
 type Totals = { he60: number; he60_20: number; he100: number; he20: number; interjornada: number; debitos: number; faltas: number; atestados: number };
@@ -286,7 +287,7 @@ export function Comparativos() {
     <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6">
       <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
         <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a>
-        <span className="dp-brand">DP Success • Comparativos</span>
+        <ScreenBrand name="Comparativos" />
       </div>
     </header>
     <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:py-8">
