@@ -371,11 +371,13 @@ export function ImportacaoHistorico() {
         </div>
       </header>
       <main className="mx-auto max-w-[1200px] px-6 py-7">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Importação</p>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Importar histórico</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Importe a aba BASE do Power BI para continuar os KPIs de 2026 sem transformar o histórico consolidado em lançamentos fictícios.
-        </p>
+        <section className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 [&_p]:!text-white/75 [&_h1]:!text-white">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Importação</p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Importar histórico</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Importe a aba BASE do Power BI para continuar os KPIs de 2026 sem transformar o histórico consolidado em lançamentos fictícios.
+          </p>
+        </section>
 
         <Card className="mt-6 p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
