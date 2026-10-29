@@ -54,7 +54,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "DP SUCCESS / RH e Departamento Pessoal" },
+      { title: "DP Success • RH e Departamento Pessoal" },
       { name: "description", content: "Sistema de RH e Departamento Pessoal para gestão de ponto, banco de horas, absenteísmo e indicadores." },
       { name: "author", content: "DP Success" },
     ],
