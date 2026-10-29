@@ -1,4 +1,5 @@
-import { ArrowLeft, ChevronDown, ChevronUp, Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Download, FileSpreadsheet, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -345,12 +346,12 @@ export function Ocorrencias() {
   }
 
 
-  function exportFilteredReport() {
+  function getFilteredReportRows() {
     const reportRows: Record<string, unknown>[] = [
       ...absenceRows.map(row => ({
         "Funcionário": row.employees?.full_name ?? "",
-        "Data inicial": row.occurrence_date,
-        "Data final": row.end_date ?? "",
+        "Data inicial": formatDate(row.occurrence_date),
+        "Data final": formatDate(row.end_date) ?? "",
         "Tipo": row.occurrence_types?.name ?? "",
         "Quantidade": row.quantity ?? "",
         "Unidade": row.unit ?? "dias",
@@ -359,8 +360,8 @@ export function Ocorrencias() {
       })),
       ...daysOffRows.map(row => ({
         "Funcionário": row.employees?.full_name ?? "",
-        "Data inicial": row.occurrence_date,
-        "Data final": row.end_date ?? "",
+        "Data inicial": formatDate(row.occurrence_date),
+        "Data final": formatDate(row.end_date) ?? "",
         "Tipo": row.occurrence_types?.name ?? "",
         "Quantidade": row.quantity ?? "",
         "Unidade": row.unit ?? "dias",
@@ -369,8 +370,8 @@ export function Ocorrencias() {
       })),
       ...filteredHistoricalAbsences.map(row => ({
         "Funcionário": row.employee_name ?? "",
-        "Data inicial": historicalDisplayStart(row),
-        "Data final": row.absence_display_end_date || row.period_end || "",
+        "Data inicial": formatDate(historicalDisplayStart(row)),
+        "Data final": formatDate(row.absence_display_end_date || row.period_end || ""),
         "Tipo": row.absence_display_type || "Falta",
         "Quantidade": row.absence_display_quantity ?? row.absence_quantity,
         "Unidade": "dias",
@@ -378,23 +379,31 @@ export function Ocorrencias() {
         "Observações": row.absence_display_notes ?? "",
       })),
     ];
-    if (!reportRows.length) {
-      setError("Não há registros para exportar com os filtros selecionados.");
-      return;
-    }
-    const escape = (value: unknown) => {
-      let text = String(value ?? "");
-      if (/^[=+\-@]/.test(text)) text = "'" + text;
-      return '"' + text.replaceAll('"', '""') + '"';
-    };
-    const csv = ["\ufeff" + Object.keys(reportRows[0]).map(escape).join(";"), ...reportRows.map(row => Object.values(row).map(escape).join(";"))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "faltas-e-folgas-filtradas.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    return reportRows;
+  }
+
+  function exportFilteredExcel() {
+    const reportRows = getFilteredReportRows();
+    if (!reportRows.length) { setError("Não há registros para exportar com os filtros selecionados."); return; }
+    const worksheet = XLSX.utils.json_to_sheet(reportRows);
+    worksheet["!cols"] = Object.keys(reportRows[0]).map(key => ({ wch: Math.min(36, Math.max(14, key.length + 4, ...reportRows.slice(0, 30).map(row => String(row[key] ?? "").length + 2))) }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Faltas e Folgas");
+    XLSX.writeFile(workbook, "faltas-e-folgas-filtradas.xlsx");
+  }
+
+  function exportFilteredPdf() {
+    const reportRows = getFilteredReportRows();
+    if (!reportRows.length) { setError("Não há registros para exportar com os filtros selecionados."); return; }
+    const columns = Object.keys(reportRows[0]);
+    const escapeHtml = (value: unknown) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+    const tableHead = columns.map(column => "<th>" + escapeHtml(column) + "</th>").join("");
+    const tableRows = reportRows.map(row => "<tr>" + columns.map(column => "<td>" + escapeHtml(row[column]) + "</td>").join("") + "</tr>").join("");
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) { setError("O navegador bloqueou a janela do PDF. Permita pop-ups para este site e tente novamente."); return; }
+    printWindow.document.write("<!doctype html><html lang='pt-BR'><head><meta charset='utf-8'><title>Faltas e Folgas</title><style>\
+      @page{size:landscape;margin:12mm}body{font-family:Arial,sans-serif;color:#17212b;font-size:10px}h1{font-size:18px;margin:0 0 6px}p{font-size:10px;color:#475569;margin:0 0 14px}table{width:100%;border-collapse:collapse;table-layout:auto}th,td{border:1px solid #cbd5e1;padding:5px;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{background:#e8eef2;font-weight:700}tr{page-break-inside:avoid}thead{display:table-header-group}</style></head><body><h1>Faltas e Folgas</h1><p>Relatório gerado conforme os filtros selecionados · 29/10/2026, 18:14:39</p><table><thead><tr>" + tableHead + "</tr></thead><tbody>" + tableRows + "</tbody></table><script>window.onload=function(){window.focus();window.print();};<\/script></body></html>");
+    printWindow.document.close();
   }
 
   function displayQuantity(row: Occ) {
@@ -446,9 +455,12 @@ export function Ocorrencias() {
           </div>
         </Card>
 
-        <div className="mt-4 flex justify-end">
-          <button type="button" onClick={exportFilteredReport} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            <Download className="h-4 w-4" /> Exportar relatório filtrado
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <button type="button" onClick={exportFilteredExcel} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            <FileSpreadsheet className="h-4 w-4" /> Exportar Excel
+          </button>
+          <button type="button" onClick={exportFilteredPdf} className="inline-flex items-center gap-2 rounded-lg border bg-card px-4 py-2.5 text-sm font-medium hover:bg-muted">
+            <FileText className="h-4 w-4" /> Exportar PDF
           </button>
         </div>
 
