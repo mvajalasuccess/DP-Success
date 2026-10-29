@@ -88,8 +88,16 @@ export function Atestados() {
     } else {
       const periodById = new Map(loadedPeriods.map(p => [p.id, p]));
       const historical = ((historicalResult.data ?? []) as HistoricalBaseRow[])
-        .map(row => { const period = periodById.get(row.period_id); return { ...row, period_start: period?.start_date, period_end: period?.end_date }; })
-        .filter(row => (row.period_end ?? (String(row.reference_year) + "-" + String(row.reference_month).padStart(2, "0") + "-28")) >= "2025-12-11");
+        .map(row => {
+          const period = periodById.get(row.period_id);
+          // BASE usa competências de 21 do mês anterior a 20 do mês de referência.
+          // Se o período não estiver vinculado, reconstruímos somente a faixa da competência.
+          const fallbackStart = new Date(row.reference_year, row.reference_month - 2, 21);
+          const fallbackEnd = new Date(row.reference_year, row.reference_month - 1, 20);
+          const toISO = (date: Date) => date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+          return { ...row, period_start: period?.start_date ?? toISO(fallbackStart), period_end: period?.end_date ?? toISO(fallbackEnd) };
+        })
+        .filter(row => (row.period_end ?? "") >= "2025-12-11");
       setHistoricalBaseRows(historical);
       setHistoricalEmployeeChoices(Object.fromEntries(historical.map(row => [row.id, row.employee_id ?? ""])));
     }
@@ -126,8 +134,12 @@ export function Atestados() {
 
   const filteredHistoricalBaseRows = historicalBaseRows.filter(row => {
     const matchedEmployee = row.employee_id ? employees.find(employee => employee.id === row.employee_id) : null;
-    const rowCompanyId = matchedEmployee?.company_id ?? null;
-    return (!companyFilter || rowCompanyId === companyFilter) && (filterEmployee === "todos" || row.employee_id === filterEmployee) && (!selectedPeriod || row.period_id === selectedPeriod.id);
+    // Registros sem vínculo precisam continuar visíveis para corrigir o funcionário.
+    const companyMatches = !companyFilter || !matchedEmployee || matchedEmployee.company_id === companyFilter;
+    const employeeMatches = filterEmployee === "todos" || !row.employee_id || row.employee_id === filterEmployee;
+    const periodMatches = !selectedPeriod || row.period_id === selectedPeriod.id ||
+      (!row.period_id && row.period_start <= selectedPeriod.end_date && row.period_end >= selectedPeriod.start_date);
+    return companyMatches && employeeMatches && periodMatches;
   });
 
   async function saveHistoricalEmployee(row: HistoricalBaseRow) {
