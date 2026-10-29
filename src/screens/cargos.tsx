@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+import { ScreenBrand } from "@/components/screen-brand";
 export function Positions() {
   const [rows, setRows] = useState<any[]>([]);
   const [search, setSearch] = useState("");
@@ -86,7 +87,7 @@ export function Positions() {
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground">
             <ArrowLeft className="h-4 w-4" /> Voltar
           </a>
-          <b className="dp-brand">DP Success • Cargos</b>
+          <ScreenBrand name="Cargos" />
         </div>
       </header>
 
