@@ -120,7 +120,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
       if (/department|departamento/.test(name)) return 1.35;
       if (/registration|matr.cula/.test(name)) return 0.8;
       if (/date|data|status|situa..o/.test(name)) return 0.85;
-      if (/min\\)|saldo|horas|he_|interjornada|d.bit|pagamento|ajuste/.test(name)) return 0.9;
+      if (/min\)|saldo|horas|he_|interjornada|d.bit|pagamento|ajuste/.test(name)) return 0.9;
       return 1;
     }
     if (/employee|funcion.rio/.test(name)) return 2.45;
