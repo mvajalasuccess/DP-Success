@@ -180,7 +180,7 @@ export function Atestados() {
       declaration_observation: row.declaration_observation || "",
       certificate_start_date: row.certificate_start_date || row.period_start || "",
       certificate_end_date: row.certificate_end_date || row.period_end || "",
-      declaration_date: row.declaration_date || row.period_start || "",
+      declaration_date: row.declaration_date || "",
     });
     setMode(kind);
     setError("");
