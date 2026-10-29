@@ -237,7 +237,7 @@ function AppShell({
           </div>
         </div>
       )}
-      <aside aria-label="Barra lateral principal" className={`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r bg-sidebar transition-[transform,width] duration-200 lg:flex lg:flex-col ${collapsed ? "-translate-x-full w-64" : "translate-x-0 w-64"}`}>
+      <aside aria-label="Barra lateral principal" className={`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r border-white/15 bg-gradient-to-b from-[#102b35] via-[#123c40] to-[#075c50] text-white transition-[transform,width] duration-200 [&_.dp-sidebar-group-label]:!text-white/75 [&_.dp-sidebar-item]:!text-white [&_.dp-sidebar-item]:hover:!bg-white/10 [&_.dp-sidebar-item-active]:!bg-white/15 [&_.dp-sidebar-item-active]:!text-white [&_.dp-sidebar-header]:!border-white/15 lg:flex lg:flex-col ${collapsed ? "-translate-x-full w-64" : "translate-x-0 w-64"}`}>
         <div className={`dp-sidebar-header flex h-[82px] shrink-0 items-center border-b border-sidebar-border ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
           {!collapsed && (
             <div className="flex min-w-0 items-center gap-3">
@@ -302,18 +302,19 @@ function AppShell({
                 <button type="button" onClick={() => setTasksOpen(v => !v)} className={sectionButtonClass} aria-expanded={tasksOpen} aria-controls="dp-sidebar-organization">
                   <span>Organização</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${tasksOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
                 </button>
+                {tasksOpen && <div id="dp-sidebar-organization" className="mt-1 space-y-1">
+                  <button type="button" onClick={() => go("planejamento-mensal")} aria-current={screen === "planejamento-mensal" ? "page" : undefined} className={buttonClass("planejamento-mensal")}><CalendarRange className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Planejamento Mensal</span></button>
+                  <button type="button" onClick={() => go("diario-ocorrencias")} aria-current={screen === "diario-ocorrencias" ? "page" : undefined} className={buttonClass("diario-ocorrencias")}><ClipboardList className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Diário de Ocorrências</span></button>
+                  <button type="button" onClick={() => go("tarefas")} aria-current={screen === "tarefas" ? "page" : undefined} className={buttonClass("tarefas")}><ListChecks className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Tarefas</span></button>
+                </div>}
+              </section>
+
               <section className="dp-sidebar-group">
                 <button type="button" onClick={() => setPeopleOpen(v => !v)} className={sectionButtonClass} aria-expanded={peopleOpen} aria-controls="dp-sidebar-people">
                   <span>Pessoas</span><ChevronDown className={"h-4 w-4 transition-transform duration-150 " + (peopleOpen ? "rotate-0" : "-rotate-90")} strokeWidth={1.8} />
                 </button>
                 {peopleOpen && <div id="dp-sidebar-people" className="mt-1 space-y-1">
                   <button type="button" onClick={() => go("ferias")} aria-current={screen === "ferias" ? "page" : undefined} className={buttonClass("ferias")}><Palmtree className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Férias</span></button>
-                </div>}
-              </section>
-                {tasksOpen && <div id="dp-sidebar-organization" className="mt-1 space-y-1">
-                  <button type="button" onClick={() => go("planejamento-mensal")} aria-current={screen === "planejamento-mensal" ? "page" : undefined} className={buttonClass("planejamento-mensal")}><CalendarRange className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Planejamento Mensal</span></button>
-                  <button type="button" onClick={() => go("diario-ocorrencias")} aria-current={screen === "diario-ocorrencias" ? "page" : undefined} className={buttonClass("diario-ocorrencias")}><ClipboardList className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Diário de Ocorrências</span></button>
-                  <button type="button" onClick={() => go("tarefas")} aria-current={screen === "tarefas" ? "page" : undefined} className={buttonClass("tarefas")}><ListChecks className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Tarefas</span></button>
                 </div>}
               </section>
             </>
