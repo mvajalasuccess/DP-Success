@@ -590,7 +590,7 @@ export function PointClosing() {
       </header>
 
       <main className="mx-auto w-full max-w-none px-4 py-7">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex flex-col justify-between gap-4 md:flex-row md:items-end [&_p]:!text-white/75 [&_h1]:!text-white">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Operação</p>
             <h1 className="mt-1 text-3xl font-bold">Fechamento de Ponto</h1>
