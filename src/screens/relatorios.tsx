@@ -1041,21 +1041,85 @@ export function Relatorios() {
       let rows: any[] = [];
 
       if (kind === "interjornada") {
-        const data = await fetchAll((from, to) => db
-          .from("overtime_records")
-          .select("employee_id,reference_date,minutes,notes,launch_type,employees(full_name,registration,company_id,departments(name))")
-          .eq("launch_type", "INTERJORNADA_50")
-          .order("reference_date", { ascending: false })
-          .range(from, to));
-        rows = data.filter((x: any) => allowedEmployeeIds.has(String(x.employee_id)) && (allCompetencies || !competence || (x.reference_date >= competence.start_date && x.reference_date <= competence.end_date))).map((x: any) => ({
-          employee_id: x.employee_id,
-          registration: x.employees?.registration ?? "",
-          employee: x.employees?.full_name ?? "",
-          department: x.employees?.departments?.name ?? "",
-          date: x.reference_date,
-          minutes: Math.abs(Number(x.minutes || 0)),
-          description: x.notes ?? "",
-        }));
+        const [operationalRows, historicalRows] = await Promise.all([
+          fetchAll((from, to) => db
+            .from("overtime_records")
+            .select("employee_id,reference_date,minutes,notes,launch_type,employees(full_name,registration,company_id,departments(name))")
+            .eq("launch_type", "INTERJORNADA_50")
+            .order("reference_date", { ascending: false })
+            .range(from, to)),
+          fetchAll((from, to) => db
+            .from("historical_kpi_data")
+            .select("employee_id,registration,employee_name,department_name,period_id,reference_year,reference_month,interjornada_minutes")
+            .gt("interjornada_minutes", 0)
+            .order("reference_year", { ascending: false })
+            .range(from, to)),
+        ]);
+
+        const periodById = new Map(periods.map((period: Period) => [String(period.id), period]));
+        const employeeByRegistration = new Map((companyEmployeeRows ?? [])
+          .filter((employee: any) => employee.registration)
+          .map((employee: any) => [String(employee.registration).trim().toLowerCase(), String(employee.id)]));
+        const employeeByName = new Map((companyEmployeeRows ?? [])
+          .map((employee: any) => [String(employee.full_name ?? "").trim().toLowerCase(), String(employee.id)]));
+        const resolveHistoricalEmployeeId = (row: any) => row.employee_id
+          ? String(row.employee_id)
+          : employeeByRegistration.get(String(row.registration ?? "").trim().toLowerCase()) ??
+            employeeByName.get(String(row.employee_name ?? "").trim().toLowerCase()) ?? "";
+        const periodForHistoricalRow = (row: any) => periodById.get(String(row.period_id ?? "")) ??
+          periods.find((period: Period) => period.reference_year === Number(row.reference_year) &&
+            period.reference_month === Number(row.reference_month));
+        const inSelectedCompetence = (period: Period | undefined) =>
+          allCompetencies || !competence || (!!period &&
+            period.start_date <= competence.end_date && period.end_date >= competence.start_date);
+
+        // Os valores importados da BASE vivem em historical_kpi_data, não em overtime_records.
+        // Para competências históricas, usamos a BASE como fonte principal e evitamos duplicar
+        // os lançamentos operacionais que eventualmente existam no mesmo período.
+        const historicalInterjornada = historicalRows
+          .filter((row: any) => {
+            const employeeId = resolveHistoricalEmployeeId(row);
+            return allowedEmployeeIds.has(employeeId) && inSelectedCompetence(periodForHistoricalRow(row));
+          })
+          .map((row: any) => {
+            const period = periodForHistoricalRow(row);
+            const employeeId = resolveHistoricalEmployeeId(row);
+            const employee = (companyEmployeeRows ?? []).find((item: any) => String(item.id) === employeeId);
+            return {
+              employee_id: employeeId,
+              registration: row.registration ?? employee?.registration ?? "",
+              employee: row.employee_name ?? employee?.full_name ?? "",
+              department: row.department_name ?? "",
+              date: period?.end_date ?? "",
+              minutes: Math.abs(Math.round(Number(row.interjornada_minutes) || 0)),
+              description: "Importado da BASE histórica",
+              source: "historical",
+              period_end_date: period?.end_date ?? "",
+            };
+          });
+
+        const operationalInterjornada = operationalRows
+          .filter((row: any) => {
+            const rowPeriod = periods.find((period: Period) =>
+              period.start_date <= String(row.reference_date ?? "") &&
+              period.end_date >= String(row.reference_date ?? ""));
+            const isHistoricalPeriod = !!rowPeriod && rowPeriod.end_date <= HISTORICAL_CUTOFF;
+            return !isHistoricalPeriod &&
+              allowedEmployeeIds.has(String(row.employee_id)) &&
+              (allCompetencies || !competence || (row.reference_date >= competence.start_date && row.reference_date <= competence.end_date));
+          })
+          .map((row: any) => ({
+            employee_id: row.employee_id,
+            registration: row.employees?.registration ?? "",
+            employee: row.employees?.full_name ?? "",
+            department: row.employees?.departments?.name ?? "",
+            date: row.reference_date,
+            minutes: Math.abs(Number(row.minutes || 0)),
+            description: row.notes ?? "",
+            source: "operational",
+          }));
+
+        rows = [...historicalInterjornada, ...operationalInterjornada];
       }
 
       if (kind === "atestados") {
