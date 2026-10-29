@@ -156,7 +156,7 @@ function formatDate(value: string) {
 }
 
 function displayPeriodStart(start: string, end: string) {
-  return start === "2025-12-21" && end === "2026-01-20" ? "2025-12-11" : start;
+  return end === "2026-01-20" ? "2025-12-11" : start;
 }
 
 function formatPeriodRange(period: Pick<Period, "start_date" | "end_date">) {
