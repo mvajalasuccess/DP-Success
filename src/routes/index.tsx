@@ -871,7 +871,7 @@ function DashboardHome() {
             <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
               <ChevronLeft className="h-4 w-4" />Voltar
             </a>
-            <span className="text-sm font-semibold">DP SUCCESS <span className="text-muted-foreground">/ Dashboard</span></span>
+            <span className="dp-brand">DP Success • Dashboard</span>
           </div>
         </header>
         <div className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
