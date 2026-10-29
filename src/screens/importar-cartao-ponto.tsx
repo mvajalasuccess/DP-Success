@@ -226,7 +226,7 @@ export function ImportarCartaoPonto() {
   return (
     <div className="dp-screen min-h-screen bg-background">
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-6 py-5">
+        <div className="mx-auto max-w-[1500px] relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex items-center justify-between px-6 py-5 [&_p]:!text-white/75 [&_h1]:!text-white">
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Fechamento de Ponto</p>
             <h1 className="text-2xl font-bold">Importar Cartão Ponto</h1>
