@@ -415,7 +415,7 @@ async function downloadClosingExcel(period: Period, rows: any[]) {
     for (let index = 0; index < closingColumns.length; index++) {
       if (closingColumns[index]?.duration) row.getCell(index + 1).numFmt = "[h]:mm;-[h]:mm";
     }
-    row.getCell(7).numFmt = "0.##";
+    row.getCell(7).numFmt = "0";
   }
 
   closingColumns.forEach((column, index) => {
@@ -723,7 +723,7 @@ async function downloadStandardReportExcel(kind: string, rows: any[], subtitle?:
         if (column.format === "date") cell.numFmt = "dd/mm/yyyy";
         else if (column.format === "duration") cell.numFmt = "[h]:mm;-[h]:mm";
         else if (column.format === "currency") cell.numFmt = '"R$" #,##0.00';
-        else if (column.format === "number") cell.numFmt = "0.##";
+        else if (column.format === "number") cell.numFmt = "0";
       });
     }
 
