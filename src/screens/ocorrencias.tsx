@@ -436,7 +436,7 @@ export function Ocorrencias() {
         });
         columns.forEach((column, index) => {
           const cell = row.getCell(index + 1);
-          if (["Dias", "Quantidade"].includes(column.key) && typeof source[column.key] === "number") cell.numFmt = "0.##";
+          if (["Dias", "Quantidade"].includes(column.key) && typeof source[column.key] === "number") cell.numFmt = "0";
         });
       }
 
