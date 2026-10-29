@@ -1216,6 +1216,8 @@ main :is(h1, h2, h3) {
   background-position: center;
 }
 .dp-brand svg { display: none !important; }
+.dp-brand-on-dark { color: #ffffff !important; }
+.dp-brand-on-dark::before { background-color: rgb(255 255 255 / 0.14); }
 .dp-brand > span { color: inherit !important; font-size: inherit !important; font-weight: inherit !important; line-height: inherit !important; }
 @media (max-width: 480px) {
   .dp-brand { gap: 0.375rem; font-size: 0.8125rem !important; }
