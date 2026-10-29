@@ -7,6 +7,22 @@ import { CompanyFilter } from "@/components/company-filter";
 import { ScreenBrand } from "@/components/screen-brand";
 type Employee = { id: string; full_name: string; status?: string; hire_date?: string | null; termination_date?: string | null; company_id?: string | null };
 type OccType = { id: string; code: string; name: string; unit: string; requires_justification: boolean; affects_balance: boolean };
+type HistoricalAbsence = {
+  id: string;
+  employee_id: string | null;
+  employee_name: string;
+  registration: string | null;
+  period_id: string | null;
+  period_start: string;
+  period_end: string;
+  reference_year: number;
+  reference_month: number;
+  absence_quantity: number;
+  absence_display_date?: string | null;
+  absence_display_type?: string | null;
+  absence_display_quantity?: number | null;
+};
+
 type Occ = {
   id: string;
   employee_id: string;
@@ -41,6 +57,12 @@ const emptyForm = {
 
 export function Ocorrencias() {
   const [rows, setRows] = useState<Occ[]>([]);
+  const [historicalAbsences, setHistoricalAbsences] = useState<HistoricalAbsence[]>([]);
+  const [historicalEditing, setHistoricalEditing] = useState<HistoricalAbsence | null>(null);
+  const [historicalForm, setHistoricalForm] = useState({ date: "", type: "Falta importada da BASE", quantity: "" });
+  const [historicalSaveError, setHistoricalSaveError] = useState("");
+  const [historicalSaving, setHistoricalSaving] = useState(false);
+  const [historicalAnnotationsReady, setHistoricalAnnotationsReady] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [types, setTypes] = useState<OccType[]>([]);
   const [periods, setPeriods] = useState<{ id: string; start_date: string; end_date: string }[]>([]);
@@ -82,6 +104,32 @@ export function Ocorrencias() {
 
     if (error) setError(error.message);
     else setRows(((data ?? []) as Occ[]).filter(row => ALLOWED_CODES.has(String(row.occurrence_types?.code ?? ""))));
+
+    const db = supabase as any;
+    const { data: historicalData, error: historicalError } = await db
+      .from("historical_kpi_data")
+      .select("id,employee_id,employee_name,registration,period_id,period_start,period_end,reference_year,reference_month,absence_quantity")
+      .gt("absence_quantity", 0)
+      .order("period_start", { ascending: false });
+    if (historicalError) {
+      setHistoricalAbsences([]);
+      setError(previous => previous || historicalError.message);
+      return;
+    }
+
+    const baseRows = (historicalData ?? []) as HistoricalAbsence[];
+    const { data: annotations, error: annotationsError } = await db
+      .from("historical_kpi_annotations")
+      .select("historical_kpi_data_id,absence_display_date,absence_display_type,absence_display_quantity")
+      .in("historical_kpi_data_id", baseRows.map(row => row.id).slice(0, 500));
+    setHistoricalAnnotationsReady(!annotationsError);
+    const annotationById = new Map<string, any>(
+      (annotations ?? []).map((item: any) => [item.historical_kpi_data_id, item]),
+    );
+    setHistoricalAbsences(baseRows.map(row => ({
+      ...row,
+      ...(annotationById.get(row.id) ?? {}),
+    })));
   }
 
   async function loadOptions() {
@@ -111,6 +159,56 @@ export function Ocorrencias() {
   );
   const absenceRows = filteredRows.filter(row => ["falta_justificada", "falta_injustificada"].includes(String(row.occurrence_types?.code ?? "")));
   const daysOffRows = filteredRows.filter(row => ["folga_abonada", "folga_descontada"].includes(String(row.occurrence_types?.code ?? "")));
+  const filteredHistoricalAbsences = historicalAbsences.filter(row =>
+    (!companyFilter || (!!row.employee_id && companyEmployeeIds.has(row.employee_id))) &&
+    (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
+    (!selectedPeriod || (row.period_start <= selectedPeriod.end_date && row.period_end >= selectedPeriod.start_date))
+  );
+
+  function startHistoricalEdit(row: HistoricalAbsence) {
+    setHistoricalEditing(row);
+    setHistoricalForm({
+      date: row.absence_display_date ?? "",
+      type: row.absence_display_type ?? "Falta importada da BASE",
+      quantity: String(row.absence_display_quantity ?? row.absence_quantity ?? ""),
+    });
+    setHistoricalSaveError("");
+  }
+
+  async function saveHistoricalDisplay() {
+    if (!historicalEditing) return;
+    const quantity = Number(historicalForm.quantity);
+    if (!historicalForm.type.trim() || !Number.isFinite(quantity) || quantity < 0) {
+      setHistoricalSaveError("Informe o tipo e uma quantidade válida igual ou maior que zero.");
+      return;
+    }
+    if (!historicalAnnotationsReady) {
+      setHistoricalSaveError("Execute o SQL complementar das faltas históricas antes de salvar. Os registros originais continuam preservados.");
+      return;
+    }
+    setHistoricalSaving(true);
+    setHistoricalSaveError("");
+    const db = supabase as any;
+    const { error: saveError } = await db.from("historical_kpi_annotations").upsert({
+      historical_kpi_data_id: historicalEditing.id,
+      absence_display_date: historicalForm.date || null,
+      absence_display_type: historicalForm.type.trim(),
+      absence_display_quantity: quantity,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "historical_kpi_data_id" });
+    setHistoricalSaving(false);
+    if (saveError) {
+      setHistoricalSaveError(saveError.message);
+      return;
+    }
+    setHistoricalEditing(null);
+    await load();
+  }
+
+  function displayHistoricalQuantity(row: HistoricalAbsence) {
+    const value = row.absence_display_quantity ?? row.absence_quantity;
+    return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  }
   function periodLabel(period: { id: string; start_date: string; end_date: string }) {
     return `${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
   }
@@ -277,6 +375,32 @@ export function Ocorrencias() {
         </Card>
 
         <Card className="mt-6 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b p-4">
+            <div>
+              <h2 className="font-semibold">Faltas importadas da BASE</h2>
+              <p className="text-xs text-muted-foreground">{filteredHistoricalAbsences.length} registro(s) histórico(s) · ajustes somente visuais</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur">
+                <tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data exibida</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Quantidade</th><th className="px-5 py-3 text-right">Ações</th></tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredHistoricalAbsences.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma falta histórica encontrada para os filtros selecionados.</td></tr>}
+                {filteredHistoricalAbsences.map(row => <tr key={row.id} className="transition-colors hover:bg-muted/25">
+                  <td className="px-5 py-4 font-medium">{row.employee_name}{row.registration ? <span className="ml-2 text-xs text-muted-foreground">({row.registration})</span> : null}<div className="text-xs text-muted-foreground">Competência: {formatDate(row.period_start)} a {formatDate(row.period_end)}</div></td>
+                  <td className="px-5 py-4">{row.absence_display_date ? formatDate(row.absence_display_date) : "—"}</td>
+                  <td className="px-5 py-4">{row.absence_display_type || "Falta importada da BASE"}</td>
+                  <td className="px-5 py-4">{displayHistoricalQuantity(row)}</td>
+                  <td className="px-5 py-4 text-right"><button onClick={() => startHistoricalEdit(row)} className="rounded-md border p-2" title="Editar somente visualização" aria-label="Editar somente visualização"><Pencil className="h-4 w-4" /></button></td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <Card className="mt-6 overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Folgas</h2><p className="text-xs text-muted-foreground">{daysOffRows.length} registro(s)</p></div><button type="button" onClick={() => setShowDaysOff(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDaysOff ? "Ocultar folgas" : "Mostrar folgas"} aria-label={showDaysOff ? "Ocultar folgas" : "Mostrar folgas"}>{showDaysOff ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
           {showDaysOff && <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Quantidade</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">
             {daysOffRows.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma folga encontrada para os filtros selecionados.</td></tr>}
@@ -284,6 +408,25 @@ export function Ocorrencias() {
           </tbody></table></div>}
         </Card>
       </main>
+
+      {historicalEditing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-xl p-6">
+            <h2 className="text-xl font-bold">Editar falta histórica</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Altere apenas a exibição. A BASE original, as competências, os cálculos, abonos e banco de horas não serão modificados.</p>
+            <div className="mt-5 grid gap-4">
+              <label className="grid gap-1 text-sm"><span>Data para exibição</span><input type="date" value={historicalForm.date} onChange={e => setHistoricalForm({ ...historicalForm, date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+              <label className="grid gap-1 text-sm"><span>Tipo para exibição</span><input value={historicalForm.type} onChange={e => setHistoricalForm({ ...historicalForm, type: e.target.value })} className="rounded-lg border px-3 py-2" placeholder="Ex.: Falta justificada" /></label>
+              <label className="grid gap-1 text-sm"><span>Quantidade para exibição</span><input type="number" min="0" step="0.01" value={historicalForm.quantity} onChange={e => setHistoricalForm({ ...historicalForm, quantity: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+            </div>
+            {historicalSaveError && <p className="mt-3 text-sm text-destructive">{historicalSaveError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setHistoricalEditing(null)} className="rounded-lg border px-4 py-2">Cancelar</button>
+              <button disabled={historicalSaving} onClick={() => void saveHistoricalDisplay()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{historicalSaving ? "Salvando..." : "Salvar visualização"}</button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
