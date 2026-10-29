@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, Circle, ClipboardList, Clock3, Filter, List, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Circle, ClipboardList, Clock3, Filter, List, Plus, Trash2, X } from "lucide-react";
+import { ScreenBrand } from "@/components/screen-brand";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -78,7 +79,8 @@ export function Tarefas(){
   const prof=(id:string|null)=>{const p=profiles.find(x=>x.id===id);return p?.full_name||p?.email};
 
   return <div className="dp-screen min-h-screen bg-background">
-    <header className="border-b px-6 py-5"><div className="mx-auto max-w-[1250px] relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex flex-wrap items-center justify-between gap-4 [&_p]:!text-white/75 [&_h1]:!text-white">
+    <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6"><div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4"><a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a><ScreenBrand name="Tarefas" /></div>
+    <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex flex-wrap items-center justify-between gap-4 [&_p]:!text-white/75 [&_h1]:!text-white">
       <div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Organização do RH</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Tarefas e Agenda</h1><p className="mt-1 text-sm text-muted-foreground">Centralize suas pendências, prazos e lembretes.</p></div>
       <button onClick={newTask} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-foreground"><Plus className="h-4 w-4"/>Nova tarefa</button>
     </div></header>
