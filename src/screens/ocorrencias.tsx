@@ -153,10 +153,10 @@ export function Ocorrencias() {
   }, []);
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
+  const displayPeriodStart = (start: string, end: string) =>
+    start === "2025-12-21" && end === "2026-01-20" ? "2025-12-11" : start;
   const historicalDisplayStart = (row: HistoricalAbsence) =>
-    row.period_start === "2025-12-21" && row.period_end === "2026-01-20"
-      ? "2025-12-11"
-      : row.period_start;
+    row.absence_display_date || displayPeriodStart(row.period_start, row.period_end);
   const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
   const companyEmployees = employees.filter(e => !companyFilter || e.company_id === companyFilter);
   const companyEmployeeIds = new Set(companyEmployees.map(e => e.id));
@@ -237,7 +237,7 @@ export function Ocorrencias() {
     return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   }
   function periodLabel(period: { id: string; start_date: string; end_date: string }) {
-    return `${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
+    return `${formatDate(displayPeriodStart(period.start_date, period.end_date))} a ${formatDate(period.end_date)}`;
   }
 
   function startNew() {
