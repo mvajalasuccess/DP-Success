@@ -236,7 +236,7 @@ export function Ocorrencias() {
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </a>
-          <b>DP Success · Faltas e Folgas</b>
+          <b>DP SUCCESS / Faltas e Folgas</b>
         </div>
       </header>
 
