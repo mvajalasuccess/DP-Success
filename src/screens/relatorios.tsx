@@ -1092,7 +1092,7 @@ export function Relatorios() {
           <a href="/" className="flex items-center gap-2 text-sm text-muted-foreground">
             <ArrowLeft className="h-4 w-4" /> Voltar
           </a>
-          <span className="font-semibold">DP Success • Relatórios</span>
+          <span className="dp-brand">DP Success • Relatórios</span>
         </div>
       </header>
       <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
