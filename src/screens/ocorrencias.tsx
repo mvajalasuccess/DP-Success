@@ -121,7 +121,7 @@ export function Ocorrencias() {
     const { data: annotations, error: annotationsError } = await db
       .from("historical_kpi_annotations")
       .select("historical_kpi_data_id,absence_display_date,absence_display_type,absence_display_quantity")
-      .in("historical_kpi_data_id", baseRows.map(row => row.id).slice(0, 500));
+      .in("historical_kpi_data_id", baseRows.map(row => row.id));
     setHistoricalAnnotationsReady(!annotationsError);
     const annotationById = new Map<string, any>(
       (annotations ?? []).map((item: any) => [item.historical_kpi_data_id, item]),
