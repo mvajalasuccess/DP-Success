@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Download, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -207,6 +207,73 @@ export function Atestados() {
     await load();
   }
 
+
+  function exportFilteredReport() {
+    const reportRows: Record<string, unknown>[] = [
+      ...filteredRows.map(row => ({
+        "Tipo de registro": "Atestado",
+        "Funcionário": row.employees?.full_name ?? "",
+        "Data inicial": row.start_date,
+        "Data final": row.end_date,
+        "Dias": displayedDays(row),
+        "Horas abonadas": "",
+        "Tipo / motivo": row.certificate_type ?? "",
+        "CID": row.cid ?? "",
+        "Observações": row.notes ?? "",
+      })),
+      ...historicalCertificates.map(row => ({
+        "Tipo de registro": "Atestado",
+        "Funcionário": historicalEmployeeName(row),
+        "Data inicial": row.period_start ?? "",
+        "Data final": row.period_end ?? "",
+        "Dias": "",
+        "Horas abonadas": formatHistoricalHours(row.certificate_minutes),
+        "Tipo / motivo": row.certificate_type ? (({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[row.certificate_type] || row.certificate_type) : "Tipo não informado",
+        "CID": row.certificate_cid ?? "",
+        "Observações": "",
+      })),
+      ...filteredDeclarations.map(row => ({
+        "Tipo de registro": "Declaração de horas",
+        "Funcionário": row.employees?.full_name ?? "",
+        "Data inicial": row.occurrence_date,
+        "Data final": row.occurrence_date,
+        "Dias": "",
+        "Horas abonadas": formatHistoricalHours(Math.round(Number(row.quantity ?? 0) * 60)),
+        "Tipo / motivo": "",
+        "CID": "",
+        "Observações": row.notes ?? "",
+      })),
+      ...historicalDeclarations.map(row => ({
+        "Tipo de registro": "Declaração de horas",
+        "Funcionário": historicalEmployeeName(row),
+        "Data inicial": row.period_start ?? "",
+        "Data final": row.period_end ?? "",
+        "Dias": "",
+        "Horas abonadas": formatHistoricalHours(row.declaration_minutes),
+        "Tipo / motivo": "",
+        "CID": "",
+        "Observações": row.declaration_observation ?? "",
+      })),
+    ];
+    if (!reportRows.length) {
+      setError("Não há registros para exportar com os filtros selecionados.");
+      return;
+    }
+    const escape = (value: unknown) => {
+      let text = String(value ?? "");
+      if (/^[=+\-@]/.test(text)) text = "'" + text;
+      return '"' + text.replaceAll('"', '""') + '"';
+    };
+    const csv = ["\\ufeff" + Object.keys(reportRows[0]).map(escape).join(";"), ...reportRows.map(row => Object.values(row).map(escape).join(";"))].join("\\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "declaracoes-e-atestados-filtrados.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function displayedDays(row: Certificate) {
     if (!selectedPeriod) return row.days;
     const overlapStart = row.start_date > selectedPeriod.start_date ? row.start_date : selectedPeriod.start_date;
@@ -338,6 +405,11 @@ export function Atestados() {
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         </div>
       </Card>
+      <div className="mt-4 flex justify-end">
+        <button type="button" onClick={exportFilteredReport} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          <Download className="h-4 w-4" /> Exportar relatório filtrado
+        </button>
+      </div>
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
       <Card className="mt-6 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Atestados</h2><p className="text-xs text-muted-foreground">{filteredRows.length + historicalCertificates.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowCertificates(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showCertificates ? "Ocultar atestados" : "Mostrar atestados"} aria-label={showCertificates ? "Ocultar atestados" : "Mostrar atestados"}>{showCertificates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
