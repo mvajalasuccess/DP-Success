@@ -408,7 +408,7 @@ export function ImportacaoHistorico() {
               <div className="mt-5 flex flex-col gap-3 rounded-xl border p-4 text-sm md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="font-semibold">Competência histórica</p>
-                  <p className="text-xs text-muted-foreground">Janeiro/2026 será gravado como 21/12/2025 até 20/01/2026. A BASE será importada somente até julho/2026. Janeiro corresponde a 21/12/2025 → 20/01/2026. Os valores de horas da BASE são horas decimais (ex.: 0,93 = 0h55m48s), e o sistema converte esses valores para minutos.</p>
+                  <p className="text-xs text-muted-foreground">Janeiro/2026 será exibido como 11/12/2025 até 20/01/2026, conforme a orientação do RH. A data original usada na importação histórica e os cálculos da BASE permanecem preservados. A BASE será importada somente até julho/2026. Os valores de horas da BASE são horas decimais (ex.: 0,93 = 0h55m48s), e o sistema converte esses valores para minutos.</p>
                 </div>
                 <button type="button" disabled={loading} onClick={() => void importData()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
                   {loading ? "Importando..." : "Importar histórico"}
