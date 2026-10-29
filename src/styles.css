@@ -1197,6 +1197,7 @@ main :is(h1, h2, h3) {
   justify-content: flex-end;
   gap: 0.5rem;
   color: #102b35 !important;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif !important;
   font-size: 0.875rem !important;
   font-weight: 600 !important;
   line-height: 1.25rem !important;
