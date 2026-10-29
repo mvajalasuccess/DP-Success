@@ -210,7 +210,7 @@ export function Atestados() {
   return <div className="dp-screen min-h-screen bg-background">
     <header className="dp-screen-topbar border-b bg-background px-4 py-3 sm:px-6 sm:py-3.5"><div className="mx-auto flex max-w-[1500px] items-center justify-between">
       <a href="/" className="flex gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a>
-      <b>DP Success · Declarações e Atestados</b>
+      <b>DP SUCCESS / Declarações e Atestados</b>
     </div></header>
     <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
       <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex items-end justify-between gap-4 [&_p]:!text-white/75 [&_h1]:!text-white"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Ponto</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Declarações e Atestados</h1><p className="text-sm text-muted-foreground">Registre atestados e declarações com as horas efetivamente abonadas.</p></div>
