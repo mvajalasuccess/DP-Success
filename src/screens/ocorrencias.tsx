@@ -153,7 +153,12 @@ export function Ocorrencias() {
   }, []);
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
-  const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
+  // Competência especial: ajuste apenas de exibição/filtro nesta tela; não altera a competência salva nem cálculos históricos.
+  const effectivePeriodStart = (period: { start_date: string; end_date: string }) =>
+    period.start_date === "2025-12-21" && period.end_date === "2026-01-20"
+      ? "2025-12-11"
+      : period.start_date;
+  const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= effectivePeriodStart(selectedPeriod)))));
   const companyEmployees = employees.filter(e => !companyFilter || e.company_id === companyFilter);
   const companyEmployeeIds = new Set(companyEmployees.map(e => e.id));
   const employeeIdByRegistration = new Map(employees.filter(e => e.registration).map(e => [String(e.registration).trim().toLowerCase(), e.id]));
@@ -166,7 +171,7 @@ export function Ocorrencias() {
   const filteredRows = rows.filter(row =>
     companyEmployeeIds.has(row.employee_id) &&
     (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
-    (!selectedPeriod || (row.occurrence_date <= selectedPeriod.end_date && (row.end_date ?? row.occurrence_date) >= selectedPeriod.start_date))
+    (!selectedPeriod || (row.occurrence_date <= selectedPeriod.end_date && (row.end_date ?? row.occurrence_date) >= effectivePeriodStart(selectedPeriod)))
   );
   const absenceRows = filteredRows.filter(row => ["falta_justificada", "falta_injustificada"].includes(String(row.occurrence_types?.code ?? "")));
   const daysOffRows = filteredRows.filter(row => ["folga_abonada", "folga_descontada"].includes(String(row.occurrence_types?.code ?? "")));
@@ -174,7 +179,7 @@ export function Ocorrencias() {
     const resolvedEmployeeId = resolveHistoricalEmployeeId(row);
     return (!companyFilter || (!!resolvedEmployeeId && companyEmployeeIds.has(resolvedEmployeeId))) &&
       (filterEmployee === "todos" || resolvedEmployeeId === filterEmployee) &&
-      (!selectedPeriod || (row.period_start <= selectedPeriod.end_date && row.period_end >= selectedPeriod.start_date));
+      (!selectedPeriod || (row.period_start <= selectedPeriod.end_date && row.period_end >= effectivePeriodStart(selectedPeriod)));
   });
 
   function startHistoricalEdit(row: HistoricalAbsence) {
@@ -233,7 +238,7 @@ export function Ocorrencias() {
     return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   }
   function periodLabel(period: { id: string; start_date: string; end_date: string }) {
-    return `${formatDate(period.start_date)} a ${formatDate(period.end_date)}`;
+    return `${formatDate(effectivePeriodStart(period))} a ${formatDate(period.end_date)}`;
   }
 
   function startNew() {
