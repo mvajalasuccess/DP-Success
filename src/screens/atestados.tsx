@@ -337,22 +337,6 @@ export function Atestados() {
       </Card>
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
       <Card className="mt-6 overflow-hidden">
-        <div className="border-b p-4"><h2 className="font-semibold">Histórico importado da BASE</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Totais históricos por funcionário e competência. A BASE não guarda, nesses registros, cada data individual de atestado ou declaração; por isso, eles são exibidos separadamente e não viram lançamentos operacionais.</p>
-          <p className="mt-1 text-xs text-muted-foreground">{filteredHistoricalBaseRows.length} registro(s) histórico(s)</p></div>
-        <div className="max-h-[420px] overflow-auto"><table className="w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-4 py-3">Nome na BASE</th><th className="px-4 py-3">Competência</th><th className="px-4 py-3">Atestados (h)</th><th className="px-4 py-3">Declarações (h)</th></tr></thead>
-          <tbody className="divide-y">
-            {filteredHistoricalBaseRows.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Nenhum total histórico da BASE encontrado para os filtros selecionados.</td></tr>}
-            {filteredHistoricalBaseRows.map(row => <tr key={row.id} className="hover:bg-muted/25">
-              <td className="px-4 py-3 font-medium">{row.employee_name || "Nome não identificado"}{row.registration ? <span className="block text-xs text-muted-foreground">Matrícula: {row.registration}</span> : null}{row.employee_id && employees.find(employee => employee.id === row.employee_id) && employees.find(employee => employee.id === row.employee_id)?.full_name !== row.employee_name ? <span className="block text-xs text-primary">Vinculado a: {employees.find(employee => employee.id === row.employee_id)?.full_name}</span> : null}</td>
-              <td className="whitespace-nowrap px-4 py-3">{row.period_start && row.period_end ? `${formatDate(row.period_start)} a ${formatDate(row.period_end)}` : `${row.reference_month}/${row.reference_year}`}</td>
-              <td className="px-4 py-3">{formatHistoricalHours(row.certificate_minutes)}</td><td className="px-4 py-3">{formatHistoricalHours(row.declaration_minutes)}</td>
-
-            </tr>)}
-          </tbody></table></div>
-      </Card>
-      <Card className="mt-6 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Atestados</h2><p className="text-xs text-muted-foreground">{filteredRows.length + historicalCertificates.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowCertificates(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showCertificates ? "Ocultar atestados" : "Mostrar atestados"} aria-label={showCertificates ? "Ocultar atestados" : "Mostrar atestados"}>{showCertificates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
         {showCertificates && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
           <th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Início</th><th className="px-5 py-3">Fim</th><th className="px-5 py-3">Dias</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">CID</th><th className="px-5 py-3 text-right">Ações</th>
