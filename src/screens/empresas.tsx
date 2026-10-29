@@ -3,6 +3,7 @@ import { Building2, Plus, Pencil, Trash2, X, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
+import { ScreenBrand } from "@/components/screen-brand";
 type Company = { id: string; name: string; cnpj: string; created_at?: string };
 
 function normalizeCnpj(value: string) { return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 14); }
@@ -83,7 +84,7 @@ export function Companies() {
 
   const filtered = companies.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.cnpj.includes(normalizeCnpj(search)));
   return <div className="dp-screen min-h-screen bg-background">
-    <header className="dp-screen-topbar border-b bg-background px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground">← Voltar</a><div className="dp-brand">DP Success • Empresas</div></div></header>
+    <header className="dp-screen-topbar border-b bg-background px-6 py-4"><div className="mx-auto flex max-w-[1500px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground">← Voltar</a><ScreenBrand name="Empresas" /></div></header>
     <main className="dp-screen-content mx-auto max-w-[1500px] px-4 py-5 sm:px-6 sm:py-6">
       <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex flex-col justify-between gap-4 md:flex-row md:items-end [&_p]:!text-white/75 [&_h1]:!text-white">
         <div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Cadastro base</p><h1 className="mt-1 text-3xl font-bold">Empresas</h1><p className="mt-1 text-sm text-muted-foreground">Cadastre as empresas do grupo para depois vinculá-las aos funcionários e usar os filtros do sistema.</p></div>
