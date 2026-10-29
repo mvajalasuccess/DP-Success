@@ -36,8 +36,6 @@ export function Atestados() {
   const [rows, setRows] = useState<Certificate[]>([]);
   const [declarations, setDeclarations] = useState<Declaration[]>([]);
   const [historicalBaseRows, setHistoricalBaseRows] = useState<HistoricalBaseRow[]>([]);
-  const [historicalEmployeeChoices, setHistoricalEmployeeChoices] = useState<Record<string, string>>({});
-  const [savingHistoricalId, setSavingHistoricalId] = useState<string | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [filterEmployee, setFilterEmployee] = useState("todos");
@@ -104,7 +102,7 @@ export function Atestados() {
         })
         .filter(row => (row.period_end ?? "") >= "2025-12-11");
       setHistoricalBaseRows(historical);
-      setHistoricalEmployeeChoices(Object.fromEntries(historical.map(row => [row.id, row.employee_id ?? ""])));
+
     }
   }
 
@@ -154,16 +152,7 @@ export function Atestados() {
     return (row.employee_id ? employees.find(employee => employee.id === row.employee_id)?.full_name : null) || row.employee_name || "Funcionário não identificado";
   }
 
-  async function saveHistoricalEmployee(row: HistoricalBaseRow) {
-    const employeeId = historicalEmployeeChoices[row.id];
-    const employee = employees.find(item => item.id === employeeId);
-    if (!employeeId || !employee) { setError("Selecione o funcionário correto para vincular este registro histórico."); return; }
-    setSavingHistoricalId(row.id); setError("");
-    const { error: updateError } = await (supabase as any).from("historical_kpi_data").update({ employee_id: employee.id }).eq("id", row.id);
-    setSavingHistoricalId(null);
-    if (updateError) { setError("Não foi possível corrigir o vínculo histórico: " + updateError.message); return; }
-    await load();
-  }
+
 
   function displayedDays(row: Certificate) {
     if (!selectedPeriod) return row.days;
@@ -302,15 +291,14 @@ export function Atestados() {
           <p className="mt-1 text-xs text-muted-foreground">Totais históricos por funcionário e competência. A BASE não guarda, nesses registros, cada data individual de atestado ou declaração; por isso, eles são exibidos separadamente e não viram lançamentos operacionais.</p>
           <p className="mt-1 text-xs text-muted-foreground">{filteredHistoricalBaseRows.length} registro(s) histórico(s)</p></div>
         <div className="max-h-[420px] overflow-auto"><table className="w-full text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-4 py-3">Nome na BASE</th><th className="px-4 py-3">Competência</th><th className="px-4 py-3">Atestados (h)</th><th className="px-4 py-3">Declarações (h)</th><th className="px-4 py-3">Corrigir funcionário</th><th className="px-4 py-3">Ação</th></tr></thead>
+          <thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-4 py-3">Nome na BASE</th><th className="px-4 py-3">Competência</th><th className="px-4 py-3">Atestados (h)</th><th className="px-4 py-3">Declarações (h)</th></tr></thead>
           <tbody className="divide-y">
-            {filteredHistoricalBaseRows.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Nenhum total histórico da BASE encontrado para os filtros selecionados.</td></tr>}
+            {filteredHistoricalBaseRows.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">Nenhum total histórico da BASE encontrado para os filtros selecionados.</td></tr>}
             {filteredHistoricalBaseRows.map(row => <tr key={row.id} className="hover:bg-muted/25">
               <td className="px-4 py-3 font-medium">{row.employee_name || "Nome não identificado"}{row.registration ? <span className="block text-xs text-muted-foreground">Matrícula: {row.registration}</span> : null}{row.employee_id && employees.find(employee => employee.id === row.employee_id) && employees.find(employee => employee.id === row.employee_id)?.full_name !== row.employee_name ? <span className="block text-xs text-primary">Vinculado a: {employees.find(employee => employee.id === row.employee_id)?.full_name}</span> : null}</td>
               <td className="whitespace-nowrap px-4 py-3">{row.period_start && row.period_end ? `${formatDate(row.period_start)} a ${formatDate(row.period_end)}` : `${row.reference_month}/${row.reference_year}`}</td>
               <td className="px-4 py-3">{formatHistoricalHours(row.certificate_minutes)}</td><td className="px-4 py-3">{formatHistoricalHours(row.declaration_minutes)}</td>
-              <td className="min-w-[220px] px-4 py-3"><select value={historicalEmployeeChoices[row.id] ?? ""} onChange={e => setHistoricalEmployeeChoices(current => ({ ...current, [row.id]: e.target.value }))} className="w-full rounded-lg border bg-background px-2 py-2"><option value="">Selecionar funcionário</option>{employees.map(employee => <option key={employee.id} value={employee.id}>{employee.full_name}</option>)}</select></td>
-              <td className="px-4 py-3"><button type="button" disabled={savingHistoricalId === row.id || !historicalEmployeeChoices[row.id]} onClick={() => void saveHistoricalEmployee(row)} className="whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50">{savingHistoricalId === row.id ? "Salvando..." : "Salvar vínculo"}</button></td>
+
             </tr>)}
           </tbody></table></div>
       </Card>
