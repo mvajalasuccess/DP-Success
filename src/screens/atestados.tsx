@@ -160,7 +160,7 @@ export function Atestados() {
     const companyMatches = !companyFilter || !matchedEmployee || matchedEmployee.company_id === companyFilter;
     const employeeMatches = filterEmployee === "todos" || !row.employee_id || row.employee_id === filterEmployee;
     const periodMatches = !selectedPeriod ||
-      (row.period_start <= selectedPeriod.end_date && row.period_end >= selectedPeriod.start_date);
+      (String(row.period_start ?? "") <= selectedPeriod.end_date && String(row.period_end ?? "") >= selectedPeriod.start_date);
     return companyMatches && employeeMatches && periodMatches;
   });
 
@@ -271,7 +271,7 @@ export function Atestados() {
       workbook.title = "Declarações e Atestados";
       workbook.created = new Date();
 
-      const columns = Object.keys(reportRows[0]).map(key => {
+      const columns = Object.keys(reportRows[0] ?? {}).map(key => {
         const values = reportRows.slice(0, 100).map(row => String(row[key] ?? ""));
         const width = Math.max(key.length + 4, ...values.map(value => Math.min(value.length + 2, 42)));
         return { header: key, key, width: Math.min(42, Math.max(12, width)) };
@@ -340,7 +340,7 @@ export function Atestados() {
     const reportRows = getFilteredReportRows();
     if (!reportRows.length) { setError("Não há registros para exportar com os filtros selecionados."); return; }
     setError("");
-    const columns = Object.keys(reportRows[0]);
+    const columns = Object.keys(reportRows[0] ?? {});
     const escapeHtml = (value: unknown) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     const columnWeight = (key: string) => {
       const name = key.toLowerCase();
