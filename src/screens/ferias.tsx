@@ -165,20 +165,20 @@ export function Ferias() {
   }
   const entitlements=useMemo<Entitlement[]>(()=>{
     const current=today();
-    return activeEmployees.filter(e=>e.hire_date&&!periods.some(p=>p.employee_id===e.id&&p.termination_paid)).flatMap(employee=>{
+    return activeEmployees.filter(e=>e.hire_date).flatMap(employee=>{
       const cycles:Entitlement[]=[];
       for(let n=0;n<60;n++){
         const raw=makeEntitlement(employee,n);
-        if(raw.acquisitionStart>addYears(current,1)) break;
+        if(raw.acquisitionStart>current) break;
         const vacations=periods.filter(p=>p.employee_id===employee.id&&p.acquisition_start_date===raw.acquisitionStart);
         const uniqueOfficialBlocks=[...new Map(vacations.filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[(p.start_date||p.official_gozo_start_date)+"|"+(p.end_date||p.official_gozo_end_date),p])).values()];
         const officialDays=uniqueOfficialBlocks.reduce((sum,p)=>sum+dayCount(p.start_date||p.official_gozo_start_date!,p.end_date||p.official_gozo_end_date!),0);
         const hasOfficialBlocks=uniqueOfficialBlocks.length>0;
-        const status:Entitlement["status"]=officialDays>=30?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
+        const terminationPaid=vacations.some(p=>p.termination_paid);
+        const status:Entitlement["status"]=terminationPaid||officialDays>=30?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
         cycles.push({...raw,status,vacations});
       }
-      const pending=cycles.find(x=>x.status!=="completed");
-      return pending?[pending]:[];
+      return cycles;
     }).sort((a,b)=>a.concessionEnd.localeCompare(b.concessionEnd));
   },[activeEmployees,periods]);
   const entitlementCounts={available:entitlements.filter(e=>e.status==="available").length,overdue:entitlements.filter(e=>e.status==="overdue").length,acquisition:entitlements.filter(e=>e.status==="acquisition").length,scheduled:entitlements.filter(e=>e.status==="scheduled").length};
