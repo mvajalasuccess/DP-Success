@@ -162,8 +162,9 @@ export function Ferias() {
         const raw=makeEntitlement(employee,n);
         if(raw.acquisitionStart>addYears(current,1)) break;
         const vacations=periods.filter(p=>p.employee_id===employee.id&&p.acquisition_start_date===raw.acquisitionStart);
-        const officialDays=vacations.reduce((sum,p)=>sum+(p.official_gozo_start_date&&p.official_gozo_end_date?dayCount(p.official_gozo_start_date,p.official_gozo_end_date):0),0);
-        const hasOfficialBlocks=vacations.some(p=>p.official_gozo_start_date&&p.official_gozo_end_date);
+        const uniqueOfficialBlocks=[...new Map(vacations.filter(p=>p.official_gozo_start_date&&p.official_gozo_end_date).map(p=>[p.official_gozo_start_date+"|"+p.official_gozo_end_date,p])).values()];
+        const officialDays=uniqueOfficialBlocks.reduce((sum,p)=>sum+dayCount(p.official_gozo_start_date!,p.official_gozo_end_date!),0);
+        const hasOfficialBlocks=uniqueOfficialBlocks.length>0;
         const status:Entitlement["status"]=officialDays>=30?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
         cycles.push({...raw,status,vacations});
       }
@@ -199,7 +200,7 @@ export function Ferias() {
 <div className="rounded-2xl border bg-card p-4"><p className="text-sm text-muted-foreground">Férias programadas</p><p className="mt-2 text-2xl font-semibold text-sky-700">{entitlementCounts.scheduled}</p><p className="mt-1 text-xs text-muted-foreground">Vinculadas ao período aquisitivo</p></div>
 </section>
 <section className="mt-6 overflow-hidden rounded-2xl border bg-card shadow-sm">
-<div className="border-b p-4 sm:p-5"><h2 className="font-display text-lg font-semibold">Acompanhamento automático por funcionário</h2><p className="mt-1 text-sm text-muted-foreground">O saldo de dias programados considera exclusivamente o Período de Gozo Oficial. Os blocos cadastrados são apenas informativos.</p></div>
+<div className="border-b p-4 sm:p-5"><h2 className="font-display text-lg font-semibold">Acompanhamento automático por funcionário</h2><p className="mt-1 text-sm text-muted-foreground">O saldo considera a soma dos dias de cada bloco de férias cadastrado.</p></div>
 {entitlements.length===0?<p className="p-6 text-sm text-muted-foreground">Não há funcionários com data de admissão válida para calcular os períodos.</p>:<div className="divide-y">{entitlements.map(e=><article key={e.employee.id+"-"+e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{e.employee.full_name}</h3><span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?"Férias programadas":"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{e.vacations&&e.vacations.some(p=>p.official_gozo_start_date&&p.official_gozo_end_date)&&(()=>{const days=e.vacations!.reduce((sum,p)=>sum+(p.official_gozo_start_date&&p.official_gozo_end_date?dayCount(p.official_gozo_start_date,p.official_gozo_end_date):0),0);return <p className="mt-1 text-xs text-muted-foreground">{days} de 30 dias utilizados em {e.vacations!.filter(p=>p.official_gozo_start_date&&p.official_gozo_end_date).length} bloco(s) · {Math.max(0,30-days)} dias restantes</p>})()}{e.status==="available"&&<p className="mt-1 text-xs font-medium text-emerald-700">Aviso para o RH: este funcionário já pode sair de férias.</p>}{e.status==="overdue"&&<p className="mt-1 text-xs font-medium text-red-700">Atenção: o prazo concessivo calculado já terminou.</p>}</div><div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{e.status!=="completed"&&<button type="button" onClick={()=>{openNew();setForm(f=>({...f,employee_id:e.employee.id,acquisition_start_date:e.acquisitionStart,acquisition_end_date:e.acquisitionEnd,concession_start_date:e.concessionStart,concession_end_date:e.concessionEnd,title:"Férias · período aquisitivo "+dateLabel(e.acquisitionStart)+" a "+dateLabel(e.acquisitionEnd)}));}} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">{e.status==="scheduled"?"Adicionar bloco":"Programar férias"}</button>}<button type="button" onClick={()=>void markTerminationPaid(e)} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100">{e.vacations?.some(p=>p.termination_paid)?"Desfazer":"Pago em rescisão"}</button></div></article>)}</div>}
 </section>
 <section className="mt-6 overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -209,7 +210,7 @@ export function Ferias() {
           const blocks=group.blocks;
           const first=blocks[0];
           if(!first)return null;
-          const officialBlocks=blocks.filter(p=>p.official_gozo_start_date&&p.official_gozo_end_date);
+          const officialBlocks=[...new Map(blocks.filter(p=>p.official_gozo_start_date&&p.official_gozo_end_date).map(p=>[p.official_gozo_start_date+"|"+p.official_gozo_end_date,p])).values()];
           const totalDays=officialBlocks.reduce((sum,p)=>sum+dayCount(p.official_gozo_start_date!,p.official_gozo_end_date!),0);
           const paidInTermination=blocks.some(p=>p.termination_paid);
           const allCompleted=totalDays>=30;
