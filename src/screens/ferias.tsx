@@ -15,13 +15,16 @@ const dateLabel = (v:string|null|undefined) => v ? v.slice(8,10)+"/"+v.slice(5,7
 const calendarDayCount = (a:string,b:string) => Math.max(1,Math.round((new Date(b+"T00:00:00").getTime()-new Date(a+"T00:00:00").getTime())/86400000)+1);
 const dayCount = (a:string,b:string) => {
   if (b < a) return 0;
+  // Blocos iniciados a partir de 21/12/2023 contam dias corridos, incluindo feriados.
+  if (a >= "2023-12-21") return calendarDayCount(a,b);
+  // Para blocos iniciados antes de 21/12/2023, mantém-se a regra histórica:
+  // Natal (25/12) e Ano-Novo (01/01) não consomem dias do bloco.
   const start = new Date(a+"T00:00:00Z");
   const end = new Date(b+"T00:00:00Z");
   let total = 0;
   for (const date = new Date(start); date <= end; date.setUTCDate(date.getUTCDate()+1)) {
     const month = date.getUTCMonth()+1;
     const day = date.getUTCDate();
-    // Natal (25/12) e Ano-Novo (01/01) não consomem dias do bloco de férias.
     if (!((month === 12 && day === 25) || (month === 1 && day === 1))) total++;
   }
   return total;
