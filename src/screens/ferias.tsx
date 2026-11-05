@@ -102,8 +102,11 @@ export function Ferias() {
     setSaving(true);setError("");
     const hasInformationalBlock=Boolean(form.start_date&&form.end_date);
     const payload={employee_id:form.employee_id,title:((!form.title||form.title.startsWith("Período aquisitivo ·")||/^Férias\\s*[·-]\\s*período aquisitivo/i.test(form.title))&&form.acquisition_start_date&&form.acquisition_end_date?"Período aquisitivo · "+dateLabel(form.acquisition_start_date)+" a "+dateLabel(form.acquisition_end_date):(form.title.trim()||null)),start_date:hasInformationalBlock?form.start_date:null,end_date:hasInformationalBlock?form.end_date:null,notes:form.notes.trim()||null,completed:form.completed,completed_at:form.completed?(editing?.completed_at||new Date().toISOString()):null,acquisition_start_date:form.acquisition_start_date||null,acquisition_end_date:form.acquisition_end_date||null,concession_start_date:concessionStart||null,concession_end_date:concessionEnd||null,official_gozo_start_date:hasInformationalBlock?form.start_date:null,official_gozo_end_date:hasInformationalBlock?form.end_date:null};
-    const result=editing?await(supabase as any).from("vacation_periods").update(payload).eq("id",editing.id):await(supabase as any).from("vacation_periods").insert({...payload,created_by:(await supabase.auth.getSession()).data.session?.user.id||null});
-    if(result.error){setError(result.error.message);setSaving(false);return}
+    const result=editing
+      ?await(supabase as any).from("vacation_periods").update(payload).eq("id",editing.id).select("id").maybeSingle()
+      :await(supabase as any).from("vacation_periods").insert({...payload,created_by:(await supabase.auth.getSession()).data.session?.user.id||null}).select("id").maybeSingle();
+    if(result.error){setError("Não foi possível salvar o período: "+result.error.message);setSaving(false);return}
+    if(!result.data?.id){setError("Nenhum registro foi atualizado. Atualize a tela e tente novamente; seus dados não foram alterados.");setSaving(false);return}
     if(extraBlocks.length){
       const sharedPayload={employee_id:form.employee_id,title:payload.title,completed:form.completed,completed_at:form.completed?(editing?.completed_at||new Date().toISOString()):null,acquisition_start_date:form.acquisition_start_date||null,acquisition_end_date:form.acquisition_end_date||null,concession_start_date:form.concession_start_date||null,concession_end_date:form.concession_end_date||null,official_gozo_start_date:null,official_gozo_end_date:null,termination_paid:Boolean(form.termination_paid)};
       const sessionUserId=(await supabase.auth.getSession()).data.session?.user.id||null;
@@ -120,8 +123,8 @@ export function Ferias() {
         const {error:syncError}=await(supabase as any).from("vacation_periods").update({
           acquisition_start_date:form.acquisition_start_date,
           acquisition_end_date:form.acquisition_end_date||null,
-          concession_start_date:form.concession_start_date||null,
-          concession_end_date:form.concession_end_date||null,
+          concession_start_date:concessionStart||null,
+          concession_end_date:concessionEnd||null,
           completed:form.completed,
           completed_at:form.completed?(editing?.completed_at||new Date().toISOString()):null,
         }).in("id",siblingIds);
