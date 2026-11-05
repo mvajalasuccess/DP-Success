@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 import { ScreenBrand } from "@/components/screen-brand";
 type Vacation = { id:string; employee_id:string; title:string|null; start_date:string|null; end_date:string|null; notes:string|null; completed:boolean; completed_at:string|null; created_at:string; acquisition_start_date?:string|null; acquisition_end_date?:string|null; concession_start_date?:string|null; concession_end_date?:string|null; official_gozo_start_date?:string|null; official_gozo_end_date?:string|null; termination_paid?:boolean|null; employees?:{full_name:string}|null };
-type Employee = { id:string; full_name:string; status?:string|null; termination_date?:string|null; hire_date?:string|null };
+type Employee = { id:string; full_name:string; status?:string|null; termination_date?:string|null; hire_date?:string|null; company_id?:string|null };
 type Entitlement = { employee:Employee; acquisitionStart:string; acquisitionEnd:string; concessionStart:string; concessionEnd:string; cycle:number; status:"acquisition"|"available"|"overdue"|"scheduled"|"completed"; vacations?:Vacation[] };
 const today = () => new Date().toISOString().slice(0,10);
 const isActiveEmployee = (e:Employee|undefined) => Boolean(e && e.status === "ativo" && !e.termination_date);
@@ -31,10 +31,13 @@ const blank = {employee_id:"",title:"",start_date:"",end_date:"",notes:"",comple
 export function Ferias() {
   const [periods,setPeriods]=useState<Vacation[]>([]);
   const [employees,setEmployees]=useState<Employee[]>([]);
+  const [companies,setCompanies]=useState<Array<{id:string;name:string}>>([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [search,setSearch]=useState("");
   const [statusFilter,setStatusFilter]=useState<"all"|"open"|"done">("open");
+  const [companyFilter,setCompanyFilter]=useState("");
+  const [employeeFilter,setEmployeeFilter]=useState("");
   const [modal,setModal]=useState(false);
   const [editing,setEditing]=useState<Vacation|null>(null);
   const [form,setForm]=useState(blank);
@@ -45,13 +48,15 @@ export function Ferias() {
 
   async function load() {
     setLoading(true); setError("");
-    const [v,e]=await Promise.all([
+    const [v,e,co]=await Promise.all([
       (supabase as any).from("vacation_periods").select("*,employees(full_name)").order("start_date",{ascending:true}),
-      (supabase as any).from("employees").select("id,full_name,status,termination_date,hire_date").order("full_name"),
+      (supabase as any).from("employees").select("id,full_name,status,termination_date,hire_date,company_id").order("full_name"),
+      (supabase as any).from("companies").select("id,name").order("name"),
     ]);
     if(v.error){setError(v.error.message.includes("vacation_periods")||v.error.code==="42P01"?"A tabela de férias ainda não foi criada no banco de dados. A migração precisa ser aplicada.":v.error.message);}
     if(e.error && !v.error)setError(e.error.message);
-    setPeriods(v.data??[]); setEmployees(e.data??[]); setLoading(false);
+    if(co.error && !v.error && !e.error)setError(co.error.message);
+    setPeriods(v.data??[]); setEmployees(e.data??[]); setCompanies(co.data??[]); setLoading(false);
   }
   useEffect(()=>{void load()},[]);
 
@@ -61,9 +66,11 @@ export function Ferias() {
   const visible=useMemo(()=>activePeriods.filter(p=>{
     const name=(p.employees?.full_name||employees.find(e=>e.id===p.employee_id)?.full_name||"").toLocaleLowerCase("pt-BR");
     const q=(name+" "+(p.title||"")+" "+(p.notes||"")).toLocaleLowerCase("pt-BR");
-    return (!search||q.includes(search.toLocaleLowerCase("pt-BR")))&&(statusFilter==="all"||(statusFilter==="done"?(p.completed||p.termination_paid):(!p.completed&&!p.termination_paid)));
-  }),[activePeriods,employees,search,statusFilter]);
-  const counts={total:activePeriods.length,open:activePeriods.filter(p=>!p.completed&&!p.termination_paid).length,done:activePeriods.filter(p=>p.completed||p.termination_paid).length,upcoming:activePeriods.filter(p=>!p.completed&&!p.termination_paid&&p.start_date!==null&&p.start_date>=today()).length};
+    const employee=employees.find(e=>e.id===p.employee_id);
+    return (!search||q.includes(search.toLocaleLowerCase("pt-BR")))&&(!companyFilter||employee?.company_id===companyFilter)&&(!employeeFilter||p.employee_id===employeeFilter)&&(statusFilter==="all"||(statusFilter==="done"?(p.completed||p.termination_paid):(!p.completed&&!p.termination_paid)));
+  }),[activePeriods,employees,search,statusFilter,companyFilter,employeeFilter]);
+  const filteredPeriods=activePeriods.filter(p=>{const employee=employees.find(e=>e.id===p.employee_id);return (!companyFilter||employee?.company_id===companyFilter)&&(!employeeFilter||p.employee_id===employeeFilter)});
+  const counts={total:filteredPeriods.length,open:filteredPeriods.filter(p=>!p.completed&&!p.termination_paid).length,done:filteredPeriods.filter(p=>p.completed||p.termination_paid).length,upcoming:filteredPeriods.filter(p=>!p.completed&&!p.termination_paid&&p.start_date!==null&&p.start_date>=today()).length};
   // Agrupa todos os blocos salvos do mesmo funcionário e período aquisitivo em um único card.
   const visibleGroups=useMemo(()=>{
     const groups=new Map<string,Vacation[]>();
@@ -179,8 +186,8 @@ export function Ferias() {
         cycles.push({...raw,status,vacations});
       }
       return cycles;
-    }).sort((a,b)=>a.concessionEnd.localeCompare(b.concessionEnd));
-  },[activeEmployees,periods]);
+    }).filter(e=>(!companyFilter||e.employee.company_id===companyFilter)&&(!employeeFilter||e.employee.id===employeeFilter)).sort((a,b)=>a.concessionEnd.localeCompare(b.concessionEnd));
+  },[activeEmployees,periods,companyFilter,employeeFilter]);
   const entitlementCounts={available:entitlements.filter(e=>e.status==="available").length,overdue:entitlements.filter(e=>e.status==="overdue").length,acquisition:entitlements.filter(e=>e.status==="acquisition").length,scheduled:entitlements.filter(e=>e.status==="scheduled").length};
   const employeeName=(p:Vacation)=>p.employees?.full_name||employees.find(e=>e.id===p.employee_id)?.full_name||"Funcionário não encontrado";
 
@@ -213,7 +220,7 @@ export function Ferias() {
 {entitlements.length===0?<p className="p-6 text-sm text-muted-foreground">Não há funcionários com data de admissão válida para calcular os períodos.</p>:<div className="divide-y">{entitlements.map(e=><article key={e.employee.id+"-"+e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{e.employee.full_name}</h3><span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?"Férias programadas":"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{e.vacations&&e.vacations.some(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date))&&(()=>{const unique=[...new Map(e.vacations!.filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[(p.start_date||p.official_gozo_start_date)+"|"+(p.end_date||p.official_gozo_end_date),p])).values()];const days=unique.reduce((sum,p)=>sum+dayCount(p.start_date||p.official_gozo_start_date!,p.end_date||p.official_gozo_end_date!),0);return <p className="mt-1 text-xs text-muted-foreground">{days} de 30 dias utilizados em {unique.length} bloco(s) · {Math.max(0,30-days)} dias restantes</p>})()}{e.status==="available"&&<p className="mt-1 text-xs font-medium text-emerald-700">Aviso para o RH: este funcionário já pode sair de férias.</p>}{e.status==="overdue"&&<p className="mt-1 text-xs font-medium text-red-700">Atenção: o prazo concessivo calculado já terminou.</p>}</div><div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{e.status!=="completed"&&<button type="button" onClick={()=>{openNew();setForm(f=>({...f,employee_id:e.employee.id,acquisition_start_date:e.acquisitionStart,acquisition_end_date:e.acquisitionEnd,concession_start_date:e.concessionStart,concession_end_date:e.concessionEnd,title:"Férias · período aquisitivo "+dateLabel(e.acquisitionStart)+" a "+dateLabel(e.acquisitionEnd)}));}} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">{e.status==="scheduled"?"Adicionar bloco":"Programar férias"}</button>}<button type="button" onClick={()=>void markTerminationPaid(e)} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100">{e.vacations?.some(p=>p.termination_paid)?"Desfazer":"Pago em rescisão"}</button></div></article>)}</div>}
 </section>
 <section className="mt-6 overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"><div><h2 className="font-display text-lg font-semibold">Planejamento de férias</h2><p className="mt-1 text-sm text-muted-foreground">Cadastre cada saída de férias como um bloco dentro do mesmo período aquisitivo. O sistema soma os dias de todos os blocos.</p></div><div className="flex flex-col gap-2 sm:flex-row"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><input aria-label="Buscar férias" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar funcionário ou observação" className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-sm sm:w-64"/></div><select aria-label="Filtrar períodos" value={statusFilter} onChange={e=>setStatusFilter(e.target.value as any)} className="h-10 rounded-lg border bg-background px-3 text-sm"><option value="open">Em aberto</option><option value="done">Concluídos</option><option value="all">Todos os períodos</option></select></div></div>
+        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"><div><h2 className="font-display text-lg font-semibold">Planejamento de férias</h2><p className="mt-1 text-sm text-muted-foreground">Cadastre cada saída de férias como um bloco dentro do mesmo período aquisitivo. O sistema soma os dias de todos os blocos.</p></div><div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><select aria-label="Filtrar por empresa" value={companyFilter} onChange={e=>{setCompanyFilter(e.target.value);setEmployeeFilter("");}} className="h-10 rounded-lg border bg-background px-3 text-sm"><option value="">Todas as empresas</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar por funcionário" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} className="h-10 rounded-lg border bg-background px-3 text-sm"><option value="">Todos os funcionários</option>{activeEmployees.filter(e=>!companyFilter||e.company_id===companyFilter).map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><input aria-label="Buscar férias" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar funcionário ou observação" className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-sm sm:w-64"/></div><select aria-label="Filtrar períodos" value={statusFilter} onChange={e=>setStatusFilter(e.target.value as any)} className="h-10 rounded-lg border bg-background px-3 text-sm"><option value="open">Em aberto</option><option value="done">Concluídos</option><option value="all">Todos os períodos</option></select></div></div>
         {error&&!modal&&<div role="alert" className="m-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/><span>{error}</span></div>}
         {loading?<div className="p-12 text-center text-sm text-muted-foreground">Carregando períodos...</div>:visibleGroups.length===0?<div className="flex flex-col items-center px-6 py-14 text-center"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700"><CalendarDays className="h-7 w-7"/></div><h3 className="mt-4 font-semibold">{periods.length===0?"Vamos planejar as primeiras férias?":"Nenhum período encontrado"}</h3><p className="mt-1 max-w-md text-sm text-muted-foreground">{periods.length===0?"Adicione um período, escolha o funcionário e informe as datas para começar seu planejamento.":"Experimente alterar o filtro ou a busca."}</p>{periods.length===0&&<button onClick={openNew} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4"/>Cadastrar primeiro período</button>}</div>:<div className="divide-y">{visibleGroups.map(group=>{
           const blocks=group.blocks;
