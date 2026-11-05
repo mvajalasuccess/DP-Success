@@ -7,6 +7,7 @@ type Vacation = { id:string; employee_id:string; title:string|null; start_date:s
 type Employee = { id:string; full_name:string; status?:string|null; termination_date?:string|null; hire_date?:string|null };
 type Entitlement = { employee:Employee; acquisitionStart:string; acquisitionEnd:string; concessionStart:string; concessionEnd:string; cycle:number; status:"acquisition"|"available"|"overdue"|"scheduled"|"completed"; vacations?:Vacation[] };
 const today = () => new Date().toISOString().slice(0,10);
+const isActiveEmployee = (e:Employee|undefined) => Boolean(e && e.status === "ativo" && !e.termination_date);
 const shiftDate = (iso:string, days:number) => { const d=new Date(iso+"T12:00:00"); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); };
 const addYears = (iso:string, years:number) => { const [y,m,d]=iso.split("-").map(Number); if(y===undefined||m===undefined||d===undefined)return iso; const targetYear=y+years; const last=new Date(targetYear,m,0).getDate(); return String(targetYear)+"-"+String(m).padStart(2,"0")+"-"+String(Math.min(d,last)).padStart(2,"0"); };
 const makeEntitlement = (employee:Employee, cycle:number) => { const acquisitionStart=addYears(employee.hire_date!,cycle); const nextAnniversary=addYears(employee.hire_date!,cycle+1); const concessionEnd=shiftDate(addYears(employee.hire_date!,cycle+2),-1); return { employee, cycle:cycle+1, acquisitionStart, acquisitionEnd:shiftDate(nextAnniversary,-1), concessionStart:nextAnniversary, concessionEnd }; };
@@ -45,16 +46,19 @@ export function Ferias() {
   }
   useEffect(()=>{void load()},[]);
 
-  const visible=useMemo(()=>periods.filter(p=>{
+  const activeEmployees=useMemo(()=>employees.filter(isActiveEmployee),[employees]);
+  const activeEmployeeIds=useMemo(()=>new Set(activeEmployees.map(e=>e.id)),[activeEmployees]);
+  const activePeriods=useMemo(()=>periods.filter(p=>activeEmployeeIds.has(p.employee_id)),[periods,activeEmployeeIds]);
+  const visible=useMemo(()=>activePeriods.filter(p=>{
     const name=(p.employees?.full_name||employees.find(e=>e.id===p.employee_id)?.full_name||"").toLocaleLowerCase("pt-BR");
     const q=(name+" "+(p.title||"")+" "+(p.notes||"")).toLocaleLowerCase("pt-BR");
     return (!search||q.includes(search.toLocaleLowerCase("pt-BR")))&&(statusFilter==="all"||(statusFilter==="done"?(p.completed||p.termination_paid):(!p.completed&&!p.termination_paid)));
-  }),[periods,employees,search,statusFilter]);
-  const counts={total:periods.length,open:periods.filter(p=>!p.completed&&!p.termination_paid).length,done:periods.filter(p=>p.completed||p.termination_paid).length,upcoming:periods.filter(p=>!p.completed&&!p.termination_paid&&p.start_date!==null&&p.start_date>=today()).length};
+  }),[activePeriods,employees,search,statusFilter]);
+  const counts={total:activePeriods.length,open:activePeriods.filter(p=>!p.completed&&!p.termination_paid).length,done:activePeriods.filter(p=>p.completed||p.termination_paid).length,upcoming:activePeriods.filter(p=>!p.completed&&!p.termination_paid&&p.start_date!==null&&p.start_date>=today()).length};
   // Agrupa todos os blocos salvos do mesmo funcionário e período aquisitivo em um único card.
   const visibleGroups=useMemo(()=>{
     const groups=new Map<string,Vacation[]>();
-    periods.forEach(p=>{
+    activePeriods.forEach(p=>{
       const key=p.acquisition_start_date
         ? p.employee_id+"::"+p.acquisition_start_date
         : p.employee_id+"::sem-periodo::"+(p.title||p.id);
@@ -63,12 +67,13 @@ export function Ferias() {
     return [...groups.entries()]
       .filter(([,blocks])=>blocks.some(p=>visible.some(v=>v.id===p.id)))
       .map(([key,blocks])=>({key,blocks:blocks.sort((a,b)=>(a.start_date||"").localeCompare(b.start_date||""))}));
-  },[periods,visible]);
+  },[activePeriods,visible]);
 
   function openNew(){setEditing(null);setForm({...blank});setExtraBlocks([]);setBlocksExpanded(true);setModal(true);setError("")}
   function openEdit(p:Vacation){setEditing(p);setForm({employee_id:p.employee_id,title:p.title||"",start_date:p.start_date||"",end_date:p.end_date||"",notes:p.notes||"",completed:p.completed,acquisition_start_date:p.acquisition_start_date||"",acquisition_end_date:p.acquisition_end_date||"",concession_start_date:p.concession_start_date||"",concession_end_date:p.concession_end_date||"",official_gozo_start_date:p.official_gozo_start_date||"",official_gozo_end_date:p.official_gozo_end_date||"",termination_paid:Boolean(p.termination_paid)});setExtraBlocks([]);setBlocksExpanded(false);setModal(true);setError("")}
   async function save(){
     if(!form.employee_id){setError("Selecione o funcionário.");return}
+    if(!isActiveEmployee(employees.find(e=>e.id===form.employee_id))){setError("Só é possível cadastrar ou editar férias de funcionários ativos.");return}
     if(Boolean(form.start_date)!==Boolean(form.end_date)){setError("Para adicionar um bloco informativo, preencha as duas datas ou deixe ambas vazias.");return}
     if(form.start_date&&form.end_date&&form.end_date<form.start_date){setError("A data final não pode ser anterior à data inicial.");return}
     if(extraBlocks.some(b=>Boolean(b.start_date)!==Boolean(b.end_date))){setError("Preencha as duas datas de cada bloco adicional ou remova esse bloco.");return}
@@ -155,7 +160,7 @@ export function Ferias() {
   }
   const entitlements=useMemo<Entitlement[]>(()=>{
     const current=today();
-    return employees.filter(e=>e.hire_date&&!periods.some(p=>p.employee_id===e.id&&p.termination_paid)).flatMap(employee=>{
+    return activeEmployees.filter(e=>e.hire_date&&!periods.some(p=>p.employee_id===e.id&&p.termination_paid)).flatMap(employee=>{
       const cycles:Entitlement[]=[];
       for(let n=0;n<60;n++){
         const raw=makeEntitlement(employee,n);
@@ -169,7 +174,7 @@ export function Ferias() {
       const pending=cycles.find(x=>x.status!=="completed");
       return pending?[pending]:[];
     }).sort((a,b)=>a.concessionEnd.localeCompare(b.concessionEnd));
-  },[employees,periods]);
+  },[activeEmployees,periods]);
   const entitlementCounts={available:entitlements.filter(e=>e.status==="available").length,overdue:entitlements.filter(e=>e.status==="overdue").length,acquisition:entitlements.filter(e=>e.status==="acquisition").length,scheduled:entitlements.filter(e=>e.status==="scheduled").length};
   const employeeName=(p:Vacation)=>p.employees?.full_name||employees.find(e=>e.id===p.employee_id)?.full_name||"Funcionário não encontrado";
 
@@ -236,7 +241,7 @@ export function Ferias() {
     </main>
 
     {modal&&<div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/55 p-4" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(false)}}><section role="dialog" aria-modal="true" aria-labelledby="vacation-modal-title" className="my-auto w-full max-w-xl rounded-2xl border bg-card shadow-2xl"><div className="flex items-start justify-between border-b p-5"><div><p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Planejamento de pessoas</p><h2 id="vacation-modal-title" className="mt-1 font-display text-xl font-semibold">{editing?"Editar período":"Adicionar período de férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Cadastre cada bloco separadamente e vincule todos ao mesmo período aquisitivo.</p></div><button type="button" onClick={()=>setModal(false)} aria-label="Fechar" className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5"/></button></div><div className="grid gap-4 p-5 sm:grid-cols-2">
-      <label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Funcionário<select value={form.employee_id} onChange={e=>{setForm({...form,employee_id:e.target.value,acquisition_start_date:"",acquisition_end_date:"",concession_start_date:"",concession_end_date:""});setExtraBlocks([])}} className="h-11 rounded-lg border bg-background px-3 font-normal" required><option value="">Selecione o funcionário</option>{employees.map(e=><option key={e.id} value={e.id}>{e.full_name}{e.termination_date?" · Inativo":""}</option>)}</select></label>
+      <label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Funcionário<select value={form.employee_id} onChange={e=>{setForm({...form,employee_id:e.target.value,acquisition_start_date:"",acquisition_end_date:"",concession_start_date:"",concession_end_date:""});setExtraBlocks([])}} className="h-11 rounded-lg border bg-background px-3 font-normal" required><option value="">Selecione o funcionário</option>{activeEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
       <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2"><div className="rounded-xl border p-4"><p className="font-semibold">Período aquisitivo</p><p className="mb-3 mt-1 text-xs text-muted-foreground">Edite as datas conforme o período real, inclusive quando houver recesso de fim de ano.</p><div className="grid gap-3"><label className="grid gap-1.5 text-sm font-medium">Data de início<input type="date" value={form.acquisition_start_date} onChange={e=>{const start=e.target.value;setForm(f=>({...f,acquisition_start_date:start,acquisition_end_date:f.acquisition_end_date&&f.acquisition_end_date<start?"":f.acquisition_end_date,...((f.title.startsWith("Período aquisitivo ·")||/^Férias\\s*[·-]\\s*período aquisitivo/i.test(f.title))||!f.title?{title:start?"Período aquisitivo · "+dateLabel(start)+" a "+dateLabel(f.acquisition_end_date):""}:{})}))}} className="h-11 rounded-lg border bg-background px-3 font-normal"/></label><label className="grid gap-1.5 text-sm font-medium">Data final<input type="date" value={form.acquisition_end_date} min={form.acquisition_start_date||undefined} onChange={e=>{const end=e.target.value;setForm(f=>({...f,acquisition_end_date:end,concession_start_date:end?shiftDate(end,1):"",concession_end_date:end?shiftDate(addYears(shiftDate(end,1),1),-1):"",title:(!f.title||f.title.startsWith("Período aquisitivo ·")||/^Férias\\s*[·-]\\s*período aquisitivo/i.test(f.title))?(f.acquisition_start_date&&end?"Período aquisitivo · "+dateLabel(f.acquisition_start_date)+" a "+dateLabel(end):""):f.title}))}} className="h-11 rounded-lg border bg-background px-3 font-normal"/></label></div></div><div className="rounded-xl border bg-muted/20 p-4"><p className="font-semibold">Período concessivo</p><p className="mb-3 mt-1 text-xs text-muted-foreground">Calculado automaticamente: começa no dia seguinte ao fim do aquisitivo e dura 1 ano.</p><div className="grid gap-3"><label className="grid gap-1.5 text-sm font-medium">Data de início<input type="date" value={form.acquisition_end_date?shiftDate(form.acquisition_end_date,1):""} readOnly className="h-11 rounded-lg border bg-background px-3 font-normal text-muted-foreground"/></label><label className="grid gap-1.5 text-sm font-medium">Data final<input type="date" value={form.acquisition_end_date?shiftDate(addYears(shiftDate(form.acquisition_end_date,1),1),-1):""} readOnly className="h-11 rounded-lg border bg-background px-3 font-normal text-muted-foreground"/></label></div></div></div><label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Identificação do período<input value={(form.acquisition_start_date&&form.acquisition_end_date&&(!form.title||form.title.startsWith("Período aquisitivo ·")||/^Férias\\s*[·-]\\s*período aquisitivo/i.test(form.title)))?"Período aquisitivo · "+dateLabel(form.acquisition_start_date)+" a "+dateLabel(form.acquisition_end_date):form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Gerada a partir do período aquisitivo" className="h-11 rounded-lg border bg-background px-3 font-normal"/></label>
       <div className="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 sm:col-span-2"><div><p className="font-semibold text-emerald-900">Período de Gozo Oficial</p><p className="mt-1 text-xs text-muted-foreground">Somente estas datas são usadas no cálculo dos dias de férias.</p></div><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-sm font-medium">Data de início oficial<input type="date" value={form.official_gozo_start_date} onChange={e=>setForm({...form,official_gozo_start_date:e.target.value})} className="h-11 rounded-lg border bg-background px-3 font-normal"/></label><label className="grid gap-1.5 text-sm font-medium">Data final oficial<input type="date" value={form.official_gozo_end_date} min={form.official_gozo_start_date||undefined} onChange={e=>setForm({...form,official_gozo_end_date:e.target.value})} className="h-11 rounded-lg border bg-background px-3 font-normal"/></label></div>{form.official_gozo_start_date&&form.official_gozo_end_date&&form.official_gozo_end_date>=form.official_gozo_start_date&&<p className="text-sm font-semibold text-emerald-900">{dayCount(form.official_gozo_start_date,form.official_gozo_end_date)} dias considerados no gozo oficial</p>}</div>
       {!blocksExpanded&&<label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Observações<textarea rows={3} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Observação do bloco informativo (opcional)" className="rounded-lg border bg-background px-3 py-2 font-normal"/></label>}
