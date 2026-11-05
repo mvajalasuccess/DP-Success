@@ -34,7 +34,7 @@ export function PlanejamentoMensal() {
       (supabase as any).from("holidays").select("*"),
       (supabase as any).from("tasks").select("id,title,category,due_date,status").neq("status","done").not("due_date","is",null),
       (supabase as any).from("employee_document_records").select("id,employee_id,document_name,due_date,status,employees(full_name),employee_document_catalog(alert_days,category)").not("due_date","is",null).eq("status","active"),
-      (supabase as any).from("vacation_periods").select("id,employee_id,acquisition_start_date,official_gozo_start_date,official_gozo_end_date,employees(full_name,status,termination_date)").not("official_gozo_start_date","is",null).not("official_gozo_end_date","is",null)
+      (supabase as any).from("vacation_periods").select("id,employee_id,acquisition_start_date,start_date,end_date,employees(full_name,status,termination_date)").not("start_date","is",null).not("end_date","is",null)
     ]);
     if(emp.error || hol.error || tasks.error || docs.error || vacations.error) setError("Algumas informações não puderam ser carregadas. Verifique os cadastros e as permissões.");
     const all:EventItem[]=[];
@@ -70,7 +70,7 @@ export function PlanejamentoMensal() {
     const officialVacationKeys=new Set<string>();
     (vacations.data||[]).forEach((v:any)=>{
       if(v.employees?.status!=="ativo" || v.employees?.termination_date) return;
-      const start=String(v.official_gozo_start_date||"").slice(0,10); const end=String(v.official_gozo_end_date||"").slice(0,10);
+      const start=String(v.start_date||"").slice(0,10); const end=String(v.end_date||"").slice(0,10);
       if(!start||!end||end<start) return;
       const officialKey=String(v.employee_id)+"|"+String(v.acquisition_start_date||"")+"|"+start+"|"+end;
       if(officialVacationKeys.has(officialKey)) return;
