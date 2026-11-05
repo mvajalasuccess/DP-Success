@@ -162,8 +162,8 @@ export function Ferias() {
         const raw=makeEntitlement(employee,n);
         if(raw.acquisitionStart>addYears(current,1)) break;
         const vacations=periods.filter(p=>p.employee_id===employee.id&&p.acquisition_start_date===raw.acquisitionStart);
-        const uniqueOfficialBlocks=[...new Map(vacations.filter(p=>p.official_gozo_start_date&&p.official_gozo_end_date).map(p=>[p.official_gozo_start_date+"|"+p.official_gozo_end_date,p])).values()];
-        const officialDays=uniqueOfficialBlocks.reduce((sum,p)=>sum+dayCount(p.official_gozo_start_date!,p.official_gozo_end_date!),0);
+        const uniqueOfficialBlocks=[...new Map(vacations.filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[(p.start_date||p.official_gozo_start_date)+"|"+(p.end_date||p.official_gozo_end_date),p])).values()];
+        const officialDays=uniqueOfficialBlocks.reduce((sum,p)=>sum+dayCount(p.start_date||p.official_gozo_start_date!,p.end_date||p.official_gozo_end_date!),0);
         const hasOfficialBlocks=uniqueOfficialBlocks.length>0;
         const status:Entitlement["status"]=officialDays>=30?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
         cycles.push({...raw,status,vacations});
@@ -210,8 +210,8 @@ export function Ferias() {
           const blocks=group.blocks;
           const first=blocks[0];
           if(!first)return null;
-          const officialBlocks=[...new Map(blocks.filter(p=>p.official_gozo_start_date&&p.official_gozo_end_date).map(p=>[p.official_gozo_start_date+"|"+p.official_gozo_end_date,p])).values()];
-          const totalDays=officialBlocks.reduce((sum,p)=>sum+dayCount(p.official_gozo_start_date!,p.official_gozo_end_date!),0);
+          const officialBlocks=[...new Map(blocks.filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[(p.start_date||p.official_gozo_start_date)+"|"+(p.end_date||p.official_gozo_end_date),p])).values()];
+          const totalDays=officialBlocks.reduce((sum,p)=>sum+dayCount(p.start_date||p.official_gozo_start_date!,p.end_date||p.official_gozo_end_date!),0);
           const paidInTermination=blocks.some(p=>p.termination_paid);
           const allCompleted=totalDays>=30;
           return <article key={group.key} className={`p-4 transition-colors hover:bg-muted/20 sm:p-5 ${allCompleted?"opacity-80":""}`}>
@@ -226,7 +226,7 @@ export function Ferias() {
             <div className="mt-4 space-y-3 border-l-2 border-emerald-100 pl-4 sm:ml-6">
               {blocks.map((p,index)=><div key={p.id} className="rounded-xl border bg-background p-3 sm:p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bloco {index+1}</span><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${p.completed?"bg-emerald-100 text-emerald-800":"bg-amber-100 text-amber-800"}`}>{p.completed?"Concluído":"Em aberto"}</span></div><div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4"/> {p.official_gozo_start_date&&p.official_gozo_end_date?dateLabel(p.official_gozo_start_date)+" a "+dateLabel(p.official_gozo_end_date):p.start_date&&p.end_date?dateLabel(p.start_date)+" a "+dateLabel(p.end_date):"Datas não informadas"}</span>{p.official_gozo_start_date&&p.official_gozo_end_date&&<span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4"/> {dayCount(p.official_gozo_start_date,p.official_gozo_end_date)} dias de férias</span>}</div>{p.notes&&<p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{p.notes}</p>}</div>
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bloco {index+1}</span><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${p.completed?"bg-emerald-100 text-emerald-800":"bg-amber-100 text-amber-800"}`}>{p.completed?"Concluído":"Em aberto"}</span></div><div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4"/> {(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)?dateLabel(p.start_date||p.official_gozo_start_date)+" a "+dateLabel(p.end_date||p.official_gozo_end_date):"Datas não informadas"}</span>{(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)&&<span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4"/> {dayCount(p.start_date||p.official_gozo_start_date,p.end_date||p.official_gozo_end_date)} dias de férias</span>}</div>{p.notes&&<p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{p.notes}</p>}</div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end"><span className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">{p.official_gozo_start_date&&p.official_gozo_end_date?dayCount(p.official_gozo_start_date,p.official_gozo_end_date)+" dias":"Sem datas"}</span><button type="button" onClick={()=>openEdit(p)} aria-label="Editar bloco informativo" className="flex h-9 w-9 items-center justify-center rounded-lg border hover:bg-muted"><Pencil className="h-4 w-4"/></button><button type="button" onClick={()=>setConfirmDelete(p)} aria-label="Excluir bloco informativo" className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4"/></button></div>
                 </div>
               </div>)}
