@@ -74,12 +74,10 @@ export function Ferias() {
   async function save(){
     if(!form.employee_id){setError("Selecione o funcionário.");return}
     if(!isActiveEmployee(employees.find(e=>e.id===form.employee_id))){setError("Só é possível cadastrar ou editar férias de funcionários ativos.");return}
-    if(Boolean(form.start_date)!==Boolean(form.end_date)){setError("Para adicionar um bloco informativo, preencha as duas datas ou deixe ambas vazias.");return}
-    if(form.start_date&&form.end_date&&form.end_date<form.start_date){setError("A data final não pode ser anterior à data inicial.");return}
+    if(Boolean(form.start_date)!==Boolean(form.end_date)){setError("Preencha o início e o fim do primeiro bloco de férias, ou deixe ambos vazios se estiver adicionando apenas outros blocos.");return}
+    if(form.start_date&&form.end_date&&form.end_date<form.start_date){setError("A data final do primeiro bloco não pode ser anterior à inicial.");return}
     if(extraBlocks.some(b=>Boolean(b.start_date)!==Boolean(b.end_date))){setError("Preencha as duas datas de cada bloco adicional ou remova esse bloco.");return}
     if(extraBlocks.some(b=>b.start_date&&b.end_date&&b.end_date<b.start_date)){setError("Em cada bloco adicional, a data final deve ser igual ou posterior à inicial.");return}
-    if(Boolean(form.official_gozo_start_date)!==Boolean(form.official_gozo_end_date)){setError("Preencha as duas datas do Período de Gozo Oficial ou deixe ambas vazias.");return}
-    if(form.official_gozo_start_date&&form.official_gozo_end_date&&form.official_gozo_end_date<form.official_gozo_start_date){setError("A data final do gozo oficial não pode ser anterior à data inicial.");return}
     if(employees.find(e=>e.id===form.employee_id)?.hire_date&&(!form.acquisition_start_date||!form.acquisition_end_date)){setError("Preencha o início e o fim do período aquisitivo.");return}
     if(form.acquisition_start_date&&form.acquisition_end_date&&form.acquisition_end_date<form.acquisition_start_date){setError("O fim do período aquisitivo não pode ser anterior ao início.");return}
     if(form.acquisition_end_date){form.concession_start_date=shiftDate(form.acquisition_end_date,1);form.concession_end_date=shiftDate(addYears(form.concession_start_date,1),-1)}
@@ -94,7 +92,7 @@ export function Ferias() {
       const {error:blocksError}=await(supabase as any).from("vacation_periods").insert(extraBlocks.map(b=>({...sharedPayload,start_date:b.start_date,end_date:b.end_date,official_gozo_start_date:b.start_date,official_gozo_end_date:b.end_date,notes:b.notes.trim()||null,created_by:sessionUserId})));
       if(blocksError){setError("O período principal foi salvo, mas houve erro ao adicionar os novos blocos: "+blocksError.message);setSaving(false);await load();return}
     }
-    // Mantém os metadados e o gozo oficial iguais em todos os blocos do mesmo período.
+    // Mantém apenas os metadados aquisitivos iguais entre os blocos. As datas de gozo são individuais.
     if(form.acquisition_start_date){
       const siblingIds=[...new Set(periods.filter(p=>p.employee_id===form.employee_id&&p.id!==editing?.id&&(
         p.acquisition_start_date===form.acquisition_start_date||
@@ -106,8 +104,6 @@ export function Ferias() {
           acquisition_end_date:form.acquisition_end_date||null,
           concession_start_date:form.concession_start_date||null,
           concession_end_date:form.concession_end_date||null,
-          official_gozo_start_date:form.official_gozo_start_date||null,
-          official_gozo_end_date:form.official_gozo_end_date||null,
         }).in("id",siblingIds);
         if(syncError){setError("O bloco foi salvo, mas não foi possível sincronizar os dados do período: "+syncError.message);setSaving(false);await load();return}
       }
@@ -166,9 +162,9 @@ export function Ferias() {
         const raw=makeEntitlement(employee,n);
         if(raw.acquisitionStart>addYears(current,1)) break;
         const vacations=periods.filter(p=>p.employee_id===employee.id&&p.acquisition_start_date===raw.acquisitionStart);
-        const official=vacations.find(p=>p.official_gozo_start_date&&p.official_gozo_end_date);
-        const officialDays=official?dayCount(official.official_gozo_start_date!,official.official_gozo_end_date!):0;
-        const status:Entitlement["status"]=officialDays>=30?"completed":official?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
+        const officialDays=vacations.reduce((sum,p)=>sum+(p.official_gozo_start_date&&p.official_gozo_end_date?dayCount(p.official_gozo_start_date,p.official_gozo_end_date):0),0);
+        const hasOfficialBlocks=vacations.some(p=>p.official_gozo_start_date&&p.official_gozo_end_date);
+        const status:Entitlement["status"]=officialDays>=30?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
         cycles.push({...raw,status,vacations});
       }
       const pending=cycles.find(x=>x.status!=="completed");
@@ -213,8 +209,8 @@ export function Ferias() {
           const blocks=group.blocks;
           const first=blocks[0];
           if(!first)return null;
-          const officialBlock=blocks.find(p=>p.official_gozo_start_date&&p.official_gozo_end_date);
-          const totalDays=officialBlock?dayCount(officialBlock.official_gozo_start_date!,officialBlock.official_gozo_end_date!):0;
+          const officialBlocks=blocks.filter(p=>p.official_gozo_start_date&&p.official_gozo_end_date);
+          const totalDays=officialBlocks.reduce((sum,p)=>sum+dayCount(p.official_gozo_start_date!,p.official_gozo_end_date!),0);
           const paidInTermination=blocks.some(p=>p.termination_paid);
           const allCompleted=totalDays>=30;
           return <article key={group.key} className={`p-4 transition-colors hover:bg-muted/20 sm:p-5 ${allCompleted?"opacity-80":""}`}>
@@ -247,7 +243,7 @@ export function Ferias() {
       {!blocksExpanded&&<label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Observações<textarea rows={3} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Observação do bloco informativo (opcional)" className="rounded-lg border bg-background px-3 py-2 font-normal"/></label>}
       <div className="rounded-xl border sm:col-span-2"><div className="flex items-center justify-between gap-3 p-4"><div><p className="font-semibold">Bloco de férias 1</p><p className="mt-1 text-xs text-muted-foreground">Informe as datas em que o funcionário efetivamente saiu de férias. Os dias serão somados aos demais blocos deste período aquisitivo.</p></div><button type="button" onClick={()=>setBlocksExpanded(v=>!v)} aria-expanded={blocksExpanded} className="inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted">{blocksExpanded?<X className="h-4 w-4"/>:<Plus className="h-4 w-4"/>}{blocksExpanded?"Ocultar informações":"Mostrar informações"}</button></div>
       {blocksExpanded&&<div className="space-y-4 border-t p-4"><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-sm font-medium">Início das férias<input type="date" value={form.start_date} onChange={e=>setForm({...form,start_date:e.target.value})} className="h-11 rounded-lg border bg-background px-3 font-normal"/></label><label className="grid gap-1.5 text-sm font-medium">Fim das férias<input type="date" value={form.end_date} min={form.start_date||undefined} onChange={e=>setForm({...form,end_date:e.target.value})} className="h-11 rounded-lg border bg-background px-3 font-normal"/></label></div>
-      <div className="grid gap-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Outros blocos de férias</p><p className="mt-1 text-xs text-muted-foreground">Adicione quantas saídas forem necessárias dentro deste período aquisitivo.</p></div><button type="button" onClick={()=>setExtraBlocks(blocks=>[...blocks,{start_date:"",end_date:"",notes:""}])} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted"><Plus className="h-4 w-4"/>Adicionar bloco</button></div>{extraBlocks.map((block,index)=><div key={index} className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2"><div className="flex items-center justify-between sm:col-span-2"><p className="text-sm font-semibold">Bloco de férias {index+2}</p><button type="button" onClick={()=>setExtraBlocks(blocks=>blocks.filter((_,i)=>i!==index))} className="rounded-lg p-1.5 text-red-700 hover:bg-red-50" aria-label={"Remover bloco informativo "+(index+2)}><Trash2 className="h-4 w-4"/></button></div><label className="grid gap-1.5 text-sm font-medium">Início das férias<input type="date" value={block.start_date} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,start_date:e.target.value}:b))} className="h-11 rounded-lg border bg-background px-3 font-normal" required/></label><label className="grid gap-1.5 text-sm font-medium">Data final<input type="date" min={block.start_date||undefined} value={block.end_date} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,end_date:e.target.value}:b))} className="h-11 rounded-lg border bg-background px-3 font-normal" required/></label><label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Observação do bloco (opcional)<input value={block.notes} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,notes:e.target.value}:b))} className="h-10 rounded-lg border bg-background px-3 font-normal"/></label></div>)}</div></div>}
+      <div className="grid gap-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Outros blocos de férias</p><p className="mt-1 text-xs text-muted-foreground">Adicione quantas saídas forem necessárias dentro deste período aquisitivo.</p></div><button type="button" onClick={()=>setExtraBlocks(blocks=>[...blocks,{start_date:"",end_date:"",notes:""}])} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted"><Plus className="h-4 w-4"/>Adicionar bloco</button></div>{extraBlocks.map((block,index)=><div key={index} className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2"><div className="flex items-center justify-between sm:col-span-2"><p className="text-sm font-semibold">Bloco de férias {index+2}</p><button type="button" onClick={()=>setExtraBlocks(blocks=>blocks.filter((_,i)=>i!==index))} className="rounded-lg p-1.5 text-red-700 hover:bg-red-50" aria-label={"Remover bloco informativo "+(index+2)}><Trash2 className="h-4 w-4"/></button></div><label className="grid gap-1.5 text-sm font-medium">Início das férias<input type="date" value={block.start_date} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,start_date:e.target.value}:b))} className="h-11 rounded-lg border bg-background px-3 font-normal" required/></label><label className="grid gap-1.5 text-sm font-medium">Fim das férias<input type="date" min={block.start_date||undefined} value={block.end_date} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,end_date:e.target.value}:b))} className="h-11 rounded-lg border bg-background px-3 font-normal" required/></label><label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Observação do bloco (opcional)<input value={block.notes} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,notes:e.target.value}:b))} className="h-10 rounded-lg border bg-background px-3 font-normal"/></label></div>)}</div></div>}
       </div>
       {blocksExpanded&&<label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Observações<textarea rows={3} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Anotações sobre o período (opcional)" className="rounded-lg border bg-background px-3 py-2 font-normal"/></label>}
       <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={form.completed} onChange={e=>setForm({...form,completed:e.target.checked})} className="h-4 w-4 rounded"/>Marcar este período como concluído</label>
