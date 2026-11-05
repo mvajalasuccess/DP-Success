@@ -59,10 +59,10 @@ function fmt(minutes: number) {
 }
 
 function getScreenFromUrl(): ScreenKey {
-  if (typeof window === "undefined") return "dashboard";
+  if (typeof window === "undefined") return "planejamento-mensal";
   const value = new URLSearchParams(window.location.search).get("tela") as ScreenKey | null;
   const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importacao-historico", "importar-cartao-ponto", "ferias"];
-  return value && validScreens.includes(value) ? value : "dashboard";
+  return value && validScreens.includes(value) ? value : "planejamento-mensal";
 }
 
 function Dashboard() {
