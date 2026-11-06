@@ -47,7 +47,7 @@ export function Ferias() {
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [search,setSearch]=useState("");
-  const [statusFilter,setStatusFilter]=useState<"all"|"open"|"done">("open");
+  const [statusFilter,setStatusFilter]=useState<"all"|"open"|"done">("all");
   const [companyFilter,setCompanyFilter]=useState("");
   const [employeeFilter,setEmployeeFilter]=useState("");
   const [modal,setModal]=useState(false);
