@@ -1862,6 +1862,7 @@ export type Database = {
           days_quantity: number | null
           employee_id: string
           end_date: string | null
+          entitled_days: number | null
           id: string
           leave_type: string
           notes: string | null
@@ -1884,6 +1885,7 @@ export type Database = {
           days_quantity?: number | null
           employee_id: string
           end_date?: string | null
+          entitled_days?: number | null
           id?: string
           leave_type?: string
           notes?: string | null
@@ -1906,6 +1908,7 @@ export type Database = {
           days_quantity?: number | null
           employee_id?: string
           end_date?: string | null
+          entitled_days?: number | null
           id?: string
           leave_type?: string
           notes?: string | null

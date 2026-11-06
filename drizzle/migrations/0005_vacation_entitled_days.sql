@@ -1,0 +1,2 @@
+ALTER TABLE public.vacation_periods ADD COLUMN IF NOT EXISTS entitled_days numeric(5,1) CHECK (entitled_days IS NULL OR (entitled_days >= 0 AND entitled_days <= 30));
+COMMENT ON COLUMN public.vacation_periods.entitled_days IS 'Direito de férias adquirido no período aquisitivo (proporcional). NULL = 30 dias integrais.';
