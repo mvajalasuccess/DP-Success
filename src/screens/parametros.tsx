@@ -68,11 +68,12 @@ export function Parametros(){
     };
   }, []);
   const isAdmin = currentProfile?.role === "administrador" || currentProfile?.role === "rh";
-  const currentYear = new Date().getFullYear();
-  const holidayYears = [...new Set([
-    ...Array.from({length: 7}, (_, i) => String(currentYear - 1 + i)),
-    ...holidays.map(h => h.holiday_date.slice(0, 4)),
-  ])].sort((a,b) => Number(b)-Number(a));
+  // O filtro mostra exclusivamente anos que já possuem feriados cadastrados.
+  const holidayYears = [...new Set(holidays.map(h => h.holiday_date.slice(0, 4)))].sort((a,b) => Number(b)-Number(a));
+  const holidayYearsKey = holidayYears.join("|");
+  useEffect(() => {
+    setHolidayYear(previous => holidayYears.includes(previous) ? previous : (holidayYears[0] ?? ""));
+  }, [holidayYearsKey]);
   const visibleHolidays = holidays.filter(h => h.holiday_date.slice(0, 4) === holidayYear);
 
   async function addHoliday() {
@@ -122,7 +123,7 @@ export function Parametros(){
     <main className="mx-auto max-w-[1180px] px-6 py-7 space-y-6">
       <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 [&_p]:!text-white/75 [&_h1]:!text-white"><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Configurações</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Configurações do sistema</h1><p className="text-sm text-muted-foreground">Centralize dados da empresa e regras usadas pelo RH e pelo DP.</p></div>
       {error&&<div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}{saved&&<div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-primary">{saved}</div>}
-      <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Feriados</h2><p className="text-xs text-muted-foreground">Cadastre e remova feriados que impactam os cálculos de dias úteis.</p></div></div><label className="flex items-center gap-2 text-sm font-medium">Ano<select aria-label="Filtrar feriados por ano" value={holidayYear} onChange={e=>setHolidayYear(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm">{holidayYears.map(year=><option key={year} value={year}>{year}</option>)}</select></label></div>
+      <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Feriados</h2><p className="text-xs text-muted-foreground">Cadastre e remova feriados que impactam os cálculos de dias úteis.</p></div></div><label className="flex items-center gap-2 text-sm font-medium">Ano<select aria-label="Filtrar feriados por ano" value={holidayYear} onChange={e=>setHolidayYear(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm">{holidayYears.length===0?<option value="">Nenhum ano cadastrado</option>:holidayYears.map(year=><option key={year} value={year}>{year}</option>)}</select></label></div>
         <div className="grid gap-3 p-5 md:grid-cols-[180px_1fr_180px_auto]"><input type="date" value={holidayForm.date} onChange={e=>setHolidayForm({...holidayForm,date:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><input placeholder="Nome do feriado" value={holidayForm.name} onChange={e=>setHolidayForm({...holidayForm,name:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><select value={holidayForm.scope} onChange={e=>setHolidayForm({...holidayForm,scope:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="nacional">Nacional</option><option value="estadual">Estadual</option><option value="municipal">Municipal</option></select><button onClick={()=>void addHoliday()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Adicionar</button></div>
         <div className="divide-y">{visibleHolidays.length===0?<p className="p-6 text-center text-sm text-muted-foreground">Nenhum feriado cadastrado para {holidayYear}.</p>:visibleHolidays.map(h=><div key={h.id} className="flex items-center justify-between p-4"><div><b className="text-sm">{h.name}</b><p className="text-xs text-muted-foreground">{brDate(h.holiday_date)} · {h.scope}</p></div><button onClick={()=>void deleteHoliday(h.id)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir"><Trash2 className="h-4 w-4"/></button></div>)}</div>
       </Card>
