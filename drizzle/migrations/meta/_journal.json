@@ -29,6 +29,13 @@
       "when": 1793099649603,
       "tag": "0003_convidado_role",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793969701429,
+      "tag": "0004_vacation_leave_type",
+      "breakpoints": true
     }
   ]
 }

@@ -1859,9 +1859,11 @@ export type Database = {
           concession_start_date: string | null
           created_at: string
           created_by: string | null
+          days_quantity: number | null
           employee_id: string
           end_date: string | null
           id: string
+          leave_type: string
           notes: string | null
           official_gozo_end_date: string | null
           official_gozo_start_date: string | null
@@ -1879,9 +1881,11 @@ export type Database = {
           concession_start_date?: string | null
           created_at?: string
           created_by?: string | null
+          days_quantity?: number | null
           employee_id: string
           end_date?: string | null
           id?: string
+          leave_type?: string
           notes?: string | null
           official_gozo_end_date?: string | null
           official_gozo_start_date?: string | null
@@ -1899,9 +1903,11 @@ export type Database = {
           concession_start_date?: string | null
           created_at?: string
           created_by?: string | null
+          days_quantity?: number | null
           employee_id?: string
           end_date?: string | null
           id?: string
+          leave_type?: string
           notes?: string | null
           official_gozo_end_date?: string | null
           official_gozo_start_date?: string | null
