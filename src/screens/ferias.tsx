@@ -46,7 +46,6 @@ export function Ferias() {
   const [companies,setCompanies]=useState<Array<{id:string;name:string}>>([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
-  const [search,setSearch]=useState("");
   const [statusFilter,setStatusFilter]=useState<"all"|"open"|"done">("all");
   const [showOverdueDetails,setShowOverdueDetails]=useState(false);
   const [radarStatusFilter,setRadarStatusFilter]=useState<"all"|"available"|"acquisition"|"overdue">("all");
@@ -80,11 +79,9 @@ export function Ferias() {
   const activeEmployeeIds=useMemo(()=>new Set(activeEmployees.map(e=>e.id)),[activeEmployees]);
   const activePeriods=useMemo(()=>periods.filter(p=>activeEmployeeIds.has(p.employee_id)),[periods,activeEmployeeIds]);
   const visible=useMemo(()=>activePeriods.filter(p=>{
-    const name=(p.employees?.full_name||employees.find(e=>e.id===p.employee_id)?.full_name||"").toLocaleLowerCase("pt-BR");
-    const q=(name+" "+(p.title||"")+" "+(p.notes||"")).toLocaleLowerCase("pt-BR");
     const employee=employees.find(e=>e.id===p.employee_id);
-    return (!search||q.includes(search.toLocaleLowerCase("pt-BR")))&&(!companyFilter||employee?.company_id===companyFilter)&&(!employeeFilter||p.employee_id===employeeFilter)&&(statusFilter==="all"||(statusFilter==="done"?(p.completed||p.termination_paid):(!p.completed&&!p.termination_paid)));
-  }),[activePeriods,employees,search,statusFilter,companyFilter,employeeFilter]);
+    return (!companyFilter||employee?.company_id===companyFilter)&&(!employeeFilter||p.employee_id===employeeFilter)&&(statusFilter==="all"||(statusFilter==="done"?(p.completed||p.termination_paid):(!p.completed&&!p.termination_paid)));
+  }),[activePeriods,employees,statusFilter,companyFilter,employeeFilter]);
   const filteredPeriods=activePeriods.filter(p=>{const employee=employees.find(e=>e.id===p.employee_id);return (!companyFilter||employee?.company_id===companyFilter)&&(!employeeFilter||p.employee_id===employeeFilter)});
   const counts={total:filteredPeriods.length,open:filteredPeriods.filter(p=>!p.completed&&!p.termination_paid).length,done:filteredPeriods.filter(p=>p.completed||p.termination_paid).length,upcoming:filteredPeriods.filter(p=>!p.completed&&!p.termination_paid&&p.start_date!==null&&p.start_date>=today()).length};
   // Agrupa todos os blocos salvos do mesmo funcionário e período aquisitivo em um único card.
