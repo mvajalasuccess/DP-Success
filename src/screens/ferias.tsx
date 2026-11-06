@@ -6,7 +6,9 @@ import { ScreenBrand } from "@/components/screen-brand";
 type Vacation = { id:string; employee_id:string; title:string|null; start_date:string|null; end_date:string|null; notes:string|null; completed:boolean; completed_at:string|null; created_at:string; acquisition_start_date?:string|null; acquisition_end_date?:string|null; concession_start_date?:string|null; concession_end_date?:string|null; official_gozo_start_date?:string|null; official_gozo_end_date?:string|null; termination_paid?:boolean|null; leave_type?:string|null; days_quantity?:number|string|null; entitled_days?:number|string|null; employees?:{full_name:string}|null };
 type Employee = { id:string; full_name:string; status?:string|null; termination_date?:string|null; hire_date?:string|null; company_id?:string|null };
 type Entitlement = { employee:Employee; acquisitionStart:string; acquisitionEnd:string; concessionStart:string; concessionEnd:string; cycle:number; status:"acquisition"|"available"|"overdue"|"scheduled"|"completed"; vacations?:Vacation[]; entitledDays?:number };
-const entitledOf=(rows:Vacation[])=>{const v=rows.map(r=>r.entitled_days).filter(x=>x!=null&&x!=="").map(Number).filter(Number.isFinite);return v.length?Math.max(...v):30;};
+const addMonths=(iso:string,months:number)=>{const [y,m,d]=iso.split("-").map(Number);const target=new Date(Date.UTC(y,m-1+months,1));const last=new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth()+1,0)).getUTCDate();return new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth(),Math.min(d,last))).toISOString().slice(0,10);};
+const proportionalEntitlement=(start:string,end:string)=>{if(!start||!end||end<start)return 30;let months=0;let cursor=start;while(months<12){const next=addMonths(start,months+1);if(next<=end){months++;cursor=next}else break;}const remaining=Math.floor((Date.parse(end+"T00:00:00Z")-Date.parse(cursor+"T00:00:00Z"))/86400000)+1;if(remaining>=15)months++;return Math.min(30,months*2.5);};
+const entitledOf=(rows:Vacation[],fallbackStart?:string,fallbackEnd?:string)=>{const v=rows.map(r=>r.entitled_days).filter(x=>x!=null&&x!=="").map(Number).filter(Number.isFinite);if(v.length)return Math.max(...v);const period=rows.find(r=>r.acquisition_start_date&&r.acquisition_end_date);const start=period?.acquisition_start_date||fallbackStart;const end=period?.acquisition_end_date||fallbackEnd;return start&&end?proportionalEntitlement(start,end):30;};
 const today = () => new Date().toISOString().slice(0,10);
 const isActiveEmployee = (e:Employee|undefined) => Boolean(e && e.status === "ativo" && !e.termination_date);
 const shiftDate = (iso:string, days:number) => { const d=new Date(iso+"T12:00:00"); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); };
@@ -202,7 +204,7 @@ export function Ferias() {
         const officialDays=uniqueOfficialBlocks.reduce((sum,p)=>sum+blockDays(p),0);
         const hasOfficialBlocks=uniqueOfficialBlocks.length>0;
         const terminationPaid=vacations.some(p=>p.termination_paid);
-        const entitledDays=entitledOf(vacations);
+        const entitledDays=entitledOf(vacations,raw.acquisitionStart,raw.acquisitionEnd);
         const status:Entitlement["status"]=terminationPaid||officialDays>=entitledDays?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
         cycles.push({...raw,status,vacations,entitledDays});
       }
@@ -250,7 +252,7 @@ export function Ferias() {
           const officialBlocks=[...new Map(blocks.filter(isVacationLeave).filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[blockKey(p),p])).values()];
           const totalDays=officialBlocks.reduce((sum,p)=>sum+blockDays(p),0);const paidLeaveDays=blocks.filter(p=>!isVacationLeave(p)).reduce((sum,p)=>sum+blockDays(p),0);
           const paidInTermination=blocks.some(p=>p.termination_paid);
-          const entitled=entitledOf(blocks);const allCompleted=totalDays>=entitled;
+          const entitled=entitledOf(blocks,first.acquisition_start_date||undefined,first.acquisition_end_date||undefined);const allCompleted=totalDays>=entitled;
           return <article key={group.key} className={`p-4 transition-colors hover:bg-muted/20 sm:p-5 ${allCompleted?"opacity-80":""}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 items-start gap-4"><div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${allCompleted?"bg-emerald-100 text-emerald-700":"bg-[#e7f8f2] text-[#087a62]"}`}>{allCompleted?<CheckCircle2 className="h-6 w-6"/>:<Palmtree className="h-6 w-6"/>}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{employeeName(first)}</h3><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${paidInTermination?"bg-amber-100 text-amber-900":allCompleted?"bg-emerald-100 text-emerald-800":blocks.some(p=>p.completed)?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800"}`}>{paidInTermination?"Pago em rescisão":allCompleted?"Concluído":blocks.some(p=>p.completed)?"Parcialmente concluído":"Em aberto"}</span><span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{blocks.length} bloco(s)</span></div>
