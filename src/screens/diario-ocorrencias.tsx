@@ -67,7 +67,7 @@ export function DiarioOcorrencias() {
 
   async function load(){
     setLoading(true);setError("");setNotice("");
-    const [e,o,d,a,t,cat,p]=await Promise.all([
+    const [e,o,d,a,t,cat,p,req]=await Promise.all([
       (supabase as any).from("employees").select("id,full_name,status,company_id,hire_date,termination_date").order("full_name"),
       (supabase as any).from("employee_life_events").select("*,employees(full_name)").order("event_date",{ascending:false}),
       (supabase as any).from("employee_document_records").select("*,employees(full_name)").order("due_date"),
