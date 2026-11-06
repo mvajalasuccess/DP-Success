@@ -36,6 +36,13 @@
       "when": 1793969701429,
       "tag": "0004_vacation_leave_type",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793970646535,
+      "tag": "0005_vacation_entitled_days",
+      "breakpoints": true
     }
   ]
 }
