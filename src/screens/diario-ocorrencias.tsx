@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarClock, ClipboardList, FileClock, FileText, Plus, RefreshCw, Star, Trash2, Pencil, BookOpen, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CalendarClock, ClipboardList, FileClock, FileText, Plus, RefreshCw, Star, Trash2, Pencil, BookOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
@@ -87,12 +87,6 @@ export function DiarioOcorrencias() {
     const payload={employee_id:eventForm.employee_id,event_date:eventForm.event_date,period_id:period?.id??null,category:eventForm.category.trim()||"Geral",direction:eventForm.direction,title:eventForm.title.trim(),description:eventForm.description.trim()||null,score:Number(eventForm.score),is_star:eventForm.is_star,source:"manual",created_by:user.data?.user?.id??null};
     const result=editingEvent?await (supabase as any).from("employee_life_events").update(payload).eq("id",editingEvent.id):await (supabase as any).from("employee_life_events").insert(payload);
     setLoading(false);if(result.error){setError(result.error.message);return;}setEventOpen(false);setNotice("Ocorrência salva.");await load();
-  }
-  async function voidEvent(e:LifeEvent){
-    const reason=window.prompt("Informe o motivo para cancelar esta ocorrência. O registro será preservado no histórico:");
-    if(!reason?.trim())return;
-    const {error}=await (supabase as any).from("employee_life_events").update({status:"void",void_reason:reason.trim()}).eq("id",e.id);
-    if(error)setError(error.message);else{setNotice("Ocorrência cancelada e preservada no histórico.");await load();}
   }
   async function deleteEvent(e:LifeEvent){
     const employeeName=e.employees?.full_name||employees.find(x=>x.id===e.employee_id)?.full_name||"este funcionário";
