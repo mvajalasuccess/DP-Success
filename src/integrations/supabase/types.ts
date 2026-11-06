@@ -858,6 +858,68 @@ export type Database = {
         }
         Relationships: []
       }
+      historical_kpi_annotations: {
+        Row: {
+          absence_display_date: string | null
+          absence_display_end_date: string | null
+          absence_display_justification: string | null
+          absence_display_notes: string | null
+          absence_display_quantity: number | null
+          absence_display_type: string | null
+          certificate_cid: string | null
+          certificate_end_date: string | null
+          certificate_start_date: string | null
+          certificate_type: string | null
+          declaration_date: string | null
+          declaration_observation: string | null
+          historical_kpi_data_id: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          absence_display_date?: string | null
+          absence_display_end_date?: string | null
+          absence_display_justification?: string | null
+          absence_display_notes?: string | null
+          absence_display_quantity?: number | null
+          absence_display_type?: string | null
+          certificate_cid?: string | null
+          certificate_end_date?: string | null
+          certificate_start_date?: string | null
+          certificate_type?: string | null
+          declaration_date?: string | null
+          declaration_observation?: string | null
+          historical_kpi_data_id: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          absence_display_date?: string | null
+          absence_display_end_date?: string | null
+          absence_display_justification?: string | null
+          absence_display_notes?: string | null
+          absence_display_quantity?: number | null
+          absence_display_type?: string | null
+          certificate_cid?: string | null
+          certificate_end_date?: string | null
+          certificate_start_date?: string | null
+          certificate_type?: string | null
+          declaration_date?: string | null
+          declaration_observation?: string | null
+          historical_kpi_data_id?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "historical_kpi_annotations_historical_kpi_data_id_fkey"
+            columns: ["historical_kpi_data_id"]
+            isOneToOne: true
+            referencedRelation: "historical_kpi_data"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       historical_kpi_data: {
         Row: {
           absence_quantity: number
@@ -1797,9 +1859,11 @@ export type Database = {
           concession_start_date: string | null
           created_at: string
           created_by: string | null
+          days_quantity: number | null
           employee_id: string
           end_date: string | null
           id: string
+          leave_type: string
           notes: string | null
           official_gozo_end_date: string | null
           official_gozo_start_date: string | null
@@ -1817,9 +1881,11 @@ export type Database = {
           concession_start_date?: string | null
           created_at?: string
           created_by?: string | null
+          days_quantity?: number | null
           employee_id: string
           end_date?: string | null
           id?: string
+          leave_type?: string
           notes?: string | null
           official_gozo_end_date?: string | null
           official_gozo_start_date?: string | null
@@ -1837,9 +1903,11 @@ export type Database = {
           concession_start_date?: string | null
           created_at?: string
           created_by?: string | null
+          days_quantity?: number | null
           employee_id?: string
           end_date?: string | null
           id?: string
+          leave_type?: string
           notes?: string | null
           official_gozo_end_date?: string | null
           official_gozo_start_date?: string | null
