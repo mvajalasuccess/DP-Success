@@ -57,6 +57,7 @@ export function Ferias() {
   const [blocksExpanded,setBlocksExpanded]=useState(false);
   const [editingBlockNumber,setEditingBlockNumber]=useState(1);
   const [saving,setSaving]=useState(false);
+  const [completionChanged,setCompletionChanged]=useState(false);
   const [confirmDelete,setConfirmDelete]=useState<Vacation|null>(null);
 
   async function load() {
@@ -98,8 +99,8 @@ export function Ferias() {
       .map(([key,blocks])=>({key,blocks:blocks.sort((a,b)=>(a.start_date||"").localeCompare(b.start_date||""))}));
   },[activePeriods,visible]);
 
-  function openNew(){setEditing(null);setEditingBlockNumber(1);setForm({...blank});setExtraBlocks([]);setBlocksExpanded(false);setModal(true);setError("")}
-  function openEdit(p:Vacation){const siblings=periods.filter(item=>item.employee_id===p.employee_id&&item.acquisition_start_date===p.acquisition_start_date).sort((a,b)=>(a.start_date||a.official_gozo_start_date||"").localeCompare(b.start_date||b.official_gozo_start_date||""));setEditing(p);setEditingBlockNumber(Math.max(1,siblings.findIndex(item=>item.id===p.id)+1));setForm({entitled_days:(()=>{const v=siblings.map(x=>x.entitled_days).filter(x=>x!=null);return v.length?String(Math.max(...v.map(Number))).replace(".",","):""})(),leave_type:p.leave_type||"ferias",days_quantity:p.days_quantity==null?"":String(p.days_quantity).replace(".",","),employee_id:p.employee_id,title:p.title||"",start_date:p.start_date||p.official_gozo_start_date||"",end_date:p.end_date||p.official_gozo_end_date||"",notes:p.notes||"",completed:p.completed,acquisition_start_date:p.acquisition_start_date||"",acquisition_end_date:p.acquisition_end_date||"",concession_start_date:p.concession_start_date||"",concession_end_date:p.concession_end_date||"",official_gozo_start_date:p.official_gozo_start_date||"",official_gozo_end_date:p.official_gozo_end_date||"",termination_paid:Boolean(p.termination_paid)});setExtraBlocks([]);setBlocksExpanded(true);setModal(true);setError("")}
+  function openNew(){setEditing(null);setCompletionChanged(false);setEditingBlockNumber(1);setForm({...blank});setExtraBlocks([]);setBlocksExpanded(false);setModal(true);setError("")}
+  function openEdit(p:Vacation){const siblings=periods.filter(item=>item.employee_id===p.employee_id&&item.acquisition_start_date===p.acquisition_start_date).sort((a,b)=>(a.start_date||a.official_gozo_start_date||"").localeCompare(b.start_date||b.official_gozo_start_date||""));setEditing(p);setCompletionChanged(false);setEditingBlockNumber(Math.max(1,siblings.findIndex(item=>item.id===p.id)+1));setForm({entitled_days:(()=>{const v=siblings.map(x=>x.entitled_days).filter(x=>x!=null);return v.length?String(Math.max(...v.map(Number))).replace(".",","):""})(),leave_type:p.leave_type||"ferias",days_quantity:p.days_quantity==null?"":String(p.days_quantity).replace(".",","),employee_id:p.employee_id,title:p.title||"",start_date:p.start_date||p.official_gozo_start_date||"",end_date:p.end_date||p.official_gozo_end_date||"",notes:p.notes||"",completed:p.completed,acquisition_start_date:p.acquisition_start_date||"",acquisition_end_date:p.acquisition_end_date||"",concession_start_date:p.concession_start_date||"",concession_end_date:p.concession_end_date||"",official_gozo_start_date:p.official_gozo_start_date||"",official_gozo_end_date:p.official_gozo_end_date||"",termination_paid:Boolean(p.termination_paid)});setExtraBlocks([]);setBlocksExpanded(true);setModal(true);setError("")}
   async function save(){
     if(!form.employee_id){setError("Selecione o funcionário.");return}
     if(!isActiveEmployee(employees.find(e=>e.id===form.employee_id))){setError("Só é possível cadastrar ou editar férias de funcionários ativos.");return}
@@ -134,14 +135,21 @@ export function Ferias() {
         (editing?.acquisition_start_date&&p.employee_id===editing.employee_id&&p.acquisition_start_date===editing.acquisition_start_date)
       )).map(p=>p.id))];
       if(siblingIds.length){
-        const {error:syncError}=await(supabase as any).from("vacation_periods").update({
+        const siblingUpdate:any={
           acquisition_start_date:form.acquisition_start_date,
           entitled_days:form.entitled_days.trim()?parseDays(form.entitled_days):null,
           notes:form.notes.trim()||null,
           acquisition_end_date:form.acquisition_end_date||null,
           concession_start_date:concessionStart||null,
           concession_end_date:concessionEnd||null,
-        }).in("id",siblingIds);
+        };
+        // Alterar somente as datas não reabre nem conclui os outros blocos.
+        // A conclusão de todo o período só é propagada quando o usuário altera a caixa explicitamente.
+        if(completionChanged){
+          siblingUpdate.completed=form.completed;
+          siblingUpdate.completed_at=form.completed?(editing?.completed_at||new Date().toISOString()):null;
+        }
+        const {error:syncError}=await(supabase as any).from("vacation_periods").update(siblingUpdate).in("id",siblingIds);
         if(syncError){setError("O bloco foi salvo, mas não foi possível sincronizar os dados do período: "+syncError.message);setSaving(false);await load();return}
       }
     }
@@ -299,7 +307,7 @@ export function Ferias() {
         {!editing&&<button type="button" onClick={()=>setExtraBlocks(blocks=>[...blocks,{start_date:"",end_date:"",leave_type:"ferias",days_quantity:""}])} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted"><Plus className="h-4 w-4"/>Adicionar bloco</button>}
         {extraBlocks.map((block,index)=><div key={index} className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2"><div className="flex items-center justify-between sm:col-span-2"><p className="text-sm font-semibold">Bloco {index+2}</p><button type="button" onClick={()=>setExtraBlocks(blocks=>blocks.filter((_,i)=>i!==index))} className="rounded-lg p-1.5 text-red-700 hover:bg-red-50" aria-label={"Remover bloco "+(index+2)}><Trash2 className="h-4 w-4"/></button></div><label className="grid gap-1.5 text-sm font-medium">Início do afastamento<input type="date" value={block.start_date} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,start_date:e.target.value}:b))} className="h-11 rounded-lg border bg-background px-3 font-normal" required/></label><label className="grid gap-1.5 text-sm font-medium">Fim do afastamento<input type="date" min={block.start_date||undefined} value={block.end_date} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,end_date:e.target.value}:b))} className="h-11 rounded-lg border bg-background px-3 font-normal" required/></label><label className="grid gap-1.5 text-sm font-medium">Tipo de afastamento<select value={block.leave_type} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,leave_type:e.target.value}:b))} className="h-11 rounded-lg border bg-background px-3 font-normal"><option value="ferias">Férias (consome saldo)</option><option value="licenca_remunerada">Licença remunerada (não consome saldo)</option></select></label><label className="grid gap-1.5 text-sm font-medium">Quantidade de dias (opcional)<input inputMode="decimal" placeholder="Ex.: 12,5 — vazio usa as datas" value={block.days_quantity} onChange={e=>setExtraBlocks(blocks=>blocks.map((b,i)=>i===index?{...b,days_quantity:e.target.value}:b))} className="h-11 rounded-lg border bg-background px-3 font-normal"/></label></div>)}
       </div></div>}
-      <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={form.completed} onChange={e=>setForm({...form,completed:e.target.checked})} className="h-4 w-4 rounded"/>Marcar este período como concluído</label>
+      <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={form.completed} onChange={e=>{setCompletionChanged(true);setForm({...form,completed:e.target.checked})}} className="h-4 w-4 rounded"/>Marcar este período como concluído</label>
       <label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Observações gerais<textarea rows={3} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Observações sobre o período (opcional)" className="rounded-lg border bg-background px-3 py-2 font-normal"/></label>
       {error&&<p role="alert" className="text-sm text-red-700 sm:col-span-2">{error}</p>}
       </div><div className="flex flex-col-reverse gap-2 border-t p-5 sm:flex-row sm:justify-end"><button type="button" onClick={()=>setModal(false)} className="rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-muted">Cancelar</button><button type="button" disabled={saving} onClick={()=>void save()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">{saving?"Salvando...":"Salvar período"}</button></div></section></div>}
