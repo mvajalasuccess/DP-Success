@@ -30,7 +30,7 @@ const DEFAULT_PERMISSIONS: Record<AccessKey, {view:boolean; edit:boolean}> = Obj
 function brDate(v:string){ const parts=v.slice(0,10).split("-"); return parts[2]+"/"+parts[1]+"/"+parts[0]; }
 
 export function Parametros(){
-  const [settings,setSettings]=useState<Setting[]>([]),[company,setCompany]=useState<any>({}),[holidays,setHolidays]=useState<Holiday[]>([]),[profiles,setProfiles]=useState<any[]>([]),[currentProfile,setCurrentProfile]=useState<any>(null),[error,setError]=useState(""),[saved,setSaved]=useState(""),[holidayForm,setHolidayForm]=useState({date:"",name:"",scope:"nacional"});
+  const [settings,setSettings]=useState<Setting[]>([]),[company,setCompany]=useState<any>({}),[holidays,setHolidays]=useState<Holiday[]>([]),[profiles,setProfiles]=useState<any[]>([]),[currentProfile,setCurrentProfile]=useState<any>(null),[error,setError]=useState(""),[saved,setSaved]=useState(""),[holidayForm,setHolidayForm]=useState({date:"",name:"",scope:"nacional"}),[holidayYear,setHolidayYear]=useState(String(new Date().getFullYear()));
   async function load(){
     setError("");
     const { data: sessionData } = await supabase.auth.getSession();
@@ -68,6 +68,12 @@ export function Parametros(){
     };
   }, []);
   const isAdmin = currentProfile?.role === "administrador" || currentProfile?.role === "rh";
+  const currentYear = new Date().getFullYear();
+  const holidayYears = [...new Set([
+    ...Array.from({length: 7}, (_, i) => String(currentYear - 1 + i)),
+    ...holidays.map(h => h.holiday_date.slice(0, 4)),
+  ])].sort((a,b) => Number(b)-Number(a));
+  const visibleHolidays = holidays.filter(h => h.holiday_date.slice(0, 4) === holidayYear);
 
   async function addHoliday() {
     if (!holidayForm.date || !holidayForm.name.trim()) { setError("Informe a data e o nome do feriado."); return; }
@@ -76,6 +82,7 @@ export function Parametros(){
       .insert({ holiday_date: holidayForm.date, name: holidayForm.name.trim(), scope: holidayForm.scope, is_demo: false });
     if (error) { setError(error.message); return; }
     setHolidayForm({ date: "", name: "", scope: "nacional" });
+    setHolidayYear(holidayForm.date.slice(0, 4));
     setSaved("Feriado adicionado.");
     void load();
   }
@@ -115,9 +122,9 @@ export function Parametros(){
     <main className="mx-auto max-w-[1180px] px-6 py-7 space-y-6">
       <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 [&_p]:!text-white/75 [&_h1]:!text-white"><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Configurações</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Configurações do sistema</h1><p className="text-sm text-muted-foreground">Centralize dados da empresa e regras usadas pelo RH e pelo DP.</p></div>
       {error&&<div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}{saved&&<div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-primary">{saved}</div>}
-      <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><CalendarDays className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Feriados</h2><p className="text-xs text-muted-foreground">Cadastre e remova feriados que impactam os cálculos de dias úteis.</p></div></div>
+      <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Feriados</h2><p className="text-xs text-muted-foreground">Cadastre e remova feriados que impactam os cálculos de dias úteis.</p></div></div><label className="flex items-center gap-2 text-sm font-medium">Ano<select aria-label="Filtrar feriados por ano" value={holidayYear} onChange={e=>setHolidayYear(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm">{holidayYears.map(year=><option key={year} value={year}>{year}</option>)}</select></label></div>
         <div className="grid gap-3 p-5 md:grid-cols-[180px_1fr_180px_auto]"><input type="date" value={holidayForm.date} onChange={e=>setHolidayForm({...holidayForm,date:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><input placeholder="Nome do feriado" value={holidayForm.name} onChange={e=>setHolidayForm({...holidayForm,name:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><select value={holidayForm.scope} onChange={e=>setHolidayForm({...holidayForm,scope:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="nacional">Nacional</option><option value="estadual">Estadual</option><option value="municipal">Municipal</option></select><button onClick={()=>void addHoliday()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Adicionar</button></div>
-        <div className="divide-y">{holidays.map(h=><div key={h.id} className="flex items-center justify-between p-4"><div><b className="text-sm">{h.name}</b><p className="text-xs text-muted-foreground">{brDate(h.holiday_date)} · {h.scope}</p></div><button onClick={()=>void deleteHoliday(h.id)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir"><Trash2 className="h-4 w-4"/></button></div>)}</div>
+        <div className="divide-y">{visibleHolidays.length===0?<p className="p-6 text-center text-sm text-muted-foreground">Nenhum feriado cadastrado para {holidayYear}.</p>:visibleHolidays.map(h=><div key={h.id} className="flex items-center justify-between p-4"><div><b className="text-sm">{h.name}</b><p className="text-xs text-muted-foreground">{brDate(h.holiday_date)} · {h.scope}</p></div><button onClick={()=>void deleteHoliday(h.id)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir"><Trash2 className="h-4 w-4"/></button></div>)}</div>
       </Card>
       <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Administrador e RH têm acesso total. Consulta pode apenas visualizar.</p></div></div>
         {!isAdmin && <div className="m-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Seu usuário é Consulta. O acesso deste perfil é somente para visualização.</div>}
