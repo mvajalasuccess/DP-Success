@@ -141,8 +141,6 @@ export function Ferias() {
           acquisition_end_date:form.acquisition_end_date||null,
           concession_start_date:concessionStart||null,
           concession_end_date:concessionEnd||null,
-          completed:form.completed,
-          completed_at:form.completed?(editing?.completed_at||new Date().toISOString()):null,
         }).in("id",siblingIds);
         if(syncError){setError("O bloco foi salvo, mas não foi possível sincronizar os dados do período: "+syncError.message);setSaving(false);await load();return}
       }
