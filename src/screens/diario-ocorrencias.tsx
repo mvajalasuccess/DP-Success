@@ -63,7 +63,7 @@ export function DiarioOcorrencias() {
 
   async function load(){
     setLoading(true);setError("");setNotice("");
-    const [e,o,d,a,t,cat,p,req]=await Promise.all([
+    const [e,o,d,t,cat,p,req]=await Promise.all([
       (supabase as any).from("employees").select("id,full_name,status,company_id,hire_date,termination_date").order("full_name"),
       (supabase as any).from("employee_life_events").select("*,employees(full_name)").order("event_date",{ascending:false}),
       (supabase as any).from("employee_document_records").select("*,employees(full_name)").order("due_date"),
@@ -74,7 +74,7 @@ export function DiarioOcorrencias() {
     ]);
     if(e.error) setError("Não foi possível carregar funcionários: "+e.error.message);
     else setEmployees(e.data??[]);
-    if(o.error||d.error||a.error||t.error||cat.error||p.error) setError("O módulo está no repositório, mas parte das tabelas pode ainda não estar aplicada no Supabase. Detalhe: "+(o.error||d.error||a.error||t.error||cat.error||p.error).message);
+    if(o.error||d.error||t.error||cat.error||p.error) setError("O módulo está no repositório, mas parte das tabelas pode ainda não estar aplicada no Supabase. Detalhe: "+(o.error||d.error||t.error||cat.error||p.error).message);
     if(req.error) setError("A configuração individual de documentos ainda não está disponível no banco. Aplique a nova migração do módulo. Detalhe: "+req.error.message);
     setEvents(o.data??[]);setDocuments(d.data??[]);setTemplates(t.data??[]);setDocCatalog(cat.data??[]);setPeriods(p.data??[]);setRequirements(req.data??[]);
     if(periodFilter==="todos"){const current=(p.data??[]).find((item:any)=>item.start_date<=today()&&item.end_date>=today());if(current)setPeriodFilter(current.id);}
