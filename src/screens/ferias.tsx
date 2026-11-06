@@ -232,7 +232,7 @@ export function Ferias() {
     }).filter(e=>(!companyFilter||e.employee.company_id===companyFilter)&&(!employeeFilter||e.employee.id===employeeFilter)).sort((a,b)=>a.concessionEnd.localeCompare(b.concessionEnd));
   },[activeEmployees,periods,companyFilter,employeeFilter]);
   const entitlementCounts={available:entitlements.filter(e=>e.status==="available").length,overdue:entitlements.filter(e=>e.status==="overdue").length,acquisition:entitlements.filter(e=>e.status==="acquisition").length,scheduled:entitlements.filter(e=>e.status==="scheduled").length};
-  const radarEntitlements=entitlements.filter(e=>e.status==="available"||e.status==="acquisition");
+  const radarEntitlements=entitlements.filter(e=>e.status==="available"||e.status==="acquisition"||e.status==="overdue");
   const employeeName=(p:Vacation)=>p.employees?.full_name||employees.find(e=>e.id===p.employee_id)?.full_name||"Funcionário não encontrado";
 
   return <div className="dp-screen min-h-screen bg-background">
