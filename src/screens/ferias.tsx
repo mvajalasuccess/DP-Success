@@ -304,8 +304,8 @@ export function Ferias() {
             </div>
           </article>;
         })}</div>}
-      </section>
         </div>}
+      </section>
       <p className="mt-4 text-xs text-muted-foreground">Esta tela é um controle de planejamento. Ela não altera fechamento de ponto, banco de horas, folha ou cálculos históricos.</p>
     </main>
 
