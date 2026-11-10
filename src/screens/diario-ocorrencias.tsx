@@ -198,7 +198,7 @@ export function DiarioOcorrencias() {
                 <tbody className="divide-y">{items.map(item=>{
                   const rule=requirements.find(r=>r.employee_id===requirementEmployee&&r.catalog_id===item.id);
                   const isStandard=rule?.is_applicable??true;
-                  const records=documents.filter(d=>d.employee_id===requirementEmployee&&d.catalog_id===item.id).sort((a,b)=>(b.last_completed_on||b.due_date||"").localeCompare(a.last_completed_on||a.due_date||""));
+                  const records=documents.filter(d=>d.employee_id===requirementEmployee&&(d.catalog_id===item.id||d.document_name===item.name)).sort((a,b)=>(b.last_completed_on||b.due_date||"").localeCompare(a.last_completed_on||a.due_date||""));
                   const latest=records[0];
                   return <tr key={item.id} className={!isStandard?"opacity-60":""}>
                     <td className="px-4 py-3"><span className="font-medium">{item.name}</span>{latest?.notes&&<p className="mt-0.5 max-w-[360px] truncate text-xs text-muted-foreground">{latest.notes}</p>}</td>
