@@ -192,7 +192,7 @@ export function DiarioOcorrencias() {
           {Array.from(new Set(docCatalog.map(item=>item.category||"Diversos"))).map(category=>{
             const items=docCatalog.filter(item=>(item.category||"Diversos")===category);
             return <Card key={category} className="overflow-hidden">
-              <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3"><div><h3 className="font-semibold">{category}</h3><p className="text-xs text-muted-foreground">{items.length} item(ns)</p></div></div>
+              <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3"><div><h3 className="font-semibold">{category==="Pessoais"?"Documentos Pessoais":category==="Contratação"?"Contrato":category}</h3><p className="text-xs text-muted-foreground">{items.length} item(ns)</p></div></div>
               <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="bg-muted/50 text-xs text-muted-foreground"><tr><th className="px-4 py-3">Documento, exame ou treinamento</th><th className="px-4 py-3 text-center">Padrão?</th><th className="px-4 py-3">Data de vencimento</th><th className="px-4 py-3 text-center">Assinado?</th><th className="px-4 py-3 text-right">Ação</th></tr></thead>
                 <tbody className="divide-y">{items.map(item=>{
