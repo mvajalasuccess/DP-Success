@@ -43,6 +43,13 @@
       "when": 1793970646535,
       "tag": "0005_vacation_entitled_days",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794424659628,
+      "tag": "0006_access_roles_and_invites",
+      "breakpoints": true
     }
   ]
 }

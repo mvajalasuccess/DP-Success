@@ -1888,6 +1888,45 @@ export type Database = {
           },
         ]
       }
+      user_invites: {
+        Row: {
+          canceled_at: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          token: string
+          used_at: string | null
+          used_by: string | null
+          used_email: string | null
+        }
+        Insert: {
+          canceled_at?: string | null
+          created_at?: string
+          created_by: string
+          expires_at: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          token: string
+          used_at?: string | null
+          used_by?: string | null
+          used_email?: string | null
+        }
+        Update: {
+          canceled_at?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+          used_email?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2042,8 +2081,37 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_update_user_name: {
+        Args: { _full_name: string; _user_id: string }
+        Returns: undefined
+      }
       can_manage: { Args: { _user_id: string }; Returns: boolean }
+      cancel_invite: { Args: { _invite_id: string }; Returns: undefined }
       certificate_cid: { Args: { _certificate_id: string }; Returns: string }
+      create_invite: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _valid_days?: number
+        }
+        Returns: {
+          canceled_at: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          token: string
+          used_at: string | null
+          used_by: string | null
+          used_email: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_invites"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_roles: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"][]
@@ -2074,6 +2142,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      invite_info: {
+        Args: { _token: string }
+        Returns: {
+          expires_at: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+        }[]
       }
       is_profile_admin: { Args: { _user_id: string }; Returns: boolean }
       is_profile_manager: { Args: { _user_id: string }; Returns: boolean }
