@@ -57,10 +57,10 @@ Deno.serve(async (req) => {
     const canManageUsers =
       !requesterProfileError &&
       requesterProfile?.active === true &&
-      (requesterProfile.role === "administrador" || requesterProfile.role === "rh");
+      requesterProfile.role === "administrador";
 
     if (!canManageUsers) {
-      return new Response(JSON.stringify({ error: "Apenas Administrador e RH ativos podem alterar acessos." }), {
+      return new Response(JSON.stringify({ error: "Apenas Administradores ativos podem alterar acessos." }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
 
     const patch: { role?: string; active?: boolean } = {};
     if (hasRole) {
-      if (!["administrador", "rh", "consulta", "convidado"].includes(body.role)) {
+      if (!["administrador", "convidado"].includes(body.role)) {
         return new Response(JSON.stringify({ error: "Perfil inválido." }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

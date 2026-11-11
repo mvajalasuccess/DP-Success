@@ -29,7 +29,12 @@ export function useAccountIdentity() {
     void supabase.auth.getSession().then(({ data }) => {
       if (!disposed && !authChanged) void reader.load(data.session?.user.id ?? null);
     }).catch(() => { if (!disposed && !authChanged) void reader.load(null); });
-    return () => { disposed = true; subscription.unsubscribe(); reader.dispose(); };
+    // Name edits in Configurações refresh the signed-in identity immediately.
+    const onProfileUpdated = () => {
+      void supabase.auth.getSession().then(({ data }) => { if (!disposed) void reader.load(data.session?.user.id ?? null); });
+    };
+    window.addEventListener("dp:profile-updated", onProfileUpdated);
+    return () => { disposed = true; subscription.unsubscribe(); reader.dispose(); window.removeEventListener("dp:profile-updated", onProfileUpdated); };
   }, []);
   return identity;
 }

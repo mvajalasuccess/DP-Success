@@ -590,12 +590,16 @@ export type Database = {
           catalog_id: string | null
           created_at: string
           created_by: string | null
+          delivery_status: string
           document_name: string
           due_date: string | null
           employee_id: string
+          has_documentation: boolean
           id: string
           last_completed_on: string | null
+          no_due_date: boolean
           notes: string | null
+          signature_status: string
           status: string
           updated_at: string
         }
@@ -603,12 +607,16 @@ export type Database = {
           catalog_id?: string | null
           created_at?: string
           created_by?: string | null
+          delivery_status?: string
           document_name: string
           due_date?: string | null
           employee_id: string
+          has_documentation?: boolean
           id?: string
           last_completed_on?: string | null
+          no_due_date?: boolean
           notes?: string | null
+          signature_status?: string
           status?: string
           updated_at?: string
         }
@@ -616,12 +624,16 @@ export type Database = {
           catalog_id?: string | null
           created_at?: string
           created_by?: string | null
+          delivery_status?: string
           document_name?: string
           due_date?: string | null
           employee_id?: string
+          has_documentation?: boolean
           id?: string
           last_completed_on?: string | null
+          no_due_date?: boolean
           notes?: string | null
+          signature_status?: string
           status?: string
           updated_at?: string
         }
@@ -635,6 +647,54 @@ export type Database = {
           },
           {
             foreignKeyName: "employee_document_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_document_requirements: {
+        Row: {
+          catalog_id: string
+          created_at: string
+          employee_id: string
+          id: string
+          is_applicable: boolean
+          is_required: boolean
+          requires_signature: boolean
+          updated_at: string
+        }
+        Insert: {
+          catalog_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          is_applicable?: boolean
+          is_required?: boolean
+          requires_signature?: boolean
+          updated_at?: string
+        }
+        Update: {
+          catalog_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          is_applicable?: boolean
+          is_required?: boolean
+          requires_signature?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_document_requirements_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "employee_document_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_document_requirements_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
@@ -1828,6 +1888,45 @@ export type Database = {
           },
         ]
       }
+      user_invites: {
+        Row: {
+          canceled_at: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          token: string
+          used_at: string | null
+          used_by: string | null
+          used_email: string | null
+        }
+        Insert: {
+          canceled_at?: string | null
+          created_at?: string
+          created_by: string
+          expires_at: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          token: string
+          used_at?: string | null
+          used_by?: string | null
+          used_email?: string | null
+        }
+        Update: {
+          canceled_at?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+          used_email?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1982,8 +2081,37 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_update_user_name: {
+        Args: { _full_name: string; _user_id: string }
+        Returns: undefined
+      }
       can_manage: { Args: { _user_id: string }; Returns: boolean }
+      cancel_invite: { Args: { _invite_id: string }; Returns: undefined }
       certificate_cid: { Args: { _certificate_id: string }; Returns: string }
+      create_invite: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _valid_days?: number
+        }
+        Returns: {
+          canceled_at: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          token: string
+          used_at: string | null
+          used_by: string | null
+          used_email: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_invites"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_roles: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"][]
@@ -2014,6 +2142,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      invite_info: {
+        Args: { _token: string }
+        Returns: {
+          expires_at: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+        }[]
       }
       is_profile_admin: { Args: { _user_id: string }; Returns: boolean }
       is_profile_manager: { Args: { _user_id: string }; Returns: boolean }

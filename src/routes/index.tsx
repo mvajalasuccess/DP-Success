@@ -68,21 +68,22 @@ function getScreenFromUrl(): ScreenKey {
 function Dashboard() {
   const [screen, setScreen] = useState<ScreenKey>(getScreenFromUrl);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isConsulta, setIsConsulta] = useState(false);
+  // undefined = carregando; o perfil vem do banco (user_roles), nunca do navegador.
+  const [accessRole, setAccessRole] = useState<string | null | undefined>(undefined);
+  const isConsulta = accessRole !== "administrador";
 
   useEffect(() => {
     let active = true;
-    void (async () => {
+    const loadRole = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) return;
-      const { data: profile } = await (supabase as any)
-        .from("profiles")
-        .select("role")
-        .eq("id", sessionData.session.user.id)
-        .maybeSingle();
-      if (active) setIsConsulta(profile?.role === "consulta" || profile?.role === "convidado");
-    })();
-    return () => { active = false; };
+      if (!sessionData.session) { if (active) setAccessRole(null); return; }
+      const { data } = await supabase.rpc("current_roles");
+      const roles = (data ?? []) as string[];
+      if (active) setAccessRole(roles.includes("administrador") ? "administrador" : roles[0] ?? null);
+    };
+    void loadRole();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => { queueMicrotask(() => { void loadRole(); }); });
+    return () => { active = false; subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
@@ -121,7 +122,11 @@ function Dashboard() {
       onNavigate={navigateToScreen}
       onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
     >
-      {Screen ? (
+      {screen === "parametros" && accessRole !== "administrador" ? (
+        <div className="flex min-h-[60vh] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+          {accessRole === undefined ? "Verificando acesso..." : "Acesso restrito: somente Administradores podem abrir as Configurações."}
+        </div>
+      ) : Screen ? (
           <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Carregando tela...</div>}>
             <Screen />
           </Suspense>
@@ -341,7 +346,7 @@ function AppShell({
 
 function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: (screen: ScreenKey) => void }) {
   const { name, role: profileRole } = useAccountIdentity();
-  const role = profileRole === "consulta" ? "Consulta" : profileRole === "convidado" ? "Convidado" : profileRole ? "Usuário RH" : "Usuário";
+  const role = profileRole === "administrador" ? "Administrador" : profileRole ? "Convidado" : "Usuário";
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -422,7 +427,7 @@ function DashboardHome() {
         .select("role")
         .eq("id", sessionData.session.user.id)
         .maybeSingle();
-      setUserRoleLabel(profile?.role === "consulta" ? "Consulta" : profile?.role === "convidado" ? "Convidado" : "Usuário RH");
+      setUserRoleLabel(profile?.role === "administrador" ? "Administrador" : "Convidado");
       // Carrega primeiro apenas o contexto necessário para a primeira pintura.
       // Os dados operacionais são buscados depois, já filtrados pela competência.
       const [emps, comp] = await Promise.all([
