@@ -590,12 +590,16 @@ export type Database = {
           catalog_id: string | null
           created_at: string
           created_by: string | null
+          delivery_status: string
           document_name: string
           due_date: string | null
           employee_id: string
+          has_documentation: boolean
           id: string
           last_completed_on: string | null
+          no_due_date: boolean
           notes: string | null
+          signature_status: string
           status: string
           updated_at: string
         }
@@ -603,12 +607,16 @@ export type Database = {
           catalog_id?: string | null
           created_at?: string
           created_by?: string | null
+          delivery_status?: string
           document_name: string
           due_date?: string | null
           employee_id: string
+          has_documentation?: boolean
           id?: string
           last_completed_on?: string | null
+          no_due_date?: boolean
           notes?: string | null
+          signature_status?: string
           status?: string
           updated_at?: string
         }
@@ -616,12 +624,16 @@ export type Database = {
           catalog_id?: string | null
           created_at?: string
           created_by?: string | null
+          delivery_status?: string
           document_name?: string
           due_date?: string | null
           employee_id?: string
+          has_documentation?: boolean
           id?: string
           last_completed_on?: string | null
+          no_due_date?: boolean
           notes?: string | null
+          signature_status?: string
           status?: string
           updated_at?: string
         }
@@ -635,6 +647,54 @@ export type Database = {
           },
           {
             foreignKeyName: "employee_document_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_document_requirements: {
+        Row: {
+          catalog_id: string
+          created_at: string
+          employee_id: string
+          id: string
+          is_applicable: boolean
+          is_required: boolean
+          requires_signature: boolean
+          updated_at: string
+        }
+        Insert: {
+          catalog_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          is_applicable?: boolean
+          is_required?: boolean
+          requires_signature?: boolean
+          updated_at?: string
+        }
+        Update: {
+          catalog_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          is_applicable?: boolean
+          is_required?: boolean
+          requires_signature?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_document_requirements_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "employee_document_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_document_requirements_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
