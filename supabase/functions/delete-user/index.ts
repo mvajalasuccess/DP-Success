@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     const canDeleteUsers =
       !profileError &&
       requesterProfile?.active === true &&
-      (requesterProfile.role === "administrador" || requesterProfile.role === "rh");
+      requesterProfile.role === "administrador";
 
     if (!canDeleteUsers) {
       return new Response(JSON.stringify({ error: "Apenas Administrador e RH ativos podem excluir usuários." }), {
