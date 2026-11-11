@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, Save, Shield, Trash2 } from "lucide-react";
+import { ArrowLeft, CalendarDays, Copy, Link2, Pencil, Save, Shield, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -27,6 +27,13 @@ const DEFAULT_PERMISSIONS: Record<AccessKey, {view:boolean; edit:boolean}> = Obj
   ACCESS_OPTIONS.map(([key]) => [key, { view: true, edit: true }]),
 ) as Record<AccessKey, {view:boolean; edit:boolean}>;
 
+type Invite = { id:string; token:string; role:string; created_at:string; expires_at:string; used_at:string|null; used_email:string|null; canceled_at:string|null };
+export function inviteStatus(i: Pick<Invite,"used_at"|"canceled_at"|"expires_at">, now = Date.now()): "Pendente"|"Utilizado"|"Expirado"|"Cancelado" {
+  if (i.canceled_at) return "Cancelado";
+  if (i.used_at) return "Utilizado";
+  return new Date(i.expires_at).getTime() <= now ? "Expirado" : "Pendente";
+}
+function brDateTime(v:string){ return new Date(v).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}); }
 function brDate(v:string){ const parts=v.slice(0,10).split("-"); return parts[2]+"/"+parts[1]+"/"+parts[0]; }
 
 export function Parametros(){
@@ -67,7 +74,43 @@ export function Parametros(){
       window.clearInterval(timer);
     };
   }, []);
-  const isAdmin = currentProfile?.role === "administrador" || currentProfile?.role === "rh";
+  const isAdmin = currentProfile?.role === "administrador";
+  const [editing,setEditing]=useState<{id:string;name:string}|null>(null);
+  const [invites,setInvites]=useState<Invite[]>([]),[inviteRole,setInviteRole]=useState<"convidado"|"administrador">("convidado"),[inviteOpen,setInviteOpen]=useState(false);
+  async function loadInvites(){
+    const { data, error } = await (supabase as any).from("user_invites").select("id,token,role,created_at,expires_at,used_at,used_email,canceled_at").order("created_at",{ascending:false});
+    if (error) { setError(error.message); return; }
+    setInvites(data ?? []);
+  }
+  useEffect(()=>{ if (isAdmin) void loadInvites(); },[isAdmin]);
+  const inviteLink=(token:string)=>`${window.location.origin}/login?convite=${token}`;
+  async function generateInvite(){
+    setError(""); setSaved("");
+    const { data, error } = await (supabase as any).rpc("create_invite",{ _role: inviteRole, _valid_days: 7 });
+    if (error) { setError(error.message); return; }
+    setInviteOpen(false);
+    try { await navigator.clipboard.writeText(inviteLink(data.token)); setSaved("Convite gerado e link copiado."); } catch { setSaved("Convite gerado. Copie o link na lista abaixo."); }
+    void loadInvites();
+  }
+  async function cancelInvite(id:string){
+    if (!window.confirm("Cancelar este convite? O link deixará de funcionar.")) return;
+    setError(""); setSaved("");
+    const { error } = await (supabase as any).rpc("cancel_invite",{ _invite_id: id });
+    if (error) { setError(error.message); return; }
+    setSaved("Convite cancelado."); void loadInvites();
+  }
+  async function copyInvite(token:string){
+    try { await navigator.clipboard.writeText(inviteLink(token)); setSaved("Link copiado."); } catch { window.prompt("Copie o link:", inviteLink(token)); }
+  }
+  async function saveName(){
+    if (!editing) return;
+    setError(""); setSaved("");
+    const { error } = await (supabase as any).rpc("admin_update_user_name",{ _user_id: editing.id, _full_name: editing.name });
+    if (error) { setError(error.message); return; }
+    setEditing(null); setSaved("Nome atualizado.");
+    window.dispatchEvent(new Event("dp:profile-updated"));
+    void load();
+  }
   // O filtro mostra exclusivamente anos que já possuem feriados cadastrados.
   const holidayYears = [...new Set(holidays.map(h => h.holiday_date.slice(0, 4)))].sort((a,b) => Number(b)-Number(a));
   const holidayYearsKey = holidayYears.join("|");
@@ -127,32 +170,31 @@ export function Parametros(){
         <div className="grid gap-3 p-5 md:grid-cols-[180px_1fr_180px_auto]"><input type="date" value={holidayForm.date} onChange={e=>setHolidayForm({...holidayForm,date:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><input placeholder="Nome do feriado" value={holidayForm.name} onChange={e=>setHolidayForm({...holidayForm,name:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><select value={holidayForm.scope} onChange={e=>setHolidayForm({...holidayForm,scope:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="nacional">Nacional</option><option value="estadual">Estadual</option><option value="municipal">Municipal</option></select><button onClick={()=>void addHoliday()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Adicionar</button></div>
         <div className="divide-y">{visibleHolidays.length===0?<p className="p-6 text-center text-sm text-muted-foreground">Nenhum feriado cadastrado para {holidayYear}.</p>:visibleHolidays.map(h=><div key={h.id} className="flex items-center justify-between p-4"><div><b className="text-sm">{h.name}</b><p className="text-xs text-muted-foreground">{brDate(h.holiday_date)} · {h.scope}</p></div><button onClick={()=>void deleteHoliday(h.id)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir"><Trash2 className="h-4 w-4"/></button></div>)}</div>
       </Card>
-      <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Administrador e RH têm acesso total. Consulta pode apenas visualizar.</p></div></div>
-        {!isAdmin && <div className="m-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Seu usuário é Consulta. O acesso deste perfil é somente para visualização.</div>}
-        <div className="divide-y">{profiles.map(p=><div key={p.id} className="p-5">
+      <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Administrador tem acesso total. Convidado pode apenas visualizar.</p></div></div>
+        {!isAdmin && <div className="m-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Seu usuário é Convidado. O acesso deste perfil é somente para visualização.</div>}
+        <div className="divide-y">{profiles.map(p=>{ const viewOnly = p.role !== "administrador"; return <div key={p.id} className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div><p className="text-sm font-medium">{p.full_name||"Usuário"}</p><p className="text-xs text-muted-foreground">{p.email}</p></div>
+            {editing?.id===p.id ? <div className="flex flex-wrap items-center gap-2"><input aria-label="Nome completo" autoFocus value={editing.name} onChange={e=>setEditing({...editing,name:e.target.value})} onKeyDown={e=>{if(e.key==="Enter")void saveName();}} className="rounded-lg border px-3 py-2 text-sm"/><button onClick={()=>void saveName()} className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Save className="mr-1 inline h-4 w-4"/>Salvar</button><button onClick={()=>setEditing(null)} className="rounded-lg border px-3 py-2 text-sm">Cancelar</button><p className="w-full text-xs text-muted-foreground">{p.email}</p></div>
+            : <div className="flex items-start gap-2"><div><p className="text-sm font-medium">{p.full_name||"Usuário"}</p><p className="text-xs text-muted-foreground">{p.email}</p></div>{isAdmin && <button onClick={()=>setEditing({id:p.id,name:p.full_name??""})} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted" title="Editar nome" aria-label={`Editar nome de ${p.email}`}><Pencil className="h-4 w-4"/></button>}</div>}
             <div className="flex items-center gap-2">
-              <select disabled={!isAdmin || p.id === currentProfile?.id} value={p.role||"consulta"} onChange={e=>void updateProfile(p.id,{role:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="rh">RH</option><option value="consulta">Consulta</option><option value="convidado">Convidado</option></select>
-              <label className="flex items-center gap-2 text-sm"><input disabled={!isAdmin} type="checkbox" checked={p.active!==false} onChange={e=>void updateProfile(p.id,{active:e.target.checked})}/>Ativo</label>
+              <select aria-label="Tipo de acesso" disabled={!isAdmin || p.id === currentProfile?.id} value={viewOnly ? "convidado" : "administrador"} onChange={e=>void updateProfile(p.id,{role:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="convidado">Convidado</option></select>
+              <label className="flex items-center gap-2 text-sm"><input disabled={!isAdmin || p.id === currentProfile?.id} type="checkbox" checked={p.active!==false} onChange={e=>void updateProfile(p.id,{active:e.target.checked})}/>Ativo</label>
               {isAdmin && p.id !== currentProfile?.id && <button onClick={()=>void deleteProfile(p.id,p.email)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir usuário"><Trash2 className="h-4 w-4"/></button>}
             </div>
           </div>
           <div className="mt-4 rounded-lg border bg-muted/20 p-4">
             <div className="flex items-center justify-between gap-4">
               <span className="text-sm font-medium">Acesso aos módulos</span>
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                {p.role === "consulta" || p.role === "convidado" ? "Somente visualização" : "Acesso total · visualizar e editar"}
-              </span>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">{viewOnly ? "Somente visualização" : "Acesso total · visualizar e editar"}</span>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {p.role === "consulta" || p.role === "convidado"
-                ? "Este usuário pode consultar as informações, mas não pode criar, editar ou excluir registros."
-                : "Este usuário pode visualizar, criar, editar e excluir os registros do sistema."}
-            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{viewOnly ? "Este usuário pode consultar as informações, mas não pode criar, editar ou excluir registros." : "Este usuário pode visualizar, criar, editar e excluir os registros do sistema."}</p>
           </div>
-        </div>)}</div>
+        </div>; })}</div>
       </Card>
+      {isAdmin && <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div className="flex items-center gap-3"><Link2 className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Links de convite</h2><p className="text-xs text-muted-foreground">Cada link vale para um único cadastro, por 7 dias, com o tipo de acesso definido aqui.</p></div></div><button onClick={()=>setInviteOpen(true)} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Gerar link de convite</button></div>
+        {inviteOpen && <div className="flex flex-wrap items-end gap-3 border-b bg-muted/20 p-5"><label className="grid gap-1 text-sm font-medium">Tipo de acesso<select aria-label="Tipo de acesso do convite" value={inviteRole} onChange={e=>setInviteRole(e.target.value as "convidado"|"administrador")} className="rounded-lg border bg-background px-3 py-2 text-sm"><option value="convidado">Convidado</option><option value="administrador">Administrador</option></select></label><button onClick={()=>void generateInvite()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Gerar e copiar link</button><button onClick={()=>setInviteOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button></div>}
+        <div className="divide-y">{invites.length===0 ? <p className="p-6 text-center text-sm text-muted-foreground">Nenhum convite gerado.</p> : invites.map(i=>{ const st=inviteStatus(i); return <div key={i.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div><p className="text-sm font-medium">{i.role==="administrador"?"Administrador":"Convidado"} <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${st==="Pendente"?"bg-primary/10 text-primary":"bg-muted text-muted-foreground"}`}>{st}</span></p><p className="text-xs text-muted-foreground">Gerado em {brDateTime(i.created_at)} · {st==="Utilizado"?`usado por ${i.used_email??"—"} em ${brDateTime(i.used_at!)}`:`válido até ${brDateTime(i.expires_at)}`}</p></div>{st==="Pendente" && <div className="flex gap-2"><button onClick={()=>void copyInvite(i.token)} className="rounded-lg border px-3 py-2 text-sm"><Copy className="mr-1 inline h-4 w-4"/>Copiar link</button><button onClick={()=>void cancelInvite(i.id)} className="rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><X className="mr-1 inline h-4 w-4"/>Cancelar</button></div>}</div>; })}</div>
+      </Card>}
     </main>
   </div>;
 }
