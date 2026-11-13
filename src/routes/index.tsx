@@ -304,7 +304,6 @@ function AppShell({
               </div>
             </div>
           )}
-          {collapsed && <Clock3 className="h-7 w-7 shrink-0 dp-sidebar-brand-icon" strokeWidth={1.7} aria-hidden="true" />}
           <button
             type="button"
             onClick={onToggleCollapsed}
