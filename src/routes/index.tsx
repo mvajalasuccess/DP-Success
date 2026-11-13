@@ -208,10 +208,10 @@ function AppShell({
   }, [collapsedFlyout]);
 
   const buttonClass = (key: ScreenKey) =>
-    \`dp-sidebar-item group relative flex min-h-10 w-full items-center py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring \${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"} \${collapsed ? "justify-center px-2" : "gap-3 px-3"}\`;
+    `dp-sidebar-item group relative flex min-h-10 w-full items-center py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
 
   const sectionButtonClass = (active: boolean) =>
-    \`dp-sidebar-group-label flex min-h-10 w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring \${active ? "dp-sidebar-group-active" : ""} \${collapsed ? "justify-center px-0" : ""}\`;
+    `dp-sidebar-group-label flex min-h-10 w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${active ? "dp-sidebar-group-active" : ""} ${collapsed ? "justify-center px-0" : ""}`;
 
   const groups: {
     id: string;
@@ -271,11 +271,11 @@ function AppShell({
               {groups.map(group => (
                 <section key={group.id} className="dp-sidebar-group mb-3">
                   <button type="button" onClick={() => group.setOpen(value => !value)} className={sectionButtonClass(group.id === activeGroup)} aria-expanded={group.open}>
-                    <span>{group.label}</span><ChevronDown className={\`h-4 w-4 transition-transform duration-150 \${group.open ? "rotate-0" : "-rotate-90"}\`} strokeWidth={1.8} />
+                    <span>{group.label}</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${group.open ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
                   </button>
                   {group.open && <div className="mt-1 space-y-1">
                     {group.items.map(([label, key, Icon]) => (
-                      <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={\`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium transition-colors duration-150 \${screen === key ? "dp-sidebar-item-active font-semibold" : ""}\`}>
+                      <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${screen === key ? "dp-sidebar-item-active font-semibold" : ""}`}>
                         <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span>
                       </button>
                     ))}
@@ -288,8 +288,8 @@ function AppShell({
         </div>
       )}
 
-      <aside aria-label="Barra lateral principal" className={\`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r transition-[width] duration-300 ease-in-out lg:flex lg:flex-col \${collapsed ? "w-[76px]" : "w-[248px]"}\`}>
-        <div className={\`dp-sidebar-header flex h-[76px] shrink-0 items-center border-b \${collapsed ? "justify-center px-2" : "justify-between px-4"}\`}>
+      <aside aria-label="Barra lateral principal" className={`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r transition-[width] duration-300 ease-in-out lg:flex lg:flex-col ${collapsed ? "w-[76px]" : "w-[248px]"}`}>
+        <div className={`dp-sidebar-header flex h-[76px] shrink-0 items-center border-b ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
           {!collapsed && (
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-black/10 bg-white/70 text-sm font-bold tracking-tight text-[#202522]">DP</div>
@@ -303,7 +303,7 @@ function AppShell({
           <button
             type="button"
             onClick={onToggleCollapsed}
-            className={\`flex h-9 w-9 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring \${collapsed ? "absolute right-1 top-[82px]" : ""}\`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${collapsed ? "absolute right-1 top-[82px]" : ""}`}
             title={collapsed ? "Expandir menu" : "Recolher menu"}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
             aria-expanded={!collapsed}
@@ -325,7 +325,7 @@ function AppShell({
               >
                 <span className={collapsed ? "sr-only" : "truncate"}>{group.label}</span>
                 <group.Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
-                {!collapsed && <ChevronDown className={\`h-4 w-4 shrink-0 transition-transform duration-150 \${group.open ? "rotate-0" : "-rotate-90"}\`} strokeWidth={1.8} />}
+                {!collapsed && <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-150 ${group.open ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />}
               </button>
               {!collapsed && group.open && (
                 <div className="mt-1 space-y-1">
@@ -339,14 +339,14 @@ function AppShell({
               {collapsed && collapsedFlyout?.group === group.id && (
                 <div
                   className="dp-sidebar-flyout fixed z-[80] w-64 border p-2 shadow-xl"
-                  style={{ top: \`\${Math.min(collapsedFlyout.top, Math.max(12, window.innerHeight - 260))}px\`, left: "76px" }}
+                  style={{ top: `${Math.min(collapsedFlyout.top, Math.max(12, window.innerHeight - 260))}px`, left: "76px" }}
                   role="menu"
                   aria-label={group.label}
                   data-sidebar-flyout-root
                 >
                   <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em]">{group.label}</p>
                   {group.items.map(([label, key, Icon]) => (
-                    <button key={key} type="button" role="menuitem" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={\`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium \${screen === key ? "dp-sidebar-item-active font-semibold" : ""}\`}>
+                    <button key={key} type="button" role="menuitem" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium ${screen === key ? "dp-sidebar-item-active font-semibold" : ""}`}>
                       <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span>
                     </button>
                   ))}
@@ -358,7 +358,7 @@ function AppShell({
         <SidebarProfile collapsed={collapsed} onNavigate={go} />
       </aside>
 
-      <main className={\`dp-app-main min-h-screen min-w-0 transition-[padding] duration-300 ease-in-out \${collapsed ? "lg:pl-[76px]" : "lg:pl-[248px]"}\`}>
+      <main className={`dp-app-main min-h-screen min-w-0 transition-[padding] duration-300 ease-in-out ${collapsed ? "lg:pl-[76px]" : "lg:pl-[248px]"}`}>
         {children}
       </main>
     </div>
