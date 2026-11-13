@@ -70,6 +70,7 @@ export function PointClosing() {
   const [editingRow, setEditingRow] = useState<any | null>(null);
   const [rowsSource, setRowsSource] = useState<"historical" | "manual">("historical");
   const [rowSaving, setRowSaving] = useState(false);
+  const [canEditOfficialCorrections, setCanEditOfficialCorrections] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -85,6 +86,28 @@ export function PointClosing() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function loadCorrectionPermission() {
+      const { data: userResult } = await supabase.auth.getUser();
+      const userId = userResult.user?.id;
+      if (!userId) {
+        if (active) setCanEditOfficialCorrections(false);
+        return;
+      }
+      const { data, error } = await (supabase as any)
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      const roles = (data ?? []).map((item: any) => String(item.role));
+      if (active) {
+        setCanEditOfficialCorrections(!error && (roles.includes("administrador") || roles.includes("rh")));
+      }
+    }
+    void loadCorrectionPermission();
+    return () => { active = false; };
+  }, []);
 
   async function openPeriod(p: Period) {
     setSelectedPeriod(p);
@@ -467,6 +490,10 @@ export function PointClosing() {
   }
 
   async function saveHistoricalRow() {
+    if (!canEditOfficialCorrections) {
+      setError("Somente usuários com perfil Administrador ou RH podem alterar correções oficiais do fechamento de ponto.");
+      return;
+    }
     if (!editingRow || !selectedPeriod) return;
     if (!editingRow.employee_id) {
       setError(`Não foi possível salvar a correção de "${editingRow.employee_name}". O registro histórico não está vinculado a um funcionário cadastrado. Confira o nome e a matrícula no cadastro de Funcionários.`);
@@ -646,7 +673,7 @@ export function PointClosing() {
                     {[row.expected_minutes,row.worked_minutes].map((v,i) => <td key={i} className="px-2 py-2 font-mono whitespace-nowrap">{minutesToHHMM(v)}</td>)}
                     <td className="px-2 py-2 font-mono whitespace-nowrap">{Number(row.absence_quantity || 0)}</td>
                     {[row.certificate_minutes,row.declaration_minutes,row.allowance_minutes,row.debit_minutes,row.he_60_minutes,row.he_60_night_minutes,row.he_100_minutes,row.he_20_minutes,row.interjornada_minutes].map((v,i) => <td key={i} className="whitespace-nowrap px-3 py-2 font-mono">{minutesToHHMM(v)}</td>)}
-                    <td className="px-2 py-2"><div className="flex items-center gap-1.5"><button onClick={() => beginEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px"><Pencil className="h-3.5 w-3.5" /> Editar</button>{row.has_manual_override && <span className="text-[11px] font-medium text-primary">Ajustado</span>}</div></td>
+                    <td className="px-2 py-2"><div className="flex items-center gap-1.5">{canEditOfficialCorrections && <button onClick={() => beginEdit(row)} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px"><Pencil className="h-3.5 w-3.5" /> Editar</button>}{row.has_manual_override && <span className="text-[11px] font-medium text-primary">Ajustado</span>}</div></td>
                   </tr>
                 ))}</tbody>
               </table></div>}
