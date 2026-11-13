@@ -173,6 +173,7 @@ function AppShell({
     if (["empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas"].includes(screen)) setCompanyMenuOpen(true);
     if (["planejamento-mensal", "diario-ocorrencias", "tarefas"].includes(screen)) setTasksOpen(true);
     if (screen === "ferias") setPeopleOpen(true);
+    if (screen === "parametros") setSettingsOpen(true);
     setCollapsedFlyout(null);
   }, [screen]);
 
