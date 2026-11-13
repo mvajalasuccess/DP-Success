@@ -339,7 +339,7 @@ function AppShell({
               {collapsed && collapsedFlyout?.group === group.id && (
                 <div
                   className="dp-sidebar-flyout fixed z-[80] w-64 border p-2 shadow-xl"
-                  style={{ top: `${Math.min(collapsedFlyout.top, Math.max(12, window.innerHeight - 260))}px`, left: "76px" }}
+                  style={{ top: `${Math.min(collapsedFlyout.top, Math.max(12, window.innerHeight - 390))}px`, left: "76px" }}
                   role="menu"
                   aria-label={group.label}
                   data-sidebar-flyout-root
