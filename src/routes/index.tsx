@@ -152,11 +152,11 @@ function AppShell({
   onToggleCollapsed: () => void;
   children: ReactNode;
 }) {
-  const [managementOpen, setManagementOpen] = useState(true);
-  const [closingMenuOpen, setClosingMenuOpen] = useState(true);
+  const [managementOpen, setManagementOpen] = useState(false);
+  const [closingMenuOpen, setClosingMenuOpen] = useState(false);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
-  const [peopleOpen, setPeopleOpen] = useState(true);
+  const [peopleOpen, setPeopleOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [collapsedFlyout, setCollapsedFlyout] = useState<{ group: string; top: number } | null>(null);
@@ -167,13 +167,8 @@ function AppShell({
     setCollapsedFlyout(null);
   };
 
+  // Mantém todos os grupos recolhidos ao entrar; navegar entre telas não os expande automaticamente.
   useEffect(() => {
-    if (["dashboard", "kpis", "comparativos", "relatorios"].includes(screen)) setManagementOpen(true);
-    if (["fechamento-ponto", "importar-cartao-ponto", "lancamentos", "banco-horas", "pagamentos", "ocorrencias", "atestados", "importacao-historico"].includes(screen)) setClosingMenuOpen(true);
-    if (["empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas"].includes(screen)) setCompanyMenuOpen(true);
-    if (["planejamento-mensal", "diario-ocorrencias", "tarefas"].includes(screen)) setTasksOpen(true);
-    if (screen === "ferias") setPeopleOpen(true);
-    if (screen === "parametros") setSettingsOpen(true);
     setCollapsedFlyout(null);
   }, [screen]);
 
