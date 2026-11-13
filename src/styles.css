@@ -1510,3 +1510,12 @@ main :is(h1, h2, h3) {
 .dp-sidebar-brand-subtitle {
   letter-spacing: 0.12em;
 }
+
+
+/* Remove o atalho "Voltar" do cabeçalho superior em todas as telas. */
+.dp-screen-topbar a[href="/"] {
+  display: none !important;
+}
+.dp-screen-topbar > div {
+  justify-content: flex-start !important;
+}
