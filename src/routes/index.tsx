@@ -289,7 +289,7 @@ function AppShell({
       )}
 
       <aside aria-label="Barra lateral principal" className={`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r transition-[width] duration-300 ease-in-out lg:flex lg:flex-col ${collapsed ? "w-[76px]" : "w-[248px]"}`}>
-        <div className={`dp-sidebar-header flex h-[76px] shrink-0 items-center border-b ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+        <div className={`dp-sidebar-header flex h-[82px] shrink-0 items-center border-b ${collapsed ? "flex-col justify-center gap-1 px-2" : "justify-between px-4"}`}>
           {!collapsed && (
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-black/10 bg-white/70 text-sm font-bold tracking-tight text-[#202522]">DP</div>
@@ -303,7 +303,7 @@ function AppShell({
           <button
             type="button"
             onClick={onToggleCollapsed}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${collapsed ? "absolute right-1 top-[82px]" : ""}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring `}
             title={collapsed ? "Expandir menu" : "Recolher menu"}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
             aria-expanded={!collapsed}
