@@ -24,7 +24,7 @@ export function useAccountIdentity() {
       authChanged = true;
       reader.dispose();
       setIdentity(EMPTY_IDENTITY);
-      queueMicrotask(() => { if (!disposed) void reader.load(session?.user.id ?? null); });
+      setTimeout(() => { if (!disposed) void reader.load(session?.user.id ?? null); }, 0);
     });
     void supabase.auth.getSession().then(({ data }) => {
       if (!disposed && !authChanged) void reader.load(data.session?.user.id ?? null);
