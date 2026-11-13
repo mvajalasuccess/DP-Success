@@ -152,13 +152,19 @@ function AppShell({
   onToggleCollapsed: () => void;
   children: ReactNode;
 }) {
-  const go = (key: ScreenKey) => { onNavigate(key); setMobileMenuOpen(false); };
   const [managementOpen, setManagementOpen] = useState(true);
   const [closingMenuOpen, setClosingMenuOpen] = useState(true);
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [collapsedFlyout, setCollapsedFlyout] = useState<{ group: string; top: number } | null>(null);
+
+  const go = (key: ScreenKey) => {
+    onNavigate(key);
+    setMobileMenuOpen(false);
+    setCollapsedFlyout(null);
+  };
 
   useEffect(() => {
     if (["dashboard", "kpis", "comparativos", "relatorios"].includes(screen)) setManagementOpen(true);
@@ -166,19 +172,8 @@ function AppShell({
     if (["empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas"].includes(screen)) setCompanyMenuOpen(true);
     if (["planejamento-mensal", "diario-ocorrencias", "tarefas"].includes(screen)) setTasksOpen(true);
     if (screen === "ferias") setPeopleOpen(true);
+    setCollapsedFlyout(null);
   }, [screen]);
-
-  const buttonClass = (key: ScreenKey) =>
-    `dp-sidebar-item group relative flex min-h-10 w-full items-center py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
-
-  const sectionButtonClass = "dp-sidebar-group-label flex min-h-9 w-full items-center justify-between px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring";
-  const mobileGroups: { label: string; items: [string, ScreenKey, LucideIcon][] }[] = [
-    { label: "Análise", items: [["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText]] },
-    { label: "Fechamento de Ponto", items: [["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck]] },
-    { label: "Cadastro", items: [["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays]] },
-    { label: "Organização", items: [["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Diário de Ocorrências", "diario-ocorrencias", ClipboardList], ["Tarefas", "tarefas", ListChecks]] },
-    { label: "Pessoas", items: [["Férias", "ferias", Palmtree]] },
-  ];
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -194,6 +189,61 @@ function AppShell({
     };
   }, [mobileMenuOpen]);
 
+  useEffect(() => {
+    if (!collapsedFlyout) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCollapsedFlyout(null);
+    };
+    const closeOnOutside = (event: MouseEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest("[data-sidebar-flyout-root]")) {
+        setCollapsedFlyout(null);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("mousedown", closeOnOutside);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("mousedown", closeOnOutside);
+    };
+  }, [collapsedFlyout]);
+
+  const buttonClass = (key: ScreenKey) =>
+    \`dp-sidebar-item group relative flex min-h-10 w-full items-center py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring \${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"} \${collapsed ? "justify-center px-2" : "gap-3 px-3"}\`;
+
+  const sectionButtonClass = (active: boolean) =>
+    \`dp-sidebar-group-label flex min-h-10 w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring \${active ? "dp-sidebar-group-active" : ""} \${collapsed ? "justify-center px-0" : ""}\`;
+
+  const groups: {
+    id: string;
+    label: string;
+    Icon: LucideIcon;
+    open: boolean;
+    setOpen: (value: boolean | ((current: boolean) => boolean)) => void;
+    items: [string, ScreenKey, LucideIcon][];
+  }[] = [
+    { id: "analysis", label: "Análise", Icon: Gauge, open: managementOpen, setOpen: setManagementOpen, items: [
+      ["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText],
+    ] },
+    { id: "closing", label: "Fechamento de Ponto", Icon: CalendarClock, open: closingMenuOpen, setOpen: setClosingMenuOpen, items: [
+      ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck],
+    ] },
+    { id: "cadastro", label: "Cadastro", Icon: Building2, open: companyMenuOpen, setOpen: setCompanyMenuOpen, items: [
+      ["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays],
+    ] },
+    { id: "organization", label: "Organização", Icon: CalendarRange, open: tasksOpen, setOpen: setTasksOpen, items: [
+      ["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Diário de Ocorrências", "diario-ocorrencias", ClipboardList], ["Tarefas", "tarefas", ListChecks],
+    ] },
+    { id: "people", label: "Pessoas", Icon: UsersRound, open: peopleOpen, setOpen: setPeopleOpen, items: [
+      ["Férias", "ferias", Palmtree],
+    ] },
+  ];
+
+  const activeGroup = groups.find(group => group.items.some(([, key]) => key === screen))?.id;
+  const openCollapsedGroup = (event: React.MouseEvent<HTMLButtonElement>, groupId: string) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setCollapsedFlyout(current => current?.group === groupId ? null : { group: groupId, top: rect.top });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 shadow-sm backdrop-blur lg:hidden">
@@ -201,32 +251,35 @@ function AppShell({
           <Clock3 className="h-5 w-5 shrink-0 text-primary-strong" strokeWidth={1.8} aria-hidden="true" />
           <span className="truncate font-display text-sm font-semibold tracking-tight">DP <span className="text-primary-strong">SUCCESS</span></span>
         </div>
-        <button type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-haspopup="dialog" className="inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <button type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-haspopup="dialog" className="inline-flex min-h-10 items-center gap-2 border px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Menu className="h-4 w-4" /> Menu
         </button>
       </div>
+
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-[70] bg-foreground/40 lg:hidden">
           <button type="button" className="absolute inset-0 h-full w-full cursor-default" onClick={() => setMobileMenuOpen(false)} aria-label="Fechar menu de navegação" />
-          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="dp-sidebar relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r border-white/15 bg-gradient-to-b from-[#102b35] via-[#123c40] to-[#075c50] text-white [&_.dp-sidebar-group-label]:!text-white/75 [&_.dp-sidebar-item]:!text-white [&_.dp-sidebar-item]:hover:!bg-white/10 [&_.dp-sidebar-item-active]:!bg-white/15 [&_.dp-sidebar-item-active]:!text-white [&_.dp-sidebar-header]:!border-white/15">
-            <div className="dp-sidebar-header flex h-[76px] shrink-0 items-center justify-between border-b border-sidebar-border px-4">
+          <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="dp-sidebar relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r">
+            <div className="dp-sidebar-header flex h-[76px] shrink-0 items-center justify-between border-b px-4">
               <div className="flex min-w-0 items-center gap-3">
-                <Clock3 className="h-5 w-5 shrink-0 text-sidebar-primary" strokeWidth={1.8} aria-hidden="true" />
-                <div className="min-w-0"><p className="font-display text-base font-bold tracking-tight">DP <span className="text-sidebar-primary">SUCCESS</span></p><p className="mt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/80">RH · DP · ANÁLISE</p></div>
+                <Clock3 className="h-5 w-5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
+                <div className="min-w-0"><p className="font-display text-base font-bold tracking-tight">DP SUCCESS</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em]">RH · DP · GESTÃO</p></div>
               </div>
-              <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center text-sidebar-foreground/80 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Fechar menu"><X className="h-5 w-5" strokeWidth={1.8} /></button>
+              <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Fechar menu"><X className="h-5 w-5" strokeWidth={1.8} /></button>
             </div>
             <nav aria-label="Navegação principal" className="dp-sidebar-nav sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3">
-              {mobileGroups.map(group => (
-                <section key={group.label} className="dp-sidebar-mobile-group mb-5">
-                  <p className="dp-sidebar-group-label px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/80">{group.label}</p>
-                  <div className="space-y-0.5">
+              {groups.map(group => (
+                <section key={group.id} className="dp-sidebar-group mb-3">
+                  <button type="button" onClick={() => group.setOpen(value => !value)} className={sectionButtonClass(group.id === activeGroup)} aria-expanded={group.open}>
+                    <span>{group.label}</span><ChevronDown className={\`h-4 w-4 transition-transform duration-150 \${group.open ? "rotate-0" : "-rotate-90"}\`} strokeWidth={1.8} />
+                  </button>
+                  {group.open && <div className="mt-1 space-y-1">
                     {group.items.map(([label, key, Icon]) => (
-                      <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"}`}>
+                      <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={\`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium transition-colors duration-150 \${screen === key ? "dp-sidebar-item-active font-semibold" : ""}\`}>
                         <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span>
                       </button>
                     ))}
-                  </div>
+                  </div>}
                 </section>
               ))}
             </nav>
@@ -234,118 +287,78 @@ function AppShell({
           </aside>
         </div>
       )}
-      {collapsed && (
-        <div className="fixed inset-x-0 top-0 z-50 hidden h-16 items-center border-b bg-background/95 px-6 shadow-sm backdrop-blur lg:flex">
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            className="mr-4 rounded-lg p-2 text-foreground transition-colors hover:bg-muted"
-            title="Abrir menu"
-            aria-label="Abrir menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Clock3 className="h-5 w-5 text-primary-strong" strokeWidth={1.8} aria-hidden="true" />
-            <span className="font-display text-base font-semibold text-foreground">DP <span className="text-primary-strong">SUCCESS</span></span>
-          </div>
-        </div>
-      )}
-      <aside aria-label="Barra lateral principal" className={`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r border-white/15 bg-gradient-to-b from-[#102b35] via-[#123c40] to-[#075c50] text-white transition-[transform,width] duration-200 [&_.dp-sidebar-group-label]:!text-white/75 [&_.dp-sidebar-item]:!text-white [&_.dp-sidebar-item]:hover:!bg-white/10 [&_.dp-sidebar-item-active]:!bg-white/15 [&_.dp-sidebar-item-active]:!text-white [&_.dp-sidebar-header]:!border-white/15 lg:flex lg:flex-col ${collapsed ? "-translate-x-full w-64" : "translate-x-0 w-64"}`}>
-        <div className={`dp-sidebar-header flex h-[82px] shrink-0 items-center border-b border-sidebar-border ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+
+      <aside aria-label="Barra lateral principal" className={\`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r transition-[width] duration-300 ease-in-out lg:flex lg:flex-col \${collapsed ? "w-[76px]" : "w-[248px]"}\`}>
+        <div className={\`dp-sidebar-header flex h-[76px] shrink-0 items-center border-b \${collapsed ? "justify-center px-2" : "justify-between px-4"}\`}>
           {!collapsed && (
             <div className="flex min-w-0 items-center gap-3">
-              <Clock3 className="h-5 w-5 shrink-0 text-sidebar-primary" strokeWidth={1.8} aria-hidden="true" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-black/10 bg-white/70 text-sm font-bold tracking-tight text-[#202522]">DP</div>
               <div className="min-w-0">
-                <div className="flex items-baseline gap-1.5 leading-none">
-                  <span className="font-display text-[20px] font-semibold tracking-[-0.035em] text-sidebar-foreground">DP</span>
-                  <span className="font-display text-[20px] font-semibold tracking-[-0.035em] text-sidebar-primary">SUCCESS</span>
-                </div>
-                <div className="mt-2 text-[11px] font-medium uppercase tracking-[0.12em] text-sidebar-foreground/80">RH · DP · GESTÃO</div>
+                <div className="font-display text-[17px] font-bold leading-none tracking-[-0.035em]">DP SUCCESS</div>
+                <div className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/65">RH · DP · GESTÃO</div>
               </div>
             </div>
           )}
+          {collapsed && <div className="flex h-9 w-9 items-center justify-center border border-black/10 bg-white/70 text-sm font-bold text-[#202522]">DP</div>}
           <button
             type="button"
             onClick={onToggleCollapsed}
-            className="flex h-10 w-10 shrink-0 items-center justify-center text-sidebar-foreground/80 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-            title={collapsed ? "Expandir menu" : "Minimizar menu"}
-            aria-label={collapsed ? "Expandir menu" : "Minimizar menu"}
+            className={\`flex h-9 w-9 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring \${collapsed ? "absolute right-1 top-[82px]" : ""}\`}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-expanded={!collapsed}
           >
-            <ChevronLeft className="h-5 w-5" strokeWidth={1.8} />
+            <Menu className="h-[19px] w-[19px]" strokeWidth={1.8} />
           </button>
         </div>
 
-        <nav aria-label="Navegação principal" className={`dp-sidebar-nav sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3 ${collapsed ? "space-y-2" : "space-y-2"}`}>
-          {!collapsed ? (
-            <>
-              <section className="dp-sidebar-group">
-                <button type="button" onClick={() => setManagementOpen(v => !v)} className={sectionButtonClass} aria-expanded={managementOpen} aria-controls="dp-sidebar-management">
-                  <span>Análise</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${managementOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
-                </button>
-                {managementOpen && <div id="dp-sidebar-management" className="mt-1 space-y-1">
-                  {([
-                    ["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText],
-                  ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={buttonClass(key)}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span></button>)}
-                </div>}
-              </section>
-
-              <section className="dp-sidebar-group">
-                <button type="button" onClick={() => setClosingMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={closingMenuOpen} aria-controls="dp-sidebar-closing">
-                  <span>Fechamento de Ponto</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${closingMenuOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
-                </button>
-                {closingMenuOpen && <div id="dp-sidebar-closing" className="mt-1 space-y-1">
-                  {([
-                    ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck],
-                  ] as [string, ScreenKey, LucideIcon][]).map(([label, key, Icon]) => <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={buttonClass(key)}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span></button>)}
-                </div>}
-              </section>
-
-              <section className="dp-sidebar-group">
-                <button type="button" onClick={() => setCompanyMenuOpen(v => !v)} className={sectionButtonClass} aria-expanded={companyMenuOpen} aria-controls="dp-sidebar-cadastro">
-                  <span>Cadastro</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${companyMenuOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
-                </button>
-                {companyMenuOpen && <div id="dp-sidebar-cadastro" className="mt-1 space-y-1">
-                  {[
-                    ["Empresas", "empresas"], ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas", "jornadas-escalas"],
-                  ].map(([label, key]) => { const Icon = key === "empresas" || key === "departamentos" ? Building2 : key === "funcionarios" ? UsersRound : key === "cargos" ? BriefcaseBusiness : CalendarDays; return <button key={key} type="button" onClick={() => go(key as ScreenKey)} aria-current={screen === key ? "page" : undefined} className={buttonClass(key as ScreenKey)}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span></button>; })}
-                </div>}
-              </section>
-
-              <section className="dp-sidebar-group">
-                <button type="button" onClick={() => setTasksOpen(v => !v)} className={sectionButtonClass} aria-expanded={tasksOpen} aria-controls="dp-sidebar-organization">
-                  <span>Organização</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${tasksOpen ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
-                </button>
-                {tasksOpen && <div id="dp-sidebar-organization" className="mt-1 space-y-1">
-                  <button type="button" onClick={() => go("planejamento-mensal")} aria-current={screen === "planejamento-mensal" ? "page" : undefined} className={buttonClass("planejamento-mensal")}><CalendarRange className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Planejamento Mensal</span></button>
-                  <button type="button" onClick={() => go("diario-ocorrencias")} aria-current={screen === "diario-ocorrencias" ? "page" : undefined} className={buttonClass("diario-ocorrencias")}><ClipboardList className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Diário de Ocorrências</span></button>
-                  <button type="button" onClick={() => go("tarefas")} aria-current={screen === "tarefas" ? "page" : undefined} className={buttonClass("tarefas")}><ListChecks className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Tarefas</span></button>
-                </div>}
-              </section>
-
-              <section className="dp-sidebar-group">
-                <button type="button" onClick={() => setPeopleOpen(v => !v)} className={sectionButtonClass} aria-expanded={peopleOpen} aria-controls="dp-sidebar-people">
-                  <span>Pessoas</span><ChevronDown className={"h-4 w-4 transition-transform duration-150 " + (peopleOpen ? "rotate-0" : "-rotate-90")} strokeWidth={1.8} />
-                </button>
-                {peopleOpen && <div id="dp-sidebar-people" className="mt-1 space-y-1">
-                  <button type="button" onClick={() => go("ferias")} aria-current={screen === "ferias" ? "page" : undefined} className={buttonClass("ferias")}><Palmtree className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Férias</span></button>
-                </div>}
-              </section>
-            </>
-          ) : (
-            <>
-              {([
-                ["dashboard", LayoutDashboard, "Dashboard"], ["kpis", ChartColumn, "KPIs"], ["comparativos", UsersRound, "Comparativos"], ["relatorios", FileText, "Relatórios"],
-                ["fechamento-ponto", CalendarClock, "Fechamento"], ["importar-cartao-ponto", Upload, "Importar Cartão Ponto"], ["lancamentos", ClipboardList, "Lançamentos"], ["banco-horas", Clock3, "Banco de Horas"], ["pagamentos", BadgeDollarSign, "Pagamentos"], ["ocorrencias", CalendarX, "Faltas e Folgas"], ["atestados", ClipboardCheck, "Declarações e Atestados"],
-                ["empresas", Building2, "Empresas"], ["funcionarios", UsersRound, "Funcionários"], ["cargos", BriefcaseBusiness, "Cargos"], ["departamentos", Building2, "Departamentos"], ["jornadas-escalas", CalendarDays, "Jornadas"], ["planejamento-mensal", CalendarRange, "Planejamento Mensal"], ["diario-ocorrencias", ClipboardList, "Diário de Ocorrências"], ["tarefas", FileText, "Tarefas"], ["ferias", Palmtree, "Férias"],
-              ] as [ScreenKey, LucideIcon, string][]).map(([key, Icon, label]) => <button key={key} type="button" onClick={() => go(key)} className={buttonClass(key)} title={label} aria-label={label} aria-current={screen === key ? "page" : undefined}><Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /></button>)}
-            </>
-          )}
+        <nav aria-label="Navegação principal" className="dp-sidebar-nav sidebar-scrollbar-hidden flex-1 space-y-2 overflow-x-visible overflow-y-auto">
+          {groups.map(group => (
+            <section key={group.id} className="dp-sidebar-group relative" data-sidebar-flyout-root>
+              <button
+                type="button"
+                onClick={collapsed ? event => openCollapsedGroup(event, group.id) : () => group.setOpen(value => !value)}
+                className={sectionButtonClass(group.id === activeGroup)}
+                aria-expanded={collapsed ? collapsedFlyout?.group === group.id : group.open}
+                aria-label={collapsed ? group.label : undefined}
+                title={collapsed ? group.label : undefined}
+              >
+                <span className={collapsed ? "sr-only" : "truncate"}>{group.label}</span>
+                <group.Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
+                {!collapsed && <ChevronDown className={\`h-4 w-4 shrink-0 transition-transform duration-150 \${group.open ? "rotate-0" : "-rotate-90"}\`} strokeWidth={1.8} />}
+              </button>
+              {!collapsed && group.open && (
+                <div className="mt-1 space-y-1">
+                  {group.items.map(([label, key, Icon]) => (
+                    <button key={key} type="button" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={buttonClass(key)}>
+                      <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {collapsed && collapsedFlyout?.group === group.id && (
+                <div
+                  className="dp-sidebar-flyout fixed z-[80] w-64 border p-2 shadow-xl"
+                  style={{ top: \`\${Math.min(collapsedFlyout.top, Math.max(12, window.innerHeight - 260))}px\`, left: "76px" }}
+                  role="menu"
+                  aria-label={group.label}
+                  data-sidebar-flyout-root
+                >
+                  <p className="px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em]">{group.label}</p>
+                  {group.items.map(([label, key, Icon]) => (
+                    <button key={key} type="button" role="menuitem" onClick={() => go(key)} aria-current={screen === key ? "page" : undefined} className={\`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium \${screen === key ? "dp-sidebar-item-active font-semibold" : ""}\`}>
+                      <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
         </nav>
         <SidebarProfile collapsed={collapsed} onNavigate={go} />
       </aside>
 
-      <main className={`dp-app-main transition-[padding] duration-200 ${collapsed ? "lg:pl-0 lg:pt-16" : "lg:pl-64"}`}>
+      <main className={\`dp-app-main min-h-screen min-w-0 transition-[padding] duration-300 ease-in-out \${collapsed ? "lg:pl-[76px]" : "lg:pl-[248px]"}\`}>
         {children}
       </main>
     </div>
