@@ -1203,3 +1203,160 @@ main :is(h1, h2, h3) {
 .dp-brand-on-dark .dp-brand-icon { color: #7cebd0; background-color: rgb(255 255 255 / 0.14); }
 @media (max-width: 480px) { .dp-brand { gap: 0.375rem; font-size: 0.8125rem !important; } }
 
+
+
+/* Sidebar compacta e clara — camada isolada da navegação DP Success. */
+.dp-sidebar {
+  --dp-sidebar-bg: #edf0ee;
+  --dp-sidebar-hover: #e1e5e2;
+  --dp-sidebar-active-bg: #dfe3e0;
+  --dp-sidebar-border: #d5dad6;
+  --dp-sidebar-text: #202522;
+  --dp-sidebar-text-muted: #68716b;
+  --dp-sidebar-accent: #e8b923;
+  --dp-sidebar-active-text: #171c19;
+  --sidebar: var(--dp-sidebar-bg);
+  --sidebar-foreground: var(--dp-sidebar-text);
+  --sidebar-primary: var(--dp-sidebar-accent);
+  --sidebar-primary-foreground: var(--dp-sidebar-text);
+  --sidebar-accent: var(--dp-sidebar-hover);
+  --sidebar-accent-foreground: var(--dp-sidebar-text);
+  --sidebar-border: var(--dp-sidebar-border);
+  --sidebar-ring: #9b7a12;
+  position: fixed;
+  background: var(--dp-sidebar-bg) !important;
+  color: var(--dp-sidebar-text) !important;
+  border-color: var(--dp-sidebar-border) !important;
+  box-shadow: 4px 0 18px rgb(25 35 29 / 0.055) !important;
+}
+.dp-sidebar-header,
+.dp-sidebar-footer {
+  background: var(--dp-sidebar-bg) !important;
+  border-color: var(--dp-sidebar-border) !important;
+}
+.dp-sidebar-header {
+  color: var(--dp-sidebar-text);
+}
+.dp-sidebar-header p,
+.dp-sidebar-header div,
+.dp-sidebar-header span {
+  color: inherit;
+}
+.dp-sidebar-nav {
+  min-height: 0;
+  padding: 12px 10px;
+  overscroll-behavior: contain;
+}
+.dp-sidebar-group + .dp-sidebar-group {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid #dce1dd;
+}
+.dp-sidebar-group-label {
+  position: relative;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 2px !important;
+  color: #303833 !important;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.015em;
+}
+.dp-sidebar-group-label:hover,
+.dp-sidebar-group-label.dp-sidebar-group-active {
+  background: #e1e5e2 !important;
+  color: #171c19 !important;
+}
+.dp-sidebar-group-label.dp-sidebar-group-active::before {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  bottom: 8px;
+  width: 3px;
+  background: var(--dp-sidebar-accent);
+  content: "";
+}
+.dp-sidebar-group-label svg {
+  color: #303833 !important;
+}
+.dp-sidebar-item {
+  position: relative;
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 2px !important;
+  color: #303833 !important;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+.dp-sidebar-item:hover {
+  background: #e3e7e4 !important;
+  color: #171c19 !important;
+}
+.dp-sidebar-item-active,
+.dp-sidebar-item-active:hover {
+  background: #dfe3e0 !important;
+  color: #171c19 !important;
+  font-weight: 650;
+}
+.dp-sidebar-item-active::before {
+  top: 7px;
+  right: 0;
+  bottom: 7px;
+  left: auto;
+  width: 3px;
+  border-radius: 0;
+  background: var(--dp-sidebar-accent) !important;
+  box-shadow: none !important;
+}
+.dp-sidebar-item-active svg {
+  color: #171c19 !important;
+}
+.dp-sidebar-flyout {
+  border-color: var(--dp-sidebar-border);
+  border-radius: 2px;
+  background: #f3f5f3;
+  color: var(--dp-sidebar-text);
+  box-shadow: 8px 8px 24px rgb(25 35 29 / 0.14);
+}
+.dp-sidebar-flyout > p {
+  color: #68716b;
+}
+.dp-sidebar-avatar {
+  border: 1px solid #cbd2cc;
+  border-radius: 2px !important;
+  background: #e1e5e2;
+  color: #202522;
+}
+.dp-sidebar-logout {
+  border-radius: 2px !important;
+  color: #58615b !important;
+}
+.dp-sidebar-logout:hover {
+  background: #e1e5e2 !important;
+  color: #171c19 !important;
+}
+.dp-sidebar :is(button, [role="button"]):focus-visible {
+  outline: 2px solid #b18b19;
+  outline-offset: 2px;
+}
+.dp-sidebar [aria-current="page"] {
+  color: #171c19 !important;
+}
+.dp-app-main {
+  min-width: 0;
+}
+@media (max-width: 1023px) {
+  .dp-sidebar {
+    position: relative;
+    box-shadow: 8px 0 24px rgb(25 35 29 / 0.12) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dp-sidebar,
+  .dp-sidebar *,
+  .dp-sidebar *::before,
+  .dp-sidebar *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
