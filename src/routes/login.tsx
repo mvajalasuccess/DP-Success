@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff, ShieldCheck, Clock3, UsersRound, ArrowRight, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,8 +27,26 @@ function Login() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  // Convite: só o token vai na URL; o tipo de acesso é lido do banco e não pode ser escolhido aqui.
+  const [invite, setInvite] = useState<{ token: string; role: string | null; status: string } | null>(null);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("convite");
+    if (!token) return;
+    setMode("signup");
+    setInvite({ token, role: null, status: "carregando" });
+    void supabase.rpc("invite_info", { _token: token }).then(({ data }) => {
+      const row = (data ?? [])[0];
+      setInvite({ token, role: row?.role ?? null, status: row?.status ?? "invalido" });
+    });
+  }, []);
+  const inviteBlocked = !!invite && invite.status !== "pendente";
 
   async function submit() {
+    if (mode === "signup" && inviteBlocked) {
+      setError("Este convite não é válido para cadastro.");
+      return;
+    }
     if (mode === "signup" && !fullName.trim()) {
       setError("Informe seu nome completo.");
       return;
@@ -71,7 +89,10 @@ function Login() {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { full_name: fullName.trim() } },
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { full_name: fullName.trim(), ...(invite ? { invite_token: invite.token } : {}) },
+      },
     });
 
     if (error) {
@@ -128,6 +149,7 @@ function Login() {
               <h1 className="text-3xl font-bold tracking-tight text-slate-900">{mode === "login" ? "Boas-vindas de volta" : "Crie seu acesso"}</h1>
               <p className="mt-2 text-sm leading-6 text-slate-500">{mode === "login" ? "Entre com suas credenciais para acessar o DP SUCCESS." : "Preencha os dados abaixo para solicitar seu acesso ao sistema."}</p>
             </div>
+            {invite && mode === "signup" && <div role="status" className={`mt-6 rounded-xl border p-3 text-sm ${inviteBlocked ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>{invite.status === "carregando" ? "Verificando convite..." : invite.status === "pendente" ? `Convite válido. Seu acesso será: ${invite.role === "administrador" ? "Administrador" : "Convidado"}.` : invite.status === "utilizado" ? "Este convite já foi utilizado." : invite.status === "expirado" ? "Este convite expirou. Peça um novo link ao administrador." : invite.status === "cancelado" ? "Este convite foi cancelado." : "Convite inválido."}</div>}
             <div className="mt-8 grid gap-5">
               {mode === "signup" && <label className="grid gap-2 text-sm font-semibold text-slate-700">Nome completo<input type="text" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="h-12 rounded-xl border border-slate-200 bg-white px-4 font-normal text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" placeholder="Como podemos te chamar?" /></label>}
               <label className="grid gap-2 text-sm font-semibold text-slate-700">E-mail corporativo<input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 rounded-xl border border-slate-200 bg-white px-4 font-normal text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10" placeholder="nome@empresa.com.br" /></label>
@@ -137,7 +159,7 @@ function Login() {
               <button type="button" disabled={saving} onClick={() => void submit()} className="group flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 hover:shadow-emerald-700/25 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Aguarde..." : mode === "login" ? "Entrar no sistema" : "Criar acesso"}{!saving && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}</button>
               <div className="flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" /><span>ou</span><span className="h-px flex-1 bg-slate-200" /></div>
               <button type="button" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); setMessage(""); }} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800">{mode === "login" ? "Ainda não tenho acesso" : "Já tenho acesso"}</button>
-              {mode === "signup" && <p className="rounded-xl bg-slate-100 p-3 text-xs leading-5 text-slate-500">Novos cadastros entram como Convidado, com permissão somente para visualização. Um administrador pode alterar o perfil depois em Configurações.</p>}
+              {mode === "signup" && !invite && <p className="rounded-xl bg-slate-100 p-3 text-xs leading-5 text-slate-500">Novos cadastros entram como Convidado, com permissão somente para visualização. Um administrador pode alterar o perfil depois em Configurações.</p>}
             </div>
             <p className="mt-8 flex items-center justify-center gap-2 text-xs text-slate-400"><ShieldCheck className="h-3.5 w-3.5" /> Acesso restrito a usuários autorizados</p>
           </Card>

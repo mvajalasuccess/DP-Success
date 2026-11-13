@@ -10,3 +10,6 @@
 <!-- LOVABLE:END -->
 
 - Authenticated identity is loaded through the account-identity hook and account-scoped profile helpers; this invalidates stale reads on account changes and preserves stored names during login.
+
+- Access level lives only in `user_roles` (Administrador edits, Convidado views); `profiles.role` is a trigger-maintained mirror for display. Why: two sources of truth let the UI and RLS disagree.
+- Invites are consumed by a trigger on account creation that reads only the invite token from signup metadata. Why: the role must come from the database, never from the URL or browser.
