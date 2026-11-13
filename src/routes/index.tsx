@@ -168,7 +168,7 @@ function AppShell({
 
   useEffect(() => {
     if (["dashboard", "kpis", "comparativos", "relatorios"].includes(screen)) setManagementOpen(true);
-    if (["fechamento-ponto", "importar-cartao-ponto", "lancamentos", "banco-horas", "pagamentos", "ocorrencias", "atestados"].includes(screen)) setClosingMenuOpen(true);
+    if (["fechamento-ponto", "importar-cartao-ponto", "lancamentos", "banco-horas", "pagamentos", "ocorrencias", "atestados", "importacao-historico"].includes(screen)) setClosingMenuOpen(true);
     if (["empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas"].includes(screen)) setCompanyMenuOpen(true);
     if (["planejamento-mensal", "diario-ocorrencias", "tarefas"].includes(screen)) setTasksOpen(true);
     if (screen === "ferias") setPeopleOpen(true);
@@ -225,7 +225,7 @@ function AppShell({
       ["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText],
     ] },
     { id: "closing", label: "Fechamento de Ponto", Icon: CalendarClock, open: closingMenuOpen, setOpen: setClosingMenuOpen, items: [
-      ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck],
+      ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck], ["Importação de Histórico", "importacao-historico", FileClock],
     ] },
     { id: "cadastro", label: "Cadastro", Icon: Building2, open: companyMenuOpen, setOpen: setCompanyMenuOpen, items: [
       ["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays],
@@ -235,6 +235,9 @@ function AppShell({
     ] },
     { id: "people", label: "Pessoas", Icon: UsersRound, open: peopleOpen, setOpen: setPeopleOpen, items: [
       ["Férias", "ferias", Palmtree],
+    ] },
+    { id: "settings", label: "Configurações", Icon: Settings2, open: tasksOpen, setOpen: setTasksOpen, items: [
+      ["Parâmetros", "parametros", SlidersHorizontal],
     ] },
   ];
 
