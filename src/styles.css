@@ -1223,7 +1223,6 @@ main :is(h1, h2, h3) {
   --sidebar-accent-foreground: var(--dp-sidebar-text);
   --sidebar-border: var(--dp-sidebar-border);
   --sidebar-ring: #9b7a12;
-  position: fixed;
   background: var(--dp-sidebar-bg) !important;
   color: var(--dp-sidebar-text) !important;
   border-color: var(--dp-sidebar-border) !important;
@@ -1318,6 +1317,8 @@ main :is(h1, h2, h3) {
   background: #f3f5f3;
   color: var(--dp-sidebar-text);
   box-shadow: 8px 8px 24px rgb(25 35 29 / 0.14);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
 }
 .dp-sidebar-flyout > p {
   color: #68716b;
