@@ -213,7 +213,7 @@ function AppShell({
     `dp-sidebar-item group relative flex min-h-10 w-full items-center py-2 text-left text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${screen === key ? "dp-sidebar-item-active font-semibold" : "text-sidebar-foreground hover:bg-sidebar-accent"} ${collapsed ? "justify-center px-2" : "gap-3 px-3"}`;
 
   const sectionButtonClass = (active: boolean) =>
-    `dp-sidebar-group-label flex min-h-10 w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${active ? "dp-sidebar-group-active" : ""} ${collapsed ? "justify-center px-0" : ""}`;
+    `dp-sidebar-group-label flex min-h-10 w-full items-center px-3 py-2 text-left text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${active ? "dp-sidebar-group-active" : ""} ${collapsed ? "justify-center px-0" : "justify-start gap-3"}`;
 
   const groups: {
     id: string;
@@ -328,9 +328,9 @@ function AppShell({
                 aria-label={collapsed ? group.label : undefined}
                 title={collapsed ? group.label : undefined}
               >
+                <group.Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} aria-hidden="true" />
                 <span className={collapsed ? "sr-only" : "truncate"}>{group.label}</span>
-                <group.Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
-                {!collapsed && <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-150 ${group.open ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />}
+                {!collapsed && <ChevronDown className={`ml-auto h-4 w-4 shrink-0 transition-transform duration-150 ${group.open ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />}
               </button>
               {!collapsed && group.open && (
                 <div className="mt-1 space-y-1">
