@@ -77,8 +77,16 @@ function Dashboard() {
     const loadRole = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) { if (active) setAccessRole(null); return; }
-      const { data } = await supabase.rpc("current_roles");
-      const roles = (data ?? []) as string[];
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", sessionData.session.user.id);
+      if (error) {
+        console.error("Não foi possível carregar o nível de acesso:", error);
+        if (active) setAccessRole(null);
+        return;
+      }
+      const roles = (data ?? []).map((item) => item.role);
       if (active) setAccessRole(roles.includes("administrador") ? "administrador" : roles[0] ?? null);
     };
     void loadRole();
