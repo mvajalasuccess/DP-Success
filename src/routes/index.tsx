@@ -253,8 +253,8 @@ function AppShell({
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 shadow-sm backdrop-blur lg:hidden">
         <div className="flex min-w-0 items-center gap-2.5">
-          <Clock3 className="h-5 w-5 shrink-0 text-primary-strong" strokeWidth={1.8} aria-hidden="true" />
-          <span className="truncate font-display text-sm font-semibold tracking-tight">DP <span className="text-primary-strong">SUCCESS</span></span>
+          <Clock3 className="h-5 w-5 shrink-0 dp-sidebar-brand-icon" strokeWidth={1.8} aria-hidden="true" />
+          <span className="truncate font-display text-sm font-semibold tracking-tight dp-sidebar-brand-title">DPSUCCESS</span>
         </div>
         <button type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-haspopup="dialog" className="inline-flex min-h-10 items-center gap-2 border px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Menu className="h-4 w-4" /> Menu
@@ -297,14 +297,14 @@ function AppShell({
         <div className={`dp-sidebar-header flex h-[82px] shrink-0 items-center border-b ${collapsed ? "flex-col justify-center gap-1 px-2" : "justify-between px-4"}`}>
           {!collapsed && (
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-black/10 bg-white/70 text-sm font-bold tracking-tight text-[#202522]">DP</div>
+              <Clock3 className="h-8 w-8 shrink-0 dp-sidebar-brand-icon" strokeWidth={1.7} aria-hidden="true" />
               <div className="min-w-0">
-                <div className="font-display text-[17px] font-bold leading-none tracking-[-0.035em]">DP SUCCESS</div>
-                <div className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/65">RH · DP · GESTÃO</div>
+                <div className="font-display text-[17px] font-bold leading-none tracking-[-0.035em] dp-sidebar-brand-title">DPSUCCESS</div>
+                <div className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] dp-sidebar-brand-subtitle">RH · DP · GESTÃO</div>
               </div>
             </div>
           )}
-          {collapsed && <div className="flex h-9 w-9 items-center justify-center border border-black/10 bg-white/70 text-sm font-bold text-[#202522]">DP</div>}
+          {collapsed && <Clock3 className="h-7 w-7 shrink-0 dp-sidebar-brand-icon" strokeWidth={1.7} aria-hidden="true" />}
           <button
             type="button"
             onClick={onToggleCollapsed}
