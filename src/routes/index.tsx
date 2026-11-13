@@ -293,7 +293,7 @@ function AppShell({
         </div>
       )}
 
-      <aside aria-label="Barra lateral principal" className={`dp-sidebar fixed inset-y-0 left-0 z-40 hidden border-r transition-[width] duration-300 ease-in-out lg:flex lg:flex-col ${collapsed ? "w-[76px]" : "w-[248px]"}`}>
+      <aside aria-label="Barra lateral principal" className={`dp-sidebar ${collapsed ? "dp-sidebar-collapsed" : ""} fixed inset-y-0 left-0 z-40 hidden border-r transition-[width] duration-300 ease-in-out lg:flex lg:flex-col ${collapsed ? "w-[76px]" : "w-[248px]"}`}>
         <div className={`dp-sidebar-header flex h-[82px] shrink-0 items-center border-b ${collapsed ? "flex-col justify-center gap-1 px-2" : "justify-between px-4"}`}>
           {!collapsed && (
             <div className="flex min-w-0 items-center gap-3">
