@@ -135,6 +135,12 @@ FOR SELECT TO authenticated
 USING (user_id = (SELECT auth.uid()));
 
 -- Stop exposing permission-check RPCs through the public API.
+-- Remove the legacy public wrappers entirely after policies have been
+-- rewritten to call private.*. DROP without CASCADE is intentional: if any
+-- dependency remains, the migration must stop rather than silently break it.
+DROP FUNCTION IF EXISTS public.is_profile_admin(uuid);
+DROP FUNCTION IF EXISTS public.is_profile_manager(uuid);
+
 REVOKE ALL ON FUNCTION public.has_role(uuid, public.app_role) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.can_manage(uuid) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.has_app_access(uuid) FROM PUBLIC, anon, authenticated;
