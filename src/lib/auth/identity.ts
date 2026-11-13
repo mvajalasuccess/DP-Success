@@ -21,8 +21,7 @@ export function createIdentityReader(
       try {
         const profile = await readProfile(userId);
         if (request === version) publish(identityForAccount(userId, profile));
-      } catch (e) {
-        console.warn('[identity-debug]', e);
+      } catch {
         if (request === version) publish(EMPTY_IDENTITY);
       }
     },
