@@ -157,6 +157,7 @@ function AppShell({
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [collapsedFlyout, setCollapsedFlyout] = useState<{ group: string; top: number } | null>(null);
 
@@ -236,7 +237,7 @@ function AppShell({
     { id: "people", label: "Pessoas", Icon: UsersRound, open: peopleOpen, setOpen: setPeopleOpen, items: [
       ["Férias", "ferias", Palmtree],
     ] },
-    { id: "settings", label: "Configurações", Icon: Settings2, open: tasksOpen, setOpen: setTasksOpen, items: [
+    { id: "settings", label: "Configurações", Icon: Settings2, open: settingsOpen, setOpen: setSettingsOpen, items: [
       ["Parâmetros", "parametros", SlidersHorizontal],
     ] },
   ];
