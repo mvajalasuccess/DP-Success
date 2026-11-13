@@ -1490,3 +1490,23 @@ main :is(h1, h2, h3) {
     box-shadow: 8px 0 24px rgb(0 0 0 / 0.3) !important;
   }
 }
+
+/* Marca DP Success na sidebar: relógio e tipografia em degradê verde. */
+.dp-sidebar-brand-icon {
+  color: #06CAA0 !important;
+  filter: drop-shadow(0 0 7px rgb(6 202 160 / 0.18));
+}
+.dp-sidebar-brand-title,
+.dp-sidebar-brand-subtitle {
+  background: linear-gradient(100deg, #8bf2d5 0%, #06CAA0 48%, #00a982 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+}
+.dp-sidebar-brand-title {
+  letter-spacing: -0.035em;
+}
+.dp-sidebar-brand-subtitle {
+  letter-spacing: 0.12em;
+}
