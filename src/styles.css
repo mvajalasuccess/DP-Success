@@ -1361,3 +1361,35 @@ main :is(h1, h2, h3) {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Alinhamento óptico da sidebar recolhida: todos os ícones no eixo central. */
+.dp-sidebar-collapsed .dp-sidebar-nav {
+  padding-inline: 0;
+}
+.dp-sidebar-collapsed .dp-sidebar-group-label {
+  display: flex;
+  justify-content: center !important;
+  padding-inline: 0 !important;
+}
+.dp-sidebar-collapsed .dp-sidebar-group-label > svg:first-of-type {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+}
+.dp-sidebar-collapsed .dp-sidebar-footer > div {
+  width: 100%;
+  align-items: center;
+}
+.dp-sidebar-collapsed .dp-sidebar-footer > div > div {
+  width: 100%;
+  flex: none;
+  align-items: center;
+}
+.dp-sidebar-collapsed .dp-sidebar-footer > div > div:last-child {
+  justify-content: center;
+}
+.dp-sidebar-collapsed .dp-sidebar-footer button {
+  margin-inline: auto;
+}
