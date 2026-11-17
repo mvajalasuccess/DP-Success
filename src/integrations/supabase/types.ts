@@ -588,6 +588,7 @@ export type Database = {
       employee_document_records: {
         Row: {
           catalog_id: string | null
+          category: string | null
           created_at: string
           created_by: string | null
           delivery_status: string
@@ -596,6 +597,7 @@ export type Database = {
           employee_id: string
           has_documentation: boolean
           id: string
+          is_custom: boolean
           last_completed_on: string | null
           no_due_date: boolean
           notes: string | null
@@ -605,6 +607,7 @@ export type Database = {
         }
         Insert: {
           catalog_id?: string | null
+          category?: string | null
           created_at?: string
           created_by?: string | null
           delivery_status?: string
@@ -613,6 +616,7 @@ export type Database = {
           employee_id: string
           has_documentation?: boolean
           id?: string
+          is_custom?: boolean
           last_completed_on?: string | null
           no_due_date?: boolean
           notes?: string | null
@@ -622,6 +626,7 @@ export type Database = {
         }
         Update: {
           catalog_id?: string | null
+          category?: string | null
           created_at?: string
           created_by?: string | null
           delivery_status?: string
@@ -630,6 +635,7 @@ export type Database = {
           employee_id?: string
           has_documentation?: boolean
           id?: string
+          is_custom?: boolean
           last_completed_on?: string | null
           no_due_date?: boolean
           notes?: string | null

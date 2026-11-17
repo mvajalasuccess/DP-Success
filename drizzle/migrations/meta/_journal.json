@@ -50,6 +50,13 @@
       "when": 1794424659628,
       "tag": "0006_access_roles_and_invites",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794932903921,
+      "tag": "0007_custom_document_records",
+      "breakpoints": true
     }
   ]
 }
