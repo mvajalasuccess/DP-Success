@@ -94,7 +94,7 @@ export function DiarioOcorrencias() {
     const period=periods.find(p=>eventForm.event_date>=p.start_date&&eventForm.event_date<=p.end_date);
     const payload={employee_id:eventForm.employee_id,event_date:eventForm.event_date,period_id:period?.id??null,category:eventForm.category.trim()||"Geral",direction:eventForm.direction,title:eventForm.title.trim(),description:eventForm.description.trim()||null,score:Number(eventForm.score),is_star:eventForm.is_star,source:"manual",created_by:user.data?.user?.id??null};
     const result=editingEvent?await (supabase as any).from("employee_life_events").update(payload).eq("id",editingEvent.id):await (supabase as any).from("employee_life_events").insert(payload);
-    setLoading(false);if(result.error){setError(result.error.message);return;}setEventOpen(false);setNotice("Ocorrência salva.");await load();
+    setLoading(false);if(result.error){setError(/row-level security/i.test(result.error.message)?"Sua sessão não tem permissão de edição. Saia e entre novamente com uma conta Administradora.":result.error.message);return;}setEventOpen(false);setNotice("Ocorrência salva.");await load();
   }
   async function deleteEvent(e:LifeEvent){
     const employeeName=e.employees?.full_name||employees.find(x=>x.id===e.employee_id)?.full_name||"este funcionário";
@@ -123,6 +123,8 @@ export function DiarioOcorrencias() {
     setError("");setDocOpen(true);
   }
   async function saveDoc(){
+    // Renova a sessão antes de gravar: um token expirado faz o banco recusar a gravação.
+    await (supabase as any).auth.refreshSession().catch(()=>null);
     if(selectedCatalog===CUSTOM_DOC){
       const name=(docForm.document_name||"").trim();
       if(!docForm.employee_id||!selectedDocCategory){setError("Selecione o funcionário e a categoria.");return;}
@@ -131,7 +133,7 @@ export function DiarioOcorrencias() {
       const result=editingDoc
         ? await (supabase as any).from("employee_document_records").update(payload).eq("id",editingDoc.id)
         : await (supabase as any).from("employee_document_records").insert({...payload,created_by:(await (supabase as any).auth.getUser()).data?.user?.id??null});
-      if(result.error){setError(result.error.message);return;}
+      if(result.error){setError(/row-level security/i.test(result.error.message)?"Sua sessão não tem permissão de edição. Saia e entre novamente com uma conta Administradora.":result.error.message);return;}
       setDocOpen(false);setDocForm(emptyDoc);setSelectedDocCategory("");setSelectedCatalog("");setEditingDoc(null);setNotice(editingDoc?"Documento atualizado.":"Documento registrado.");await load();return;
     }
     const chosen=docCatalog.find(c=>c.id===selectedCatalog);
@@ -141,7 +143,7 @@ export function DiarioOcorrencias() {
     const result=editingDoc
       ? await (supabase as any).from("employee_document_records").update(payload).eq("id",editingDoc.id)
       : await (supabase as any).from("employee_document_records").insert({...payload,created_by:(await (supabase as any).auth.getUser()).data?.user?.id??null});
-    if(result.error){setError(result.error.message);return;}
+    if(result.error){setError(/row-level security/i.test(result.error.message)?"Sua sessão não tem permissão de edição. Saia e entre novamente com uma conta Administradora.":result.error.message);return;}
     setDocOpen(false);setDocForm(emptyDoc);setSelectedDocCategory("");setSelectedCatalog("");setEditingDoc(null);setNotice(editingDoc?"Documento atualizado.":"Documento registrado.");await load();
   }
   async function saveCustomStandard(records:DocRecord[],isStandard:boolean){
