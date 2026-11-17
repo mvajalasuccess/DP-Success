@@ -7,7 +7,7 @@ import { CompanyFilter } from "@/components/company-filter";
 import { ScreenBrand } from "@/components/screen-brand";
 type Employee = { id: string; full_name: string; status?: string; company_id?: string | null; hire_date?: string | null; termination_date?: string | null };
 type LifeEvent = { id: string; employee_id: string; event_date: string; period_id?: string|null; category: string; direction: "positive"|"negative"|"neutral"; title: string; description: string|null; score: number; is_star: boolean; status: "active"|"void"; employees?: { full_name: string }|null };
-type DocRecord = { id: string; employee_id: string; document_name: string; catalog_id?: string|null; no_due_date?: boolean; has_documentation?: boolean; delivery_status?: "not_delivered"|"delivered"; signature_status?: "not_applicable"|"pending"|"signed"; last_completed_on: string|null; due_date: string|null; notes: string|null; status: string; category?: string|null; is_custom?: boolean; employees?: { full_name: string }|null };
+type DocRecord = { id: string; employee_id: string; document_name: string; catalog_id?: string|null; is_standard?: boolean; no_due_date?: boolean; has_documentation?: boolean; delivery_status?: "not_delivered"|"delivered"; signature_status?: "not_applicable"|"pending"|"signed"; last_completed_on: string|null; due_date: string|null; notes: string|null; status: string; category?: string|null; is_custom?: boolean; employees?: { full_name: string }|null };
 type DocRequirement = { id?: string; employee_id: string; catalog_id: string; is_applicable: boolean; is_required: boolean; requires_signature: boolean };
 const CUSTOM_DOC="__outro__";
 const normCat=(v:string|null|undefined)=>v==="Documentos Pessoais"?"Pessoais":v==="Contrato"?"Contratação":v==="Responsabilidades Anuais"?"Responsabilidades anuais":(v||"Diversos");
@@ -127,7 +127,7 @@ export function DiarioOcorrencias() {
       const name=(docForm.document_name||"").trim();
       if(!docForm.employee_id||!selectedDocCategory){setError("Selecione o funcionário e a categoria.");return;}
       if(!name){setError("Informe o nome do documento, exame ou treinamento.");return;}
-      const payload={employee_id:docForm.employee_id,catalog_id:null,category:selectedDocCategory,is_custom:true,document_name:name,has_documentation:docForm.has_documentation==="true",delivery_status:docForm.delivery_status,signature_status:docForm.signature_status,last_completed_on:docForm.last_completed_on||null,due_date:docForm.no_due_date?null:(docForm.due_date||null),no_due_date:docForm.no_due_date,notes:docForm.notes.trim()||null};
+      const payload={employee_id:docForm.employee_id,catalog_id:null,category:selectedDocCategory,is_custom:true,is_standard:editingDoc?.is_standard??false,document_name:name,has_documentation:docForm.has_documentation==="true",delivery_status:docForm.delivery_status,signature_status:docForm.signature_status,last_completed_on:docForm.last_completed_on||null,due_date:docForm.no_due_date?null:(docForm.due_date||null),no_due_date:docForm.no_due_date,notes:docForm.notes.trim()||null};
       const result=editingDoc
         ? await (supabase as any).from("employee_document_records").update(payload).eq("id",editingDoc.id)
         : await (supabase as any).from("employee_document_records").insert({...payload,created_by:(await (supabase as any).auth.getUser()).data?.user?.id??null});
@@ -143,6 +143,14 @@ export function DiarioOcorrencias() {
       : await (supabase as any).from("employee_document_records").insert({...payload,created_by:(await (supabase as any).auth.getUser()).data?.user?.id??null});
     if(result.error){setError(result.error.message);return;}
     setDocOpen(false);setDocForm(emptyDoc);setSelectedDocCategory("");setSelectedCatalog("");setEditingDoc(null);setNotice(editingDoc?"Documento atualizado.":"Documento registrado.");await load();
+  }
+  async function saveCustomStandard(records:DocRecord[],isStandard:boolean){
+    const ids=records.map(record=>record.id);
+    if(!ids.length)return;
+    const {error}=await (supabase as any).from("employee_document_records").update({is_standard:isStandard}).in("id",ids);
+    if(error){setError("Não foi possível atualizar o padrão deste documento: "+error.message);return;}
+    setDocuments(current=>current.map(record=>ids.includes(record.id)?{...record,is_standard:isStandard}:record));
+    setNotice("Configuração de padrão atualizada.");
   }
   async function saveRequirement(catalogId:string,patch:Partial<DocRequirement>={}){
     if(!requirementEmployee){setError("Selecione um funcionário para configurar os documentos.");return;}
@@ -235,7 +243,7 @@ export function DiarioOcorrencias() {
                   </tr>;
                 })}{customGroups.map(list=>{const latest=list[0]!;return <tr key={"custom-"+latest.id}>
                     <td className="px-5 py-4"><span className="font-medium">{latest.document_name}</span></td>
-                    <td className="px-5 py-4 text-center"><span className="text-muted-foreground">Não</span></td>
+                    <td className="px-5 py-4 text-center"><select aria-label={"Padrão para "+latest.document_name} value={latest.is_standard?"sim":"nao"} onChange={e=>void saveCustomStandard(list,e.target.value==="sim")} className="h-9 min-w-[76px] rounded-md border bg-background px-3 text-xs"><option value="sim">Sim</option><option value="nao">Não</option></select></td>
                     <td className="px-5 py-4">{latest.no_due_date?<span className="text-muted-foreground">Não possui vencimento</span>:latest.due_date?dateLabel(latest.due_date):<span className="text-muted-foreground">Não informado</span>}{!latest.no_due_date&&latest.due_date&&<span className={"ml-2 text-xs "+(dueState(latest)==="Vencido"?"text-rose-600":dueState(latest)==="Próximo do vencimento"?"text-amber-600":"text-emerald-600")}>{dueState(latest)}</span>}</td>
                     <td className="px-5 py-4 text-center"><span className={latest.signature_status==="signed"?"font-medium text-emerald-600":"text-muted-foreground"}>{latest.signature_status==="not_applicable"?"Não se aplica":latest.signature_status==="signed"?"Sim":"Não"}</span></td>
                     <td className="px-5 py-4"><span className="block max-w-[280px] whitespace-normal break-words text-xs text-muted-foreground">{latest.notes||"—"}</span></td>
