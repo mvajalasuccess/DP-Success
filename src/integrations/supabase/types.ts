@@ -598,6 +598,7 @@ export type Database = {
           has_documentation: boolean
           id: string
           is_custom: boolean
+          is_standard: boolean
           last_completed_on: string | null
           no_due_date: boolean
           notes: string | null
@@ -617,6 +618,7 @@ export type Database = {
           has_documentation?: boolean
           id?: string
           is_custom?: boolean
+          is_standard?: boolean
           last_completed_on?: string | null
           no_due_date?: boolean
           notes?: string | null
@@ -636,6 +638,7 @@ export type Database = {
           has_documentation?: boolean
           id?: string
           is_custom?: boolean
+          is_standard?: boolean
           last_completed_on?: string | null
           no_due_date?: boolean
           notes?: string | null
