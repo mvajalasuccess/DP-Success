@@ -2151,9 +2151,6 @@ export type Database = {
           status: string
         }[]
       }
-      is_profile_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_profile_manager: { Args: { _user_id: string }; Returns: boolean }
-      is_rh_user: { Args: never; Returns: boolean }
       lock_launch_group: {
         Args: {
           _credit_ids: string[]
