@@ -191,7 +191,7 @@ function AppShell({
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setCollapsedFlyout(null);
     };
-    const closeOnOutside = (event: MouseEvent) => {
+    const closeOnOutside = (event: globalThis.MouseEvent) => {
       if (!(event.target instanceof Element) || !event.target.closest("[data-sidebar-flyout-root]")) {
         setCollapsedFlyout(null);
       }
