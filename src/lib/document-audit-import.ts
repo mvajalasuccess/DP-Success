@@ -89,8 +89,16 @@ function parseHoursFromTitle(title: string): number | null {
   return minutes > 0 ? Math.round((minutes / 60) * 100) / 100 : null;
 }
 
+export function auditTrainingKey(name: string): string | null {
+  const key = normalize(name);
+  const nr = key.match(/^nr0?(1|6|12|18|35)(?!\d)/);
+  if (nr) return "nr" + nr[1].padStart(2, "0");
+  if (/^(pta|plataformadetrabalhoaereo|plataformaelevatoria)/.test(key)) return "pta";
+  return null;
+}
+
 function parseComment(comment: string) {
-  const dateMatch = comment.match(/(?:assinado|realizado|conclu[ií]do|emitido|feito|data)\s*(?:em|:)?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  const dateMatch = comment.match(/(?:assinad[oa]|realizad[oa]|conclu[ií]d[oa]|emitid[oa]|feit[oa]|data)\s*(?:em\s*|:\s*)?(\d{1,2}\/\d{1,2}\/(?:\d{4}|\d{2}))(?!\d)/i);
   const completedOn = dateMatch ? parseDate(dateMatch[1]) : null;
   const validityMatch = comment.match(/(?:validade|vig[eê]ncia)\s*(?:de)?\s*(\d+)\s*(anos?|a|meses?|m[eê]s|dias?)/i);
   let dueDate: string | null = null;
@@ -206,6 +214,7 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             }
             if (!category || documentName.toLocaleLowerCase("pt-BR") === "padrão?") continue;
             const standard = parseStandard(standardCell);
+            if (auditTrainingKey(documentName) && !["Atestados", "Faltas e Folgas"].includes(category)) category = "Medicina e Segurança do Trabalho";
             const parsedComment = parseComment(comment);
             const categoryKey = normalize(category);
             const titleKey = normalize(documentName);
