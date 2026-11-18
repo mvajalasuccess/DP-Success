@@ -162,7 +162,7 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
           const match = resolveEmployee(employeeName, hireDate, employees);
           let category = "";
           let blockRows = 0;
-          for (let rowIndex = firstHeader + 1; rowIndex < matrix.length; rowIndex++) {
+          for (let rowIndex = firstHeader; rowIndex < matrix.length; rowIndex++) {
             const row = matrix[rowIndex] ?? [];
             const documentName = text(row[startCol]);
             if (!documentName) continue;
