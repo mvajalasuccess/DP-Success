@@ -99,6 +99,45 @@ function Dashboard() {
     return () => document.body.classList.remove("role-consulta");
   }, [isConsulta]);
 
+  // UI guard supplements database RLS; it is not an authorization boundary.
+  useEffect(() => {
+    if (!isConsulta) return;
+    const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const mutation = /(?:^|\s)(?:nov[oa]s?|criar|adicionar|editar|excluir|remover|salvar|cadastrar|registrar|importar|recalcular|sincronizar|confirmar|desativar|ativar|aplicar|finalizar|encerrar|reabrir|marcar como|concluir|pagar|programar|cancelar pagamento|estornar|gerar link|desmembrar|atualizar cadastro|limpar|zerar|restaurar|lancar|incluir|alterar|gravar|duplicar|transferir|entregar|devolver)(?:\s|$)/;
+    function blocked(el: Element) {
+      if (el.closest(".dp-sidebar, [data-guest-event-create]")) return false;
+      if (el.closest("[data-guest-event-form]")) return false;
+      const text = normalize([el.textContent, el.getAttribute("title"), el.getAttribute("aria-label"), el.getAttribute("value")].filter(Boolean).join(" ")).trim();
+      if (el.matches("[data-role-sensitive],button[type=submit],input[type=submit]")) return true;
+      if (el.querySelector("svg.lucide-plus,svg.lucide-pencil,svg.lucide-trash-2,svg.lucide-save,svg.lucide-power")) return true;
+      if (/^(?:exportar|baixar|download|visualizar|consultar|atualizar kpis|atualizar dados|atualizar lista|atualizar tela|atualizar relatorio)\b/.test(text)) return false;
+      return mutation.test(text);
+    }
+    function scan() {
+      document.querySelectorAll("button, [role=button], input[type=submit], [data-role-sensitive]").forEach(el => {
+        el.toggleAttribute("data-guest-blocked",blocked(el));
+      });
+    }
+    function guard(e: Event) {
+      const target=e.target instanceof Element?e.target:null;
+      if (!target) return;
+      if(e.type==="submit"&&!target.closest("[data-guest-event-form]")){e.preventDefault();e.stopImmediatePropagation();return;}
+      const el=target.closest("button,[role=button],input[type=submit],[data-role-sensitive]");
+      if(el&&blocked(el)){e.preventDefault();e.stopImmediatePropagation();}
+    }
+    scan();
+    const observer=new MutationObserver(scan);
+    observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["title","aria-label","class"]});
+    document.addEventListener("click",guard,true);
+    document.addEventListener("submit",guard,true);
+    return ()=>{
+      observer.disconnect();
+      document.removeEventListener("click",guard,true);
+      document.removeEventListener("submit",guard,true);
+      document.querySelectorAll("[data-guest-blocked]").forEach(el=>el.removeAttribute("data-guest-blocked"));
+    };
+  }, [isConsulta]);
+
   const navigateToScreen = (target: ScreenKey) => {
     setScreen(target);
     const url = new URL(window.location.href);
