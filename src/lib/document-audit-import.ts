@@ -1,3 +1,4 @@
+import {pjCategory} from "@/lib/pj-document-categories";
 import * as XLSX from "xlsx";
 
 export type AuditEmployee = {
@@ -257,7 +258,7 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             }
             if (destination === "documents") {
               if (standard === null) issues.push("Valor de Padrão? ausente ou não reconhecido; revisar manualmente.");
-              if (!canonicalCategories.has(category)) issues.push("Categoria fora da lista padrão do DP Success; precisa ser classificada antes da importação.");
+              if (match.link !== "PJ" && !canonicalCategories.has(category)) issues.push("Categoria fora da lista padrão do DP Success; precisa ser classificada antes da importação.");
             } else if (destination === "absences" && !referenceDate) {
               issues.push("Data da falta não identificada na linha.");
             } else if (destination === "certificates") {
@@ -273,7 +274,7 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             const key = [file.name, sheetName, startCol, rowIndex + 1].join("::");
             rows.push({
               key, fileName: file.name, sheetName, employeeName, hireDate, employeeId: match.id,
-              employeeStatus: match.status, link:match.link, category, documentName, isStandard: standard,
+              employeeStatus: match.status, link:match.link, category:match.link==="PJ"?pjCategory(category):category, documentName, isStandard: standard,
               completedOn: parsedComment.completedOn, dueDate: parsedComment.dueDate,
               notes: parsedComment.notes, originalComment: comment, issue, destination,
               referenceDate, referenceDateLabel: destination === "absences" ? "Data da falta" : "Data de entrega (conferir)",
