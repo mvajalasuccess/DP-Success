@@ -23,6 +23,13 @@ export type AuditRow = {
   notes: string | null;
   originalComment: string;
   issue: string | null;
+  destination: "documents" | "certificates" | "declarations" | "absences";
+  referenceDate: string | null;
+  referenceDateLabel: string | null;
+  durationDays: number | null;
+  durationHours: number | null;
+  cid: string | null;
+  certificateType: "medico" | "odontologico" | "acompanhamento" | "outro" | null;
 };
 
 export type AuditParseResult = {
@@ -68,6 +75,20 @@ function addValidity(dateIso: string, amount: number, unit: "year" | "month" | "
   return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay))).toISOString().slice(0, 10);
 }
 
+function parseDeliveredDate(comment: string): string | null {
+  const match = comment.match(/entregue\\s*m?\\s*(?:em)?\\s*(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4})/i);
+  return match ? parseDate(match[1]) : null;
+}
+
+function parseHoursFromTitle(title: string): number | null {
+  const match = title.match(/(\\d{1,2})h(\\d{2})?\\s*(?:às|as|a)\\s*(\\d{1,2})h(\\d{2})?/i);
+  if (!match) return null;
+  const start = Number(match[1]) * 60 + Number(match[2] || 0);
+  const end = Number(match[3]) * 60 + Number(match[4] || 0);
+  const minutes = end - start;
+  return minutes > 0 ? Math.round((minutes / 60) * 100) / 100 : null;
+}
+
 function parseComment(comment: string) {
   const dateMatch = comment.match(/(?:assinado|realizado|conclu[ií]do|emitido|feito|data)\s*(?:em|:)?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
   const completedOn = dateMatch ? parseDate(dateMatch[1]) : null;
@@ -105,6 +126,8 @@ const categoryMap: Record<string, string> = {
   "vales avulsos, acordos diversos": "Vales avulsos, acordos diversos",
   "contratos de vales avulsos, acordos diversos": "Vales avulsos, acordos diversos",
   "diversos": "Diversos",
+  "atestados": "Atestados",
+  "faltas injustificadas descontadas em folha": "Faltas e Folgas",
 };
 
 function parseStandard(value: unknown): boolean | null {
@@ -122,7 +145,8 @@ function resolveEmployee(name: string, hireDate: string | null, employees: Audit
   );
   if (matches.length > 1) return { id: null, status: "ambiguous" as const };
   if (matches.length === 0) return { id: null, status: "not-found" as const };
-  if ((matches[0].status || "").toLocaleLowerCase("pt-BR") !== "ativo") return { id: matches[0].id, status: "inactive" as const };
+  const employeeStatus = String(matches[0].status ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+  if (!["ativo", "active"].includes(employeeStatus)) return { id: matches[0].id, status: "inactive" as const };
   return { id: matches[0].id, status: "matched" as const };
 }
 
@@ -170,7 +194,9 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
           let blockRows = 0;
           for (let rowIndex = firstHeader; rowIndex < matrix.length; rowIndex++) {
             const row = matrix[rowIndex] ?? [];
-            const documentName = text(row[startCol]);
+            const rawDocumentValue = row[startCol];
+            const sourceDate = parseExcelDate(rawDocumentValue);
+            const documentName = rawDocumentValue instanceof Date && sourceDate ? sourceDate.split("-").reverse().join("/") : text(rawDocumentValue);
             if (!documentName) continue;
             const standardCell = row[startCol + 1];
             const comment = text(row[startCol + 2]);
@@ -183,23 +209,51 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             if (!category || documentName.toLocaleLowerCase("pt-BR") === "padrão?") continue;
             const standard = parseStandard(standardCell);
             const parsedComment = parseComment(comment);
+            const categoryKey = normalize(category);
+            const titleKey = normalize(documentName);
+            const destination: AuditRow["destination"] = categoryKey === normalize("Atestados")
+              ? (titleKey.startsWith("declaracao") ? "declarations" : "certificates")
+              : categoryKey === normalize("Faltas e Folgas") ? "absences" : "documents";
+            const deliveredDate = parseDeliveredDate(comment);
+            const referenceDate = destination === "absences" ? sourceDate : deliveredDate;
+            const durationDaysMatch = documentName.match(/(\\d+)\\s*dias?/i);
+            const durationDays = durationDaysMatch ? Number(durationDaysMatch[1]) : null;
+            const durationHours = destination === "declarations" ? parseHoursFromTitle(documentName) : null;
+            const cidMatch = documentName.match(/\\bCID\\s*([A-Z0-9.]+)/i);
+            const cid = cidMatch?.[1] ?? null;
+            const certificateType: AuditRow["certificateType"] = /odont|dentist/i.test(documentName)
+              ? "odontologico" : /acompanhante/i.test(documentName) ? "acompanhamento" : /^atestado/i.test(documentName) ? "medico" : "outro";
             const issues: string[] = [];
-            if (parsedComment.issue) issues.push(parsedComment.issue);
+            if (parsedComment.issue && destination === "documents") issues.push(parsedComment.issue);
             if (!match.id || match.status !== "matched") {
               issues.push(match.status === "missing-hire-date" ? "Bloco sem data de admissão válida." :
                 match.status === "inactive" ? "Funcionário inativo/desligado; bloco bloqueado." :
                 match.status === "ambiguous" ? "Mais de um funcionário corresponde ao nome e à admissão." :
                 "Funcionário não encontrado com nome completo e admissão exatos.");
             }
-            if (standard === null) issues.push("Valor de Padrão? ausente ou não reconhecido; revisar manualmente.");
-            if (!canonicalCategories.has(category)) issues.push("Categoria fora da lista padrão do DP Success; precisa ser classificada antes da importação.");
+            if (destination === "documents") {
+              if (standard === null) issues.push("Valor de Padrão? ausente ou não reconhecido; revisar manualmente.");
+              if (!canonicalCategories.has(category)) issues.push("Categoria fora da lista padrão do DP Success; precisa ser classificada antes da importação.");
+            } else if (destination === "absences" && !referenceDate) {
+              issues.push("Data da falta não identificada na linha.");
+            } else if (destination === "certificates") {
+              if (!durationDays) issues.push("Quantidade de dias do atestado não identificada.");
+              if (!referenceDate) issues.push("A planilha não informa data de início do afastamento; há somente a data de entrega.");
+              else issues.push("A data disponível é de entrega do documento, não necessariamente o início do afastamento. Revisar antes de lançar.");
+            } else if (destination === "declarations") {
+              if (!durationHours) issues.push("Horário ou duração da declaração não identificado.");
+              if (!referenceDate) issues.push("Data da declaração não identificada; a planilha pode informar somente a entrega.");
+              else issues.push("A data disponível é de entrega do documento, não necessariamente a data do comparecimento. Revisar antes de lançar.");
+            }
             const issue = issues.length ? issues.join(" ") : null;
             const key = [file.name, sheetName, startCol, rowIndex + 1].join("::");
             rows.push({
               key, fileName: file.name, sheetName, employeeName, hireDate, employeeId: match.id,
               employeeStatus: match.status, category, documentName, isStandard: standard,
               completedOn: parsedComment.completedOn, dueDate: parsedComment.dueDate,
-              notes: parsedComment.notes, originalComment: comment, issue,
+              notes: parsedComment.notes, originalComment: comment, issue, destination,
+              referenceDate, referenceDateLabel: destination === "absences" ? "Data da falta" : "Data de entrega (conferir)",
+              durationDays, durationHours, cid, certificateType,
             });
             blockRows++;
           }
