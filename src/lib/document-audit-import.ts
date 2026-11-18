@@ -1,4 +1,4 @@
-import {pjCategory} from "@/lib/pj-document-categories";
+import {pjRecordCategory} from "@/lib/pj-document-categories";
 import * as XLSX from "xlsx";
 
 export type AuditEmployee = {
@@ -225,7 +225,8 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
               continue;
             }
             if (!category || documentName.toLocaleLowerCase("pt-BR") === "padrão?") continue;
-            const standard = parseStandard(standardCell);
+            const invoice=match.link==="PJ"&&pjRecordCategory(category,documentName)==="NFs";
+            const standard = invoice?false:parseStandard(standardCell);
             if (auditTrainingKey(documentName) && !["Atestados", "Faltas e Folgas"].includes(category)) category = "Medicina e Segurança do Trabalho";
             const parsedComment = parseComment(comment);
             const categoryKey = normalize(category);
@@ -274,7 +275,7 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             const key = [file.name, sheetName, startCol, rowIndex + 1].join("::");
             rows.push({
               key, fileName: file.name, sheetName, employeeName, hireDate, employeeId: match.id,
-              employeeStatus: match.status, link:match.link, category:match.link==="PJ"?pjCategory(category):category, documentName, isStandard: standard,
+              employeeStatus: match.status, link:match.link, category:match.link==="PJ"?pjRecordCategory(category,documentName):category, documentName, isStandard: standard,
               completedOn: parsedComment.completedOn, dueDate: parsedComment.dueDate,
               notes: parsedComment.notes, originalComment: comment, issue, destination,
               referenceDate, referenceDateLabel: destination === "absences" ? "Data da falta" : "Data de entrega (conferir)",
