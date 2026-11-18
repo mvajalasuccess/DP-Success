@@ -204,20 +204,11 @@ textarea:disabled {
   cursor: not-allowed;
 }
 
-/* Perfil Consulta: remove ações de criação, edição, exclusão e salvamento. */
-body.role-consulta [data-role-sensitive] { display: none !important; }\n\nbody.role-consulta button:has(svg.lucide-plus),
-body.role-consulta button:has(svg.lucide-pencil),
-body.role-consulta button:has(svg.lucide-trash-2),
-body.role-consulta button:has(svg.lucide-save),
-body.role-consulta button:has(svg.lucide-power) {
+/* Ações mutáveis são ocultadas no modo consulta; RLS protege os dados. */
+body.role-consulta [data-guest-blocked],
+body.role-consulta [data-role-sensitive]:not([data-guest-event-create]):not([data-guest-event-form] *) {
   display: none !important;
 }
-
-body.role-consulta input[type="submit"],
-body.role-consulta button[type="submit"] {
-  display: none !important;
-}
-
 
 /* Sidebar: mantém a rolagem, mas oculta a barra visual. */
 .sidebar-scrollbar-hidden {
