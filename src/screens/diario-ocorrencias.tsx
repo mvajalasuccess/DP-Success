@@ -38,6 +38,7 @@ export function DiarioOcorrencias() {
   const [selectedCatalog,setSelectedCatalog]=useState("");
   const [templates,setTemplates]=useState<ChecklistTemplate[]>([]);
   const [loading,setLoading]=useState(false);
+  const [removingImportedDocuments,setRemovingImportedDocuments]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [companyFilter,setCompanyFilter]=useState("");
@@ -244,21 +245,35 @@ export function DiarioOcorrencias() {
     await load();
   }
   async function removeImportedDocuments(){
-    if(!requirementEmployee)return;
+    if(removingImportedDocuments)return;
+    setRemovingImportedDocuments(true);setError("");setNotice("");
     const db=supabase as any;
-    // The audit importer generates UUIDs with version 5 and RFC variant; manual records use database-generated v4 IDs.
-    const ids:string[]=[];
-    for(let offset=0;;offset+=500){
-      const {data,error}=await db.from("employee_document_records").select("id").eq("employee_id",requirementEmployee).order("id").range(offset,offset+499);
-      if(error){setError(error.message);return;}
-      ids.push(...(data??[]).map((d:{id:string})=>d.id).filter((id:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)));
-      if(!data||data.length<500)break;
-    }
-    if(!ids.length){setNotice("Nenhum registro de importação identificado para este funcionário.");return;}
-    if(!window.confirm("Excluir "+ids.length+" registros identificados como importados deste funcionário? Os cadastros manuais serão preservados. A ação não pode ser desfeita."))return;
-    const {data,error}=await db.from("employee_document_records").delete().eq("employee_id",requirementEmployee).in("id",ids).select("id");
-    if(error){setError(error.message);return;}
-    await load();setNotice((data?.length??0)+" registros excluídos.");
+    let removed=0;
+    try{
+      // All employees and companies, regardless of the current screen filters.
+      // Audit importer uses deterministic UUID v5; manually created rows use database-generated v4.
+      const ids:string[]=[];
+      for(let offset=0;;offset+=500){
+        const {data,error}=await db.from("employee_document_records").select("id").order("id").range(offset,offset+499);
+        if(error)throw new Error(error.message);
+        ids.push(...(data??[]).map((d:{id:string})=>d.id).filter((id:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)));
+        if(!data||data.length<500)break;
+      }
+      if(!ids.length){setNotice("Nenhum documento importado identificado no sistema.");return;}
+      if(!window.confirm("ATENÇÃO: excluir "+ids.length+" documentos importados de TODOS os funcionários e empresas? Esta ação é definitiva. Documentos manuais e configurações individuais de padrão serão preservados."))return;
+      for(let offset=0;offset<ids.length;offset+=100){
+        const batch=ids.slice(offset,offset+100);
+        const {data,error}=await db.from("employee_document_records").delete().in("id",batch).select("id");
+        if(error)throw new Error(error.message);
+        removed+=data?.length??0;
+      }
+      await load();
+      if(removed!==ids.length)setError(removed+" de "+ids.length+" registros excluídos. Os demais não foram removidos; verifique as permissões.");
+      else setNotice(removed+" documentos importados excluídos de todos os funcionários.");
+    }catch(e){
+      if(removed)await load();
+      setError("Exclusão interrompida. "+removed+" registros excluídos. "+(e instanceof Error?e.message:String(e)));
+    }finally{setRemovingImportedDocuments(false);}
   }
   async function removeDoc(d:DocRecord){if(!window.confirm(`Excluir o registro de "${d.document_name}"? Esta ação não poderá ser desfeita.`))return;const {data,error}=await (supabase as any).from("employee_document_records").delete().eq("id",d.id).select("id");if(error||!data?.length){setError(error?.message||"Registro não excluído. Verifique sua permissão.");return;}setDocOpen(false);setEditingDoc(null);setDocForm(emptyDoc);await load();setNotice("Registro excluído.");}
   async function deleteChecklistStep(stepId:string){
@@ -303,7 +318,7 @@ export function DiarioOcorrencias() {
         <Card className="p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><h2 className="font-semibold">Documentação do funcionário</h2><p className="mt-1 text-sm text-muted-foreground">Checklist único por categoria. Marque se o item é padrão para o funcionário e acompanhe vencimento e assinatura.</p></div>
-            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date}))} onImport={importAuditDocuments}/>{requirementEmployee&&<button type="button" disabled={loading} onClick={()=>void removeImportedDocuments()} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">Excluir documentos importados</button>}
+            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date}))} onImport={importAuditDocuments}/><button type="button" disabled={loading||removingImportedDocuments} onClick={()=>void removeImportedDocuments()} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">{removingImportedDocuments?"Excluindo importações...":"Excluir todas as importações"}</button>
           </div>
           {requirementEmployee&&<div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-md border px-3 py-2"><strong>{docCatalog.length}</strong> itens no catálogo</span>
