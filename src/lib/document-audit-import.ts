@@ -76,12 +76,12 @@ function addValidity(dateIso: string, amount: number, unit: "year" | "month" | "
 }
 
 function parseDeliveredDate(comment: string): string | null {
-  const match = comment.match(/entregue\\s*m?\\s*(?:em)?\\s*(\\d{1,2}\\/\\d{1,2}\\/\\d{2,4})/i);
+  const match = comment.match(/entregue\s*m?\s*(?:em)?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
   return match ? parseDate(match[1]) : null;
 }
 
 function parseHoursFromTitle(title: string): number | null {
-  const match = title.match(/(\\d{1,2})h(\\d{2})?\\s*(?:às|as|a)\\s*(\\d{1,2})h(\\d{2})?/i);
+  const match = title.match(/(\d{1,2})h(\d{2})?\s*(?:às|as|a)\s*(\d{1,2})h(\d{2})?/i);
   if (!match) return null;
   const start = Number(match[1]) * 60 + Number(match[2] || 0);
   const end = Number(match[3]) * 60 + Number(match[4] || 0);
@@ -216,10 +216,10 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
               : categoryKey === normalize("Faltas e Folgas") ? "absences" : "documents";
             const deliveredDate = parseDeliveredDate(comment);
             const referenceDate = destination === "absences" ? sourceDate : deliveredDate;
-            const durationDaysMatch = documentName.match(/(\\d+)\\s*dias?/i);
+            const durationDaysMatch = documentName.match(/(\d+)\s*dias?/i);
             const durationDays = durationDaysMatch ? Number(durationDaysMatch[1]) : null;
             const durationHours = destination === "declarations" ? parseHoursFromTitle(documentName) : null;
-            const cidMatch = documentName.match(/\\bCID\\s*([A-Z0-9.]+)/i);
+            const cidMatch = documentName.match(/\bCID\s*([A-Z0-9.]+)/i);
             const cid = cidMatch?.[1] ?? null;
             const certificateType: AuditRow["certificateType"] = /odont|dentist/i.test(documentName)
               ? "odontologico" : /acompanhante/i.test(documentName) ? "acompanhamento" : /^atestado/i.test(documentName) ? "medico" : "outro";
