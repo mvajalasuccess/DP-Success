@@ -6,7 +6,7 @@ import { CompanyFilter } from "@/components/company-filter";
 
 import { ScreenBrand } from "@/components/screen-brand";
 import { DocumentAuditImport } from "@/components/document-audit-import";
-import type { AuditRow } from "@/lib/document-audit-import";
+import { auditTrainingKey, type AuditRow } from "@/lib/document-audit-import";
 type Employee = { id: string; full_name: string; status?: string; company_id?: string | null; hire_date?: string | null; termination_date?: string | null };
 type LifeEvent = { id: string; employee_id: string; event_date: string; period_id?: string|null; category: string; direction: "positive"|"negative"|"neutral"; title: string; description: string|null; score: number; is_star: boolean; status: "active"|"void"; employees?: { full_name: string }|null };
 type DocRecord = { id: string; employee_id: string; document_name: string; catalog_id?: string|null; is_standard?: boolean; no_due_date?: boolean; has_documentation?: boolean; delivery_status?: "not_delivered"|"delivered"; signature_status?: "not_applicable"|"pending"|"signed"; last_completed_on: string|null; due_date: string|null; notes: string|null; status: string; category?: string|null; is_custom?: boolean; employees?: { full_name: string }|null };
@@ -155,7 +155,7 @@ export function DiarioOcorrencias() {
     const rules = new Map<string, any>();
     const seen = new Map<string, number>();
     for (const row of safeRows) {
-      const candidates = catalog.filter(item => canonical(normCat(item.category)) === canonical(normCat(row.category)) && canonical(item.name) === canonical(row.documentName));
+      const candidates = catalog.filter(item => canonical(normCat(item.category)) === canonical(normCat(row.category)) && (canonical(item.name) === canonical(row.documentName) || (!!auditTrainingKey(row.documentName) && auditTrainingKey(item.name) === auditTrainingKey(row.documentName))));
       if (candidates.length > 1 || (candidates.length === 1 && !candidates[0].active)) {
         skipped++; warnings.push(row.employeeName + " — " + row.documentName + ": catálogo ambíguo ou inativo."); continue;
       }
@@ -243,7 +243,24 @@ export function DiarioOcorrencias() {
     setNotice("Configuração individual atualizada.");
     await load();
   }
-  async function removeDoc(d:DocRecord){if(!window.confirm(`Excluir o registro de "${d.document_name}"? Esta ação não poderá ser desfeita.`))return;const {error}=await (supabase as any).from("employee_document_records").delete().eq("id",d.id);if(error){setError(error.message);return;}setDocOpen(false);setEditingDoc(null);setDocForm(emptyDoc);setNotice("Registro excluído.");await load();}
+  async function removeImportedDocuments(){
+    if(!requirementEmployee)return;
+    const db=supabase as any;
+    // The audit importer generates UUIDs with version 5 and RFC variant; manual records use database-generated v4 IDs.
+    const ids:string[]=[];
+    for(let offset=0;;offset+=500){
+      const {data,error}=await db.from("employee_document_records").select("id").eq("employee_id",requirementEmployee).order("id").range(offset,offset+499);
+      if(error){setError(error.message);return;}
+      ids.push(...(data??[]).map((d:{id:string})=>d.id).filter((id:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)));
+      if(!data||data.length<500)break;
+    }
+    if(!ids.length){setNotice("Nenhum registro de importação identificado para este funcionário.");return;}
+    if(!window.confirm("Excluir "+ids.length+" registros identificados como importados deste funcionário? Os cadastros manuais serão preservados. A ação não pode ser desfeita."))return;
+    const {data,error}=await db.from("employee_document_records").delete().eq("employee_id",requirementEmployee).in("id",ids).select("id");
+    if(error){setError(error.message);return;}
+    await load();setNotice((data?.length??0)+" registros excluídos.");
+  }
+  async function removeDoc(d:DocRecord){if(!window.confirm(`Excluir o registro de "${d.document_name}"? Esta ação não poderá ser desfeita.`))return;const {data,error}=await (supabase as any).from("employee_document_records").delete().eq("id",d.id).select("id");if(error||!data?.length){setError(error?.message||"Registro não excluído. Verifique sua permissão.");return;}setDocOpen(false);setEditingDoc(null);setDocForm(emptyDoc);await load();setNotice("Registro excluído.");}
   async function deleteChecklistStep(stepId:string){
     if(!window.confirm("Excluir definitivamente esta etapa do checklist?"))return;
     setError("");setNotice("");
@@ -286,7 +303,7 @@ export function DiarioOcorrencias() {
         <Card className="p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><h2 className="font-semibold">Documentação do funcionário</h2><p className="mt-1 text-sm text-muted-foreground">Checklist único por categoria. Marque se o item é padrão para o funcionário e acompanhe vencimento e assinatura.</p></div>
-            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date}))} onImport={importAuditDocuments}/>
+            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date}))} onImport={importAuditDocuments}/>{requirementEmployee&&<button type="button" disabled={loading} onClick={()=>void removeImportedDocuments()} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">Excluir documentos importados</button>}
           </div>
           {requirementEmployee&&<div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-md border px-3 py-2"><strong>{docCatalog.length}</strong> itens no catálogo</span>
