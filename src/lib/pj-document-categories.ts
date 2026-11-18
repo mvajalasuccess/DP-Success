@@ -5,7 +5,7 @@ export function pjCategory(value:unknown):string{
  if(["contrato","contratacao","contrato admissao","contrato de prestacao de servicos"].includes(s))return "Contratação";
  if(s==="responsabilidades anuais")return "Responsabilidades anuais";
  if(s==="medicina e seguranca do trabalho")return "Medicina e Segurança do Trabalho";
- if(["nf","nfs","nota fiscal","notas fiscais","nf's","nf-e","nfe","nfes"].includes(s))return "NFs";
+ if(["nf","nfs","notafiscal","notasfiscais","nfe","nfes"].includes(s.replace(/[^a-z0-9]/g,"")))return "NFs";
  if(s.includes("vales avulsos"))return "Vales avulsos, acordos diversos";
  return "Diversos";
 }
