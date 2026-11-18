@@ -73,7 +73,7 @@ export function Employees() {
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("ativo");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ name: string; role: string; department: string; salary: string; birth_date: string; gender: string; pension_amount: "sim" | "nao"; admission: string; termination: string; bank: string; work_schedule_id: string; status: "ativo" | "inativo"; company_id: string }>({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
+  const [form, setForm] = useState<{ name: string; role: string; department: string; salary: string; birth_date: string; gender: string; pension_amount: "sim" | "nao"; admission: string; termination: string; work_schedule_id: string; status: "ativo" | "inativo"; company_id: string }>({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", work_schedule_id: "", status: "ativo", company_id: "" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -128,7 +128,7 @@ export function Employees() {
   function openNew() {
     setError("");
     setEditingId(null);
-    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
+    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", work_schedule_id: "", status: "ativo", company_id: "" });
     setOpen(true);
   }
 
@@ -145,7 +145,7 @@ export function Employees() {
       pension_amount: Number(employee.pension_amount ?? 0) > 0 ? "sim" : "nao",
       admission: employee.hire_date ?? "",
       termination: employee.termination_date ?? "",
-      bank: "",
+     
       status: employee.status ?? "ativo",
       work_schedule_id: employee.work_schedule_id ?? "",
       company_id: employee.company_id ?? "",
@@ -197,11 +197,6 @@ export function Employees() {
     }
 
     const salary = parseSalary(form.salary);
-    const match = form.bank.trim().match(/^([+-])?(\d{1,3}):(\d{2})$/);
-    const bankMinutes = match
-      ? Number(match[1] === "-" ? -1 : 1) * (Number(match[2]) * 60 + Number(match[3]))
-      : 0;
-
     if (!salary || salary < 0) {
       setError("Informe um salário válido.");
       setSaving(false);
@@ -229,20 +224,7 @@ export function Employees() {
       return;
     }
 
-    if (bankMinutes !== 0) {
-      const bank = await supabase.from("bank_hours").insert({
-        employee_id: emp.data.id,
-        entry_date: form.admission,
-        kind: bankMinutes > 0 ? "credito" : "debito",
-        minutes: Math.abs(bankMinutes),
-        previous_balance_minutes: 0,
-        balance_minutes: bankMinutes,
-        justification: "Saldo inicial do cadastro",
-      });
-      if (bank.error) setError("Funcionário criado, mas o saldo inicial não pôde ser lançado: " + bank.error.message);
-    }
-
-    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", bank: "", work_schedule_id: "", status: "ativo", company_id: "" });
+    setForm({ name: "", role: "", department: "", salary: "", birth_date: "", gender: "", pension_amount: "nao", admission: "", termination: "", work_schedule_id: "", status: "ativo", company_id: "" });
     setOpen(false);
     setSaving(false);
     await loadEmployees();
@@ -393,7 +375,6 @@ export function Employees() {
             <label className="grid gap-1 text-sm font-medium">Data de admissão<input type="date" value={form.admission} onChange={(e) => setForm({ ...form, admission: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" /></label>
             <label className="grid gap-1 text-sm font-medium">Situação<select value={form.status} onChange={(e) => { const status = e.target.value === "inativo" ? "inativo" : "ativo"; setForm({ ...form, status, termination: status === "ativo" ? "" : form.termination }); }} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>
             <label className="grid gap-1 text-sm font-medium">Data de desligamento<input type="date" value={form.termination} onChange={(e) => setForm({ ...form, termination: e.target.value })} disabled={form.status !== "inativo"} className="rounded-lg border bg-background px-3 py-2 font-normal disabled:bg-muted disabled:text-muted-foreground" /></label>
-            {!editingId && <label className="grid gap-1 text-sm font-medium">Saldo inicial<input value={form.bank} onChange={(e) => setForm({ ...form, bank: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="+12:35 ou -03:20" /></label>}
             <label className="grid gap-1 text-sm font-medium md:col-span-2">Jornada / escala<select value={form.work_schedule_id} onChange={(e) => setForm({ ...form, work_schedule_id: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecionar jornada</option>{schedules.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           </div>
 
