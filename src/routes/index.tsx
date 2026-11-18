@@ -228,10 +228,10 @@ function AppShell({
       ["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays],
     ] },
     { id: "organization", label: "Organização", Icon: CalendarRange, open: tasksOpen, setOpen: setTasksOpen, items: [
-      ["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Diário de Ocorrências", "diario-ocorrencias", ClipboardList], ["Tarefas", "tarefas", ListChecks],
+      ["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Tarefas", "tarefas", ListChecks],
     ] },
     { id: "people", label: "Pessoas", Icon: UsersRound, open: peopleOpen, setOpen: setPeopleOpen, items: [
-      ["Férias", "ferias", Palmtree],
+      ["Férias", "ferias", Palmtree], ["Diário de Ocorrências", "diario-ocorrencias", ClipboardList],
     ] },
     { id: "settings", label: "Configurações", Icon: Settings2, open: settingsOpen, setOpen: setSettingsOpen, items: [
       ["Parâmetros", "parametros", SlidersHorizontal],
