@@ -2,6 +2,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, Download, FileSpreadsheet, FileText,
 import * as XLSX from "xlsx";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { DocumentAuditImport } from "@/components/document-audit-import";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 
@@ -494,7 +495,8 @@ export function Atestados() {
       <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 flex items-end justify-between gap-4 [&_p]:!text-white/75 [&_h1]:!text-white"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Ponto</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Declarações e Atestados</h1><p className="text-sm text-muted-foreground">Registre atestados e declarações com as horas efetivamente abonadas.</p></div>
         <div className="flex gap-2"><button onClick={() => { startNew(); setMode("atestado"); }} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="mr-2 inline h-4 w-4" />Novo atestado</button><button onClick={() => { setMode("declaracao"); setEditing(null); setEditingDeclaration(null); setError(""); setDeclarationForm({ employee_id: "", occurrence_date: "", quantity: "", reason: "Acompanhante", notes: "" }); setOpen(true); }} className="rounded-lg border px-4 py-2.5 text-sm"><Plus className="mr-2 inline h-4 w-4" />Nova declaração</button></div>
       </div>
-      <Card className="mt-6 p-4">
+      <div className="mb-4 flex justify-end"><DocumentAuditImport employees={employees} mode="attendance" /></div>
+        <Card className="mt-6 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-medium"><span>Filtros</span><span className="text-xs font-normal text-muted-foreground">Aplicados às duas listas</span></div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Empresa</span><CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setFilterEmployee("todos"); }} /></label>
