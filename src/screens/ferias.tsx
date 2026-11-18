@@ -265,7 +265,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
     <main className="mx-auto max-w-[1450px] px-4 pb-10 pt-6 sm:px-7 sm:pt-8">
       <div className="mb-4 flex gap-2"><button className={"rounded-sm border px-4 py-2 text-sm "+(vacationLink==="clt"?"bg-primary text-primary-foreground":"")} onClick={()=>setVacationLink("clt")}>Férias CLT</button><button className={"rounded-sm border px-4 py-2 text-sm "+(vacationLink==="pj"?"bg-primary text-primary-foreground":"")} onClick={()=>setVacationLink("pj")}>Recessos PJ</button></div>
       <>
-      <section className="relative isolate overflow-hidden rounded-sm bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
+      <section className="relative isolate overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
         <div className="pointer-events-none absolute -right-10 -top-20 -z-10 h-56 w-56 rounded-full bg-[#06CAA0]/20 blur-3xl"/>
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div className="flex items-start gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm border border-white/15 bg-white/10"><Palmtree className="h-6 w-6 text-[#7cebd0]"/></div><div><h1 style={{color:"#fff",WebkitTextFillColor:"#fff"}} className="!text-white text-3xl font-semibold tracking-tight sm:text-4xl">{pj?"Recessos PJ":"Férias"}</h1><p className="mt-2 max-w-2xl text-sm text-slate-200">Organize os períodos, acompanhe o planejamento e marque cada etapa como concluída.</p></div></div>
