@@ -6,7 +6,7 @@ import { CompanyFilter } from "@/components/company-filter";
 
 import { ScreenBrand } from "@/components/screen-brand";
 import { DocumentAuditImport } from "@/components/document-audit-import";
-import { auditTrainingKey, type AuditRow } from "@/lib/document-audit-import";
+import { auditTrainingKey, isAuditEmployeeActive, type AuditRow } from "@/lib/document-audit-import";
 type Employee = { id: string; full_name: string; status?: string; company_id?: string | null; hire_date?: string | null; termination_date?: string | null };
 type LifeEvent = { id: string; employee_id: string; event_date: string; period_id?: string|null; category: string; direction: "positive"|"negative"|"neutral"; title: string; description: string|null; score: number; is_star: boolean; status: "active"|"void"; employees?: { full_name: string }|null };
 type DocRecord = { id: string; employee_id: string; document_name: string; catalog_id?: string|null; is_standard?: boolean; no_due_date?: boolean; has_documentation?: boolean; delivery_status?: "not_delivered"|"delivered"; signature_status?: "not_applicable"|"pending"|"signed"; last_completed_on: string|null; due_date: string|null; notes: string|null; status: string; category?: string|null; is_custom?: boolean; employees?: { full_name: string }|null };
@@ -129,7 +129,15 @@ export function DiarioOcorrencias() {
     const db = supabase as any;
     const { data: auth, error: authError } = await db.auth.getUser();
     if (authError || !auth?.user?.id) throw new Error("Sessão inválida. Entre novamente no sistema.");
-    const safeRows = rows.filter(r => r.destination === "documents" && r.employeeStatus === "matched" && r.employeeId && !r.issue && r.isStandard !== null);
+    const candidates = rows.filter(r => r.destination === "documents" && r.employeeStatus === "matched" && r.employeeId && !r.issue && r.isStandard !== null);
+    const ids = [...new Set(candidates.map(r => r.employeeId!))];
+    const activeIds = new Set<string>();
+    for (let offset = 0; offset < ids.length; offset += 100) {
+      const { data, error } = await db.from("employees").select("id,full_name,status,hire_date,termination_date").in("id", ids.slice(offset, offset + 100));
+      if (error) throw new Error("Não foi possível validar funcionários ativos: " + error.message);
+      for (const employee of data ?? []) if (isAuditEmployeeActive(employee)) activeIds.add(employee.id);
+    }
+    const safeRows = candidates.filter(r => activeIds.has(r.employeeId!));
     const canonical = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
     const warnings: string[] = [];
     let imported = 0, skipped = rows.length - safeRows.length;
@@ -320,7 +328,7 @@ export function DiarioOcorrencias() {
         <Card className="p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><h2 className="font-semibold">Documentação do funcionário</h2><p className="mt-1 text-sm text-muted-foreground">Checklist único por categoria. Marque se o item é padrão para o funcionário e acompanhe vencimento e assinatura.</p></div>
-            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date}))} onImport={importAuditDocuments}/><button type="button" disabled={loading||removingImportedDocuments} onClick={()=>void removeImportedDocuments()} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">{removingImportedDocuments?"Excluindo importações...":"Excluir todas as importações"}</button>
+            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date,termination_date:e.termination_date}))} onImport={importAuditDocuments}/><button type="button" disabled={loading||removingImportedDocuments} onClick={()=>void removeImportedDocuments()} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">{removingImportedDocuments?"Excluindo importações...":"Excluir todas as importações"}</button>
           </div>
           {requirementEmployee&&<div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-md border px-3 py-2"><strong>{docCatalog.length}</strong> itens no catálogo</span>
