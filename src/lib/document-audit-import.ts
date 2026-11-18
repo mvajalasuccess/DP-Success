@@ -5,6 +5,7 @@ export type AuditEmployee = {
   full_name: string;
   status?: string | null;
   hire_date?: string | null;
+  termination_date?: string | null;
 };
 
 export type AuditRow = {
@@ -145,6 +146,13 @@ function parseStandard(value: unknown): boolean | null {
   return null;
 }
 
+export function isAuditEmployeeActive(employee: AuditEmployee): boolean {
+  const status = normalize(String(employee.status ?? ""));
+  const termination = parseExcelDate(employee.termination_date);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  return ["ativo", "active"].includes(status) && (!termination || termination > today);
+}
+
 function resolveEmployee(name: string, hireDate: string | null, employees: AuditEmployee[]) {
   if (!hireDate) return { id: null, status: "missing-hire-date" as const };
   const matches = employees.filter(employee =>
@@ -153,6 +161,7 @@ function resolveEmployee(name: string, hireDate: string | null, employees: Audit
   );
   if (matches.length > 1) return { id: null, status: "ambiguous" as const };
   if (matches.length === 0) return { id: null, status: "not-found" as const };
+  if (!isAuditEmployeeActive(matches[0])) return { id: null, status: "inactive" as const };
   return { id: matches[0].id, status: "matched" as const };
 }
 
@@ -196,6 +205,7 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
           const employeeName = admission?.[1]?.trim() || employeeHeader.replace(/\s*-\s*(?:PJ|CLT)$/i, "").trim();
           const hireDate = admission ? parseDate(admission[2]) : null;
           const match = resolveEmployee(employeeName, hireDate, employees);
+          if (match.status === "inactive") continue;
           let category = "";
           let blockRows = 0;
           for (let rowIndex = firstHeader; rowIndex < matrix.length; rowIndex++) {
