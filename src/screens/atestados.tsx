@@ -30,8 +30,8 @@ function countDays(start: string, end: string) {
 
 type Declaration = { id: string; employee_id: string; occurrence_date: string; quantity: number; notes: string | null; employees?: { full_name: string } | null };
 type Period = { id: string; start_date: string; end_date: string };
-type HistoricalBaseRow = { id: string; employee_id: string | null; employee_name: string; registration: string | null; period_id: string; reference_year: number; reference_month: number; certificate_minutes: number; declaration_minutes: number; period_start?: string; period_end?: string; certificate_type?: string | null; certificate_cid?: string | null; declaration_observation?: string | null };
-type HistoricalAnnotationForm = { row: HistoricalBaseRow; certificate_type: string; certificate_cid: string; declaration_observation: string };
+type HistoricalBaseRow = { id: string; employee_id: string | null; employee_name: string; registration: string | null; period_id: string; reference_year: number; reference_month: number; certificate_minutes: number; declaration_minutes: number; period_start?: string; period_end?: string; certificate_type?: string | null; certificate_cid?: string | null; declaration_observation?: string | null; certificate_display_start?:string|null; certificate_display_end?:string|null; certificate_display_days?:number|null; certificate_display_notes?:string|null; declaration_display_start?:string|null; declaration_display_end?:string|null; declaration_display_minutes?:number|null; declaration_display_reason?:string|null };
+type HistoricalAnnotationForm = { row: HistoricalBaseRow; certificate_type: string; certificate_cid: string; declaration_observation: string; kind:"atestado"|"declaracao"; start:string; end:string; days:string; quantity:string; notes:string; reason:string };
 
 const declarationReasons = ["Acompanhante", "Consulta", "Exame", "Outros"];
 
@@ -91,7 +91,7 @@ export function Atestados() {
     } else {
       const { data: annotationData, error: annotationError } = await (supabase as any)
         .from("historical_kpi_annotations")
-        .select("historical_kpi_data_id,certificate_type,certificate_cid,declaration_observation");
+        .select("historical_kpi_data_id,certificate_type,certificate_cid,declaration_observation,certificate_display_start,certificate_display_end,certificate_display_days,certificate_display_notes,declaration_display_start,declaration_display_end,declaration_display_minutes,declaration_display_reason");
       if (annotationError) {
         setError(previous => previous || "Os campos complementares do histórico ainda precisam ser habilitados no banco de dados: " + annotationError.message);
       }
@@ -110,6 +110,7 @@ export function Atestados() {
           const toISO = (date: Date) => date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
           return {
             ...row,
+            ...(annotation??{}),
             certificate_type: annotation?.certificate_type ?? null,
             certificate_cid: annotation?.certificate_cid ?? null,
             declaration_observation: annotation?.declaration_observation ?? null,
@@ -176,7 +177,13 @@ export function Atestados() {
 
   function startEditHistorical(row: HistoricalBaseRow, kind: "atestado" | "declaracao") {
     setHistoricalEdit({
-      row,
+      row,kind,
+      start:(kind==="atestado"?row.certificate_display_start:row.declaration_display_start)||"",
+      end:(kind==="atestado"?row.certificate_display_end:row.declaration_display_end)||"",
+      days:row.certificate_display_days==null?"":String(row.certificate_display_days),
+      quantity:formatHistoricalHours(row.declaration_display_minutes??row.declaration_minutes),
+      notes:row.certificate_display_notes||"",
+      reason:row.declaration_display_reason||"Outros",
       certificate_type: row.certificate_type || "medico",
       certificate_cid: row.certificate_cid || "",
       declaration_observation: row.declaration_observation || "",
@@ -187,16 +194,15 @@ export function Atestados() {
 
   async function saveHistoricalAnnotation() {
     if (!historicalEdit) return;
-    setSavingHistoricalAnnotation(true);
-    setError("");
-    const row = historicalEdit.row;
-    const payload = {
-      historical_kpi_data_id: row.id,
-      certificate_type: Number(row.certificate_minutes ?? 0) > 0 ? historicalEdit.certificate_type : null,
-      certificate_cid: Number(row.certificate_minutes ?? 0) > 0 ? (historicalEdit.certificate_cid.trim() || null) : null,
-      declaration_observation: Number(row.declaration_minutes ?? 0) > 0 ? (historicalEdit.declaration_observation.trim() || null) : null,
-      updated_at: new Date().toISOString(),
-    };
+    const h=historicalEdit;
+    if(!h.start||!h.end||h.end<h.start){setError("Informe as datas reais de início e fim, em ordem válida.");return;}
+    const [hours,minutes]=h.quantity.split(":").map(Number);
+    if(h.kind==="atestado"&&(!Number.isInteger(Number(h.days||countDays(h.start,h.end)))||Number(h.days||countDays(h.start,h.end))<=0)){setError("Informe uma quantidade de dias inteira e positiva.");return;}
+    if(h.kind==="declaracao"&&(!/^\d{1,4}:[0-5]\d$/.test(h.quantity)||hours*60+minutes<=0)){setError("Informe a duração abonada em HH:MM.");return;}
+    setSavingHistoricalAnnotation(true);setError("");
+    const payload={historical_kpi_data_id:h.row.id,updated_at:new Date().toISOString(),...(h.kind==="atestado"?{
+      certificate_type:h.certificate_type,certificate_cid:h.certificate_cid.trim()||null,certificate_display_start:h.start,certificate_display_end:h.end,certificate_display_days:Number(h.days||countDays(h.start,h.end)),certificate_display_notes:h.notes.trim()||null
+    }:{declaration_display_start:h.start,declaration_display_end:h.end,declaration_display_minutes:hours*60+minutes,declaration_display_reason:h.reason,declaration_observation:h.declaration_observation.trim()||null})};
     const { error: saveError } = await (supabase as any)
       .from("historical_kpi_annotations")
       .upsert(payload, { onConflict: "historical_kpi_data_id" });
@@ -226,13 +232,13 @@ export function Atestados() {
       ...historicalCertificates.map(row => ({
         "Tipo de registro": "Atestado",
         "Funcionário": historicalEmployeeName(row),
-        "Data inicial": formatDate(row.period_start ?? ""),
-        "Data final": formatDate(row.period_end ?? ""),
-        "Dias": "",
+        "Data inicial": formatDate(row.certificate_display_start ?? row.period_start ?? ""),
+        "Data final": formatDate(row.certificate_display_end ?? row.period_end ?? ""),
+        "Dias": row.certificate_display_days ?? "",
         "Horas abonadas": formatHistoricalHours(row.certificate_minutes),
         "Tipo / motivo": row.certificate_type ? (({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[row.certificate_type] || row.certificate_type) : "Tipo não informado",
         "CID": row.certificate_cid ?? "",
-        "Observações": "",
+        "Observações": row.certificate_display_notes ?? "",
       })),
       ...filteredDeclarations.map(row => ({
         "Tipo de registro": "Declaração de horas",
@@ -248,11 +254,11 @@ export function Atestados() {
       ...historicalDeclarations.map(row => ({
         "Tipo de registro": "Declaração de horas",
         "Funcionário": historicalEmployeeName(row),
-        "Data inicial": formatDate(row.period_start ?? ""),
-        "Data final": formatDate(row.period_end ?? ""),
+        "Data inicial": formatDate(row.declaration_display_start ?? row.period_start ?? ""),
+        "Data final": formatDate(row.declaration_display_end ?? row.period_end ?? ""),
         "Dias": "",
-        "Horas abonadas": formatHistoricalHours(row.declaration_minutes),
-        "Tipo / motivo": "",
+        "Horas abonadas": formatHistoricalHours(row.declaration_display_minutes??row.declaration_minutes),
+        "Tipo / motivo": row.declaration_display_reason??"",
         "CID": "",
         "Observações": row.declaration_observation ?? "",
       })),
@@ -520,46 +526,54 @@ export function Atestados() {
         </tr></thead><tbody className="divide-y">
           {filteredRows.length === 0 && historicalCertificates.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">Nenhum atestado encontrado para os filtros selecionados.</td></tr>}
           {filteredRows.map(r => <tr key={r.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{r.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(r.start_date)}</td><td className="px-5 py-4">{formatDate(r.end_date)}</td><td className="px-5 py-4">{displayedDays(r)}</td><td className="px-5 py-4">{r.certificate_type}</td><td className="px-5 py-4">{r.cid ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => void startEdit(r)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(r)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
-          {historicalCertificates.map(r => <tr key={"base-cert-" + r.id} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_end || "")}</td><td className="px-5 py-4">—</td><td className="px-5 py-4">{(r.certificate_type ? ({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[r.certificate_type] || r.certificate_type : "Tipo não informado") + " · " + formatHistoricalHours(r.certificate_minutes) + " h"}</td><td className="px-5 py-4">{r.certificate_cid || "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditHistorical(r, "atestado")} className="rounded-md border p-2" title="Editar tipo e CID do histórico"><Pencil className="h-4 w-4" /></button></td></tr>)}
+          {historicalCertificates.map(r => <tr key={"base-cert-" + r.id} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_start || r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_end || r.period_end || "")}</td><td className="px-5 py-4">{r.certificate_display_days??"—"}</td><td className="px-5 py-4">{(r.certificate_type ? ({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[r.certificate_type] || r.certificate_type : "Tipo não informado") + " · " + formatHistoricalHours(r.certificate_minutes) + " h"}</td><td className="px-5 py-4">{r.certificate_cid || "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditHistorical(r, "atestado")} className="rounded-md border p-2" title="Editar tipo e CID do histórico"><Pencil className="h-4 w-4" /></button></td></tr>)}
         </tbody></table></div>}
       </Card>
-      <Card className="mt-6 overflow-hidden"><div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Declarações</h2><p className="text-xs text-muted-foreground">{filteredDeclarations.length + historicalDeclarations.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowDeclarations(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"} aria-label={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"}>{showDeclarations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>{showDeclarations && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Horas abonadas</th><th className="px-5 py-3">Observação</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filteredDeclarations.length === 0 && historicalDeclarations.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">Nenhuma declaração encontrada para os filtros selecionados.</td></tr>}{filteredDeclarations.map(d => <tr key={d.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{d.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(d.occurrence_date)}</td><td className="px-5 py-4">{String(Math.floor(Number(d.quantity) || 0)).padStart(2,"0")}:{String(Math.round(((Number(d.quantity)||0)%1)*60)).padStart(2,"0")}</td><td className="px-5 py-4">{d.notes ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditDeclaration(d)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void removeDeclaration(d)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}{historicalDeclarations.map(r => <tr key={"base-decl-" + r.id} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.period_start || "")} a {formatDate(r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_minutes)}</td><td className="px-5 py-4">{r.declaration_observation || "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditHistorical(r, "declaracao")} className="rounded-md border p-2" title="Editar observação do histórico"><Pencil className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>}</Card>
+      <Card className="mt-6 overflow-hidden"><div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Declarações</h2><p className="text-xs text-muted-foreground">{filteredDeclarations.length + historicalDeclarations.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowDeclarations(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"} aria-label={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"}>{showDeclarations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>{showDeclarations && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Horas abonadas</th><th className="px-5 py-3">Observação</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filteredDeclarations.length === 0 && historicalDeclarations.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">Nenhuma declaração encontrada para os filtros selecionados.</td></tr>}{filteredDeclarations.map(d => <tr key={d.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{d.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(d.occurrence_date)}</td><td className="px-5 py-4">{String(Math.floor(Number(d.quantity) || 0)).padStart(2,"0")}:{String(Math.round(((Number(d.quantity)||0)%1)*60)).padStart(2,"0")}</td><td className="px-5 py-4">{d.notes ?? "—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditDeclaration(d)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void removeDeclaration(d)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}{historicalDeclarations.map(r => <tr key={"base-decl-" + r.id} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.declaration_display_start || r.period_start || "")} a {formatDate(r.declaration_display_end || r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_display_minutes??r.declaration_minutes)}</td><td className="px-5 py-4">{[r.declaration_display_reason,r.declaration_observation].filter(Boolean).join(" — ")||"—"}</td><td className="px-5 py-4 text-right"><button onClick={() => startEditHistorical(r, "declaracao")} className="rounded-md border p-2" title="Editar observação do histórico"><Pencil className="h-4 w-4" /></button></td></tr>)}</tbody></table></div>}</Card>
     </main>
-    {historicalEdit && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-6">
-      <h2 className="text-xl font-bold">{Number(historicalEdit.row.certificate_minutes ?? 0) > 0 && Number(historicalEdit.row.declaration_minutes ?? 0) > 0 ? "Editar dados complementares do histórico" : Number(historicalEdit.row.certificate_minutes ?? 0) > 0 ? "Editar atestado importado da BASE" : "Editar declaração de horas importada da BASE"}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Esses campos são apenas complementares. Não alteram as horas históricas, não criam lançamentos oficiais e não interferem nos cálculos.</p>
-      <div className="mt-4 grid gap-3">
-        {Number(historicalEdit.row.certificate_minutes ?? 0) > 0 && <>
-          <label className="grid gap-1 text-sm">Tipo do atestado<select value={historicalEdit.certificate_type} onChange={e => setHistoricalEdit(current => current ? { ...current, certificate_type: e.target.value } : current)} className="rounded-lg border bg-background px-3 py-2"><option value="medico">Médico</option><option value="odontologico">Odontológico</option><option value="acompanhamento">Acompanhamento</option><option value="outro">Outro</option></select></label>
-          <label className="grid gap-1 text-sm">CID<input value={historicalEdit.certificate_cid} onChange={e => setHistoricalEdit(current => current ? { ...current, certificate_cid: e.target.value } : current)} placeholder="Informe o CID" className="rounded-lg border bg-background px-3 py-2" /></label>
+    {historicalEdit && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-xl overflow-y-auto p-6">
+      <h2 className="text-xl font-bold">{historicalEdit.kind==="atestado"?"Editar atestado":"Editar declaração de horas"}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Dados informativos para o histórico e dossiê. Os cálculos originais permanecem intactos.</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1 text-sm sm:col-span-2">Funcionário<input readOnly className="rounded-lg border bg-muted px-3 py-2" value={historicalEmployeeName(historicalEdit.row)}/></label>
+        <label className="grid gap-1 text-sm">Início<input type="date" value={historicalEdit.start} onChange={e=>setHistoricalEdit({...historicalEdit,start:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
+        <label className="grid gap-1 text-sm">Fim<input type="date" value={historicalEdit.end} onChange={e=>setHistoricalEdit({...historicalEdit,end:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
+        {historicalEdit.kind==="atestado"?<>
+          <label className="grid gap-1 text-sm">Quantidade de dias<input type="number" min="1" step="1" placeholder={String(countDays(historicalEdit.start,historicalEdit.end)||"")} value={historicalEdit.days} onChange={e=>setHistoricalEdit({...historicalEdit,days:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
+          <label className="grid gap-1 text-sm">Categoria<select value={historicalEdit.certificate_type} onChange={e=>setHistoricalEdit({...historicalEdit,certificate_type:e.target.value})} className="rounded-lg border bg-background px-3 py-2"><option value="medico">Médico</option><option value="odontologico">Odontológico</option><option value="acompanhamento">Acompanhamento</option><option value="outro">Outro</option></select></label>
+          <label className="grid gap-1 text-sm sm:col-span-2">CID (opcional)<input value={historicalEdit.certificate_cid} onChange={e=>setHistoricalEdit({...historicalEdit,certificate_cid:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
+          <label className="grid gap-1 text-sm sm:col-span-2">Observações<textarea value={historicalEdit.notes} onChange={e=>setHistoricalEdit({...historicalEdit,notes:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
+        </>:<>
+          <label className="grid gap-1 text-sm">Horas abonadas (HH:MM)<input value={historicalEdit.quantity} onChange={e=>setHistoricalEdit({...historicalEdit,quantity:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
+          <label className="grid gap-1 text-sm">Categoria<select value={historicalEdit.reason} onChange={e=>setHistoricalEdit({...historicalEdit,reason:e.target.value})} className="rounded-lg border bg-background px-3 py-2">{declarationReasons.map(r=><option key={r}>{r}</option>)}</select></label>
+          <label className="grid gap-1 text-sm sm:col-span-2">Observações<textarea value={historicalEdit.declaration_observation} onChange={e=>setHistoricalEdit({...historicalEdit,declaration_observation:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
         </>}
-        {Number(historicalEdit.row.declaration_minutes ?? 0) > 0 && <label className="grid gap-1 text-sm">Observação da declaração de horas<textarea value={historicalEdit.declaration_observation} onChange={e => setHistoricalEdit(current => current ? { ...current, declaration_observation: e.target.value } : current)} placeholder="Digite a observação" className="rounded-lg border bg-background px-3 py-2" /></label>}
       </div>
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
       <div className="mt-5 flex justify-end gap-2"><button onClick={() => setHistoricalEdit(null)} className="rounded-lg border px-4 py-2">Cancelar</button><button disabled={savingHistoricalAnnotation} onClick={() => void saveHistoricalAnnotation()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{savingHistoricalAnnotation ? "Salvando..." : "Salvar alterações"}</button></div>
     </Card></div>}
-    {open && mode === "atestado" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-6">
+    {open && mode === "atestado" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-xl overflow-y-auto p-6">
       <h2 className="text-xl font-bold">{editing ? "Editar atestado" : "Novo atestado"}</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>
-        <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="rounded-lg border px-3 py-2" />
-        <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" />
-        <input type="number" min="1" step="1" placeholder={`Quantidade de dias (automático: ${countDays(form.start_date, form.end_date) || "—"})`} value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} className="rounded-lg border px-3 py-2" />
-        <select value={form.certificate_type} onChange={e => setForm({ ...form, certificate_type: e.target.value })} className="rounded-lg border px-3 py-2"><option value="medico">Médico</option><option value="odontologico">Odontológico</option><option value="acompanhamento">Acompanhamento</option><option value="outro">Outro</option></select>
-        <input placeholder="CID" value={form.cid} onChange={e => setForm({ ...form, cid: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2" />
-        <textarea placeholder="Observações" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2" />
+        <label className="grid gap-1 text-sm md:col-span-2">Funcionário<select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+        <label className="grid gap-1 text-sm ">Início<input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+        <label className="grid gap-1 text-sm ">Fim<input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+        <label className="grid gap-1 text-sm ">Quantidade de dias<input type="number" min="1" step="1" placeholder={`Quantidade de dias (automático: ${countDays(form.start_date, form.end_date) || "—"})`} value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+        <label className="grid gap-1 text-sm ">Categoria<select value={form.certificate_type} onChange={e => setForm({ ...form, certificate_type: e.target.value })} className="rounded-lg border px-3 py-2"><option value="medico">Médico</option><option value="odontologico">Odontológico</option><option value="acompanhamento">Acompanhamento</option><option value="outro">Outro</option></select></label>
+        <label className="grid gap-1 text-sm md:col-span-2">CID (opcional)<input placeholder="CID" value={form.cid} onChange={e => setForm({ ...form, cid: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+        <label className="grid gap-1 text-sm md:col-span-2">Observações<textarea placeholder="Observações" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
       </div>
       <div className="mt-4 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2">Cancelar</button><button disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{saving ? "Salvando..." : "Salvar"}</button></div>
     </Card></div>}
-    {open && mode === "declaracao" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-6">
+    {open && mode === "declaracao" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-xl overflow-y-auto p-6">
       <h2 className="text-xl font-bold">{editingDeclaration ? "Editar declaração de horas" : "Nova declaração de horas"}</h2>
       <p className="mt-1 text-sm text-muted-foreground">Informe somente as horas que serão efetivamente abonadas.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <select value={declarationForm.employee_id} onChange={e => setDeclarationForm({ ...declarationForm, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select>
-        <input type="date" value={declarationForm.occurrence_date} onChange={e => setDeclarationForm({ ...declarationForm, occurrence_date: e.target.value })} className="rounded-lg border px-3 py-2" />
-        <input type="time" value={declarationForm.quantity} onChange={e => setDeclarationForm({ ...declarationForm, quantity: e.target.value })} className="rounded-lg border px-3 py-2" />
-        <select value={declarationForm.reason} onChange={e => setDeclarationForm({ ...declarationForm, reason: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2">{declarationReasons.map(reason => <option key={reason} value={reason}>{reason}</option>)}</select>
-        <textarea placeholder="Observações" value={declarationForm.notes} onChange={e => setDeclarationForm({ ...declarationForm, notes: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2" />
+        <label className="grid gap-1 text-sm md:col-span-2">Funcionário<select value={declarationForm.employee_id} onChange={e => setDeclarationForm({ ...declarationForm, employee_id: e.target.value })} className="rounded-lg border px-3 py-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+        <label className="grid gap-1 text-sm ">Data da declaração<input type="date" value={declarationForm.occurrence_date} onChange={e => setDeclarationForm({ ...declarationForm, occurrence_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+        <label className="grid gap-1 text-sm ">Horas abonadas<input type="time" value={declarationForm.quantity} onChange={e => setDeclarationForm({ ...declarationForm, quantity: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
+        <label className="grid gap-1 text-sm md:col-span-2">Categoria<select value={declarationForm.reason} onChange={e => setDeclarationForm({ ...declarationForm, reason: e.target.value })} className="rounded-lg border px-3 py-2">{declarationReasons.map(reason => <option key={reason} value={reason}>{reason}</option>)}</select></label>
+        <label className="grid gap-1 text-sm md:col-span-2">Observações<textarea placeholder="Observações" value={declarationForm.notes} onChange={e => setDeclarationForm({ ...declarationForm, notes: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
       </div>
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
       <div className="mt-4 flex justify-end gap-2"><button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2">Cancelar</button><button disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{saving ? "Salvando..." : editingDeclaration ? "Salvar alterações" : "Salvar declaração"}</button></div>
