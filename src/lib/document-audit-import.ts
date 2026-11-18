@@ -226,10 +226,16 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             const issues: string[] = [];
             if (parsedComment.issue && destination === "documents") issues.push(parsedComment.issue);
             if (!match.id || match.status !== "matched") {
-              issues.push(match.status === "missing-hire-date" ? "Bloco sem data de admissão válida." :
-                match.status === "inactive" ? "Funcionário inativo/desligado; bloco bloqueado." :
-                match.status === "ambiguous" ? "Mais de um funcionário corresponde ao nome e à admissão." :
-                "Funcionário não encontrado com nome completo e admissão exatos.");
+              if (match.status === "missing-hire-date") issues.push("Bloco sem data de admissão válida.");
+              else if (match.status === "inactive") issues.push("Funcionário inativo/desligado; bloco bloqueado.");
+              else if (match.status === "ambiguous") issues.push("Mais de um funcionário corresponde ao nome e à admissão.");
+              else {
+                const sameName = employees.filter(employee => normalize(employee.full_name) === normalize(employeeName));
+                const knownDates = [...new Set(sameName.map(employee => parseExcelDate(employee.hire_date)).filter(Boolean))];
+                issues.push(sameName.length
+                  ? "Nome encontrado, mas a admissão da planilha (" + hireDate?.split("-").reverse().join("/") + ") não coincide com a admissão cadastrada (" + (knownDates.map(date => date!.split("-").reverse().join("/")).join(", ") || "não informada") + ")."
+                  : "Funcionário não encontrado pelo nome completo. Confira o nome no cadastro.");
+              }
             }
             if (destination === "documents") {
               if (standard === null) issues.push("Valor de Padrão? ausente ou não reconhecido; revisar manualmente.");
