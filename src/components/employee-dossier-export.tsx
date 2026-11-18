@@ -18,14 +18,14 @@ export function EmployeeDossierExport(){
  const [companies,setCompanies]=useState<Company[]>([]);
  const [company,setCompany]=useState("");
  const [person,setPerson]=useState("");
- const [status,setStatus]=useState("all");
+ const [status,setStatus]=useState("ativo");
  const [period,setPeriod]=useState("all");
  const [start,setStart]=useState("");
  const [end,setEnd]=useState("");
  const [sections,setSections]=useState<Section[]>(dossierSections.map(s=>s[0]));
  useEffect(()=>{if(!permitted)setOpen(false)},[permitted]);
  async function show(){
-  if(!permitted)return;setOpen(true);setLoading(true);setError("");
+  if(!permitted)return;setStatus("ativo");setPerson("");setOpen(true);setLoading(true);setError("");
   try{const db=supabase as any;const all=async(table:string,columns:string)=>{const out:any[]=[];for(let offset=0;;offset+=500){const {data,error}=await db.from(table).select(columns).order("id").range(offset,offset+499);if(error)throw new Error(error.message);out.push(...(data??[]));if(!data||data.length<500)return out;}};
    const [p,c]=await Promise.all([all("employees","id,full_name,company_id,status,hire_date"),all("companies","id,name")]);setPeople(p.sort((a,b)=>a.full_name.localeCompare(b.full_name,"pt-BR")));setCompanies(c.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR")));
   }catch(e){setError(e instanceof Error?e.message:String(e))}finally{setLoading(false)}
