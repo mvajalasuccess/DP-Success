@@ -156,16 +156,18 @@ export function DiarioOcorrencias() {
     const rules = new Map<string, any>();
     const seen = new Map<string, number>();
     for (const row of safeRows) {
-      const candidates = catalog.filter(item => canonical(normCat(item.category)) === canonical(normCat(row.category)) && (canonical(item.name) === canonical(row.documentName) || (!!auditTrainingKey(row.documentName) && auditTrainingKey(item.name) === auditTrainingKey(row.documentName))));
-      if (candidates.length > 1 || (candidates.length === 1 && !candidates[0].active)) {
-        skipped++; warnings.push(row.employeeName + " — " + row.documentName + ": catálogo ambíguo ou inativo."); continue;
-      }
-      const item = candidates[0];
+      const inCategory = catalog.filter(item => item.active && canonical(normCat(item.category)) === canonical(normCat(row.category)));
+      const exact = inCategory.filter(item => canonical(item.name) === canonical(row.documentName));
+      const trainingKey = auditTrainingKey(row.documentName);
+      const aliases = trainingKey ? inCategory.filter(item => auditTrainingKey(item.name) === trainingKey) : [];
+      // Exact title takes precedence; an ambiguous alias must not discard a training record.
+      const item = exact.length === 1 ? exact[0] : exact.length === 0 && aliases.length === 1 ? aliases[0] : undefined;
+      if (!item && (exact.length > 1 || aliases.length > 1)) warnings.push(row.employeeName + " — " + row.documentName + ": mantido como documento personalizado para não misturar certificados distintos.");
       const name = item?.name ?? row.documentName;
       const comment = row.originalComment.trim();
       const commentKey = canonical(comment);
-      const signed = /\bassinado\b/.test(commentKey) && !/\b(?:nao|sem)\s+assinad[oa]/.test(commentKey);
-      const delivered = signed || /\b(?:entregue|realizado|emitido|concluido)\b/.test(commentKey) && !/\b(?:nao|sem)\s+(?:entregue|realizado|emitido|concluido)\b/.test(commentKey);
+      const signed = /\bassinad[oa]\b/.test(commentKey) && !/\b(?:nao|sem)\s+assinad[oa]/.test(commentKey);
+      const delivered = signed || /\b(?:entregue|realizad[oa]|emitid[oa]|concluid[oa])\b/.test(commentKey) && !/\b(?:nao|sem)\s+(?:entregue|realizado|emitido|concluido)\b/.test(commentKey);
       const noDue = /\b(?:sem vencimento|nao possui vencimento|nao se aplica vencimento)\b/.test(commentKey);
       const sameDocument = (d: any) => d.employee_id === row.employeeId && ((item && d.catalog_id === item.id) || (canonical(d.document_name) === canonical(name) && canonical(normCat(d.category ?? (catalog.find(x => x.id === d.catalog_id)?.category))) === canonical(normCat(row.category))));
       const sameRecord = existing.some(d => sameDocument(d) && (d.last_completed_on ?? null) === row.completedOn && (d.due_date ?? null) === row.dueDate);
