@@ -88,14 +88,19 @@ function parseComment(comment: string) {
   return { completedOn, dueDate, notes, issue };
 }
 
+const canonicalCategories = new Set(["Pessoais", "Contratação", "Responsabilidades anuais", "Medicina e Segurança do Trabalho", "Recibos", "Cartão de Ponto", "Advertências", "Vales avulsos, acordos diversos", "Diversos"]);
+
 const categoryMap: Record<string, string> = {
   "documentos pessoais": "Pessoais",
   "contrato": "Contratação",
+  "contrato admissão": "Contratação",
   "responsabilidades anuais": "Responsabilidades anuais",
   "medicina e segurança do trabalho": "Medicina e Segurança do Trabalho",
   "recibos": "Recibos",
+  "recibos (férias e holerites)": "Recibos",
   "cartão de ponto": "Cartão de Ponto",
   "advertências": "Advertências",
+  "advertências recebidas": "Advertências",
   "vales avulsos, acordos diversos": "Vales avulsos, acordos diversos",
   "contratos de vales avulsos, acordos diversos": "Vales avulsos, acordos diversos",
   "diversos": "Diversos",
@@ -177,15 +182,17 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             if (!category || documentName.toLocaleLowerCase("pt-BR") === "padrão?") continue;
             const standard = parseStandard(standardCell);
             const parsedComment = parseComment(comment);
-            let issue = parsedComment.issue;
+            const issues: string[] = [];
+            if (parsedComment.issue) issues.push(parsedComment.issue);
             if (!match.id || match.status !== "matched") {
-              issue = match.status === "missing-hire-date" ? "Bloco sem data de admissão válida." :
+              issues.push(match.status === "missing-hire-date" ? "Bloco sem data de admissão válida." :
                 match.status === "inactive" ? "Funcionário inativo/desligado; bloco bloqueado." :
                 match.status === "ambiguous" ? "Mais de um funcionário corresponde ao nome e à admissão." :
-                "Funcionário não encontrado com nome completo e admissão exatos.";
-            } else if (standard === null) {
-              issue = [issue, "Valor de Padrão? ausente ou não reconhecido; revisar manualmente."].filter(Boolean).join(" ");
+                "Funcionário não encontrado com nome completo e admissão exatos.");
             }
+            if (standard === null) issues.push("Valor de Padrão? ausente ou não reconhecido; revisar manualmente.");
+            if (!canonicalCategories.has(category)) issues.push("Categoria fora da lista padrão do DP Success; precisa ser classificada antes da importação.");
+            const issue = issues.length ? issues.join(" ") : null;
             const key = [file.name, sheetName, startCol, rowIndex + 1].join("::");
             rows.push({
               key, fileName: file.name, sheetName, employeeName, hireDate, employeeId: match.id,
