@@ -1519,3 +1519,73 @@ main :is(h1, h2, h3) {
 .dp-screen-topbar > div {
   justify-content: flex-start !important;
 }
+
+
+/* Padrão de dimensões do Dashboard para todas as páginas da aplicação.
+   A largura das tabelas continua independente, com rolagem nos seus próprios painéis. */
+.dp-app-main {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.dp-app-main > :has(> .dp-screen-topbar) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+.dp-app-main > :has(> .dp-screen-topbar) > .dp-screen-topbar {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem 0 !important;
+}
+.dp-app-main > :has(> .dp-screen-topbar) > .dp-screen-topbar > div,
+.dp-app-main > :has(> .dp-screen-topbar) > :is(main, .dp-screen-content) {
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 1500px !important;
+  min-width: 0;
+  margin-inline: auto !important;
+  padding-inline: 1rem !important;
+}
+.dp-app-main > :has(> .dp-screen-topbar) > .dp-screen-topbar > div {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start !important;
+  gap: 1rem;
+}
+.dp-app-main > :has(> .dp-screen-topbar) > :is(main, .dp-screen-content) {
+  padding-block: 1.25rem !important;
+}
+.dp-app-main > :has(> .dp-screen-topbar) > :is(main, .dp-screen-content) > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.dp-app-main > :has(> .dp-screen-topbar) > :is(main, .dp-screen-content) h1 {
+  font-size: 1.5rem !important;
+  line-height: 1.2 !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.025em !important;
+}
+.dp-app-main > :has(> .dp-screen-topbar) > .dp-screen-topbar .dp-brand {
+  min-width: 0;
+  justify-content: flex-start;
+}
+.dp-app-main > :has(> .dp-screen-topbar) > .dp-screen-topbar .dp-brand-label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 640px) {
+  .dp-app-main > :has(> .dp-screen-topbar) > .dp-screen-topbar > div,
+  .dp-app-main > :has(> .dp-screen-topbar) > :is(main, .dp-screen-content) {
+    padding-inline: 1.5rem !important;
+  }
+  .dp-app-main > :has(> .dp-screen-topbar) > :is(main, .dp-screen-content) {
+    padding-block: 1.5rem !important;
+  }
+  .dp-app-main > :has(> .dp-screen-topbar) > :is(main, .dp-screen-content) h1 {
+    font-size: 30px !important;
+  }
+}
