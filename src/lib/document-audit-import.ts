@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 
 export type AuditEmployee = {
   id: string;
+  link?: "CLT" | "PJ";
   full_name: string;
   status?: string | null;
   hire_date?: string | null;
@@ -15,6 +16,7 @@ export type AuditRow = {
   employeeName: string;
   hireDate: string | null;
   employeeId: string | null;
+  link?: "CLT" | "PJ";
   employeeStatus: "matched" | "missing-hire-date" | "inactive" | "not-found" | "ambiguous";
   category: string;
   documentName: string;
@@ -35,7 +37,7 @@ export type AuditRow = {
 
 export type AuditParseResult = {
   rows: AuditRow[];
-  blocks: { fileName: string; sheetName: string; employeeName: string; hireDate: string | null; employeeStatus: AuditRow["employeeStatus"]; rowCount: number }[];
+  blocks: { fileName: string; sheetName: string; employeeName: string; hireDate: string | null; employeeStatus: AuditRow["employeeStatus"]; link?: "CLT" | "PJ"; rowCount: number }[];
   errors: string[];
 };
 
@@ -153,16 +155,15 @@ export function isAuditEmployeeActive(employee: AuditEmployee): boolean {
   return ["ativo", "active"].includes(status) && (!termination || termination > today);
 }
 
-function resolveEmployee(name: string, hireDate: string | null, employees: AuditEmployee[]) {
-  if (!hireDate) return { id: null, status: "missing-hire-date" as const };
-  const matches = employees.filter(employee =>
-    normalize(employee.full_name) === normalize(name) &&
-    parseExcelDate(employee.hire_date) === hireDate
-  );
-  if (matches.length > 1) return { id: null, status: "ambiguous" as const };
-  if (matches.length === 0) return { id: null, status: "not-found" as const };
-  if (!isAuditEmployeeActive(matches[0])) return { id: null, status: "inactive" as const };
-  return { id: matches[0].id, status: "matched" as const };
+function resolveEmployee(name: string, hireDate: string | null, employees: AuditEmployee[], link?: "CLT"|"PJ") {
+  const named=employees.filter(e=>normalize(e.full_name)===normalize(name)&&(!link||(e.link??"CLT")===link));
+  const matches=hireDate?named.filter(e=>parseExcelDate(e.hire_date)===hireDate):named;
+  if(!hireDate&&(!matches.length||matches.some(e=>(e.link??"CLT")!=="PJ")))return {id:null,status:"missing-hire-date" as const,link};
+  if(matches.length>1)return {id:null,status:"ambiguous" as const,link};
+  if(!matches.length)return {id:null,status:"not-found" as const,link};
+  const resolved=matches[0].link??"CLT";
+  if(!isAuditEmployeeActive(matches[0]))return {id:null,status:"inactive" as const,link:resolved};
+  return {id:matches[0].id,status:"matched" as const,link:resolved};
 }
 
 export async function parseDocumentAuditFiles(files: File[], employees: AuditEmployee[]): Promise<AuditParseResult> {
@@ -195,16 +196,16 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
           let employeeHeader = "";
           for (let rowIndex = firstHeader - 1; rowIndex >= 0; rowIndex--) {
             const candidate = text(matrix[rowIndex]?.[startCol]);
-            if (candidate && /admiss[aã]o\s*:/i.test(candidate)) { employeeHeader = candidate; break; }
-            if (candidate && !/auditoria dp/i.test(candidate) && !/admiss[aã]o\s*:/i.test(candidate)) {
-              // A PJ-only block may have a name but no admission date; keep it for the explicit warning.
-              if (/\s-\s(?:PJ|CLT)$/i.test(candidate)) { employeeHeader = candidate; break; }
-            }
+            if(candidate&&/(?:admiss[aã]o|in[ií]cio(?:\s+(?:do\s+)?contrato)?|contrata[cç][aã]o|presta[cç][aã]o\s+de\s+servi[cç]os)\s*:/i.test(candidate)){employeeHeader=candidate;break;}
+            if(candidate&&(/(?:\s*[-–]\s*|\s*\()(?:PJ|CLT)\)?\s*$/i.test(candidate)||employees.some(e=>e.link==="PJ"&&normalize(e.full_name)===normalize(candidate)))){employeeHeader=candidate;break;}
           }
-          const admission = employeeHeader.match(/^(.*?)\s*-\s*Admiss[aã]o\s*:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
-          const employeeName = admission?.[1]?.trim() || employeeHeader.replace(/\s*-\s*(?:PJ|CLT)$/i, "").trim();
-          const hireDate = admission ? parseDate(admission[2]) : null;
-          const match = resolveEmployee(employeeName, hireDate, employees);
+          const admission=employeeHeader.match(/^(.*?)\s*[-–]?\s*(?:Admiss[aã]o|In[ií]cio(?:\s+(?:do\s+)?contrato)?|Contrata[cç][aã]o|Presta[cç][aã]o\s+de\s+servi[cç]os)\s*:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+          const rawName=(admission?.[1]||employeeHeader).trim();
+          const marker=rawName.match(/(?:\s*[-–]\s*|\s*\()(PJ|CLT)\)?\s*$/i)||employeeHeader.match(/\s*[-–]\s*(PJ|CLT)\s*$/i);
+          const link=marker?.[1]?.toUpperCase() as "CLT"|"PJ"|undefined;
+          const employeeName=rawName.replace(/(?:\s*[-–]\s*|\s*\()(?:PJ|CLT)\)?\s*$/i,"").trim();
+          const hireDate=admission?parseDate(admission[2]):null;
+          const match=resolveEmployee(employeeName,hireDate,employees,link);
           if (match.status === "inactive") continue;
           let category = "";
           let blockRows = 0;
@@ -272,7 +273,7 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             const key = [file.name, sheetName, startCol, rowIndex + 1].join("::");
             rows.push({
               key, fileName: file.name, sheetName, employeeName, hireDate, employeeId: match.id,
-              employeeStatus: match.status, category, documentName, isStandard: standard,
+              employeeStatus: match.status, link:match.link, category, documentName, isStandard: standard,
               completedOn: parsedComment.completedOn, dueDate: parsedComment.dueDate,
               notes: parsedComment.notes, originalComment: comment, issue, destination,
               referenceDate, referenceDateLabel: destination === "absences" ? "Data da falta" : "Data de entrega (conferir)",
@@ -281,28 +282,28 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
             blockRows++;
           }
           blocks.push({ fileName: file.name, sheetName, employeeName: employeeName || "Nome não identificado", hireDate,
-            employeeStatus: match.status, rowCount: blockRows });
+            employeeStatus: match.status, link:match.link, rowCount: blockRows });
         }
       }
     } catch (error) {
       errors.push(`${file.name}: ${error instanceof Error ? error.message : "não foi possível ler a planilha"}`);
     }
   }
-  const identity = (name: string, date: string | null) => normalize(name) + "|" + (date ?? "");
+  const identity = (name: string, date: string | null, link?:string) => normalize(name) + "|" + (link==="PJ"?"PJ":date??"");
   const counts = new Map<string, number>();
   for (const block of blocks) {
-    if (!block.hireDate) continue;
-    const key = identity(block.employeeName, block.hireDate);
+    if (!block.hireDate && block.link!=="PJ") continue;
+    const key = identity(block.employeeName, block.hireDate,block.link);
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const duplicateKeys = new Set([...counts].filter(([, count]) => count > 1).map(([key]) => key));
   for (const key of duplicateKeys) {
-    const block = blocks.find(b => identity(b.employeeName, b.hireDate) === key);
+    const block = blocks.find(b => identity(b.employeeName, b.hireDate,b.link) === key);
     if (block) errors.push("Auditorias duplicadas ignoradas: " + block.employeeName + " (" + block.hireDate + ").");
   }
   return {
-    rows: rows.filter(row => !duplicateKeys.has(identity(row.employeeName, row.hireDate))),
-    blocks: blocks.filter(block => !duplicateKeys.has(identity(block.employeeName, block.hireDate))),
+    rows: rows.filter(row => !duplicateKeys.has(identity(row.employeeName, row.hireDate,row.link))),
+    blocks: blocks.filter(block => !duplicateKeys.has(identity(block.employeeName, block.hireDate,block.link))),
     errors,
   };
 }
