@@ -361,22 +361,22 @@ export function Employees() {
         </>}
       </main>
 
-      {pjOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-3xl overflow-y-auto p-6">
+      {pjOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-4xl overflow-y-auto p-5 sm:p-8">
         <h2 className="text-xl font-bold">{pjId?"Editar prestador PJ":"Novo prestador PJ"}</h2>
         <p className="mt-1 text-sm text-muted-foreground">Vínculo: Pessoa Jurídica (PJ)</p>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-1 text-sm sm:col-span-2">Nome completo *<input value={pjForm.full_name} onChange={e=>setPjForm({...pjForm,full_name:e.target.value})} className="rounded-sm border bg-background px-3 py-2"/></label>
-          <label className="grid gap-1 text-sm">Empresa *<select value={pjForm.company_id} onChange={e=>setPjForm({...pjForm,company_id:e.target.value})} className="rounded-sm border bg-background px-3 py-2"><option value="">Selecione</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-          <label className="grid gap-1 text-sm">Atividade / função<input value={pjForm.activity} onChange={e=>setPjForm({...pjForm,activity:e.target.value})} className="rounded-sm border bg-background px-3 py-2"/></label>
-          <label className="grid gap-1 text-sm">Início da prestação de serviços *<input type="date" value={pjForm.start_date} onChange={e=>setPjForm({...pjForm,start_date:e.target.value})} className="rounded-sm border bg-background px-3 py-2"/></label>
-          <label className="grid gap-1 text-sm">Data de nascimento<input type="date" value={pjForm.birth_date} onChange={e=>setPjForm({...pjForm,birth_date:e.target.value})} className="rounded-sm border bg-background px-3 py-2"/></label>
-          <label className="grid gap-1 text-sm">CPF<input value={pjForm.cpf} onChange={e=>setPjForm({...pjForm,cpf:e.target.value})} className="rounded-sm border bg-background px-3 py-2"/></label>
-          <label className="grid gap-1 text-sm">CNPJ<input value={pjForm.cnpj} onChange={e=>setPjForm({...pjForm,cnpj:e.target.value})} className="rounded-sm border bg-background px-3 py-2"/></label>
-          <label className="grid gap-1 text-sm">Status<select value={pjForm.status} onChange={e=>setPjForm({...pjForm,status:e.target.value==="inativo"?"inativo":"ativo",end_date:e.target.value==="ativo"?"":pjForm.end_date})} className="rounded-sm border bg-background px-3 py-2"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>
-          {pjForm.status==="inativo"&&<label className="grid gap-1 text-sm">Encerramento *<input type="date" value={pjForm.end_date} onChange={e=>setPjForm({...pjForm,end_date:e.target.value})} className="rounded-sm border bg-background px-3 py-2"/></label>}
+        <div className="mt-7 grid gap-y-7 gap-x-10 md:grid-cols-2">
+          <label className="grid min-w-0 gap-2 text-sm font-medium md:col-span-2">Nome completo *<input value={pjForm.full_name} onChange={e=>setPjForm({...pjForm,full_name:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
+          <label className="grid min-w-0 gap-2 text-sm font-medium">Empresa *<select value={pjForm.company_id} onChange={e=>setPjForm({...pjForm,company_id:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"><option value="">Selecione</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="grid min-w-0 gap-2 text-sm font-medium">Atividade / função<input value={pjForm.activity} onChange={e=>setPjForm({...pjForm,activity:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
+          <label className="grid min-w-0 gap-2 text-sm font-medium">Início da prestação de serviços *<input type="date" value={pjForm.start_date} onChange={e=>setPjForm({...pjForm,start_date:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
+          <label className="grid min-w-0 gap-2 text-sm font-medium">Data de nascimento<input type="date" value={pjForm.birth_date} onChange={e=>setPjForm({...pjForm,birth_date:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
+          <label className="grid min-w-0 gap-2 text-sm font-medium">CPF<input value={pjForm.cpf} onChange={e=>setPjForm({...pjForm,cpf:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
+          <label className="grid min-w-0 gap-2 text-sm font-medium">CNPJ<input value={pjForm.cnpj} onChange={e=>setPjForm({...pjForm,cnpj:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
+          <label className="grid min-w-0 gap-2 text-sm font-medium">Status<select value={pjForm.status} onChange={e=>setPjForm({...pjForm,status:e.target.value==="inativo"?"inativo":"ativo",end_date:e.target.value==="ativo"?"":pjForm.end_date})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>
+          {pjForm.status==="inativo"&&<label className="grid min-w-0 gap-2 text-sm font-medium">Encerramento *<input type="date" value={pjForm.end_date} onChange={e=>setPjForm({...pjForm,end_date:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>}
         </div>
         {pjError&&<p className="mt-3 text-sm text-destructive">{pjError}</p>}
-        <div className="mt-5 flex justify-end gap-2"><button disabled={pjSaving} onClick={()=>setPjOpen(false)} className="rounded-sm border px-4 py-2 text-sm">Cancelar</button><button disabled={pjSaving} onClick={()=>void savePj()} className="rounded-sm bg-primary px-4 py-2 text-sm text-primary-foreground">{pjSaving?"Salvando...":"Salvar prestador"}</button></div>
+        <div className="mt-8 flex justify-end gap-3 border-t pt-5"><button disabled={pjSaving} onClick={()=>setPjOpen(false)} className="rounded-sm border px-4 py-2 text-sm">Cancelar</button><button disabled={pjSaving} onClick={()=>void savePj()} className="rounded-sm bg-primary px-4 py-2 text-sm text-primary-foreground">{pjSaving?"Salvando...":"Salvar prestador"}</button></div>
       </Card></div>}
       {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
         <Card className="w-full max-w-4xl p-7">
