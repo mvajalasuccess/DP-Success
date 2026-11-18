@@ -17,7 +17,7 @@ const CUSTOM_DOC="__outro__";
 const normCat=(v:string|null|undefined)=>v==="Documentos Pessoais"?"Pessoais":v==="Contrato"?"Contratação":v==="Responsabilidades Anuais"?"Responsabilidades anuais":(v||"Diversos");
 type DocCatalog = { id: string; name: string; category: string; alert_days: number; active: boolean };
 type ChecklistTemplate = { id: string; process_type: "onboarding"|"offboarding"; title: string; position: number; active: boolean };
-const tabs = [{id:"career",label:"Evolução Funcional e Salarial",icon:BookOpen},{id:"diario",label:"Ocorrências",icon:BookOpen},{id:"documentos",label:"Documentos e vencimentos",icon:CalendarClock},{id:"checklists",label:"Onboarding e demissão",icon:ClipboardList},] as const;
+const tabs = [{id:"diario",label:"Ocorrências",icon:BookOpen},{id:"documentos",label:"Documentos e vencimentos",icon:CalendarClock},{id:"checklists",label:"Onboarding e demissão",icon:ClipboardList},{id:"career",label:"Evolução Funcional e Salarial",icon:BookOpen},] as const;
 const today = () => new Date().toISOString().slice(0,10);
 const dateLabel = (v?: string|null) => v ? v.slice(0,10).split("-").reverse().join("/") : "—";
 const emptyEvent = {employee_id:"",event_date:today(),category:"Geral",direction:"positive" as "positive"|"negative"|"neutral",title:"",description:"",score:"1",is_star:false};
