@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, FileUp, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { parseDocumentAuditFiles, type AuditEmployee, type AuditParseResult } from "@/lib/document-audit-import";
+import { parseDocumentAuditFiles, type AuditEmployee, type AuditParseResult, type AuditRow } from "@/lib/document-audit-import";
 
 type Props = {
   employees: AuditEmployee[];
   mode?: "documents" | "attendance" | "absences";
+  onImport?: (rows: AuditRow[]) => Promise<{ imported: number; skipped: number; warnings: string[] }>;
 };
 
 const statusLabel = (status: AuditParseResult["blocks"][number]["employeeStatus"]) => ({
@@ -16,11 +17,14 @@ const statusLabel = (status: AuditParseResult["blocks"][number]["employeeStatus"
   ambiguous: "Correspondência ambígua",
 }[status]);
 
-export function DocumentAuditImport({ employees, mode = "documents" }: Props) {
+export function DocumentAuditImport({ employees, mode = "documents", onImport }: Props) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [result, setResult] = useState<AuditParseResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [report, setReport] = useState<{ imported: number; skipped: number; warnings: string[] } | null>(null);
+  const [importError, setImportError] = useState("");
   const [showOnlyIssues, setShowOnlyIssues] = useState(false);
 
   const documentRows = useMemo(() => mode === "documents" ? result?.rows.filter(row => row.destination === "documents") ?? [] : [], [result, mode]);
@@ -36,6 +40,8 @@ export function DocumentAuditImport({ employees, mode = "documents" }: Props) {
   async function analyze() {
     if (!files.length) return;
     setBusy(true);
+    setReport(null);
+    setImportError("");
     setResult(null);
     const parsed = await parseDocumentAuditFiles(files, employees);
     const rows = parsed.rows.filter(row => mode === "documents" ? row.destination === "documents" : mode === "attendance" ? row.destination === "certificates" || row.destination === "declarations" : row.destination === "absences");
@@ -43,7 +49,20 @@ export function DocumentAuditImport({ employees, mode = "documents" }: Props) {
     setBusy(false);
   }
 
+  async function confirmImport() {
+    if (!onImport || mode !== "documents" || importing || !validRows.length || report) return;
+    if (!window.confirm("Importar " + validRows.length + " linhas documentais aptas? Registros existentes não serão sobrescritos.")) return;
+    setImporting(true);
+    setImportError("");
+    try { setReport(await onImport(validRows)); }
+    catch (error) { setImportError(error instanceof Error ? error.message : String(error)); }
+    finally { setImporting(false); }
+  }
+
   function close() {
+    if (importing) return;
+    setReport(null);
+    setImportError("");
     setOpen(false);
     setFiles([]);
     setResult(null);
@@ -69,7 +88,9 @@ export function DocumentAuditImport({ employees, mode = "documents" }: Props) {
               <FileUp className="h-7 w-7 text-muted-foreground" />
               <span className="text-sm font-medium">Selecionar arquivos Excel</span>
               <span className="text-xs text-muted-foreground">Você pode selecionar as duas auditorias na mesma etapa (.xlsx ou .xls).</span>
-              <input type="file" accept=".xlsx,.xls" multiple className="sr-only" onChange={event => {
+              <input type="file" accept=".xlsx,.xls" disabled={importing} multiple className="sr-only" onChange={event => {
+                setReport(null);
+                setImportError("");
                 setFiles(Array.from(event.target.files ?? []));
                 setResult(null);
               }} />
@@ -78,7 +99,7 @@ export function DocumentAuditImport({ employees, mode = "documents" }: Props) {
               {files.map(file => <span key={file.name} className="rounded-md bg-muted px-3 py-1.5 text-xs">{file.name}</span>)}
             </div>}
             <div className="mt-4 flex justify-center">
-              <button type="button" disabled={!files.length || busy} onClick={() => void analyze()} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+              <button type="button" disabled={!files.length || busy || importing} onClick={() => void analyze()} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
                 {busy ? "Analisando planilhas..." : "Analisar e gerar prévia"}
               </button>
             </div>
@@ -165,13 +186,16 @@ export function DocumentAuditImport({ employees, mode = "documents" }: Props) {
               </table></div>
             </section>}
 
+            {report && <div className="rounded-md border p-3 text-sm"><strong>Resultado da importação</strong><p>{report.imported} documentos gravados · {report.skipped} ignorados · {issueRows.length} linhas pendentes na prévia.</p>{report.warnings.map((warning, i) => <p key={i} className="text-amber-700">{warning}</p>)}</div>}
+            {importError && <p className="text-sm text-destructive">{importError}</p>}
             <div className="rounded-md border border-amber-300/50 bg-amber-50/60 p-3 text-sm text-amber-900">
-              <strong>Prévia somente para conferência.</strong> Nenhum registro foi gravado nesta etapa. A importação definitiva depende de validação e proteção contra duplicidades.
+              {mode === "documents" ? "Somente linhas documentais aptas serão gravadas. Atestados, declarações e faltas não serão importados. Linhas inconsistentes permanecem pendentes." : "Prévia somente para conferência. Nenhum registro será gravado nesta tela por enquanto."}
             </div>
           </>}
         </div>
         <div className="flex justify-end gap-2 border-t p-4">
-          <button type="button" onClick={close} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">Fechar</button>
+          <button type="button" disabled={importing} onClick={close} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">Fechar</button>
+          {mode === "documents" && onImport && result && <button type="button" disabled={busy || importing || !validRows.length || !!report} onClick={() => void confirmImport()} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{importing ? "Importando..." : "Importar " + validRows.length + " linhas aptas"}</button>}
         </div>
       </Card>
     </div>}
