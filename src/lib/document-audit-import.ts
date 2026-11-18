@@ -145,8 +145,6 @@ function resolveEmployee(name: string, hireDate: string | null, employees: Audit
   );
   if (matches.length > 1) return { id: null, status: "ambiguous" as const };
   if (matches.length === 0) return { id: null, status: "not-found" as const };
-  const employeeStatus = String(matches[0].status ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
-  if (!["ativo", "active"].includes(employeeStatus)) return { id: matches[0].id, status: "inactive" as const };
   return { id: matches[0].id, status: "matched" as const };
 }
 
@@ -271,5 +269,21 @@ export async function parseDocumentAuditFiles(files: File[], employees: AuditEmp
       errors.push(`${file.name}: ${error instanceof Error ? error.message : "não foi possível ler a planilha"}`);
     }
   }
-  return { rows, blocks, errors };
+  const identity = (name: string, date: string | null) => normalize(name) + "|" + (date ?? "");
+  const counts = new Map<string, number>();
+  for (const block of blocks) {
+    if (!block.hireDate) continue;
+    const key = identity(block.employeeName, block.hireDate);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const duplicateKeys = new Set([...counts].filter(([, count]) => count > 1).map(([key]) => key));
+  for (const key of duplicateKeys) {
+    const block = blocks.find(b => identity(b.employeeName, b.hireDate) === key);
+    if (block) errors.push("Auditorias duplicadas ignoradas: " + block.employeeName + " (" + block.hireDate + ").");
+  }
+  return {
+    rows: rows.filter(row => !duplicateKeys.has(identity(row.employeeName, row.hireDate))),
+    blocks: blocks.filter(block => !duplicateKeys.has(identity(block.employeeName, block.hireDate))),
+    errors,
+  };
 }
