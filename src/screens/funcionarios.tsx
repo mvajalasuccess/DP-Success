@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 import { ScreenBrand } from "@/components/screen-brand";
-type PjForm = { full_name: string; company_id: string; start_date: string; birth_date: string; cpf: string; cnpj: string; activity: string; status: "ativo" | "inativo"; end_date: string };
-const emptyPj: PjForm = {full_name:"",company_id:"",start_date:"",birth_date:"",cpf:"",cnpj:"",activity:"",status:"ativo",end_date:""};
+type PjForm = { full_name: string; company_id: string; start_date: string; birth_date: string; cnpj: string; activity: string; status: "ativo" | "inativo"; end_date: string };
+const emptyPj: PjForm = {full_name:"",company_id:"",start_date:"",birth_date:"",cnpj:"",activity:"",status:"ativo",end_date:""};
 type PjPerson = PjForm & {id:string};
 export function Employees() {
   const [view,setView]=useState<"clt"|"pj">("clt");
@@ -33,7 +33,7 @@ export function Employees() {
   }
   function editPj(person?:PjPerson){
     setPjError("");setPjId(person?.id??null);
-    setPjForm(person?{full_name:person.full_name,company_id:person.company_id??"",start_date:person.start_date,birth_date:person.birth_date??"",cpf:person.cpf??"",cnpj:person.cnpj??"",activity:person.activity??"",status:person.status,end_date:person.end_date??""}:{...emptyPj});
+    setPjForm(person?{full_name:person.full_name,company_id:person.company_id??"",start_date:person.start_date,birth_date:person.birth_date??"",cnpj:person.cnpj??"",activity:person.activity??"",status:person.status,end_date:person.end_date??""}:{...emptyPj});
     setPjOpen(true);
   }
   async function savePj(){
@@ -41,9 +41,9 @@ export function Employees() {
     if(!pjForm.full_name.trim()||!pjForm.start_date||!pjForm.company_id){setPjError("Informe nome, empresa e início da prestação de serviços.");return;}
     if(pjForm.status==="inativo"&&!pjForm.end_date){setPjError("Informe a data de encerramento.");return;}
     if(pjForm.end_date&&pjForm.end_date<pjForm.start_date){setPjError("O encerramento não pode ser anterior ao início.");return;}
-    const cpf=pjForm.cpf.replace(/\D/g,""),cnpj=pjForm.cnpj.replace(/\D/g,"");
-    if((cpf&&cpf.length!==11)||(cnpj&&cnpj.length!==14)){setPjError("Confira a quantidade de dígitos do CPF e do CNPJ.");return;}
-    const payload={...pjForm,full_name:pjForm.full_name.trim(),birth_date:pjForm.birth_date||null,cpf:cpf||null,cnpj:cnpj||null,activity:pjForm.activity.trim()||null,end_date:pjForm.status==="inativo"?pjForm.end_date:null};
+    const cnpj=pjForm.cnpj.replace(/\D/g,"");
+    if(cnpj&&cnpj.length!==14){setPjError("Confira a quantidade de dígitos do CNPJ.");return;}
+    const payload={...pjForm,full_name:pjForm.full_name.trim(),birth_date:pjForm.birth_date||null,cnpj:cnpj||null,activity:pjForm.activity.trim()||null,end_date:pjForm.status==="inativo"?pjForm.end_date:null};
     setPjSaving(true);setPjError("");
     try{
       const db=supabase as any;
@@ -370,7 +370,6 @@ export function Employees() {
           <label className="grid min-w-0 gap-2 text-sm font-medium">Atividade / função<input value={pjForm.activity} onChange={e=>setPjForm({...pjForm,activity:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
           <label className="grid min-w-0 gap-2 text-sm font-medium">Início da prestação de serviços *<input type="date" value={pjForm.start_date} onChange={e=>setPjForm({...pjForm,start_date:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
           <label className="grid min-w-0 gap-2 text-sm font-medium">Data de nascimento<input type="date" value={pjForm.birth_date} onChange={e=>setPjForm({...pjForm,birth_date:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
-          <label className="grid min-w-0 gap-2 text-sm font-medium">CPF<input value={pjForm.cpf} onChange={e=>setPjForm({...pjForm,cpf:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
           <label className="grid min-w-0 gap-2 text-sm font-medium">CNPJ<input value={pjForm.cnpj} onChange={e=>setPjForm({...pjForm,cnpj:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>
           <label className="grid min-w-0 gap-2 text-sm font-medium">Status<select value={pjForm.status} onChange={e=>setPjForm({...pjForm,status:e.target.value==="inativo"?"inativo":"ativo",end_date:e.target.value==="ativo"?"":pjForm.end_date})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>
           {pjForm.status==="inativo"&&<label className="grid min-w-0 gap-2 text-sm font-medium">Encerramento *<input type="date" value={pjForm.end_date} onChange={e=>setPjForm({...pjForm,end_date:e.target.value})} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 py-2 font-normal"/></label>}
