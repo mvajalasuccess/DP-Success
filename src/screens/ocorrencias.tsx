@@ -2,6 +2,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, Download, FileSpreadsheet, FileText,
 import * as XLSX from "xlsx";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { DocumentAuditImport } from "@/components/document-audit-import";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 
@@ -534,6 +535,7 @@ export function Ocorrencias() {
 
         {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
+        <div className="mb-4 flex justify-end"><DocumentAuditImport employees={employees} mode="absences" /></div>
         <Card className="mt-6 p-4">
           <div className="mb-3 text-sm font-medium">Filtros</div>
           <div className="grid gap-3 sm:grid-cols-3">
