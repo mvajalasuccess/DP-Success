@@ -11,3 +11,11 @@ export function pjCategory(value:unknown):string{
 }
 export const pjCategoryLabel=(v:string)=>v==="Pessoais"?"Documentos Pessoais":v==="Contratação"?"Contrato":v==="Responsabilidades anuais"?"Responsabilidades Anuais":v;
 export const pjDocKey=(value:unknown)=>String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase().replace(/\s+/g," ");
+
+export function isPjInvoiceName(value:unknown):boolean{
+ const s=String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
+ return /^(?:nf(?:[’'´\x60-]?s|-?e(?:s)?|se)?(?=$|[\s\d#º°:./_-])|notas?\s+fiscais?(?=$|[\s\d#º°:./_-])|nota\s+fiscal(?=$|[\s\d#º°:./_-]))/.test(s);
+}
+export function pjRecordCategory(category:unknown,name:unknown):string{
+ return isPjInvoiceName(name)?"NFs":pjCategory(category);
+}
