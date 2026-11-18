@@ -6,6 +6,7 @@ import { CompanyFilter } from "@/components/company-filter";
 
 import { ScreenBrand } from "@/components/screen-brand";
 import { DocumentAuditImport } from "@/components/document-audit-import";
+import type { AuditRow } from "@/lib/document-audit-import";
 type Employee = { id: string; full_name: string; status?: string; company_id?: string | null; hire_date?: string | null; termination_date?: string | null };
 type LifeEvent = { id: string; employee_id: string; event_date: string; period_id?: string|null; category: string; direction: "positive"|"negative"|"neutral"; title: string; description: string|null; score: number; is_star: boolean; status: "active"|"void"; employees?: { full_name: string }|null };
 type DocRecord = { id: string; employee_id: string; document_name: string; catalog_id?: string|null; is_standard?: boolean; no_due_date?: boolean; has_documentation?: boolean; delivery_status?: "not_delivered"|"delivered"; signature_status?: "not_applicable"|"pending"|"signed"; last_completed_on: string|null; due_date: string|null; notes: string|null; status: string; category?: string|null; is_custom?: boolean; employees?: { full_name: string }|null };
@@ -123,6 +124,84 @@ export function DiarioOcorrencias() {
     setDocForm({employee_id:d.employee_id,document_name:d.document_name,has_documentation:String(d.has_documentation??true),delivery_status:d.delivery_status??"delivered",signature_status:d.signature_status??"pending",last_completed_on:d.last_completed_on??"",due_date:d.due_date??"",no_due_date:d.no_due_date??false,notes:d.notes??""});
     setError("");setDocOpen(true);
   }
+  async function importAuditDocuments(rows: AuditRow[]) {
+    const db = supabase as any;
+    const { data: auth, error: authError } = await db.auth.getUser();
+    if (authError || !auth?.user?.id) throw new Error("Sessão inválida. Entre novamente no sistema.");
+    const safeRows = rows.filter(r => r.destination === "documents" && r.employeeStatus === "matched" && r.employeeId && !r.issue && r.isStandard !== null);
+    const canonical = (v: unknown) => String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
+    const warnings: string[] = [];
+    let imported = 0, skipped = rows.length - safeRows.length;
+    const selectedIds = [...new Set(safeRows.map(r => r.employeeId!))];
+    if (!selectedIds.length) return { imported, skipped, warnings };
+    // Fetch fresh existing records, including all pages, before inserting anything.
+    async function readAll(table: string, filter?: string[]) {
+      const all: any[] = [];
+      for (let offset = 0; ; offset += 500) {
+        let query = db.from(table).select("*").order("id");
+        if (filter) query = query.in("employee_id", filter);
+        const { data, error } = await query.range(offset, offset + 499);
+        if (error) throw new Error(error.message);
+        all.push(...(data ?? []));
+        if (!data || data.length < 500) return all;
+      }
+    }
+    const [existing, catalog, existingRules] = await Promise.all([
+      readAll("employee_document_records", selectedIds),
+      readAll("employee_document_catalog"),
+      readAll("employee_document_requirements", selectedIds),
+    ]);
+    const pending: any[] = [];
+    const rules = new Map<string, any>();
+    const seen = new Map<string, number>();
+    for (const row of safeRows) {
+      const candidates = catalog.filter(item => canonical(normCat(item.category)) === canonical(normCat(row.category)) && canonical(item.name) === canonical(row.documentName));
+      if (candidates.length > 1 || (candidates.length === 1 && !candidates[0].active)) {
+        skipped++; warnings.push(row.employeeName + " — " + row.documentName + ": catálogo ambíguo ou inativo."); continue;
+      }
+      const item = candidates[0];
+      const name = item?.name ?? row.documentName;
+      const comment = row.originalComment.trim();
+      const commentKey = canonical(comment);
+      const signed = /\bassinado\b/.test(commentKey) && !/\b(?:nao|sem)\s+assinad[oa]/.test(commentKey);
+      const delivered = signed || /\b(?:entregue|realizado|emitido|concluido)\b/.test(commentKey) && !/\b(?:nao|sem)\s+(?:entregue|realizado|emitido|concluido)\b/.test(commentKey);
+      const noDue = /\b(?:sem vencimento|nao possui vencimento|nao se aplica vencimento)\b/.test(commentKey);
+      const sameDocument = (d: any) => d.employee_id === row.employeeId && ((item && d.catalog_id === item.id) || (canonical(d.document_name) === canonical(name) && canonical(normCat(d.category ?? (catalog.find(x => x.id === d.catalog_id)?.category))) === canonical(normCat(row.category))));
+      const sameRecord = existing.some(d => sameDocument(d) && (d.last_completed_on ?? null) === row.completedOn && (d.due_date ?? null) === row.dueDate);
+      if (sameRecord) { skipped++; continue; }
+      // Stable ID by content + occurrence number prevents duplicate writes on retry.
+      const identity = JSON.stringify([row.employeeId, canonical(row.category), canonical(name), row.completedOn, row.dueDate, commentKey]);
+      const ordinal = (seen.get(identity) ?? 0) + 1;
+      seen.set(identity, ordinal);
+      const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(identity + "|" + ordinal)));
+      digest[6] = (digest[6] & 15) | 80; digest[8] = (digest[8] & 63) | 128;
+      const hex = Array.from(digest.slice(0,16), x => x.toString(16).padStart(2,"0")).join("");
+      const id = hex.slice(0,8)+"-"+hex.slice(8,12)+"-"+hex.slice(12,16)+"-"+hex.slice(16,20)+"-"+hex.slice(20);
+      pending.push({ id, employee_id: row.employeeId, catalog_id: item?.id ?? null, category: normCat(row.category), is_custom: !item, is_standard: row.isStandard, document_name: name, has_documentation: delivered, delivery_status: delivered ? "delivered" : "not_delivered", signature_status: signed ? "signed" : "pending", last_completed_on: row.completedOn, due_date: row.dueDate, no_due_date: !row.dueDate && noDue, notes: comment || null, created_by: auth.user.id });
+      if (item) {
+        const key = row.employeeId + "|" + item.id;
+        const old = existingRules.find(r => r.employee_id === row.employeeId && r.catalog_id === item.id);
+        if (old) {
+          if (old.is_applicable !== row.isStandard) warnings.push(row.employeeName + " — " + name + ": padrão já cadastrado preservado.");
+        } else if (!rules.has(key)) {
+          rules.set(key, { employee_id: row.employeeId, catalog_id: item.id, is_applicable: row.isStandard, is_required: false, requires_signature: false });
+        }
+      }
+    }
+    // One insert-only request for records: no updates to existing rows.
+    if (pending.length) {
+      const { data, error } = await db.from("employee_document_records").upsert(pending, { onConflict: "id", ignoreDuplicates: true }).select("id");
+      if (error) throw new Error("Documentos não gravados: " + error.message);
+      imported = data?.length ?? 0;
+      skipped += pending.length - imported;
+    }
+    if (rules.size) {
+      const { error } = await db.from("employee_document_requirements").upsert([...rules.values()], { onConflict: "employee_id,catalog_id", ignoreDuplicates: true });
+      if (error) warnings.push("Documentos gravados, mas a configuração de padrão não foi concluída: " + error.message);
+    }
+    await load();
+    return { imported, skipped, warnings };
+  }
   async function saveDoc(){
     // Renova a sessão antes de gravar: um token expirado faz o banco recusar a gravação.
     await (supabase as any).auth.refreshSession().catch(()=>null);
@@ -207,7 +286,7 @@ export function DiarioOcorrencias() {
         <Card className="p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><h2 className="font-semibold">Documentação do funcionário</h2><p className="mt-1 text-sm text-muted-foreground">Checklist único por categoria. Marque se o item é padrão para o funcionário e acompanhe vencimento e assinatura.</p></div>
-            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date}))}/>
+            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date}))} onImport={importAuditDocuments}/>
           </div>
           {requirementEmployee&&<div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-md border px-3 py-2"><strong>{docCatalog.length}</strong> itens no catálogo</span>
