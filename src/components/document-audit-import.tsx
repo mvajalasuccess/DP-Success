@@ -5,6 +5,7 @@ import { parseDocumentAuditFiles, type AuditEmployee, type AuditParseResult } fr
 
 type Props = {
   employees: AuditEmployee[];
+  mode?: "documents" | "attendance" | "absences";
 };
 
 const statusLabel = (status: AuditParseResult["blocks"][number]["employeeStatus"]) => ({
@@ -15,16 +16,16 @@ const statusLabel = (status: AuditParseResult["blocks"][number]["employeeStatus"
   ambiguous: "Correspondência ambígua",
 }[status]);
 
-export function DocumentAuditImport({ employees }: Props) {
+export function DocumentAuditImport({ employees, mode = "documents" }: Props) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [result, setResult] = useState<AuditParseResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [showOnlyIssues, setShowOnlyIssues] = useState(false);
 
-  const documentRows = useMemo(() => result?.rows.filter(row => row.destination === "documents") ?? [], [result]);
-  const attendanceRows = useMemo(() => result?.rows.filter(row => row.destination === "certificates" || row.destination === "declarations") ?? [], [result]);
-  const absenceRows = useMemo(() => result?.rows.filter(row => row.destination === "absences") ?? [], [result]);
+  const documentRows = useMemo(() => mode === "documents" ? result?.rows.filter(row => row.destination === "documents") ?? [] : [], [result, mode]);
+  const attendanceRows = useMemo(() => mode === "attendance" ? result?.rows.filter(row => row.destination === "certificates" || row.destination === "declarations") ?? [] : [], [result, mode]);
+  const absenceRows = useMemo(() => mode === "absences" ? result?.rows.filter(row => row.destination === "absences") ?? [] : [], [result, mode]);
   const validRows = useMemo(() => documentRows.filter(row => row.employeeStatus === "matched" && !row.issue), [documentRows]);
   const issueRows = useMemo(() => documentRows.filter(row => row.employeeStatus !== "matched" || !!row.issue), [documentRows]);
   const visibleRows = useMemo(() => {
@@ -37,7 +38,8 @@ export function DocumentAuditImport({ employees }: Props) {
     setBusy(true);
     setResult(null);
     const parsed = await parseDocumentAuditFiles(files, employees);
-    setResult(parsed);
+    const rows = parsed.rows.filter(row => mode === "documents" ? row.destination === "documents" : mode === "attendance" ? row.destination === "certificates" || row.destination === "declarations" : row.destination === "absences");
+    setResult({ ...parsed, rows, blocks: parsed.blocks.map(block => ({ ...block, rowCount: rows.filter(row => row.fileName === block.fileName && row.sheetName === block.sheetName && row.employeeName === block.employeeName && row.hireDate === block.hireDate).length })).filter(block => block.rowCount > 0) });
     setBusy(false);
   }
 
@@ -56,7 +58,7 @@ export function DocumentAuditImport({ employees }: Props) {
       <Card className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden">
         <div className="flex items-start justify-between gap-4 border-b p-4 sm:p-5">
           <div>
-            <h2 className="text-lg font-semibold">Importação auditada de documentos</h2>
+            <h2 className="text-lg font-semibold">{mode === "documents" ? "Importação auditada de documentos" : mode === "attendance" ? "Importação de atestados e declarações" : "Importação de faltas"}</h2>
             <p className="mt-1 text-sm text-muted-foreground">Selecione as planilhas para conferir os blocos, funcionários e documentos antes de qualquer gravação.</p>
           </div>
           <button type="button" onClick={close} aria-label="Fechar importação" className="rounded-md border p-2 hover:bg-muted"><X className="h-4 w-4" /></button>
@@ -83,13 +85,14 @@ export function DocumentAuditImport({ employees }: Props) {
           </div>
 
           {result && <>
-            <div className="grid gap-3 sm:grid-cols-3">
+            {mode === "documents" && <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Blocos de funcionários</p><p className="mt-1 text-2xl font-semibold">{result.blocks.length}</p></div>
               <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Documentos aptos para revisão</p><p className="mt-1 text-2xl font-semibold text-emerald-600">{validRows.length}</p></div>
               <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Documentos com inconsistências</p><p className="mt-1 text-2xl font-semibold text-amber-600">{issueRows.length}</p></div>
-            </div>
+            </div>}
 
-            <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Atestados e declarações encaminhados ao módulo próprio</p><p className="mt-1 text-2xl font-semibold">{attendanceRows.length}</p></div><div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Faltas encaminhadas a Faltas e Folgas</p><p className="mt-1 text-2xl font-semibold">{absenceRows.length}</p></div></div>
+            {mode === "attendance" && <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Atestados e declarações identificados</p><p className="mt-1 text-2xl font-semibold">{attendanceRows.length}</p></div>}
+            {mode === "absences" && <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Faltas identificadas</p><p className="mt-1 text-2xl font-semibold">{absenceRows.length}</p></div>}
 
             {result.errors.length > 0 && <div className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{result.errors.map(error => <p key={error}>{error}</p>)}</div>}
 
@@ -111,7 +114,7 @@ export function DocumentAuditImport({ employees }: Props) {
               </div>
             </section>
 
-            <section className="space-y-2">
+            {mode === "documents" && <section className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="font-semibold">Detalhamento dos documentos</h3>
                 <button type="button" onClick={() => setShowOnlyIssues(value => !value)} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted">
@@ -137,7 +140,7 @@ export function DocumentAuditImport({ employees }: Props) {
                 </table>
               </div>
               {((showOnlyIssues ? issueRows : result.rows).length > visibleRows.length) && <p className="text-xs text-muted-foreground">Exibindo as primeiras 250 linhas desta visualização. O total e os alertas consideram todas as linhas analisadas.</p>}
-            </section>
+            </section>}
 
             {attendanceRows.length > 0 && <section className="space-y-2">
               <h3 className="font-semibold">Atestados e declarações — destino: Declarações e Atestados</h3>
@@ -163,7 +166,7 @@ export function DocumentAuditImport({ employees }: Props) {
             </section>}
 
             <div className="rounded-md border border-amber-300/50 bg-amber-50/60 p-3 text-sm text-amber-900">
-              <strong>Prévia somente para conferência.</strong> Nenhum documento, vencimento, padrão ou configuração individual foi gravado no DP Success nesta etapa. A importação definitiva será liberada depois da validação transacional e da proteção contra reimportação. Atestados, declarações e faltas serão gravados somente nos módulos próprios, nunca em Documentos e Vencimentos.
+              <strong>Prévia somente para conferência.</strong> Nenhum registro foi gravado nesta etapa. A importação definitiva depende de validação e proteção contra duplicidades.
             </div>
           </>}
         </div>
