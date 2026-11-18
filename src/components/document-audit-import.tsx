@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileSpreadsheet, FileUp, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -5,6 +6,7 @@ import { parseDocumentAuditFiles, type AuditEmployee, type AuditParseResult, typ
 
 type Props = {
   employees: AuditEmployee[];
+  includePj?: boolean;
   mode?: "documents" | "attendance" | "absences";
   onImport?: (rows: AuditRow[]) => Promise<{ imported: number; skipped: number; warnings: string[] }>;
 };
@@ -17,7 +19,7 @@ const statusLabel = (status: AuditParseResult["blocks"][number]["employeeStatus"
   ambiguous: "Correspondência ambígua",
 }[status]);
 
-export function DocumentAuditImport({ employees, mode = "documents", onImport }: Props) {
+export function DocumentAuditImport({ employees, mode = "documents", onImport, includePj = false }: Props) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [result, setResult] = useState<AuditParseResult | null>(null);
@@ -43,10 +45,22 @@ export function DocumentAuditImport({ employees, mode = "documents", onImport }:
     setReport(null);
     setImportError("");
     setResult(null);
-    const parsed = await parseDocumentAuditFiles(files, employees);
+    try {
+    let candidates=employees;
+    if(includePj){
+      const pj:AuditEmployee[]=[];
+      for(let offset=0;;offset+=500){
+        const {data,error}=await (supabase as any).from("pj_people").select("id,full_name,status,start_date,end_date").order("id").range(offset,offset+499);
+        if(error)throw new Error("Não foi possível consultar prestadores PJ: "+error.message);
+        pj.push(...(data??[]).map((p:any)=>({id:p.id,link:"PJ" as const,full_name:p.full_name,status:p.status,hire_date:p.start_date,termination_date:p.end_date})));
+        if(!data||data.length<500)break;
+      }
+      candidates=[...employees,...pj];
+    }
+    const parsed = await parseDocumentAuditFiles(files, candidates);
     const rows = parsed.rows.filter(row => mode === "documents" ? row.destination === "documents" : mode === "attendance" ? row.destination === "certificates" || row.destination === "declarations" : row.destination === "absences");
     setResult({ ...parsed, rows, blocks: parsed.blocks.map(block => ({ ...block, rowCount: rows.filter(row => row.fileName === block.fileName && row.sheetName === block.sheetName && row.employeeName === block.employeeName && row.hireDate === block.hireDate).length })).filter(block => block.rowCount > 0) });
-    setBusy(false);
+    } catch(error){setImportError(error instanceof Error?error.message:String(error));}finally{setBusy(false);}
   }
 
   async function confirmImport() {
@@ -105,7 +119,7 @@ export function DocumentAuditImport({ employees, mode = "documents", onImport }:
             </div>
           </div>
 
-          {result && <>
+          {!result&&importError&&<p role="alert" className="text-sm text-destructive">{importError}</p>}{result && <>
             {mode === "documents" && <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Blocos de funcionários</p><p className="mt-1 text-2xl font-semibold">{result.blocks.length}</p></div>
               <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Documentos aptos para revisão</p><p className="mt-1 text-2xl font-semibold text-emerald-600">{validRows.length}</p></div>
@@ -121,11 +135,11 @@ export function DocumentAuditImport({ employees, mode = "documents", onImport }:
               <h3 className="font-semibold">Validação dos blocos</h3>
               <div className="overflow-x-auto rounded-md border">
                 <table className="w-full min-w-[680px] text-left text-sm">
-                  <thead className="bg-muted/60 text-xs text-muted-foreground"><tr><th className="px-3 py-2">Arquivo / aba</th><th className="px-3 py-2">Funcionário identificado</th><th className="px-3 py-2">Admissão</th><th className="px-3 py-2">Resultado</th><th className="px-3 py-2 text-right">Linhas</th></tr></thead>
+                  <thead className="bg-muted/60 text-xs text-muted-foreground"><tr><th className="px-3 py-2">Arquivo / aba</th><th className="px-3 py-2">Funcionário identificado</th><th className="px-3 py-2">Admissão / início</th><th className="px-3 py-2">Resultado</th><th className="px-3 py-2 text-right">Linhas</th></tr></thead>
                   <tbody className="divide-y">
                     {result.blocks.map((block, index) => <tr key={block.fileName + block.sheetName + index}>
                       <td className="px-3 py-2"><span className="block font-medium">{block.fileName}</span><span className="text-xs text-muted-foreground">{block.sheetName}</span></td>
-                      <td className="px-3 py-2">{block.employeeName}</td>
+                      <td className="px-3 py-2">{block.employeeName}{block.link&&<span className="ml-2 rounded-sm border px-1.5 py-0.5 text-xs">{block.link}</span>}</td>
                       <td className="whitespace-nowrap px-3 py-2">{block.hireDate ? block.hireDate.split("-").reverse().join("/") : "Não identificada"}</td>
                       <td className="px-3 py-2"><span className={block.employeeStatus === "matched" ? "inline-flex items-center gap-1 text-emerald-600" : "inline-flex items-center gap-1 text-amber-600"}>{block.employeeStatus === "matched" ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{statusLabel(block.employeeStatus)}</span></td>
                       <td className="px-3 py-2 text-right tabular-nums">{block.rowCount}</td>
@@ -147,7 +161,7 @@ export function DocumentAuditImport({ employees, mode = "documents", onImport }:
                   <thead className="bg-muted/60 text-muted-foreground"><tr><th className="px-3 py-2">Funcionário</th><th className="px-3 py-2">Categoria</th><th className="px-3 py-2">Documento</th><th className="px-3 py-2">Padrão?</th><th className="px-3 py-2">Realização</th><th className="px-3 py-2">Vencimento</th><th className="px-3 py-2">Comentário original</th><th className="px-3 py-2">Validação</th></tr></thead>
                   <tbody className="divide-y">
                     {visibleRows.map(row => <tr key={row.key}>
-                      <td className="px-3 py-2"><span className="font-medium">{row.employeeName}</span><span className="block text-[11px] text-muted-foreground">{row.hireDate ? row.hireDate.split("-").reverse().join("/") : "Admissão ausente"}</span></td>
+                      <td className="px-3 py-2"><span className="font-medium">{row.employeeName}{row.link&&<span className="ml-1 text-muted-foreground"> · {row.link}</span>}</span><span className="block text-[11px] text-muted-foreground">{row.hireDate ? row.hireDate.split("-").reverse().join("/") : row.link==="PJ"?"Sem data no bloco PJ":"Admissão ausente"}</span></td>
                       <td className="px-3 py-2">{row.category}</td>
                       <td className="px-3 py-2">{row.documentName}</td>
                       <td className="px-3 py-2">{row.isStandard === null ? "Revisar" : row.isStandard ? "Sim" : "Não"}</td>
