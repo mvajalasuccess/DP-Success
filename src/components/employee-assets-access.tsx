@@ -21,7 +21,7 @@ const blank=(kind:Kind="company_key")=>({kind,item_name:["uniform","door","other
 export function EmployeeAssetsAccess({employees,companyFilter}:{employees:Person[];companyFilter:string}){
  const [companies,setCompanies]=useState<Company[]>([]);
  const [person,setPerson]=useState("");
- const [scope,setScope]=useState("all");
+ const [scope,setScope]=useState("active");
  const [mode,setMode]=useState<"on"|"off">("on");
  const [rows,setRows]=useState<Item[]>([]);
  const [loading,setLoading]=useState(true);
