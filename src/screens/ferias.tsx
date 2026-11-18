@@ -3,6 +3,7 @@ import { ArrowLeft, CalendarDays, Palmtree, Plus, CheckCircle2, Pencil, Trash2, 
 import { supabase } from "@/integrations/supabase/client";
 
 import { ScreenBrand } from "@/components/screen-brand";
+import { PjOrganization } from "@/components/pj-organization";
 type Vacation = { id:string; employee_id:string; title:string|null; start_date:string|null; end_date:string|null; notes:string|null; completed:boolean; completed_at:string|null; created_at:string; acquisition_start_date?:string|null; acquisition_end_date?:string|null; concession_start_date?:string|null; concession_end_date?:string|null; official_gozo_start_date?:string|null; official_gozo_end_date?:string|null; termination_paid?:boolean|null; leave_type?:string|null; days_quantity?:number|string|null; entitled_days?:number|string|null; employees?:{full_name:string}|null };
 type Employee = { id:string; full_name:string; status?:string|null; termination_date?:string|null; hire_date?:string|null; company_id?:string|null };
 type Entitlement = { employee:Employee; acquisitionStart:string; acquisitionEnd:string; concessionStart:string; concessionEnd:string; cycle:number; status:"acquisition"|"available"|"overdue"|"scheduled"|"completed"; vacations?:Vacation[]; entitledDays?:number };
@@ -41,6 +42,7 @@ const blockKey=(p:Vacation)=>(p.start_date||p.official_gozo_start_date)+"|"+(p.e
 const blank = {entitled_days:"",leave_type:"ferias",days_quantity:"",employee_id:"",title:"",start_date:"",end_date:"",notes:"",completed:false,acquisition_start_date:"",acquisition_end_date:"",concession_start_date:"",concession_end_date:"",official_gozo_start_date:"",official_gozo_end_date:"",termination_paid:false};
 
 export function Ferias() {
+  const [vacationLink,setVacationLink]=useState<"clt"|"pj">("clt");
   const [periods,setPeriods]=useState<Vacation[]>([]);
   const [employees,setEmployees]=useState<Employee[]>([]);
   const [companies,setCompanies]=useState<Array<{id:string;name:string}>>([]);
@@ -248,6 +250,8 @@ export function Ferias() {
   return <div className="dp-screen min-h-screen bg-background">
     <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6"><div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4"><a href="/" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" />Voltar</a><ScreenBrand name="Férias" /></div></header>
     <main className="mx-auto max-w-[1450px] px-4 pb-10 pt-6 sm:px-7 sm:pt-8">
+      <div className="mb-4 flex gap-2"><button className={"rounded-sm border px-4 py-2 text-sm "+(vacationLink==="clt"?"bg-primary text-primary-foreground":"")} onClick={()=>setVacationLink("clt")}>Férias CLT</button><button className={"rounded-sm border px-4 py-2 text-sm "+(vacationLink==="pj"?"bg-primary text-primary-foreground":"")} onClick={()=>setVacationLink("pj")}>Recessos PJ</button></div>
+      {vacationLink==="pj"?<PjOrganization mode="recesses"/>:<>
       <section className="relative isolate overflow-hidden rounded-sm bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7">
         <div className="pointer-events-none absolute -right-10 -top-20 -z-10 h-56 w-56 rounded-full bg-[#06CAA0]/20 blur-3xl"/>
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
@@ -307,6 +311,7 @@ export function Ferias() {
         </div>}
       </section>
       <p className="mt-4 text-xs text-muted-foreground">Esta tela é um controle de planejamento. Ela não altera fechamento de ponto, banco de horas, folha ou cálculos históricos.</p>
+      </>}
     </main>
 
     {modal&&<div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/55 p-4" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(false)}}><section role="dialog" aria-modal="true" aria-labelledby="vacation-modal-title" className="my-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-sm border bg-card shadow-2xl"><div className="flex items-start justify-between border-b p-5"><div><p className="text-xs font-semibold uppercase tracking-widest text-emerald-700">Planejamento de pessoas</p><h2 id="vacation-modal-title" className="mt-1 font-display text-xl font-semibold">{editing?"Editar bloco de afastamento":"Programar férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Informe o período aquisitivo e, se necessário, separe as férias em blocos.</p></div><button type="button" onClick={()=>setModal(false)} aria-label="Fechar" className="rounded-sm p-2 hover:bg-muted"><X className="h-5 w-5"/></button></div><div className="grid gap-4 p-5 sm:grid-cols-2">
