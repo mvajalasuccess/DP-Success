@@ -130,6 +130,41 @@ export function DiarioOcorrencias() {
     setDocForm({employee_id:d.employee_id,document_name:d.document_name,has_documentation:String(d.has_documentation??true),delivery_status:d.delivery_status??"delivered",signature_status:d.signature_status??"pending",last_completed_on:d.last_completed_on??"",due_date:d.due_date??"",no_due_date:d.no_due_date??false,notes:d.notes??""});
     setError("");setDocOpen(true);
   }
+  async function importMixedAuditDocuments(rows: AuditRow[]) {
+    const clt=rows.filter(r=>r.link!=="PJ"),pj=rows.filter(r=>r.link==="PJ");
+    const result=clt.length?await importAuditDocuments(clt):{imported:0,skipped:0,warnings:[] as string[]};
+    if(!pj.length)return result;
+    try{
+      const db=supabase as any;
+      const ids=[...new Set(pj.map(r=>r.employeeId).filter(Boolean))];
+      const activeIds=new Set<string>();
+      for(let i=0;i<ids.length;i+=100){
+        const {data,error}=await db.from("pj_people").select("id,full_name,status,start_date,end_date").in("id",ids.slice(i,i+100));
+        if(error)throw new Error(error.message);
+        for(const p of data??[])if(isAuditEmployeeActive({id:p.id,full_name:p.full_name,status:p.status,hire_date:p.start_date,termination_date:p.end_date}))activeIds.add(p.id);
+      }
+      const existing:any[]=[];
+      for(let i=0;i<ids.length;i+=100)for(let offset=0;;offset+=500){
+        const {data,error}=await db.from("pj_documents").select("*").in("person_id",ids.slice(i,i+100)).order("id").range(offset,offset+499);
+        if(error)throw new Error(error.message);existing.push(...(data??[]));if(!data||data.length<500)break;
+      }
+      const canonical=(s:unknown)=>String(s??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase().replace(/\s+/g," ");
+      const pending:any[]=[];
+      for(const row of pj){
+        if(row.destination!=="documents"||row.employeeStatus!=="matched"||!row.employeeId||!activeIds.has(row.employeeId)||row.issue||row.isStandard===null){result.skipped++;continue;}
+        const match=(d:any)=>d.person_id===row.employeeId&&canonical(d.category)===canonical(row.category)&&canonical(d.document_name)===canonical(row.documentName)&&(d.completed_on??null)===row.completedOn&&(d.due_date??null)===row.dueDate;
+        if(existing.some(match)||pending.some(match)){result.skipped++;continue;}
+        const comment=row.originalComment.trim(),normalized=canonical(comment);
+        const signed=/\bassinad[oa]\b/.test(normalized)&&!/\b(?:nao|sem)\s+assinad[oa]/.test(normalized);
+        const identity=JSON.stringify(["PJ",row.employeeId,canonical(row.category),canonical(row.documentName),row.completedOn,row.dueDate]);
+        const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(identity)));digest[6]=(digest[6]&15)|80;digest[8]=(digest[8]&63)|128;
+        const hex=Array.from(digest.slice(0,16),x=>x.toString(16).padStart(2,"0")).join("");const id=hex.slice(0,8)+"-"+hex.slice(8,12)+"-"+hex.slice(12,16)+"-"+hex.slice(16,20)+"-"+hex.slice(20);
+        pending.push({id,person_id:row.employeeId,category:row.category,document_name:row.documentName,is_standard:row.isStandard,completed_on:row.completedOn,due_date:row.dueDate,signature_status:signed?"signed":"pending",notes:comment||null});
+      }
+      if(pending.length){const {data,error}=await db.from("pj_documents").upsert(pending,{onConflict:"id",ignoreDuplicates:true}).select("id");if(error)throw new Error(error.message);result.imported+=data?.length??0;result.skipped+=pending.length-(data?.length??0);}
+    }catch(e){result.warnings.push("Importação PJ não concluída: "+(e instanceof Error?e.message:String(e))); }
+    return result;
+  }
   async function importAuditDocuments(rows: AuditRow[]) {
     const db = supabase as any;
     const { data: auth, error: authError } = await db.auth.getUser();
@@ -336,7 +371,7 @@ export function DiarioOcorrencias() {
         <Card className="p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div><h2 className="font-semibold">Documentação do funcionário</h2><p className="mt-1 text-sm text-muted-foreground">Checklist único por categoria. Marque se o item é padrão para o funcionário e acompanhe vencimento e assinatura.</p></div>
-            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date,termination_date:e.termination_date}))} onImport={importAuditDocuments}/><button type="button" disabled={loading||removingImportedDocuments} onClick={()=>void removeImportedDocuments()} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">{removingImportedDocuments?"Excluindo importações...":"Excluir todas as importações"}</button>
+            <label className="grid min-w-[260px] gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={requirementEmployee} onChange={e=>setRequirementEmployee(e.target.value)} className="h-10 rounded-md border bg-background px-3"><option value="">Selecione o funcionário</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><DocumentAuditImport employees={employees.map(e=>({id:e.id,full_name:e.full_name,status:e.status,hire_date:e.hire_date,termination_date:e.termination_date}))} includePj onImport={importMixedAuditDocuments}/><button type="button" disabled={loading||removingImportedDocuments} onClick={()=>void removeImportedDocuments()} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">{removingImportedDocuments?"Excluindo importações...":"Excluir todas as importações"}</button>
           </div>
           {requirementEmployee&&<div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-md border px-3 py-2"><strong>{docCatalog.length}</strong> itens no catálogo</span>
