@@ -22,12 +22,15 @@ export function DocumentAuditImport({ employees }: Props) {
   const [busy, setBusy] = useState(false);
   const [showOnlyIssues, setShowOnlyIssues] = useState(false);
 
-  const validRows = useMemo(() => result?.rows.filter(row => row.employeeStatus === "matched" && !row.issue) ?? [], [result]);
-  const issueRows = useMemo(() => result?.rows.filter(row => row.employeeStatus !== "matched" || !!row.issue) ?? [], [result]);
+  const documentRows = useMemo(() => result?.rows.filter(row => row.destination === "documents") ?? [], [result]);
+  const attendanceRows = useMemo(() => result?.rows.filter(row => row.destination === "certificates" || row.destination === "declarations") ?? [], [result]);
+  const absenceRows = useMemo(() => result?.rows.filter(row => row.destination === "absences") ?? [], [result]);
+  const validRows = useMemo(() => documentRows.filter(row => row.employeeStatus === "matched" && !row.issue), [documentRows]);
+  const issueRows = useMemo(() => documentRows.filter(row => row.employeeStatus !== "matched" || !!row.issue), [documentRows]);
   const visibleRows = useMemo(() => {
-    const rows = showOnlyIssues ? issueRows : result?.rows ?? [];
+    const rows = showOnlyIssues ? issueRows : documentRows;
     return rows.slice(0, 250);
-  }, [result, showOnlyIssues, issueRows]);
+  }, [result, showOnlyIssues, issueRows, documentRows]);
 
   async function analyze() {
     if (!files.length) return;
@@ -82,9 +85,11 @@ export function DocumentAuditImport({ employees }: Props) {
           {result && <>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Blocos de funcionários</p><p className="mt-1 text-2xl font-semibold">{result.blocks.length}</p></div>
-              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Linhas aptas para revisão</p><p className="mt-1 text-2xl font-semibold text-emerald-600">{validRows.length}</p></div>
-              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Linhas com inconsistências</p><p className="mt-1 text-2xl font-semibold text-amber-600">{issueRows.length}</p></div>
+              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Documentos aptos para revisão</p><p className="mt-1 text-2xl font-semibold text-emerald-600">{validRows.length}</p></div>
+              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Documentos com inconsistências</p><p className="mt-1 text-2xl font-semibold text-amber-600">{issueRows.length}</p></div>
             </div>
+
+            <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Atestados e declarações encaminhados ao módulo próprio</p><p className="mt-1 text-2xl font-semibold">{attendanceRows.length}</p></div><div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Faltas encaminhadas a Faltas e Folgas</p><p className="mt-1 text-2xl font-semibold">{absenceRows.length}</p></div></div>
 
             {result.errors.length > 0 && <div className="rounded-md border border-destructive/30 p-3 text-sm text-destructive">{result.errors.map(error => <p key={error}>{error}</p>)}</div>}
 
@@ -134,8 +139,31 @@ export function DocumentAuditImport({ employees }: Props) {
               {((showOnlyIssues ? issueRows : result.rows).length > visibleRows.length) && <p className="text-xs text-muted-foreground">Exibindo as primeiras 250 linhas desta visualização. O total e os alertas consideram todas as linhas analisadas.</p>}
             </section>
 
+            {attendanceRows.length > 0 && <section className="space-y-2">
+              <h3 className="font-semibold">Atestados e declarações — destino: Declarações e Atestados</h3>
+              <p className="text-xs text-muted-foreground">Esses itens não serão cadastrados como documentos com vencimento. A data encontrada na planilha é de entrega do documento; ela não será tratada automaticamente como data do afastamento ou do comparecimento.</p>
+              <div className="overflow-x-auto rounded-md border"><table className="w-full min-w-[850px] text-left text-xs">
+                <thead className="bg-muted/60 text-muted-foreground"><tr><th className="px-3 py-2">Funcionário</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Descrição original</th><th className="px-3 py-2">Dias / horas</th><th className="px-3 py-2">CID</th><th className="px-3 py-2">Data de entrega</th><th className="px-3 py-2">Pendência</th></tr></thead>
+                <tbody className="divide-y">{attendanceRows.map(row => <tr key={row.key}>
+                  <td className="px-3 py-2">{row.employeeName}</td><td className="px-3 py-2">{row.destination === "declarations" ? "Declaração" : "Atestado"}</td><td className="px-3 py-2">{row.documentName}</td>
+                  <td className="px-3 py-2">{row.durationDays ? row.durationDays + " dia(s)" : row.durationHours ? row.durationHours.toLocaleString("pt-BR") + " h" : "—"}</td><td className="px-3 py-2">{row.cid || "—"}</td><td className="px-3 py-2">{row.referenceDate ? row.referenceDate.split("-").reverse().join("/") : "Não identificada"}</td><td className="max-w-[280px] whitespace-normal px-3 py-2 text-amber-700">{row.issue || "Conferir data antes de lançar"}</td>
+                </tr>)}</tbody>
+              </table></div>
+            </section>}
+
+            {absenceRows.length > 0 && <section className="space-y-2">
+              <h3 className="font-semibold">Faltas — destino: Faltas e Folgas</h3>
+              <p className="text-xs text-muted-foreground">As datas da própria linha são tratadas como datas das faltas; a observação de desconto em folha será preservada separadamente.</p>
+              <div className="overflow-x-auto rounded-md border"><table className="w-full min-w-[720px] text-left text-xs">
+                <thead className="bg-muted/60 text-muted-foreground"><tr><th className="px-3 py-2">Funcionário</th><th className="px-3 py-2">Data da falta</th><th className="px-3 py-2">Quantidade</th><th className="px-3 py-2">Comentário original</th><th className="px-3 py-2">Validação</th></tr></thead>
+                <tbody className="divide-y">{absenceRows.map(row => <tr key={row.key}>
+                  <td className="px-3 py-2">{row.employeeName}</td><td className="px-3 py-2">{row.referenceDate ? row.referenceDate.split("-").reverse().join("/") : "Não identificada"}</td><td className="px-3 py-2">1 dia</td><td className="px-3 py-2">{row.originalComment || "—"}</td><td className="px-3 py-2">{row.issue ? <span className="text-amber-700">{row.issue}</span> : <span className="text-emerald-600">Apto para revisão</span>}</td>
+                </tr>)}</tbody>
+              </table></div>
+            </section>}
+
             <div className="rounded-md border border-amber-300/50 bg-amber-50/60 p-3 text-sm text-amber-900">
-              <strong>Prévia somente para conferência.</strong> Nenhum documento, vencimento, padrão ou configuração individual foi gravado no DP Success nesta etapa. A importação definitiva será liberada depois da validação transacional e da proteção contra reimportação.
+              <strong>Prévia somente para conferência.</strong> Nenhum documento, vencimento, padrão ou configuração individual foi gravado no DP Success nesta etapa. A importação definitiva será liberada depois da validação transacional e da proteção contra reimportação. Atestados, declarações e faltas serão gravados somente nos módulos próprios, nunca em Documentos e Vencimentos.
             </div>
           </>}
         </div>
