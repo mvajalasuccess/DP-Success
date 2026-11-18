@@ -1,4 +1,4 @@
-import {pjCategory,pjDocKey} from "@/lib/pj-document-categories";
+import {pjRecordCategory,pjDocKey} from "@/lib/pj-document-categories";
 import { EmployeeDossierExport } from "@/components/employee-dossier-export";
 import { EmployeeAssetsAccess } from "@/components/employee-assets-access";
 import { useEffect, useMemo, useState } from "react";
@@ -153,17 +153,17 @@ export function DiarioOcorrencias() {
       const pending:any[]=[];
       for(const row of pj){
         if(row.destination!=="documents"||row.employeeStatus!=="matched"||!row.employeeId||!activeIds.has(row.employeeId)||row.issue||row.isStandard===null){result.skipped++;continue;}
-        const match=(d:any)=>d.person_id===row.employeeId&&pjCategory(d.category)===pjCategory(row.category)&&canonical(d.document_name)===canonical(row.documentName)&&(d.completed_on??null)===row.completedOn&&(d.due_date??null)===row.dueDate;
+        const match=(d:any)=>d.person_id===row.employeeId&&pjRecordCategory(d.category,d.document_name)===pjRecordCategory(row.category,row.documentName)&&canonical(d.document_name)===canonical(row.documentName)&&(d.completed_on??null)===row.completedOn&&(d.due_date??null)===row.dueDate;
         if(existing.some(match)||pending.some(match)){result.skipped++;continue;}
         const comment=row.originalComment.trim(),normalized=canonical(comment);
         const signed=/\bassinad[oa]\b/.test(normalized)&&!/\b(?:nao|sem)\s+assinad[oa]/.test(normalized);
-        const identity=JSON.stringify(["PJ",row.employeeId,pjCategory(row.category),canonical(row.documentName),row.completedOn,row.dueDate]);
+        const identity=JSON.stringify(["PJ",row.employeeId,pjRecordCategory(row.category,row.documentName),canonical(row.documentName),row.completedOn,row.dueDate]);
         const digest=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(identity)));digest[6]=(digest[6]&15)|80;digest[8]=(digest[8]&63)|128;
         const hex=Array.from(digest.slice(0,16),x=>x.toString(16).padStart(2,"0")).join("");const id=hex.slice(0,8)+"-"+hex.slice(8,12)+"-"+hex.slice(12,16)+"-"+hex.slice(16,20)+"-"+hex.slice(20);
-        pending.push({id,imported_from_audit:true,person_id:row.employeeId,category:pjCategory(row.category),document_name:row.documentName,is_standard:row.isStandard,completed_on:row.completedOn,due_date:row.dueDate,signature_status:signed?"signed":"pending",notes:comment||null});
+        pending.push({id,imported_from_audit:true,person_id:row.employeeId,category:pjRecordCategory(row.category,row.documentName),document_name:row.documentName,is_standard:pjRecordCategory(row.category,row.documentName)==="NFs"?false:row.isStandard,completed_on:row.completedOn,due_date:row.dueDate,signature_status:signed?"signed":"pending",notes:comment||null});
       }
       if(pending.length){const {data,error}=await db.from("pj_documents").upsert(pending,{onConflict:"id",ignoreDuplicates:true}).select("id");if(error)throw new Error(error.message);result.imported+=data?.length??0;result.skipped+=pending.length-(data?.length??0);}
-      const catalogRows=[...new Map(pj.filter(r=>r.isStandard&&r.employeeId&&activeIds.has(r.employeeId)).map(r=>[pjCategory(r.category)+"|"+pjDocKey(r.documentName),{category:pjCategory(r.category),name:r.documentName.trim()}])).values()];
+      const catalogRows=[...new Map(pj.filter(r=>pjRecordCategory(r.category,r.documentName)!=="NFs"&&r.isStandard&&r.employeeId&&activeIds.has(r.employeeId)).map(r=>[pjRecordCategory(r.category,r.documentName)+"|"+pjDocKey(r.documentName),{category:pjRecordCategory(r.category,r.documentName),name:r.documentName.trim()}])).values()];
       if(catalogRows.length){const {error}=await db.from("pj_document_catalog").upsert(catalogRows,{onConflict:"category,name",ignoreDuplicates:true});if(error)result.warnings.push("Catálogo PJ: "+error.message);}
     }catch(e){result.warnings.push("Importação PJ não concluída: "+(e instanceof Error?e.message:String(e))); }
     return result;
