@@ -360,10 +360,11 @@ export function Employees() {
         <div className="mt-8 flex justify-end gap-3 border-t pt-5"><button disabled={pjSaving} onClick={()=>setPjOpen(false)} className="rounded-sm border px-4 py-2 text-sm">Cancelar</button><button disabled={pjSaving} onClick={()=>void savePj()} className="rounded-sm bg-primary px-4 py-2 text-sm text-primary-foreground">{pjSaving?"Salvando...":"Salvar prestador"}</button></div>
       </Card></div>}
       {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <Card className="w-full max-w-4xl p-7">
-          <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold">{editingId ? "Editar funcionário" : "Novo funcionário"}</h2><p className="text-sm text-muted-foreground">Selecione os cadastros já existentes e salve o funcionário.</p></div><button type="button" onClick={() => setOpen(false)} className="text-muted-foreground"><X className="h-5 w-5" /></button></div>
+        <Card className="flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden p-0">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-4 sm:px-7"><div><h2 className="text-xl font-bold">{editingId ? "Editar funcionário" : "Novo funcionário"}</h2><p className="text-sm text-muted-foreground">Selecione os cadastros já existentes e salve o funcionário.</p></div><button type="button" onClick={() => setOpen(false)} className="text-muted-foreground"><X className="h-5 w-5" /></button></div>
 
-          <div className="mt-7 grid gap-y-7 gap-x-10 md:grid-cols-2">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7">
+          <div className="grid gap-y-5 gap-x-10 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium md:col-span-2">Nome completo<input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" placeholder="Nome completo" /></label>
             <label className="grid min-w-0 gap-1 text-sm font-medium">Empresa<select value={form.company_id} onChange={(e) => setForm({ ...form, company_id: e.target.value })} className="h-10 w-full min-w-0 max-w-full rounded-lg border bg-background px-3 py-2 font-normal text-ellipsis"><option value="">Sem empresa vinculada</option>{companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
             <label className="grid gap-1 text-sm font-medium">Cargo<select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal"><option value="">Selecione o cargo</option>{positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
@@ -380,7 +381,8 @@ export function Employees() {
 
           {error && <p className="mt-4 rounded-lg bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
 
-          <div className="mt-7 flex justify-end gap-2"><button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={saving} onClick={() => void saveEmployee()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar funcionário"}</button></div>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t bg-card px-5 py-4 sm:px-7"><button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button><button type="button" disabled={saving} onClick={() => void saveEmployee()} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar funcionário"}</button></div>
         </Card>
       </div>}
     </div>
