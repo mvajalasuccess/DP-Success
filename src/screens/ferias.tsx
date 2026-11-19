@@ -66,6 +66,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const [historyEmployeeId,setHistoryEmployeeId]=useState("");
   const [historyStatus, setHistoryStatus] = useState<"all" | "active" | "inactive">("active");
   const [planningCollapsed,setPlanningCollapsed]=useState(false);
+  const [radarCollapsed, setRadarCollapsed] = useState(false);
   
   const [radarStatusFilter,setRadarStatusFilter]=useState<"all"|"available"|"acquisition"|"overdue"|"scheduled">("all");
   const [companyFilter,setCompanyFilter]=useState("");
@@ -359,7 +360,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
 
       <section aria-label="Filtrar Radar por situação" className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
         {cardStatuses.map(status => (
-          <button key={status} type="button" aria-pressed={radarStatusFilter === status} aria-controls="vacation-radar-results" onClick={() => setRadarStatusFilter(current => current === status ? "all" : status)} className={`rounded-md border bg-card p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:p-4 ${radarStatusFilter === status ? "ring-2 ring-emerald-500" : ""}`}>
+          <button key={status} type="button" aria-pressed={radarStatusFilter === status} aria-controls="vacation-radar-results" onClick={() => { setRadarCollapsed(false); setRadarStatusFilter(current => current === status ? "all" : status); }} className={`rounded-md border bg-card p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:p-4 ${radarStatusFilter === status ? "ring-2 ring-emerald-500" : ""}`}>
             <span className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${radarStatus[status].tone}`}>{radarStatus[status].label}</span>
             <span className="mt-2 block text-2xl font-semibold">{staffByStatus[status]}</span>
             <span className="text-xs text-muted-foreground">{pj ? "prestadores" : "funcionários"}</span>
@@ -367,7 +368,14 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
         ))}
       </section>
 <section className="mt-6 overflow-hidden rounded-sm border bg-card shadow-sm">
-<div className="flex flex-col gap-3 border-b p-4 sm:p-5"><div><h2 className="font-display text-lg font-semibold">{pj?"Radar de Recessos":"Radar de Férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Os períodos do Radar são calculados a partir da admissão. A lista também mostra os blocos que já foram registrados.</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"><select aria-label="Filtrar por empresa" value={companyFilter} onChange={e=>{setCompanyFilter(e.target.value);setEmployeeFilter("");setHistoryEmployeeId("");}} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 text-sm"><option value="">Todas as empresas</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar por funcionário" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 text-sm"><option value="">{pj?"Todos os prestadores":"Todos os funcionários"}</option>{activeEmployees.filter(e=>!companyFilter||e.company_id===companyFilter).map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select><select aria-label="Filtrar Radar de Férias por situação" value={radarStatusFilter} onChange={e=>setRadarStatusFilter(e.target.value as "all"|"available"|"acquisition"|"overdue"|"scheduled")} className="h-10 w-full rounded-sm border bg-background px-3 text-sm sm:w-auto"><option value="all">Todas as situações</option><option value="available">Direito adquirido</option><option value="acquisition">Em aquisição</option><option value="overdue">Prazo concessivo vencido</option><option value="scheduled">{pj?"Recessos programados":"Férias programadas"}</option></select></div></div>
+<div className="flex items-start justify-between gap-4 border-b p-4 sm:items-center sm:p-5">
+    <div className="min-w-0"><h2 className="font-display text-lg font-semibold">{pj?"Radar de Recessos":"Radar de Férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Os períodos do Radar são calculados a partir da admissão. A lista também mostra os blocos que já foram registrados.</p></div>
+    <button type="button" onClick={() => setRadarCollapsed(value => !value)} aria-expanded={!radarCollapsed} aria-controls="vacation-radar-content" aria-label={radarCollapsed ? "Expandir Radar" : "Recolher Radar"} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+      {radarCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+    </button>
+  </div>
+  <div id="vacation-radar-content" hidden={radarCollapsed}>
+    <div className="grid grid-cols-1 gap-3 border-b p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3"><select aria-label="Filtrar por empresa" value={companyFilter} onChange={e=>{setCompanyFilter(e.target.value);setEmployeeFilter("");setHistoryEmployeeId("");}} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 text-sm"><option value="">Todas as empresas</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar por funcionário" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 text-sm"><option value="">{pj?"Todos os prestadores":"Todos os funcionários"}</option>{activeEmployees.filter(e=>!companyFilter||e.company_id===companyFilter).map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select><select aria-label="Filtrar Radar de Férias por situação" value={radarStatusFilter} onChange={e=>setRadarStatusFilter(e.target.value as "all"|"available"|"acquisition"|"overdue"|"scheduled")} className="h-10 w-full rounded-sm border bg-background px-3 text-sm sm:w-auto"><option value="all">Todas as situações</option><option value="available">Direito adquirido</option><option value="acquisition">Em aquisição</option><option value="overdue">Prazo concessivo vencido</option><option value="scheduled">{pj?"Recessos programados":"Férias programadas"}</option></select></div>
 <div id="vacation-radar-results">
   <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-5">
     <p aria-live="polite" className="text-sm text-muted-foreground">{radarPeople.size} {pj ? "prestador(es)" : "funcionário(s)"}</p>
@@ -405,6 +413,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
     </div>
   </>}
 </div>
+  </div>
 </section>
 <section className="mt-6 overflow-hidden rounded-sm border bg-card shadow-sm">
         <div className="flex items-start justify-between gap-4 border-b p-4 sm:items-center sm:p-5">
