@@ -276,8 +276,9 @@ function AppShell({
       ["Parâmetros", "parametros", SlidersHorizontal],
     ] },
   ];
+  const visibleGroups = isConsulta ? groups.filter(group => group.id !== "settings") : groups;
 
-  const activeGroup = groups.find(group => group.items.some(([, key]) => key === screen))?.id;
+  const activeGroup = visibleGroups.find(group => group.items.some(([, key]) => key === screen))?.id;
   const openCollapsedGroup = (event: MouseEvent<HTMLButtonElement>, groupId: string) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setCollapsedFlyout(current => current?.group === groupId ? null : { group: groupId, top: rect.top });
@@ -307,7 +308,7 @@ function AppShell({
               <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Fechar menu"><X className="h-5 w-5" strokeWidth={1.8} /></button>
             </div>
             <nav aria-label="Navegação principal" className="dp-sidebar-nav sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3">
-              {groups.map(group => (
+              {visibleGroups.map(group => (
                 <section key={group.id} className="dp-sidebar-group mb-3">
                   <button type="button" onClick={() => group.setOpen(value => !value)} className={sectionButtonClass(group.id === activeGroup)} aria-expanded={group.open}>
                     <span>{group.label}</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${group.open ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
@@ -322,7 +323,7 @@ function AppShell({
                 </section>
               ))}
             </nav>
-            <SidebarProfile collapsed={false} onNavigate={go} />
+            <SidebarProfile canOpenSettings={!isConsulta} collapsed={false} onNavigate={go} />
           </aside>
         </div>
       )}
@@ -351,7 +352,7 @@ function AppShell({
         </div>
 
         <nav aria-label="Navegação principal" className="dp-sidebar-nav sidebar-scrollbar-hidden flex-1 space-y-2 overflow-x-visible overflow-y-auto">
-          {groups.map(group => (
+          {visibleGroups.map(group => (
             <section key={group.id} className="dp-sidebar-group relative" data-sidebar-flyout-root>
               <button
                 type="button"
@@ -393,7 +394,7 @@ function AppShell({
             </section>
           ))}
         </nav>
-        <SidebarProfile collapsed={collapsed} onNavigate={go} />
+        <SidebarProfile canOpenSettings={!isConsulta} collapsed={collapsed} onNavigate={go} />
       </aside>
 
       <main className={`dp-app-main min-h-screen min-w-0 transition-[padding] duration-300 ease-in-out ${collapsed ? "lg:pl-[76px]" : "lg:pl-[248px]"}`}>
@@ -403,7 +404,7 @@ function AppShell({
   );
 }
 
-function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: (screen: ScreenKey) => void }) {
+function SidebarProfile({ collapsed, onNavigate, canOpenSettings }: { collapsed: boolean; canOpenSettings: boolean; onNavigate: (screen: ScreenKey) => void }) {
   const { name, role: profileRole } = useAccountIdentity();
   const role = profileRole === "administrador" ? "Administrador" : profileRole ? "Convidado" : "Usuário";
 
@@ -426,7 +427,7 @@ function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavig
           )}
         </div>
         <div className={`flex shrink-0 items-center ${collapsed ? "flex-col gap-1" : "gap-1"}`}>
-          <button
+          {canOpenSettings && <button
             type="button"
             onClick={() => onNavigate("parametros")}
             className="flex h-10 w-10 items-center justify-center text-sidebar-foreground/80 transition-colors duration-150 hover:bg-sidebar-accent hover:text-sidebar-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
@@ -434,7 +435,7 @@ function SidebarProfile({ collapsed, onNavigate }: { collapsed: boolean; onNavig
             aria-label="Configurações"
           >
             <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
-          </button>
+          </button>}
           <button
             type="button"
             onClick={() => void handleLogout()}
