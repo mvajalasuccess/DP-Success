@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, Palmtree, Plus, CheckCircle2, Pencil, Trash2, X, Clock3, CalendarCheck, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, CalendarDays, Palmtree, Plus, CheckCircle2, Pencil, Trash2, X, Clock3, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 import { settlementNote, isSettlementOnly } from "@/lib/vacation-settlement";
@@ -125,12 +125,6 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const periodGroups = groupByAcquisition(filteredPeriods);
   const isOpenBlock = (p: Vacation) => !isSettlementOnly(p) && !p.termination_paid &&
     (startOf(p) > currentDate || !p.completed || (hasStarted(p) && !hasEnded(p)));
-  const counts = {
-    total: periodGroups.length,
-    open: periodGroups.filter(({ blocks }) => blocks.some(isOpenBlock)).length,
-    done: periodGroups.filter(({ blocks }) => blocks.every(p => !isOpenBlock(p))).length,
-    upcoming: periodGroups.filter(({ blocks }) => blocks.some(p => !p.termination_paid && startOf(p) > currentDate)).length,
-  };
   const visibleGroups = periodGroups.filter(({ blocks }) => blocks.some(isOpenBlock));
   const companyPeriods = periods.filter(p => {
     const employee = employees.find(e => e.id === p.employee_id);
@@ -292,8 +286,46 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
       return cycles;
     }).filter(e=>(!companyFilter||e.employee.company_id===companyFilter)&&(!employeeFilter||e.employee.id===employeeFilter)).sort((a,b)=>a.concessionEnd.localeCompare(b.concessionEnd));
   },[activeEmployees,periods,companyFilter,employeeFilter]);
-  const entitlementCounts={available:entitlements.filter(e=>e.status==="available").length,overdue:entitlements.filter(e=>e.status==="overdue").length,acquisition:entitlements.filter(e=>e.status==="acquisition").length,scheduled:entitlements.filter(e=>e.status==="scheduled").length};
-  const radarEntitlements=entitlements.filter(e=>(!registeredOnly||Boolean(e.vacations?.length))&&(e.status==="available"||e.status==="acquisition"||e.status==="overdue"||e.status==="scheduled")&&(radarStatusFilter==="all"||e.status===radarStatusFilter));
+  const radarStatus = {
+    overdue: { label: "Prazo vencido", tone: "bg-red-100 text-red-800" },
+    available: { label: "Direito adquirido", tone: "bg-emerald-100 text-emerald-800" },
+    acquisition: { label: "Em aquisição", tone: "bg-amber-100 text-amber-900" },
+    scheduled: { label: pj ? "Recessos programados" : "Férias programadas", tone: "bg-sky-100 text-sky-800" },
+  };
+  type RadarStatus = keyof typeof radarStatus;
+  const cardStatuses: RadarStatus[] = ["overdue", "available", "acquisition", "scheduled"];
+  const priority: Record<RadarStatus, number> = { overdue: 0, available: 1, scheduled: 2, acquisition: 3 };
+  const radarPeriods = entitlements.filter(
+    (period): period is Entitlement & { status: RadarStatus } =>
+      period.status !== "completed" && (!registeredOnly || Boolean(period.vacations?.length))
+  );
+  const staffByStatus = Object.fromEntries(cardStatuses.map(status => [
+    status, new Set(radarPeriods.filter(period => period.status === status).map(period => period.employee.id)).size,
+  ]));
+  const orderedRadarPeriods = radarPeriods.filter(period => radarStatusFilter === "all" || period.status === radarStatusFilter)
+    .sort((a, b) => priority[a.status] - priority[b.status] || a.concessionEnd.localeCompare(b.concessionEnd));
+  const radarPeople = new Map<string, typeof orderedRadarPeriods>();
+  for (const period of orderedRadarPeriods) {
+    const personPeriods = radarPeople.get(period.employee.id) ?? [];
+    personPeriods.push(period);
+    radarPeople.set(period.employee.id, personPeriods);
+  }
+  const radarSituation = (period: (typeof radarPeriods)[number]) => {
+    if (period.status === "overdue") {
+      const daysLate = Math.round((Date.parse(currentDate) - Date.parse(period.concessionEnd)) / 86400000);
+      return `Prazo vencido há ${daysLate} ${daysLate === 1 ? "dia" : "dias"}`;
+    }
+    if (period.status === "available") {
+      const daysLeft = Math.round((Date.parse(period.concessionEnd) - Date.parse(currentDate)) / 86400000);
+      if (daysLeft === 0) return "Vence hoje";
+      if (daysLeft <= 30) return `Vence em ${daysLeft} ${daysLeft === 1 ? "dia" : "dias"}`;
+    }
+    if (period.status === "scheduled") {
+      const nextStart = (period.vacations ?? []).map(startOf).filter(date => date && date >= currentDate).sort()[0];
+      if (nextStart) return `Programadas para ${dateLabel(nextStart)}`;
+    }
+    return radarStatus[period.status].label;
+  };
   const employeeName=(p:Vacation)=>p.employees?.full_name||employees.find(e=>e.id===p.employee_id)?.full_name||"Funcionário não encontrado";
 
   return <div className="dp-screen min-h-screen bg-background">
@@ -309,26 +341,58 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
         </div>
       </section>
 
-      <section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Períodos cadastrados</p><CalendarDays className="h-5 w-5 text-primary"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.total}</p><p className="mt-1 text-xs text-muted-foreground">Períodos aquisitivos distintos</p></div>
-        <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Em aberto</p><Clock3 className="h-5 w-5 text-amber-600"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.open}</p><p className="mt-1 text-xs text-muted-foreground">Aguardando conclusão</p></div>
-        <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Concluídos</p><CheckCircle2 className="h-5 w-5 text-emerald-600"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.done}</p><p className="mt-1 text-xs text-muted-foreground">Períodos finalizados</p></div>
-        <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Próximos períodos</p><CalendarCheck className="h-5 w-5 text-sky-600"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.upcoming}</p><p className="mt-1 text-xs text-muted-foreground">Com início futuro</p></div>
+      <section aria-label="Filtrar Radar por situação" className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
+        {cardStatuses.map(status => (
+          <button key={status} type="button" aria-pressed={radarStatusFilter === status} aria-controls="vacation-radar-results" onClick={() => setRadarStatusFilter(current => current === status ? "all" : status)} className={`rounded-md border bg-card p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 sm:p-4 ${radarStatusFilter === status ? "ring-2 ring-emerald-500" : ""}`}>
+            <span className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${radarStatus[status].tone}`}>{radarStatus[status].label}</span>
+            <span className="mt-2 block text-2xl font-semibold">{staffByStatus[status]}</span>
+            <span className="text-xs text-muted-foreground">{pj ? "prestadores" : "funcionários"}</span>
+          </button>
+        ))}
       </section>
-
-      <section className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
-<button type="button" onClick={()=>setRadarStatusFilter("available")} aria-pressed={radarStatusFilter==="available"} className={"min-w-0 rounded-sm border bg-card p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 sm:p-4 "+(radarStatusFilter==="available"?"ring-2 ring-emerald-500 ring-offset-2":"")}><p className="text-xs leading-tight text-muted-foreground sm:text-sm">Direito adquirido</p><p className="mt-2 text-xl font-semibold text-emerald-700 sm:text-2xl">{entitlementCounts.available}</p><p className="mt-1 text-[11px] leading-tight text-muted-foreground sm:text-xs">Clique para ver os períodos</p></button>
-<button type="button" onClick={()=>setRadarStatusFilter("overdue")} aria-pressed={radarStatusFilter==="overdue"} className={"min-w-0 rounded-sm border bg-card p-3 text-left transition hover:border-red-300 hover:bg-red-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 sm:p-4 "+(radarStatusFilter==="overdue"?"ring-2 ring-red-500 ring-offset-2":"")}><p className="text-xs leading-tight text-muted-foreground sm:text-sm">Prazo concessivo vencido</p><p className="mt-2 text-xl font-semibold text-red-700 sm:text-2xl">{entitlementCounts.overdue}</p><p className="mt-1 text-[11px] leading-tight text-muted-foreground sm:text-xs">Clique para ver os colaboradores</p></button>
-<button type="button" onClick={()=>setRadarStatusFilter("acquisition")} aria-pressed={radarStatusFilter==="acquisition"} className={"min-w-0 rounded-sm border bg-card p-3 text-left transition hover:border-amber-300 hover:bg-amber-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 sm:p-4 "+(radarStatusFilter==="acquisition"?"ring-2 ring-amber-500 ring-offset-2":"")}><p className="text-xs leading-tight text-muted-foreground sm:text-sm">Em aquisição</p><p className="mt-2 text-xl font-semibold sm:text-2xl">{entitlementCounts.acquisition}</p><p className="mt-1 text-[11px] leading-tight text-muted-foreground sm:text-xs">Clique para ver os períodos</p></button>
-<button type="button" onClick={()=>setRadarStatusFilter("scheduled")} aria-pressed={radarStatusFilter==="scheduled"} className={"min-w-0 rounded-sm border bg-card p-3 text-left transition hover:border-sky-300 hover:bg-sky-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 sm:p-4 "+(radarStatusFilter==="scheduled"?"ring-2 ring-sky-500 ring-offset-2":"")}><p className="text-xs leading-tight text-muted-foreground sm:text-sm">{pj?"Recessos programados":"Férias programadas"}</p><p className="mt-2 text-xl font-semibold text-sky-700 sm:text-2xl">{entitlementCounts.scheduled}</p><p className="mt-1 text-[11px] leading-tight text-muted-foreground sm:text-xs">Clique para ver os períodos</p></button>
-</section>
 <section className="mt-6 overflow-hidden rounded-sm border bg-card shadow-sm">
 <div className="flex flex-col gap-3 border-b p-4 sm:p-5"><div><h2 className="font-display text-lg font-semibold">{pj?"Radar de Recessos":"Radar de Férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Os períodos do Radar são calculados a partir da admissão. A lista também mostra os blocos que já foram registrados.</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex"><select aria-label="Filtrar por empresa" value={companyFilter} onChange={e=>{setCompanyFilter(e.target.value);setEmployeeFilter("");setHistoryEmployeeId("");}} className="h-10 rounded-sm border bg-background px-3 text-sm"><option value="">Todas as empresas</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar por funcionário" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} className="h-10 rounded-sm border bg-background px-3 text-sm"><option value="">{pj?"Todos os prestadores":"Todos os funcionários"}</option>{activeEmployees.filter(e=>!companyFilter||e.company_id===companyFilter).map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select><select aria-label="Filtrar Radar de Férias por situação" value={radarStatusFilter} onChange={e=>setRadarStatusFilter(e.target.value as "all"|"available"|"acquisition"|"overdue"|"scheduled")} className="h-10 w-full rounded-sm border bg-background px-3 text-sm sm:w-auto"><option value="all">Todas as situações</option><option value="available">Direito adquirido</option><option value="acquisition">Em aquisição</option><option value="overdue">Prazo concessivo vencido</option><option value="scheduled">{pj?"Recessos programados":"Férias programadas"}</option></select></div></div>
 <label className="flex items-center gap-2 border-b px-4 py-3 text-sm sm:px-5">
   <input type="checkbox" checked={registeredOnly} onChange={event => setRegisteredOnly(event.target.checked)} />
   Só períodos com registro
 </label>
-{radarEntitlements.length===0?<div className="p-8 text-center"><p className="text-sm font-medium text-foreground">{radarStatusFilter==="all"?"Nenhum período encontrado para os filtros atuais.":radarStatusFilter==="available"?"Nenhum período com direito adquirido.":radarStatusFilter==="acquisition"?"Nenhum período em aquisição.":radarStatusFilter==="overdue"?"Nenhum prazo concessivo vencido.":"Nenhum período com férias programadas."}</p><p className="mt-1 text-xs text-muted-foreground">Experimente alterar os filtros de empresa, funcionário ou situação.</p></div>:<div className="divide-y">{radarEntitlements.map(e=><article key={e.employee.id+"-"+e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{e.employee.full_name}</h3>{!e.vacations?.length&&<span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">Sem registro</span>}<span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"||e.status==="completed"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="completed"?"Concluído":e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?(pj?"Recessos programados":"Férias programadas"):"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{(()=>{const unique=[...new Map((e.vacations||[]).filter(isVacationLeave).filter(p=>startOf(p)&&endOf(p)).map(p=>[blockKey(p),p])).values()];const days=unique.reduce((sum,p)=>sum+blockDays(p),0);return <p className="mt-1 text-xs text-muted-foreground">Direito adquirido: {fmtDays(e.entitledDays??30)} dias · Registrados: {fmtDays(days)} em {unique.length} bloco(s) · Saldo: {fmtDays(Math.max(0,(e.entitledDays??30)-days))} dias</p>})()}{e.status==="available"&&<p className="mt-1 text-xs font-medium text-emerald-700">Aviso para o RH: este funcionário já pode sair de férias.</p>}{e.status==="overdue"&&<p className="mt-1 text-xs font-medium text-red-700">Atenção: o prazo concessivo calculado já terminou.</p>}</div><div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{e.status!=="completed"&&<button data-role-sensitive type="button" onClick={()=>{openNew();setForm(f=>({...f,employee_id:e.employee.id,acquisition_start_date:e.acquisitionStart,acquisition_end_date:e.acquisitionEnd,concession_start_date:e.concessionStart,concession_end_date:e.concessionEnd,...(pj?{entitled_days:String(e.entitledDays??30).replace(".",",")} : {}),title:(pj?"Recesso · período aquisitivo ":"Férias · período aquisitivo ")+dateLabel(e.acquisitionStart)+" a "+dateLabel(e.acquisitionEnd)}));}} className="rounded-sm bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">{e.status==="scheduled"?"Adicionar bloco":pj?"Programar recesso":"Programar férias"}</button>}{!pj&&(e.vacations?.some(p=>p.termination_paid)||e.status!=="completed")&&<button data-role-sensitive type="button" onClick={()=>void markTerminationPaid(e)} className="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100">{e.vacations?.some(p=>p.termination_paid)?"Desfazer":"Pago em rescisão"}</button>}</div></article>)}</div>}
+<div id="vacation-radar-results">
+  <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-5">
+    <p aria-live="polite" className="text-sm text-muted-foreground">{radarPeople.size} {pj ? "prestador(es)" : "funcionário(s)"}</p>
+    <button type="button" aria-pressed={radarStatusFilter === "all"} onClick={() => setRadarStatusFilter("all")} className={`rounded-md border px-3 py-1.5 text-sm ${radarStatusFilter === "all" ? "border-primary bg-primary/10 font-semibold" : "hover:bg-muted"}`}>Todos</button>
+  </div>
+  {loading ? <p className="p-8 text-center text-sm text-muted-foreground">Carregando Radar...</p> : radarPeople.size === 0 ? (
+    <p className="p-8 text-center text-sm text-muted-foreground">Nenhum período encontrado para os filtros atuais.</p>
+  ) : <>
+    <div aria-hidden="true" className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem] gap-3 bg-muted/50 px-4 py-2 text-xs font-semibold text-muted-foreground sm:grid sm:px-5">
+      <span>{pj ? "Prestador" : "Funcionário"}</span><span>Situação</span><span className="text-right">Períodos</span>
+    </div>
+    <div className="divide-y">
+      {[...radarPeople.entries()].map(([id, personPeriods]) => {
+        const first = personPeriods[0]!;
+        return <details key={id} className="group">
+          <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem] sm:px-5 [&::-webkit-details-marker]:hidden">
+            <span className="break-words text-sm font-semibold">{first.employee.full_name}</span>
+            <span className="col-start-1 row-start-2 sm:col-start-2 sm:row-start-1"><span className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${radarStatus[first.status].tone}`}>{radarSituation(first)}</span></span>
+            <span className="col-start-2 row-start-1 flex items-center justify-end gap-2 whitespace-nowrap text-xs text-muted-foreground sm:col-start-3">
+              {personPeriods.length} {personPeriods.length === 1 ? "período" : "períodos"}
+              <ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" />
+            </span>
+          </summary>
+          <div className="divide-y border-t bg-muted/20 sm:pl-5">
+            {personPeriods.map(e => (<article key={e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">Período aquisitivo</h3>{!e.vacations?.length&&<span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">Sem registro</span>}<span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"||e.status==="completed"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="completed"?"Concluído":e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?(pj?"Recessos programados":"Férias programadas"):"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{(()=>{const unique=[...new Map((e.vacations||[]).filter(isVacationLeave).filter(p=>startOf(p)&&endOf(p)).map(p=>[blockKey(p),p])).values()];const days=unique.reduce((sum,p)=>sum+blockDays(p),0);return <p className="mt-1 text-xs text-muted-foreground">Direito adquirido: {fmtDays(e.entitledDays??30)} dias · Registrados: {fmtDays(days)} em {unique.length} bloco(s) · Saldo: {fmtDays(Math.max(0,(e.entitledDays??30)-days))} dias</p>})()}{(e.vacations ?? []).filter(p => startOf(p) && endOf(p)).length > 0 && (
+  <ul aria-label="Blocos registrados" className="mt-2 space-y-1 border-l-2 border-emerald-200 pl-3 text-xs text-muted-foreground">
+    {(e.vacations ?? []).filter(p => startOf(p) && endOf(p)).map(p => (
+      <li key={p.id}>{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} dias{p.completed ? " · Concluído" : ""}</li>
+    ))}
+  </ul>
+)}{e.status==="available"&&<p className="mt-1 text-xs font-medium text-emerald-700">Aviso para o RH: este funcionário já pode sair de férias.</p>}{e.status==="overdue"&&<p className="mt-1 text-xs font-medium text-red-700">Atenção: o prazo concessivo calculado já terminou.</p>}</div><div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{e.status!=="completed"&&<button data-role-sensitive type="button" onClick={()=>{openNew();setForm(f=>({...f,employee_id:e.employee.id,acquisition_start_date:e.acquisitionStart,acquisition_end_date:e.acquisitionEnd,concession_start_date:e.concessionStart,concession_end_date:e.concessionEnd,...(pj?{entitled_days:String(e.entitledDays??30).replace(".",",")} : {}),title:(pj?"Recesso · período aquisitivo ":"Férias · período aquisitivo ")+dateLabel(e.acquisitionStart)+" a "+dateLabel(e.acquisitionEnd)}));}} className="rounded-sm bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">{e.status==="scheduled"?"Adicionar bloco":pj?"Programar recesso":"Programar férias"}</button>}{!pj&&(e.vacations?.some(p=>p.termination_paid)||e.status!=="completed")&&<button data-role-sensitive type="button" onClick={()=>void markTerminationPaid(e)} className="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100">{e.vacations?.some(p=>p.termination_paid)?"Desfazer":"Pago em rescisão"}</button>}</div></article>))}
+          </div>
+        </details>;
+      })}
+    </div>
+  </>}
+</div>
 </section>
 <section className="mt-6 overflow-hidden rounded-sm border bg-card shadow-sm">
         <div className="flex items-start justify-between gap-4 border-b p-4 sm:items-center sm:p-5">
@@ -336,6 +400,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
             <h2 className="font-display text-lg font-semibold">
               {recordView === "history" ? (pj ? "Histórico de Recessos" : "Histórico de Férias") : (pj ? "Recessos em aberto" : "Férias em aberto")}
             </h2>
+            <p className="text-xs text-muted-foreground">{recordView === "history" ? historyGroups.length : visibleGroups.length} período(s)</p>
           </div>
           <button type="button" onClick={() => setPlanningCollapsed(value => !value)} aria-expanded={!planningCollapsed} aria-controls="vacation-planning-content" aria-label={planningCollapsed ? "Expandir registros" : "Recolher registros"} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
             {planningCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
