@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CalendarDays, Palmtree, Plus, CheckCircle2, Pencil, Trash2, X, Clock3, CalendarCheck, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+import { settlementNote, isSettlementOnly } from "@/lib/vacation-settlement";
 import { ScreenBrand } from "@/components/screen-brand";
 
 type Vacation = { id:string; employee_id:string; title:string|null; start_date:string|null; end_date:string|null; notes:string|null; completed:boolean; completed_at:string|null; created_at:string; acquisition_start_date?:string|null; acquisition_end_date?:string|null; concession_start_date?:string|null; concession_end_date?:string|null; official_gozo_start_date?:string|null; official_gozo_end_date?:string|null; termination_paid?:boolean|null; leave_type?:string|null; days_quantity?:number|string|null; entitled_days?:number|string|null; employees?:{full_name:string}|null };
@@ -97,8 +98,8 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const activeEmployeeIds=useMemo(()=>new Set(activeEmployees.map(e=>e.id)),[activeEmployees]);
   const activePeriods=useMemo(()=>periods.filter(p=>activeEmployeeIds.has(p.employee_id)),[periods,activeEmployeeIds]);
   const currentDate = today();
-  const startOf = (p: Vacation) => p.start_date || p.official_gozo_start_date || "";
-  const endOf = (p: Vacation) => p.end_date || p.official_gozo_end_date || "";
+  const startOf = (p: Vacation) => isSettlementOnly(p) ? "" : p.start_date || p.official_gozo_start_date || "";
+  const endOf = (p: Vacation) => isSettlementOnly(p) ? "" : p.end_date || p.official_gozo_end_date || "";
   const hasStarted = (p: Vacation) => Boolean(startOf(p) && endOf(p) && startOf(p) <= currentDate);
   const hasEnded = (p: Vacation) => hasStarted(p) && endOf(p) <= currentDate;
   const confirmedLeave = (p: Vacation) => p.completed && hasEnded(p);
@@ -122,7 +123,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
     }));
   };
   const periodGroups = groupByAcquisition(filteredPeriods);
-  const isOpenBlock = (p: Vacation) => !p.termination_paid &&
+  const isOpenBlock = (p: Vacation) => !isSettlementOnly(p) && !p.termination_paid &&
     (startOf(p) > currentDate || !p.completed || (hasStarted(p) && !hasEnded(p)));
   const counts = {
     total: periodGroups.length,
@@ -232,13 +233,12 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
       return;
     }
     const sessionUserId=(await supabase.auth.getSession()).data.session?.user.id||null;
-    const anchorDate=entitlement.employee.termination_date||today();
     const {error:e}=await(supabase as any).from(vacationTable).insert({
       employee_id:entitlement.employee.id,
       title:"Pago em rescisão · período aquisitivo "+dateLabel(entitlement.acquisitionStart)+" a "+dateLabel(entitlement.acquisitionEnd),
-      start_date:anchorDate,
-      end_date:anchorDate,
-      notes:"Registro de controle: férias proporcionais pagas na rescisão. Datas do registro não representam gozo de férias.",
+      start_date:null,
+      end_date:null,
+      notes:settlementNote,
       completed:true,
       completed_at:new Date().toISOString(),
       acquisition_start_date:entitlement.acquisitionStart,
@@ -256,8 +256,10 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
 
   async function remove(){
     if(!confirmDelete)return;
-    const {error:e}=await(supabase as any).from(vacationTable).delete().eq("id",confirmDelete.id);
-    if(e)setError(e.message);else{setConfirmDelete(null);await load()}
+    setError("");
+    const {data,error:e}=await(supabase as any).from(vacationTable).delete().eq("id",confirmDelete.id).select("id").maybeSingle();
+    if(e||!data){setError(e?.message||"O registro não foi excluído. Verifique sua permissão e tente novamente.");return;}
+    setConfirmDelete(null);await load();
   }
   const entitlements=useMemo<Entitlement[]>(()=>{
     const current=today();
@@ -279,7 +281,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
           concessionEnd:savedPeriod.concession_end_date||shiftDate(addYears(savedPeriod.concession_start_date||shiftDate(savedPeriod.acquisition_end_date!,1),1),-1),
         }:generated;
         const vacations=periods.filter(p=>p.employee_id===employee.id&&p.acquisition_start_date===raw.acquisitionStart);
-        const uniqueOfficialBlocks=[...new Map(vacations.filter(isVacationLeave).filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[blockKey(p),p])).values()];
+        const uniqueOfficialBlocks=[...new Map(vacations.filter(isVacationLeave).filter(p=>startOf(p)&&endOf(p)).map(p=>[blockKey(p),p])).values()];
         const officialDays=uniqueOfficialBlocks.reduce((sum,p)=>sum+blockDays(p),0);
         const hasOfficialBlocks=uniqueOfficialBlocks.length>0;
         const terminationPaid=vacations.some(p=>p.termination_paid);
@@ -326,7 +328,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   <input type="checkbox" checked={registeredOnly} onChange={event => setRegisteredOnly(event.target.checked)} />
   Só períodos com registro
 </label>
-{radarEntitlements.length===0?<div className="p-8 text-center"><p className="text-sm font-medium text-foreground">{radarStatusFilter==="all"?"Nenhum período encontrado para os filtros atuais.":radarStatusFilter==="available"?"Nenhum período com direito adquirido.":radarStatusFilter==="acquisition"?"Nenhum período em aquisição.":radarStatusFilter==="overdue"?"Nenhum prazo concessivo vencido.":"Nenhum período com férias programadas."}</p><p className="mt-1 text-xs text-muted-foreground">Experimente alterar os filtros de empresa, funcionário ou situação.</p></div>:<div className="divide-y">{radarEntitlements.map(e=><article key={e.employee.id+"-"+e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{e.employee.full_name}</h3>{!e.vacations?.length&&<span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">Sem registro</span>}<span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"||e.status==="completed"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="completed"?"Concluído":e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?(pj?"Recessos programados":"Férias programadas"):"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{(()=>{const unique=[...new Map((e.vacations||[]).filter(isVacationLeave).filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[blockKey(p),p])).values()];const days=unique.reduce((sum,p)=>sum+blockDays(p),0);return <p className="mt-1 text-xs text-muted-foreground">Direito adquirido: {fmtDays(e.entitledDays??30)} dias · Registrados: {fmtDays(days)} em {unique.length} bloco(s) · Saldo: {fmtDays(Math.max(0,(e.entitledDays??30)-days))} dias</p>})()}{e.status==="available"&&<p className="mt-1 text-xs font-medium text-emerald-700">Aviso para o RH: este funcionário já pode sair de férias.</p>}{e.status==="overdue"&&<p className="mt-1 text-xs font-medium text-red-700">Atenção: o prazo concessivo calculado já terminou.</p>}</div><div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{e.status!=="completed"&&<button data-role-sensitive type="button" onClick={()=>{openNew();setForm(f=>({...f,employee_id:e.employee.id,acquisition_start_date:e.acquisitionStart,acquisition_end_date:e.acquisitionEnd,concession_start_date:e.concessionStart,concession_end_date:e.concessionEnd,...(pj?{entitled_days:String(e.entitledDays??30).replace(".",",")} : {}),title:(pj?"Recesso · período aquisitivo ":"Férias · período aquisitivo ")+dateLabel(e.acquisitionStart)+" a "+dateLabel(e.acquisitionEnd)}));}} className="rounded-sm bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">{e.status==="scheduled"?"Adicionar bloco":pj?"Programar recesso":"Programar férias"}</button>}{!pj&&(e.vacations?.some(p=>p.termination_paid)||e.status!=="completed")&&<button data-role-sensitive type="button" onClick={()=>void markTerminationPaid(e)} className="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100">{e.vacations?.some(p=>p.termination_paid)?"Desfazer":"Pago em rescisão"}</button>}</div></article>)}</div>}
+{radarEntitlements.length===0?<div className="p-8 text-center"><p className="text-sm font-medium text-foreground">{radarStatusFilter==="all"?"Nenhum período encontrado para os filtros atuais.":radarStatusFilter==="available"?"Nenhum período com direito adquirido.":radarStatusFilter==="acquisition"?"Nenhum período em aquisição.":radarStatusFilter==="overdue"?"Nenhum prazo concessivo vencido.":"Nenhum período com férias programadas."}</p><p className="mt-1 text-xs text-muted-foreground">Experimente alterar os filtros de empresa, funcionário ou situação.</p></div>:<div className="divide-y">{radarEntitlements.map(e=><article key={e.employee.id+"-"+e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{e.employee.full_name}</h3>{!e.vacations?.length&&<span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">Sem registro</span>}<span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"||e.status==="completed"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="completed"?"Concluído":e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?(pj?"Recessos programados":"Férias programadas"):"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{(()=>{const unique=[...new Map((e.vacations||[]).filter(isVacationLeave).filter(p=>startOf(p)&&endOf(p)).map(p=>[blockKey(p),p])).values()];const days=unique.reduce((sum,p)=>sum+blockDays(p),0);return <p className="mt-1 text-xs text-muted-foreground">Direito adquirido: {fmtDays(e.entitledDays??30)} dias · Registrados: {fmtDays(days)} em {unique.length} bloco(s) · Saldo: {fmtDays(Math.max(0,(e.entitledDays??30)-days))} dias</p>})()}{e.status==="available"&&<p className="mt-1 text-xs font-medium text-emerald-700">Aviso para o RH: este funcionário já pode sair de férias.</p>}{e.status==="overdue"&&<p className="mt-1 text-xs font-medium text-red-700">Atenção: o prazo concessivo calculado já terminou.</p>}</div><div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{e.status!=="completed"&&<button data-role-sensitive type="button" onClick={()=>{openNew();setForm(f=>({...f,employee_id:e.employee.id,acquisition_start_date:e.acquisitionStart,acquisition_end_date:e.acquisitionEnd,concession_start_date:e.concessionStart,concession_end_date:e.concessionEnd,...(pj?{entitled_days:String(e.entitledDays??30).replace(".",",")} : {}),title:(pj?"Recesso · período aquisitivo ":"Férias · período aquisitivo ")+dateLabel(e.acquisitionStart)+" a "+dateLabel(e.acquisitionEnd)}));}} className="rounded-sm bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">{e.status==="scheduled"?"Adicionar bloco":pj?"Programar recesso":"Programar férias"}</button>}{!pj&&(e.vacations?.some(p=>p.termination_paid)||e.status!=="completed")&&<button data-role-sensitive type="button" onClick={()=>void markTerminationPaid(e)} className="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100">{e.vacations?.some(p=>p.termination_paid)?"Desfazer":"Pago em rescisão"}</button>}</div></article>)}</div>}
 </section>
 <section className="mt-6 overflow-hidden rounded-sm border bg-card shadow-sm">
         <div className="flex items-start justify-between gap-4 border-b p-4 sm:items-center sm:p-5">
@@ -377,14 +379,14 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
                   {blocks.map(p => (
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                       <div>
-                        <p className="font-medium">{!startOf(p) && p.termination_paid ? "Pago em rescisão" : isVacationLeave(p) ? (pj ? "Recesso" : "Férias") : (LEAVE_LABELS[p.leave_type || ""] || p.leave_type)}</p>
+                        <p className="font-medium">{isSettlementOnly(p) || (!startOf(p) && p.termination_paid) ? "Pago em rescisão" : isVacationLeave(p) ? (pj ? "Recesso" : "Férias") : (LEAVE_LABELS[p.leave_type || ""] || p.leave_type)}</p>
                         {startOf(p) && endOf(p) && <p className="text-muted-foreground">{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} dias no bloco{startOf(p) > currentDate ? " · Programado" : confirmedLeave(p) ? " · Concluído" : " · Aguardando confirmação"}</p>}
                         {p.notes && <p className="whitespace-pre-wrap text-muted-foreground">{p.notes}</p>}
                       </div>
-                      {activeEmployeeIds.has(p.employee_id) && <div className="flex gap-2">
-                        <button data-role-sensitive type="button" onClick={() => openEdit(p)} aria-label="Editar bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border hover:bg-muted"><Pencil className="h-4 w-4" /></button>
+                      <div className="flex gap-2">
+                        {activeEmployeeIds.has(p.employee_id) && !isSettlementOnly(p) && <button data-role-sensitive type="button" onClick={() => openEdit(p)} aria-label="Editar bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border hover:bg-muted"><Pencil className="h-4 w-4" /></button>}
                         <button data-role-sensitive type="button" onClick={() => setConfirmDelete(p)} aria-label="Excluir bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
-                      </div>}
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -395,7 +397,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
           const blocks=group.blocks;
           const first=blocks[0];
           if(!first)return null;
-          const officialBlocks=[...new Map(blocks.filter(isVacationLeave).filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[blockKey(p),p])).values()];
+          const officialBlocks=[...new Map(blocks.filter(isVacationLeave).filter(p=>startOf(p)&&endOf(p)).map(p=>[blockKey(p),p])).values()];
           const totalDays=officialBlocks.reduce((sum,p)=>sum+blockDays(p),0);const paidLeaveDays=blocks.filter(p=>!isVacationLeave(p)).reduce((sum,p)=>sum+blockDays(p),0);
           const paidInTermination=blocks.some(p=>p.termination_paid);
           const entitled=entitlementOf(blocks,first.acquisition_start_date||undefined,first.acquisition_end_date||undefined);const allCompleted=(totalDays>=entitled&&officialBlocks.every(confirmedLeave))||(pj&&blocks.every(p=>p.completed&&(!startOf(p)||hasEnded(p))));
@@ -409,7 +411,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
               <div className="shrink-0 text-xs text-muted-foreground">Blocos reunidos neste período</div>
             </div>
             <div className="mt-4 space-y-3 border-l-2 border-emerald-100 pl-4 sm:ml-6">
-              {blocks.map((p,index)=><div key={p.id} className="rounded-sm border bg-background p-3 sm:p-4">
+              {blocks.map((p,index)=>!isSettlementOnly(p)&&<div key={p.id} className="rounded-sm border bg-background p-3 sm:p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bloco {index+1}</span><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${isVacationLeave(p)?"bg-muted":"bg-sky-100 text-sky-800"}`}>{pj&&isVacationLeave(p)?"Recesso":LEAVE_LABELS[p.leave_type||"ferias"]||p.leave_type}</span><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${p.completed?"bg-emerald-100 text-emerald-800":"bg-amber-100 text-amber-800"}`}>{p.completed?"Concluído":"Em aberto"}</span></div><div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4"/> {(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)?dateLabel(p.start_date||p.official_gozo_start_date)+" a "+dateLabel(p.end_date||p.official_gozo_end_date):"Datas não informadas"}</span>{(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)&&<span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4"/> {fmtDays(blockDays(p))} dias de {isVacationLeave(p)?pj?"recesso":"férias":"licença remunerada"}</span>}</div></div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end"><span className="rounded-sm bg-muted px-3 py-2 text-xs text-muted-foreground">{(pj?p.start_date&&p.end_date:p.official_gozo_start_date&&p.official_gozo_end_date)?fmtDays(blockDays(p))+" dias":"Sem datas"}</span><button data-role-sensitive type="button" onClick={()=>openEdit(p)} aria-label="Editar bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border hover:bg-muted"><Pencil className="h-4 w-4"/></button><button data-role-sensitive type="button" onClick={()=>setConfirmDelete(p)} aria-label="Excluir bloco informativo" className="flex h-9 w-9 items-center justify-center rounded-sm border border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4"/></button></div>
@@ -440,6 +442,6 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
       <label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Observações gerais<textarea rows={3} value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Observações sobre o período (opcional)" className="rounded-sm border bg-background px-3 py-2 font-normal"/></label>
       {error&&<p role="alert" className="text-sm text-red-700 sm:col-span-2">{error}</p>}
       </div><div className="flex flex-col-reverse gap-2 border-t p-5 sm:flex-row sm:justify-end"><button type="button" onClick={()=>setModal(false)} className="rounded-sm border px-4 py-2.5 text-sm font-medium hover:bg-muted">Cancelar</button><button data-role-sensitive type="button" disabled={saving} onClick={()=>void save()} className="inline-flex items-center justify-center gap-2 rounded-sm bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">{saving?"Salvando...":"Salvar período"}</button></div></section></div>}
-    {confirmDelete&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4"><section role="alertdialog" aria-modal="true" className="w-full max-w-md rounded-sm border bg-card p-6 shadow-2xl"><div className="flex h-11 w-11 items-center justify-center rounded-sm bg-red-50 text-red-700"><Trash2 className="h-5 w-5"/></div><h2 className="mt-4 font-display text-xl font-semibold">Excluir este período?</h2><p className="mt-2 text-sm text-muted-foreground">O período de {employeeName(confirmDelete)} ({confirmDelete.start_date&&confirmDelete.end_date?dateLabel(confirmDelete.start_date)+" a "+dateLabel(confirmDelete.end_date):"sem bloco informativo"}) será removido permanentemente.</p><div className="mt-6 flex justify-end gap-2"><button type="button" onClick={()=>setConfirmDelete(null)} className="rounded-sm border px-4 py-2 text-sm">Cancelar</button><button data-role-sensitive type="button" onClick={()=>void remove()} className="rounded-sm bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Excluir período</button></div></section></div>}
+    {confirmDelete&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4"><section role="alertdialog" aria-modal="true" className="w-full max-w-md rounded-sm border bg-card p-6 shadow-2xl"><div className="flex h-11 w-11 items-center justify-center rounded-sm bg-red-50 text-red-700"><Trash2 className="h-5 w-5"/></div><h2 className="mt-4 font-display text-xl font-semibold">Excluir este período?</h2><p className="mt-2 text-sm text-muted-foreground">O período de {employeeName(confirmDelete)} ({isSettlementOnly(confirmDelete)?"registro de rescisão":startOf(confirmDelete)&&endOf(confirmDelete)?dateLabel(startOf(confirmDelete))+" a "+dateLabel(endOf(confirmDelete)):"sem bloco informativo"}) será removido permanentemente.</p>{error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={()=>setConfirmDelete(null)} className="rounded-sm border px-4 py-2 text-sm">Cancelar</button><button data-role-sensitive type="button" onClick={()=>void remove()} className="rounded-sm bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Excluir período</button></div></section></div>}
   </div>;
 }
