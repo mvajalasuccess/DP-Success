@@ -64,6 +64,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const [recordView,setRecordView]=useState<"open"|"history">("open");
   const [historyYear,setHistoryYear]=useState("");
   const [historyEmployeeId,setHistoryEmployeeId]=useState("");
+  const [historyStatus, setHistoryStatus] = useState<"all" | "active" | "inactive">("all");
   const [planningCollapsed,setPlanningCollapsed]=useState(false);
   
   const [radarStatusFilter,setRadarStatusFilter]=useState<"all"|"available"|"acquisition"|"overdue"|"scheduled">("all");
@@ -80,11 +81,23 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const [completionChanged,setCompletionChanged]=useState(false);
   const [confirmDelete,setConfirmDelete]=useState<Vacation|null>(null);
 
+  async function loadAllRows(table: string, columns: string, order: string) {
+    const rows: any[] = [];
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await (supabase as any).from(table).select(columns)
+        .order(order).order("id").range(offset, offset + pageSize - 1);
+      if (error) return { data: null, error };
+      rows.push(...(data ?? []));
+      if (!data || data.length < pageSize) return { data: rows, error: null };
+    }
+  }
+
   async function load() {
     setLoading(true); setError("");
     const [v,e,co]=await Promise.all([
-      (supabase as any).from(vacationTable).select(pj?"*":"*,employees(full_name)").order("start_date",{ascending:true}),
-      (supabase as any).from(pj?"pj_people":"employees").select(pj?"id,full_name,status,end_date,start_date,company_id":"id,full_name,status,termination_date,hire_date,company_id").order("full_name"),
+      loadAllRows(vacationTable, pj ? "*" : "*,employees(full_name)", "start_date"),
+      loadAllRows(pj ? "pj_people" : "employees", pj ? "id,full_name,status,end_date,start_date,company_id" : "id,full_name,status,termination_date,hire_date,company_id", "full_name"),
       (supabase as any).from("companies").select("id,name").order("name"),
     ]);
     if(v.error){setError(v.error.message.includes("vacation_periods")||v.error.code==="42P01"?"A tabela de férias ainda não foi criada no banco de dados. A migração precisa ser aplicada.":v.error.message);}
@@ -128,10 +141,14 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const visibleGroups = periodGroups.filter(({ blocks }) => blocks.some(isOpenBlock));
   const companyPeriods = periods.filter(p => {
     const employee = employees.find(e => e.id === p.employee_id);
-    return !companyFilter || employee?.company_id === companyFilter;
+    if (companyFilter && employee?.company_id !== companyFilter) return false;
+    if (historyStatus === "all") return true;
+    return Boolean(employee) && (historyStatus === "active") === activeEmployeeIds.has(p.employee_id);
   });
   const isPaidSettlement = (p: Vacation) => Boolean(p.termination_paid);
-  const isHistoricalLeave = (p: Vacation) => !isPaidSettlement(p) && confirmedLeave(p);
+  const hasLeaveDates = (p: Vacation) => !isSettlementOnly(p) && Boolean(startOf(p) && endOf(p)) &&
+    (!isPaidSettlement(p) || Boolean(p.official_gozo_start_date && p.official_gozo_end_date));
+  const isHistoricalLeave = (p: Vacation) => hasLeaveDates(p) && hasEnded(p);
   const historyPeriods = companyPeriods.filter(p => isPaidSettlement(p) || isHistoricalLeave(p));
   const historyYears = new Set<string>();
   historyPeriods.filter(p => isVacationLeave(p) && isHistoricalLeave(p)).forEach(p => {
@@ -415,6 +432,14 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
           </div>
           {recordView === "history" && <>
             <label className="grid min-w-0 gap-1 text-sm font-medium">
+              Situação cadastral
+              <select value={historyStatus} onChange={event => { setHistoryStatus(event.target.value as typeof historyStatus); setHistoryEmployeeId(""); }} className="h-10 rounded-sm border bg-background px-3 text-sm">
+                <option value="all">Todos</option>
+                <option value="active">Ativos</option>
+                <option value="inactive">Inativos</option>
+              </select>
+            </label>
+            <label className="grid min-w-0 gap-1 text-sm font-medium">
               {pj ? "Ano do recesso" : "Ano de gozo"}
               <select value={selectedHistoryYear} onChange={event => setHistoryYear(event.target.value)} className="h-10 rounded-sm border bg-background px-3 text-sm">
                 <option value="">Todos</option>
@@ -432,13 +457,13 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
         </div>
         {loading ? <div className="p-12 text-center text-sm text-muted-foreground">Carregando períodos...</div> : recordView === "history" ? (
           <div className="space-y-3 p-4 sm:p-5">
-            <p aria-live="polite" className="text-sm text-muted-foreground">{vacationEmployeeCount} {pj ? "prestador(es) com recesso" : "funcionário(s) com férias concluídas"}</p>
+            <p aria-live="polite" className="text-sm text-muted-foreground">{vacationEmployeeCount} {pj ? "prestador(es) com recesso registrado" : "funcionário(s) com férias registradas"}</p>
             {historyGroups.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado para os filtros atuais.</p>}
             {historyGroups.sort((a, b) => employeeName(a.blocks[0]!).localeCompare(employeeName(b.blocks[0]!), "pt-BR") ||
               (b.blocks[0]?.acquisition_start_date ?? "").localeCompare(a.blocks[0]?.acquisition_start_date ?? "")).map(({ key, blocks }) => {
               const period = blocks[0]!;
               const paidSettlement = blocks.some(isPaidSettlement);
-              const leaveBlocks = blocks.filter(p => !isPaidSettlement(p) && !isSettlementOnly(p) && startOf(p) && endOf(p));
+              const leaveBlocks = blocks.filter(hasLeaveDates);
               const periodHeading = (
                 <span className="min-w-0 break-words">
                   <span className="block font-medium">{employeeName(period)}</span>
