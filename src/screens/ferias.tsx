@@ -69,7 +69,6 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   
   const [radarStatusFilter,setRadarStatusFilter]=useState<"all"|"available"|"acquisition"|"overdue"|"scheduled">("all");
   const [companyFilter,setCompanyFilter]=useState("");
-  const [registeredOnly,setRegisteredOnly]=useState(false);
   const [employeeFilter,setEmployeeFilter]=useState("");
   const [modal,setModal]=useState(false);
   const [editing,setEditing]=useState<Vacation|null>(null);
@@ -314,7 +313,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const priority: Record<RadarStatus, number> = { overdue: 0, available: 1, scheduled: 2, acquisition: 3 };
   const radarPeriods = entitlements.filter(
     (period): period is Entitlement & { status: RadarStatus } =>
-      period.status !== "completed" && (!registeredOnly || Boolean(period.vacations?.length))
+      period.status !== "completed"
   );
   const staffByStatus = Object.fromEntries(cardStatuses.map(status => [
     status, new Set(radarPeriods.filter(period => period.status === status).map(period => period.employee.id)).size,
@@ -369,10 +368,6 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
       </section>
 <section className="mt-6 overflow-hidden rounded-sm border bg-card shadow-sm">
 <div className="flex flex-col gap-3 border-b p-4 sm:p-5"><div><h2 className="font-display text-lg font-semibold">{pj?"Radar de Recessos":"Radar de Férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Os períodos do Radar são calculados a partir da admissão. A lista também mostra os blocos que já foram registrados.</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"><select aria-label="Filtrar por empresa" value={companyFilter} onChange={e=>{setCompanyFilter(e.target.value);setEmployeeFilter("");setHistoryEmployeeId("");}} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 text-sm"><option value="">Todas as empresas</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar por funcionário" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} className="h-10 w-full min-w-0 rounded-sm border bg-background px-3 text-sm"><option value="">{pj?"Todos os prestadores":"Todos os funcionários"}</option>{activeEmployees.filter(e=>!companyFilter||e.company_id===companyFilter).map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select><select aria-label="Filtrar Radar de Férias por situação" value={radarStatusFilter} onChange={e=>setRadarStatusFilter(e.target.value as "all"|"available"|"acquisition"|"overdue"|"scheduled")} className="h-10 w-full rounded-sm border bg-background px-3 text-sm sm:w-auto"><option value="all">Todas as situações</option><option value="available">Direito adquirido</option><option value="acquisition">Em aquisição</option><option value="overdue">Prazo concessivo vencido</option><option value="scheduled">{pj?"Recessos programados":"Férias programadas"}</option></select></div></div>
-<label className="flex items-center gap-2 border-b px-4 py-3 text-sm sm:px-5">
-  <input type="checkbox" checked={registeredOnly} onChange={event => setRegisteredOnly(event.target.checked)} />
-  Só períodos com registro
-</label>
 <div id="vacation-radar-results">
   <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-5">
     <p aria-live="polite" className="text-sm text-muted-foreground">{radarPeople.size} {pj ? "prestador(es)" : "funcionário(s)"}</p>
