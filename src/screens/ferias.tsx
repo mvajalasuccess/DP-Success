@@ -64,7 +64,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const [recordView,setRecordView]=useState<"open"|"history">("open");
   const [historyYear,setHistoryYear]=useState("");
   const [historyEmployeeId,setHistoryEmployeeId]=useState("");
-  const [historyStatus, setHistoryStatus] = useState<"all" | "active" | "inactive">("all");
+  const [historyStatus, setHistoryStatus] = useState<"all" | "active" | "inactive">("active");
   const [planningCollapsed,setPlanningCollapsed]=useState(false);
   
   const [radarStatusFilter,setRadarStatusFilter]=useState<"all"|"available"|"acquisition"|"overdue"|"scheduled">("all");
@@ -432,7 +432,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
           </div>
           {recordView === "history" && <>
             <label className="grid min-w-0 gap-1 text-sm font-medium">
-              Situação cadastral
+              Situação
               <select value={historyStatus} onChange={event => { setHistoryStatus(event.target.value as typeof historyStatus); setHistoryEmployeeId(""); }} className="h-10 rounded-sm border bg-background px-3 text-sm">
                 <option value="all">Todos</option>
                 <option value="active">Ativos</option>
