@@ -104,17 +104,22 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
     const employee = employees.find(e => e.id === p.employee_id);
     return (!companyFilter || employee?.company_id === companyFilter) && (!employeeFilter || p.employee_id === employeeFilter);
   });
-  const countGroups = new Map<string, Vacation[]>();
-  filteredPeriods.forEach(p => {
-    const key = p.acquisition_start_date
-      ? p.employee_id + "::" + p.acquisition_start_date
-      : p.employee_id + "::sem-periodo::" + (p.title || p.id);
-    countGroups.set(key, [...(countGroups.get(key) || []), p]);
-  });
-  const periodGroups = [...countGroups.entries()].map(([key, blocks]) => ({
-    key,
-    blocks: blocks.sort((a, b) => startOf(a).localeCompare(startOf(b))),
-  }));
+  const groupByAcquisition = (rows: Vacation[]) => {
+    const groups = new Map<string, Vacation[]>();
+    for (const row of rows) {
+      const key = row.acquisition_start_date
+        ? row.employee_id + "::" + row.acquisition_start_date
+        : row.employee_id + "::sem-periodo::" + (row.title || row.id);
+      const group = groups.get(key) ?? [];
+      group.push(row);
+      groups.set(key, group);
+    }
+    return [...groups.entries()].map(([key, blocks]) => ({
+      key,
+      blocks: blocks.sort((a, b) => startOf(a).localeCompare(startOf(b))),
+    }));
+  };
+  const periodGroups = groupByAcquisition(filteredPeriods);
   const isOpenBlock = (p: Vacation) => !p.termination_paid &&
     (startOf(p) > currentDate || (!p.completed && !hasEnded(p)));
   const counts = {
@@ -124,11 +129,13 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
     upcoming: periodGroups.filter(({ blocks }) => blocks.some(p => !p.termination_paid && startOf(p) > currentDate)).length,
   };
   const visibleGroups = periodGroups.filter(({ blocks }) => blocks.some(isOpenBlock));
-  const historyPeriods = periods.filter(p => {
+  const companyPeriods = periods.filter(p => {
     const employee = employees.find(e => e.id === p.employee_id);
-    return (!companyFilter || employee?.company_id === companyFilter) &&
-      (hasStarted(p) || (!startOf(p) && (p.completed || p.termination_paid)));
+    return !companyFilter || employee?.company_id === companyFilter;
   });
+  const historyPeriods = companyPeriods.filter(p =>
+    hasStarted(p) || (!startOf(p) && (p.completed || p.termination_paid))
+  );
   const historyYears = new Set<string>();
   historyPeriods.filter(p => isVacationLeave(p) && hasStarted(p)).forEach(p => {
     const lastDate = endOf(p) < currentDate ? endOf(p) : currentDate;
@@ -142,9 +149,10 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
     if (historyEmployeeId && p.employee_id !== historyEmployeeId) return false;
     return !selectedHistoryYear || (isVacationLeave(p) && hasStarted(p) &&
       startOf(p) <= selectedHistoryYear + "-12-31" && endOf(p) >= selectedHistoryYear + "-01-01");
-  }).sort((a, b) => startOf(b).localeCompare(startOf(a)));
-  const historyGroups = new Map<string, Vacation[]>();
-  visibleHistory.forEach(p => historyGroups.set(p.employee_id, [...(historyGroups.get(p.employee_id) || []), p]));
+  });
+  const matchingHistoryIds = new Set(visibleHistory.map(p => p.id));
+  const historyGroups = groupByAcquisition(companyPeriods)
+    .filter(({ blocks }) => blocks.some(p => matchingHistoryIds.has(p.id)));
   const historyEmployeeOptions = employees.filter(e => historyPeriods.some(p => p.employee_id === e.id));
   const vacationEmployeeCount = new Set(visibleHistory.filter(p => isVacationLeave(p) && hasStarted(p)).map(p => p.employee_id)).size;
 
@@ -346,11 +354,17 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
         {loading ? <div className="p-12 text-center text-sm text-muted-foreground">Carregando períodos...</div> : recordView === "history" ? (
           <div className="space-y-3 p-4 sm:p-5">
             <p aria-live="polite" className="text-sm text-muted-foreground">{vacationEmployeeCount} {pj ? "prestador(es) com recesso" : "funcionário(s) com férias gozadas ou em andamento"}</p>
-            {historyGroups.size === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado para os filtros atuais.</p>}
-            {[...historyGroups.entries()].sort(([,a], [,b]) => employeeName(a[0]!).localeCompare(employeeName(b[0]!), "pt-BR")).map(([employeeId, blocks]) => (
-              <details key={employeeId} className="group rounded-md border bg-background">
+            {historyGroups.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado para os filtros atuais.</p>}
+            {historyGroups.sort((a, b) => employeeName(a.blocks[0]!).localeCompare(employeeName(b.blocks[0]!), "pt-BR") ||
+              (b.blocks[0]?.acquisition_start_date ?? "").localeCompare(a.blocks[0]?.acquisition_start_date ?? "")).map(({ key, blocks }) => (
+              <details key={key} className="group rounded-md border bg-background">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-                  <span className="min-w-0 break-words font-medium">{employeeName(blocks[0]!)}</span>
+                  <span className="min-w-0 break-words">
+                    <span className="block font-medium">{employeeName(blocks[0]!)}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {blocks[0]?.acquisition_start_date ? `Aquisitivo: ${dateLabel(blocks[0].acquisition_start_date)} a ${dateLabel(blocks[0].acquisition_end_date)}` : "Período aquisitivo não informado"}
+                    </span>
+                  </span>
                   <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">{blocks.length} bloco(s)<ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" /></span>
                 </summary>
                 <ul className="divide-y border-t">
@@ -358,11 +372,10 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                       <div>
                         <p className="font-medium">{!startOf(p) && p.termination_paid ? "Pago em rescisão" : isVacationLeave(p) ? (pj ? "Recesso" : "Férias") : (LEAVE_LABELS[p.leave_type || ""] || p.leave_type)}</p>
-                        {hasStarted(p) && <p className="text-muted-foreground">{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} dias no bloco{hasEnded(p) ? "" : " · Em andamento"}</p>}
-                        {p.acquisition_start_date && <p className="text-xs text-muted-foreground">Aquisitivo: {dateLabel(p.acquisition_start_date)} a {dateLabel(p.acquisition_end_date)}</p>}
+                        {startOf(p) && endOf(p) && <p className="text-muted-foreground">{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} dias no bloco{startOf(p) > currentDate ? " · Programado" : hasEnded(p) ? "" : " · Em andamento"}</p>}
                         {p.notes && <p className="whitespace-pre-wrap text-muted-foreground">{p.notes}</p>}
                       </div>
-                      {activeEmployeeIds.has(employeeId) && <div className="flex gap-2">
+                      {activeEmployeeIds.has(p.employee_id) && <div className="flex gap-2">
                         <button data-role-sensitive type="button" onClick={() => openEdit(p)} aria-label="Editar bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border hover:bg-muted"><Pencil className="h-4 w-4" /></button>
                         <button data-role-sensitive type="button" onClick={() => setConfirmDelete(p)} aria-label="Excluir bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
                       </div>}
@@ -390,7 +403,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
               <div className="shrink-0 text-xs text-muted-foreground">Blocos reunidos neste período</div>
             </div>
             <div className="mt-4 space-y-3 border-l-2 border-emerald-100 pl-4 sm:ml-6">
-              {blocks.map((p,index)=>isOpenBlock(p)&&<div key={p.id} className="rounded-sm border bg-background p-3 sm:p-4">
+              {blocks.map((p,index)=><div key={p.id} className="rounded-sm border bg-background p-3 sm:p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bloco {index+1}</span><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${isVacationLeave(p)?"bg-muted":"bg-sky-100 text-sky-800"}`}>{pj&&isVacationLeave(p)?"Recesso":LEAVE_LABELS[p.leave_type||"ferias"]||p.leave_type}</span><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${p.completed?"bg-emerald-100 text-emerald-800":"bg-amber-100 text-amber-800"}`}>{p.completed?"Concluído":"Em aberto"}</span></div><div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4"/> {(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)?dateLabel(p.start_date||p.official_gozo_start_date)+" a "+dateLabel(p.end_date||p.official_gozo_end_date):"Datas não informadas"}</span>{(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)&&<span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4"/> {fmtDays(blockDays(p))} dias de {isVacationLeave(p)?pj?"recesso":"férias":"licença remunerada"}</span>}</div></div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end"><span className="rounded-sm bg-muted px-3 py-2 text-xs text-muted-foreground">{(pj?p.start_date&&p.end_date:p.official_gozo_start_date&&p.official_gozo_end_date)?fmtDays(blockDays(p))+" dias":"Sem datas"}</span><button data-role-sensitive type="button" onClick={()=>openEdit(p)} aria-label="Editar bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border hover:bg-muted"><Pencil className="h-4 w-4"/></button><button data-role-sensitive type="button" onClick={()=>setConfirmDelete(p)} aria-label="Excluir bloco informativo" className="flex h-9 w-9 items-center justify-center rounded-sm border border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4"/></button></div>
