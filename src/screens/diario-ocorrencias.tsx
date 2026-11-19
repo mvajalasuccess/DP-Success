@@ -3,8 +3,9 @@ import {pjRecordCategory,pjDocKey} from "@/lib/pj-document-categories";
 import { EmployeeDossierExport } from "@/components/employee-dossier-export";
 import { EmployeeAssetsAccess } from "@/components/employee-assets-access";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarClock, ClipboardList, Plus, RefreshCw, Star, Trash2, Pencil, BookOpen, ChevronDown } from "lucide-react";
+import { ArrowLeft, CalendarClock, ClipboardList, Plus, RefreshCw, Star, Trash2, Pencil, BookOpen, ChevronDown, Info, Minus } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccountIdentity } from "@/hooks/use-account-identity";
 import { CompanyFilter } from "@/components/company-filter";
@@ -25,6 +26,12 @@ type ChecklistTemplate = { id: string; process_type: "onboarding"|"offboarding";
 const tabs = [{id:"diario",label:"Ocorrências",icon:BookOpen},{id:"documentos",label:"Documentos e vencimentos",icon:CalendarClock},{id:"checklists",label:"Onboarding e demissão",icon:ClipboardList},{id:"career",label:"Evolução Funcional e Salarial",icon:BookOpen},] as const;
 const today = () => new Date().toISOString().slice(0,10);
 const dateLabel = (v?: string|null) => v ? v.slice(0,10).split("-").reverse().join("/") : "—";
+const occurrenceTypes = {
+  positive: { label: "Positiva", Icon: Star, tone: "border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
+  negative: { label: "Negativa", Icon: Minus, tone: "border-rose-500/35 bg-rose-500/10 text-rose-700 dark:text-rose-300" },
+  neutral: { label: "Informativa", Icon: Info, tone: "border-border bg-muted text-foreground" },
+} satisfies Record<LifeEvent["direction"], { label: string; Icon: typeof Star; tone: string }>;
+
 const emptyEvent = {employee_id:"",event_date:today(),category:"Geral",direction:"positive" as "positive"|"negative"|"neutral",title:"",description:"",is_star:false};
 const emptyDoc = {employee_id:"",document_name:"",no_due_date:false,has_documentation:"true",delivery_status:"not_delivered" as "not_delivered"|"delivered",signature_status:"pending" as "not_applicable"|"pending"|"signed",last_completed_on:"",due_date:"",notes:""};
 export function DiarioOcorrencias() {
@@ -377,7 +384,66 @@ export function DiarioOcorrencias() {
       <div className="flex flex-wrap gap-2 border-b pb-3">{tabs.map(t=>{const Icon=t.icon;return <button key={t.id} onClick={()=>setTab(t.id)} className={"inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm "+(tab===t.id?"bg-primary text-primary-foreground":"border hover:bg-muted")}><Icon className="h-4 w-4"/>{t.label}</button>})}</div>
       {loading&&<p className="text-sm text-muted-foreground">Carregando dados...</p>}
       {tab==="career"&&<CareerHistory initialEmployee={sessionStorage.getItem("dp-career-employee")||""}/>}
-      {tab==="diario"&&<Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Ocorrências por funcionário e competência</h2><p className="text-xs text-muted-foreground">{visibleEvents.length} registro(s) no filtro atual</p></div>{canManageEvents&&<button data-role-sensitive onClick={openNewEvent} className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Plus className="mr-1 inline h-4 w-4"/>Nova ocorrência</button>}</div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-muted/70 text-xs text-muted-foreground"><tr><th className="px-4 py-3">Data</th><th className="px-4 py-3">Funcionário</th><th className="px-4 py-3">Tipo / categoria</th><th className="px-4 py-3">Ocorrência</th><th className="px-4 py-3">Pontuação</th><th className="px-4 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{visibleEvents.length===0&&<tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">Nenhuma ocorrência nesta competência.</td></tr>}{visibleEvents.map(e=><tr key={e.id} className={e.status==="void"?"opacity-50":"hover:bg-muted/25"}><td className="whitespace-nowrap px-4 py-3">{dateLabel(e.event_date)}</td><td className="px-4 py-3 font-medium">{e.employees?.full_name||employees.find(x=>x.id===e.employee_id)?.full_name||"—"}</td><td className="px-4 py-3"><span className={e.direction==="positive"?"text-emerald-600":e.direction==="negative"?"text-rose-600":"text-muted-foreground"}>{e.direction==="positive"?"Positiva":e.direction==="negative"?"Negativa":"Informativa"}</span>{e.direction!=="neutral"&&e.category!=="Geral"&&<p className="text-xs text-muted-foreground">{e.category}</p>}</td><td className="max-w-[320px] px-4 py-3"><p className="font-medium">{e.title}</p><p className="text-xs text-muted-foreground">{e.description}</p>{e.status==="void"&&<p className="text-xs text-destructive">Cancelada</p>}</td><td className="px-4 py-3">{e.direction!=="neutral"&&(e.status==="void"?"—":<span className="inline-flex items-center gap-1">{e.direction==="positive"&&<Star aria-hidden="true" className={e.score>0?"size-4 fill-emerald-500 text-emerald-500":"size-4 text-muted-foreground"}/>}{e.score===0?0:(e.direction==="negative"?"−":"+")+e.score}</span>)}</td><td className="whitespace-nowrap px-4 py-3 text-right">{canManageEvents&&<><button data-role-sensitive title="Editar ocorrência" aria-label={`Editar ocorrência: ${e.title}`} onClick={()=>editEvent(e)} className="mr-1 rounded-md border p-2"><Pencil className="h-4 w-4"/></button><button data-role-sensitive title="Excluir definitivamente" aria-label={`Excluir ocorrência: ${e.title}`} onClick={()=>void deleteEvent(e)} className="rounded-md border p-2 text-destructive"><Trash2 className="h-4 w-4"/></button></>}</td></tr>)}</tbody></table></div></Card>}
+      {tab === "diario" && (
+        <section aria-labelledby="occurrence-list-title">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 id="occurrence-list-title" className="font-semibold">Ocorrências por funcionário e competência</h2>
+              <p className="text-xs text-muted-foreground">{visibleEvents.length} registro(s) no filtro atual</p>
+            </div>
+            {canManageEvents && (
+              <button type="button" data-role-sensitive onClick={openNewEvent} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+                <Plus className="size-4" aria-hidden="true" /> Nova ocorrência
+              </button>
+            )}
+          </div>
+          {visibleEvents.length === 0 ? (
+            <Card className="p-8 text-center text-sm text-muted-foreground">Nenhuma ocorrência nesta competência.</Card>
+          ) : (
+            <ul className="grid gap-3 lg:grid-cols-2">
+              {visibleEvents.map(event => {
+                const { label, Icon, tone } = occurrenceTypes[event.direction];
+                const employeeName = event.employees?.full_name ?? employees.find(employee => employee.id === event.employee_id)?.full_name ?? "—";
+                return (
+                  <li key={event.id}>
+                    <Card className="flex h-full flex-col gap-3 rounded-xl p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="min-w-0 text-sm">
+                          <span className="font-medium">{employeeName}</span>
+                          <span className="text-muted-foreground"> · {dateLabel(event.event_date)}</span>
+                        </p>
+                        {event.status === "active" && event.direction !== "neutral" && (
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}>
+                            <Icon className={`size-3.5 ${event.direction === "positive" && event.score > 0 ? "fill-current" : ""}`} aria-hidden="true" />
+                            {event.score === 0 ? "0" : `${event.direction === "negative" ? "−" : "+"}${event.score}`}
+                            {event.score === 1 ? " ponto" : " pontos"}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">{label}{event.direction !== "neutral" && event.category !== "Geral" ? ` · ${event.category}` : ""}</p>
+                        <h3 className="mt-1 break-words font-semibold">{event.title}</h3>
+                        {event.description && <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{event.description}</p>}
+                        {event.status === "void" && <p className="mt-1 text-xs text-destructive">Cancelada</p>}
+                      </div>
+                      {canManageEvents && (
+                        <div className="mt-auto flex justify-end gap-1">
+                          <button type="button" data-role-sensitive title="Editar ocorrência" aria-label={`Editar ocorrência: ${event.title}`} onClick={() => editEvent(event)} className="rounded-md p-2 hover:bg-muted">
+                            <Pencil className="size-4" aria-hidden="true" />
+                          </button>
+                          <button type="button" data-role-sensitive title="Excluir ocorrência" aria-label={`Excluir ocorrência: ${event.title}`} onClick={() => void deleteEvent(event)} className="rounded-md p-2 text-destructive hover:bg-muted">
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      )}
+                    </Card>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
       {tab==="documentos"&&<div className="flex gap-2"><button className={"rounded-sm border px-4 py-2 text-sm "+(documentLink==="clt"?"bg-primary text-primary-foreground":"")} onClick={()=>setDocumentLink("clt")}>Documentos CLT</button><button className={"rounded-sm border px-4 py-2 text-sm "+(documentLink==="pj"?"bg-primary text-primary-foreground":"")} onClick={()=>setDocumentLink("pj")}>Documentos PJ</button></div>}
       {tab==="documentos"&&documentLink==="pj"&&<PjOrganization mode="documents" onImport={importMixedAuditDocuments}/>}
       {tab==="documentos"&&documentLink==="clt"&&<div className="space-y-4">
@@ -456,41 +522,85 @@ export function DiarioOcorrencias() {
       </div>}
       {tab==="checklists"&&<><EmployeeAssetsAccess employees={employees} companyFilter={companyFilter}/></>}
           </main>
-    {eventOpen && canManageEvents && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6">
-          <h2 className="text-xl font-bold">{editingEvent ? "Editar ocorrência" : "Nova ocorrência"}</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm">Funcionário<select value={eventForm.employee_id} onChange={e=>setEventForm({...eventForm,employee_id:e.target.value})} className="rounded-lg border bg-background px-3 py-2"><option value="">Selecione</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
-            <label className="grid gap-1 text-sm">Data<input type="date" value={eventForm.event_date} onChange={e=>setEventForm({...eventForm,event_date:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
-            <label className="grid gap-1 text-sm">Tipo<select value={eventForm.direction} onChange={e=>setEventForm({...eventForm,direction:e.target.value as LifeEvent["direction"]})} className="rounded-lg border bg-background px-3 py-2"><option value="positive">Positiva</option><option value="negative">Negativa</option><option value="neutral">Informativa (sem pontuação)</option></select></label>
-            <label className="grid gap-1 text-sm">Título<input value={eventForm.title} onChange={e=>setEventForm({...eventForm,title:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
-            <label className="grid gap-1 text-sm sm:col-span-2">Descrição<textarea value={eventForm.description} onChange={e=>setEventForm({...eventForm,description:e.target.value})} rows={3} className="rounded-lg border bg-background px-3 py-2"/></label>
+    {canManageEvents && (
+      <Dialog open={eventOpen} onOpenChange={setEventOpen}>
+        <DialogContent aria-describedby={undefined} className="max-h-[90vh] w-[calc(100%_-_2rem)] gap-0 overflow-y-auto rounded-xl p-0 sm:max-w-xl">
+          <DialogHeader className="border-b px-5 py-5 pr-12 text-left sm:px-6">
+            <DialogTitle>{editingEvent ? "Editar ocorrência" : "Nova ocorrência"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={event => { event.preventDefault(); if (!loading) void saveEvent(); }} className="grid gap-4 px-5 py-5 sm:px-6">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.6fr)]">
+              <label className="grid gap-1.5 text-sm font-medium">
+                Funcionário
+                <select value={eventForm.employee_id} onChange={event => setEventForm({ ...eventForm, employee_id: event.target.value })} className="w-full min-w-0 rounded-lg border bg-background px-3 py-2 font-normal">
+                  <option value="">Selecione</option>
+                  {visibleEmployees.map(employee => <option key={employee.id} value={employee.id}>{employee.full_name}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Data
+                <input type="date" value={eventForm.event_date} onChange={event => setEventForm({ ...eventForm, event_date: event.target.value })} className="w-full min-w-0 rounded-lg border bg-background px-3 py-2 font-normal" />
+              </label>
+            </div>
+
+            <fieldset>
+              <legend className="mb-2 text-sm font-medium">Tipo</legend>
+              <div className="grid grid-cols-3 gap-2">
+                {Object.entries(occurrenceTypes).map(([direction, { label, Icon, tone }]) => (
+                  <label key={direction} className="block min-w-0 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="occurrence-type"
+                      value={direction}
+                      checked={eventForm.direction === direction}
+                      onChange={() => setEventForm(current => ({ ...current, direction: direction as LifeEvent["direction"] }))}
+                      className="peer sr-only"
+                    />
+                    <span className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-center text-xs font-medium transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring sm:flex-row sm:gap-2 sm:px-2 sm:text-sm ${eventForm.direction === direction ? tone : "bg-background text-muted-foreground hover:bg-muted"}`}>
+                      <Icon className="size-4 shrink-0" aria-hidden="true" />
+                      {label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="grid gap-1.5 text-sm font-medium">
+              Título
+              <input value={eventForm.title} onChange={event => setEventForm({ ...eventForm, title: event.target.value })} className="rounded-lg border bg-background px-3 py-2 font-normal" />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Descrição
+              <textarea value={eventForm.description} onChange={event => setEventForm({ ...eventForm, description: event.target.value })} rows={3} className="rounded-lg border bg-background px-3 py-2 font-normal" />
+            </label>
+
             {eventForm.direction === "positive" && (
-              <div className="grid justify-items-start gap-1 text-sm sm:col-span-2">
-                <span>Pontuação</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    data-role-sensitive
-                    aria-label="Atribuir um ponto"
-                    aria-pressed={eventForm.is_star}
-                    onClick={() => setEventForm(current => ({ ...current, is_star: !current.is_star }))}
-                    className={`rounded-md p-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${eventForm.is_star ? "text-emerald-500" : "text-muted-foreground"}`}
-                  >
-                    <Star className={`size-8 ${eventForm.is_star ? "fill-current" : ""}`} aria-hidden="true" />
-                  </button>
-                  <span>{eventForm.is_star ? "1 ponto" : "0 pontos"}</span>
+              <div className="flex items-center justify-between gap-4 rounded-xl bg-slate-900 px-4 py-3 text-white">
+                <div>
+                  <p className="text-sm font-medium">Pontuação</p>
+                  <p aria-live="polite" className="mt-0.5 text-xs text-slate-300">{eventForm.is_star ? "+1 ponto" : "0 pontos"}</p>
                 </div>
+                <button
+                  type="button"
+                  data-role-sensitive
+                  aria-label="Atribuir um ponto"
+                  aria-pressed={eventForm.is_star}
+                  onClick={() => setEventForm(current => ({ ...current, is_star: !current.is_star }))}
+                  className={`rounded-xl p-2.5 transition-colors hover:bg-slate-700 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 motion-safe:transition-transform motion-safe:hover:scale-110 motion-safe:active:scale-95 ${eventForm.is_star ? "bg-emerald-400/15 text-emerald-300" : "bg-slate-800 text-slate-400"}`}
+                >
+                  <Star className={`size-8 ${eventForm.is_star ? "fill-current" : ""}`} aria-hidden="true" />
+                </button>
               </div>
             )}
-          </div>
-          <div className="mt-5 flex justify-end gap-2">
-            <button type="button" onClick={() => setEventOpen(false)} className="rounded-lg border px-4 py-2">Cancelar</button>
-            <button type="button" data-role-sensitive disabled={loading} onClick={() => void saveEvent()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">Salvar ocorrência</button>
-          </div>
-        </Card>
-      </div>
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <button type="button" onClick={() => setEventOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button>
+              <button type="submit" data-role-sensitive disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Salvar ocorrência</button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     )}
     {docOpen&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-xl p-6"><h2 className="text-xl font-bold">{editingDoc?"Editar documento, exame ou treinamento":"Registrar documento, exame ou treinamento"}</h2><div className="mt-4 grid gap-3"><label className="grid gap-1 text-sm">Funcionário<select value={docForm.employee_id} onChange={e=>setDocForm({...docForm,employee_id:e.target.value})} className="rounded-lg border bg-background px-3 py-2"><option value="">Selecione</option>{visibleEmployees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label><label className="grid gap-1 text-sm">Categoria<select required value={selectedDocCategory} onChange={e=>{setSelectedDocCategory(e.target.value);setSelectedCatalog("");}} className="rounded-lg border bg-background px-3 py-2"><option value="">Selecione a categoria</option>{["Pessoais","Contratação","Responsabilidades anuais","Medicina e Segurança do Trabalho","Recibos","Cartão de Ponto","Advertências","Vales avulsos, acordos diversos","Diversos"].map(category=><option key={category} value={category}>{category}</option>)}</select></label><label className="grid gap-1 text-sm">Documento padrão<select required value={selectedCatalog} onChange={e=>setSelectedCatalog(e.target.value)} disabled={!selectedDocCategory||!!editingDoc?.is_custom} className="rounded-lg border bg-background px-3 py-2"><option value="">{selectedDocCategory?"Selecione um documento":"Selecione primeiro a categoria"}</option>{docCatalog.filter(item=>item.category===selectedDocCategory).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}{(!editingDoc||editingDoc.is_custom)&&<option value={CUSTOM_DOC}>Outro</option>}</select>{docCatalog.length===0&&<span className="text-xs text-muted-foreground">Cadastre primeiro os documentos na lista padrão acima.</span>}{selectedDocCategory&&docCatalog.filter(item=>item.category===selectedDocCategory).length===0&&<span className="text-xs text-muted-foreground">Nenhum item cadastrado nesta categoria.</span>}</label>{selectedCatalog===CUSTOM_DOC&&<label className="grid gap-1 text-sm">Nome do documento, exame ou treinamento *<input required value={docForm.document_name} onChange={e=>setDocForm({...docForm,document_name:e.target.value})} placeholder="Digite o nome" className="rounded-lg border bg-background px-3 py-2"/><span className="text-xs text-muted-foreground">Padrão? Não — não entra na lista padrão.</span></label>}<label className="grid gap-1 text-sm">Assinado?<select value={docForm.signature_status==="signed"?"sim":"nao"} disabled={docForm.signature_status==="not_applicable"} onChange={e=>setDocForm({...docForm,signature_status:e.target.value==="sim"?"signed":"pending"})} className="rounded-lg border bg-background px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"><option value="sim">Sim</option><option value="nao">Não</option></select></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={docForm.signature_status==="not_applicable"} onChange={e=>setDocForm({...docForm,signature_status:e.target.checked?"not_applicable":"pending"})}/> Este documento não precisa de assinatura</label><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-sm">Última realização<input type="date" value={docForm.last_completed_on} onChange={e=>setDocForm({...docForm,last_completed_on:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label><label className="grid gap-1 text-sm">Data de vencimento<input type="date" value={docForm.due_date} disabled={docForm.no_due_date} onChange={e=>setDocForm({...docForm,due_date:e.target.value})} className="rounded-lg border bg-background px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"/></label></div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={docForm.no_due_date} onChange={e=>setDocForm({...docForm,no_due_date:e.target.checked,due_date:e.target.checked?"":docForm.due_date})}/> Este documento não possui data de vencimento</label><label className="grid gap-1 text-sm">Observações<textarea value={docForm.notes} onChange={e=>setDocForm({...docForm,notes:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label></div><div className="mt-5 flex flex-wrap items-center justify-between gap-2">{editingDoc?<button data-role-sensitive type="button" onClick={()=>void removeDoc(editingDoc)} className="rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive hover:bg-destructive/10">Excluir registro</button>:<span/>}<div className="flex justify-end gap-2"><button onClick={()=>{setDocOpen(false);setEditingDoc(null);}} className="rounded-lg border px-4 py-2">Cancelar</button><button data-role-sensitive onClick={()=>void saveDoc()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{editingDoc?"Salvar alterações":"Salvar"}</button></div></div></Card></div>}
   </div>;
