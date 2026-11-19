@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, CalendarRange, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, FileClock, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Settings2, SlidersHorizontal, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, Palmtree, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, CalendarRange, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Settings2, SlidersHorizontal, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, Palmtree, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ScreenBrand } from "@/components/screen-brand";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +24,6 @@ const Parametros = lazy(() => import("@/screens/parametros").then(m => ({ defaul
 const Tarefas = lazy(() => import("@/screens/tarefas").then(m => ({ default: m.Tarefas })));
 const PlanejamentoMensal = lazy(() => import("@/screens/planejamento-mensal").then(m => ({ default: m.PlanejamentoMensal })));
 const DiarioOcorrencias = lazy(() => import("@/screens/diario-ocorrencias").then(m => ({ default: m.DiarioOcorrencias })));
-const ImportacaoHistorico = lazy(() => import("@/screens/importacao-historico").then(m => ({ default: m.ImportacaoHistorico })));
 const ImportarCartaoPonto = lazy(() => import("@/screens/importar-cartao-ponto").then(m => ({ default: m.ImportarCartaoPonto })));
 const Ferias = lazy(() => import("@/screens/ferias").then(m => ({ default: m.Ferias })));
 import { countWorkingWeekdays } from "@/lib/feriados";
@@ -42,13 +41,13 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importacao-historico" | "importar-cartao-ponto" | "ferias";
+type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importar-cartao-ponto" | "ferias";
 
 const screenComponents = {
   empresas: Companies, funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours, pagamentos: Payments,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
-  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importacao-historico": ImportacaoHistorico, "importar-cartao-ponto": ImportarCartaoPonto, ferias: Ferias,
+  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importar-cartao-ponto": ImportarCartaoPonto, ferias: Ferias,
 };
 
 
@@ -61,7 +60,7 @@ function fmt(minutes: number) {
 function getScreenFromUrl(): ScreenKey {
   if (typeof window === "undefined") return "planejamento-mensal";
   const value = new URLSearchParams(window.location.search).get("tela") as ScreenKey | null;
-  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importacao-historico", "importar-cartao-ponto", "ferias"];
+  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importar-cartao-ponto", "ferias"];
   return value && validScreens.includes(value) ? value : "planejamento-mensal";
 }
 
@@ -261,7 +260,7 @@ function AppShell({
       ["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", UsersRound], ["Relatórios", "relatorios", FileText],
     ] },
     { id: "closing", label: "Fechamento de Ponto", Icon: CalendarClock, open: closingMenuOpen, setOpen: setClosingMenuOpen, items: [
-      ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck], ["Importação de Histórico", "importacao-historico", FileClock],
+      ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck],
     ] },
     { id: "cadastro", label: "Cadastro", Icon: Building2, open: companyMenuOpen, setOpen: setCompanyMenuOpen, items: [
       ["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays],
