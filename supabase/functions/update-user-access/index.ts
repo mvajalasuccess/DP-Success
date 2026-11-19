@@ -105,89 +105,17 @@ Deno.serve(async (req) => {
       patch.active = body.active;
     }
 
-    const { data: target, error: targetError } = await adminClient
-      .from("profiles")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (targetError) {
-      return new Response(JSON.stringify({ error: targetError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (!target) {
-      return new Response(JSON.stringify({ error: "Usuário não encontrado." }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Sincroniza o papel nas duas estruturas usadas pelo sistema:
-    // profiles controla a interface; user_roles controla políticas de acesso aos dados.
-    let previousRoles: { role: string }[] = [];
-    if (patch.role) {
-      const { data: rolesBefore, error: rolesBeforeError } = await adminClient
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId);
-
-      if (rolesBeforeError) {
-        return new Response(JSON.stringify({ error: "Não foi possível consultar as permissões atuais." }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      previousRoles = rolesBefore ?? [];
-
-      const { error: clearRolesError } = await adminClient
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
-
-      if (clearRolesError) {
-        return new Response(JSON.stringify({ error: "Não foi possível atualizar o papel de acesso." }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { error: insertRoleError } = await adminClient
-        .from("user_roles")
-        .insert({ user_id: userId, role: patch.role });
-
-      if (insertRoleError) {
-        if (previousRoles.length) {
-          await adminClient.from("user_roles").insert(previousRoles.map((item) => ({
-            user_id: userId,
-            role: item.role,
-          })));
-        }
-        return new Response(JSON.stringify({ error: "Não foi possível gravar o novo papel de acesso." }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    const { error: updateError } = await adminClient
-      .from("profiles")
-      .update(patch)
-      .eq("id", userId);
+    const { error: updateError } = await adminClient.rpc("set_account_access", {
+      requester_id: requester.id,
+      target_id: userId,
+      new_role: patch.role ?? null,
+      new_active: patch.active ?? null,
+    });
 
     if (updateError) {
-      if (patch.role) {
-        await adminClient.from("user_roles").delete().eq("user_id", userId);
-        if (previousRoles.length) {
-          await adminClient.from("user_roles").insert(previousRoles.map((item) => ({
-            user_id: userId,
-            role: item.role,
-          })));
-        }
-      }
+      const status = updateError.code === "42501" ? 403 : updateError.code === "P0002" ? 404 : 500;
       return new Response(JSON.stringify({ error: updateError.message }), {
-        status: 500,
+        status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
