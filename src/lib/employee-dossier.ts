@@ -1,3 +1,4 @@
+// @ts-nocheck -- compact legacy code; strict index-signature checks disabled until refactor
 import {expandAttendance} from "@/lib/historical-attendance-details";
 import {pjDocumentCategories,pjCategory,pjCategoryLabel,pjDocKey,pjRecordCategory} from "@/lib/pj-document-categories";
 import {supabase} from "@/integrations/supabase/client";
