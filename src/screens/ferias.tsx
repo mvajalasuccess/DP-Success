@@ -343,20 +343,26 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
         </div>
         {!planningCollapsed&&<div id="vacation-planning-content">
         {error&&!modal&&<div role="alert" className="m-4 flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/><span>{error}</span></div>}
-        <div className="flex flex-wrap items-center gap-2 border-b p-4 sm:p-5">
+        <div className="flex flex-wrap items-end gap-3 border-b p-4 sm:p-5">
           <div role="group" aria-label="Exibição dos registros" className="inline-flex rounded-md border bg-muted/40 p-1">
             <button type="button" aria-pressed={recordView === "open"} onClick={() => setRecordView("open")} className={`rounded px-3 py-1.5 text-sm ${recordView === "open" ? "bg-card font-semibold shadow-sm" : "text-muted-foreground"}`}>Em aberto</button>
             <button type="button" aria-pressed={recordView === "history"} onClick={() => setRecordView("history")} className={`rounded px-3 py-1.5 text-sm ${recordView === "history" ? "bg-card font-semibold shadow-sm" : "text-muted-foreground"}`}>Histórico</button>
           </div>
           {recordView === "history" && <>
-            <select aria-label={pj ? "Ano do recesso" : "Ano de gozo"} value={selectedHistoryYear} onChange={event => setHistoryYear(event.target.value)} className="h-10 rounded-sm border bg-background px-3 text-sm">
-              <option value="">Todos os anos de gozo</option>
-              {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
-            </select>
-            <select aria-label={pj ? "Prestador no histórico" : "Funcionário no histórico"} value={historyEmployeeOptions.some(e => e.id === historyEmployeeId) ? historyEmployeeId : ""} onChange={event => setHistoryEmployeeId(event.target.value)} className="h-10 max-w-full rounded-sm border bg-background px-3 text-sm">
-              <option value="">{pj ? "Todos os prestadores" : "Todos os funcionários"}</option>
-              {historyEmployeeOptions.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
-            </select>
+            <label className="grid min-w-0 gap-1 text-sm font-medium">
+              {pj ? "Ano do recesso" : "Ano de gozo"}
+              <select value={selectedHistoryYear} onChange={event => setHistoryYear(event.target.value)} className="h-10 rounded-sm border bg-background px-3 text-sm">
+                <option value="">Todos</option>
+                {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </label>
+            <label className="grid min-w-0 gap-1 text-sm font-medium">
+              {pj ? "Prestador" : "Funcionário"}
+              <select value={historyEmployeeOptions.some(e => e.id === historyEmployeeId) ? historyEmployeeId : ""} onChange={event => setHistoryEmployeeId(event.target.value)} className="h-10 max-w-full rounded-sm border bg-background px-3 text-sm">
+                <option value="">{pj ? "Todos os prestadores" : "Todos os funcionários"}</option>
+                {historyEmployeeOptions.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+              </select>
+            </label>
           </>}
         </div>
         {loading ? <div className="p-12 text-center text-sm text-muted-foreground">Carregando períodos...</div> : recordView === "history" ? (
