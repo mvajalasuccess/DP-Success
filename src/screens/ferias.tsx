@@ -136,11 +136,11 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
     const employee = employees.find(e => e.id === p.employee_id);
     return !companyFilter || employee?.company_id === companyFilter;
   });
-  const historyPeriods = companyPeriods.filter(p =>
-    confirmedLeave(p) || (!startOf(p) && (p.completed || p.termination_paid))
-  );
+  const isPaidSettlement = (p: Vacation) => Boolean(p.termination_paid);
+  const isHistoricalLeave = (p: Vacation) => !isPaidSettlement(p) && confirmedLeave(p);
+  const historyPeriods = companyPeriods.filter(p => isPaidSettlement(p) || isHistoricalLeave(p));
   const historyYears = new Set<string>();
-  historyPeriods.filter(p => isVacationLeave(p) && confirmedLeave(p)).forEach(p => {
+  historyPeriods.filter(p => isVacationLeave(p) && isHistoricalLeave(p)).forEach(p => {
     const lastDate = endOf(p) < currentDate ? endOf(p) : currentDate;
     for (let year = Number(startOf(p).slice(0, 4)); year <= Number(lastDate.slice(0, 4)); year++) {
       historyYears.add(String(year));
@@ -150,14 +150,14 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const selectedHistoryYear = historyYears.has(historyYear) ? historyYear : "";
   const visibleHistory = historyPeriods.filter(p => {
     if (historyEmployeeId && p.employee_id !== historyEmployeeId) return false;
-    return !selectedHistoryYear || (isVacationLeave(p) && hasStarted(p) &&
+    return !selectedHistoryYear || (isVacationLeave(p) && isHistoricalLeave(p) &&
       startOf(p) <= selectedHistoryYear + "-12-31" && endOf(p) >= selectedHistoryYear + "-01-01");
   });
   const matchingHistoryIds = new Set(visibleHistory.map(p => p.id));
   const historyGroups = groupByAcquisition(companyPeriods)
     .filter(({ blocks }) => blocks.some(p => matchingHistoryIds.has(p.id)));
   const historyEmployeeOptions = employees.filter(e => historyPeriods.some(p => p.employee_id === e.id));
-  const vacationEmployeeCount = new Set(visibleHistory.filter(p => isVacationLeave(p) && hasStarted(p)).map(p => p.employee_id)).size;
+  const vacationEmployeeCount = new Set(visibleHistory.filter(p => isVacationLeave(p) && isHistoricalLeave(p)).map(p => p.employee_id)).size;
 
   function openNew(){setEditing(null);setCompletionChanged(false);setEditingBlockNumber(1);setForm({...blank});setExtraBlocks([]);setBlocksExpanded(false);setModal(true);setError("")}
   function openEdit(p:Vacation){const siblings=periods.filter(item=>item.employee_id===p.employee_id&&item.acquisition_start_date===p.acquisition_start_date).sort((a,b)=>(a.start_date||a.official_gozo_start_date||"").localeCompare(b.start_date||b.official_gozo_start_date||""));setEditing(p);setCompletionChanged(false);setEditingBlockNumber(Math.max(1,siblings.findIndex(item=>item.id===p.id)+1));setForm({entitled_days:(()=>{const v=siblings.map(x=>x.entitled_days).filter(x=>x!=null);return v.length?String(Math.max(...v.map(Number))).replace(".",","):""})(),leave_type:p.leave_type||"ferias",days_quantity:p.days_quantity==null?"":String(p.days_quantity).replace(".",","),employee_id:p.employee_id,title:p.title||"",start_date:p.start_date||p.official_gozo_start_date||"",end_date:p.end_date||p.official_gozo_end_date||"",notes:p.notes||"",completed:p.completed,acquisition_start_date:p.acquisition_start_date||"",acquisition_end_date:p.acquisition_end_date||"",concession_start_date:p.concession_start_date||"",concession_end_date:p.concession_end_date||"",official_gozo_start_date:p.official_gozo_start_date||"",official_gozo_end_date:p.official_gozo_end_date||"",termination_paid:Boolean(p.termination_paid)});setExtraBlocks([]);setBlocksExpanded(true);setModal(true);setError("")}
@@ -370,22 +370,41 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
             <p aria-live="polite" className="text-sm text-muted-foreground">{vacationEmployeeCount} {pj ? "prestador(es) com recesso" : "funcionário(s) com férias concluídas"}</p>
             {historyGroups.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado para os filtros atuais.</p>}
             {historyGroups.sort((a, b) => employeeName(a.blocks[0]!).localeCompare(employeeName(b.blocks[0]!), "pt-BR") ||
-              (b.blocks[0]?.acquisition_start_date ?? "").localeCompare(a.blocks[0]?.acquisition_start_date ?? "")).map(({ key, blocks }) => (
-              <details key={key} className="group rounded-md border bg-background">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-                  <span className="min-w-0 break-words">
-                    <span className="block font-medium">{employeeName(blocks[0]!)}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {blocks[0]?.acquisition_start_date ? `Aquisitivo: ${dateLabel(blocks[0].acquisition_start_date)} a ${dateLabel(blocks[0].acquisition_end_date)}` : "Período aquisitivo não informado"}
-                    </span>
+              (b.blocks[0]?.acquisition_start_date ?? "").localeCompare(a.blocks[0]?.acquisition_start_date ?? "")).map(({ key, blocks }) => {
+              const period = blocks[0]!;
+              const paidSettlement = blocks.some(isPaidSettlement);
+              const leaveBlocks = blocks.filter(p => !isPaidSettlement(p) && !isSettlementOnly(p) && startOf(p) && endOf(p));
+              const periodHeading = (
+                <span className="min-w-0 break-words">
+                  <span className="block font-medium">{employeeName(period)}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {period.acquisition_start_date ? `Aquisitivo: ${dateLabel(period.acquisition_start_date)} a ${dateLabel(period.acquisition_end_date)}` : "Período aquisitivo não informado"}
                   </span>
-                  <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">{blocks.length} bloco(s)<ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" /></span>
+                </span>
+              );
+              const settlementBadge = paidSettlement && (
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">Pago em rescisão</span>
+              );
+              if (leaveBlocks.length === 0) {
+                return <article key={key} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background px-4 py-3">
+                  {periodHeading}
+                  {settlementBadge}
+                </article>;
+              }
+              return <details key={key} className="group rounded-md border bg-background">
+                <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                  {periodHeading}
+                  <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {settlementBadge}
+                    {leaveBlocks.length} bloco(s)
+                    <ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" />
+                  </span>
                 </summary>
                 <ul className="divide-y border-t">
-                  {blocks.map(p => (
+                  {leaveBlocks.map(p => (
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                       <div>
-                        <p className="font-medium">{isSettlementOnly(p) || (!startOf(p) && p.termination_paid) ? "Pago em rescisão" : isVacationLeave(p) ? (pj ? "Recesso" : "Férias") : (LEAVE_LABELS[p.leave_type || ""] || p.leave_type)}</p>
+                        <p className="font-medium">{isVacationLeave(p) ? (pj ? "Recesso" : "Férias") : (LEAVE_LABELS[p.leave_type || ""] || p.leave_type)}</p>
                         {startOf(p) && endOf(p) && <p className="text-muted-foreground">{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} dias no bloco{startOf(p) > currentDate ? " · Programado" : confirmedLeave(p) ? " · Concluído" : " · Aguardando confirmação"}</p>}
                         {p.notes && <p className="whitespace-pre-wrap text-muted-foreground">{p.notes}</p>}
                       </div>
@@ -396,8 +415,8 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
                     </li>
                   ))}
                 </ul>
-              </details>
-            ))}
+              </details>;
+            })}
           </div>
         ) : visibleGroups.length===0?<div className="flex flex-col items-center px-6 py-14 text-center"><div className="flex h-14 w-14 items-center justify-center rounded-sm bg-emerald-50 text-emerald-700"><CalendarDays className="h-7 w-7"/></div><h3 className="mt-4 font-semibold">{periods.length===0?"Vamos planejar as primeiras férias?":"Nenhum período encontrado"}</h3><p className="mt-1 max-w-md text-sm text-muted-foreground">{periods.length===0?"Adicione um período, escolha o funcionário e informe as datas para começar seu planejamento.":"Experimente alterar os filtros de empresa, funcionário ou situação."}</p>{periods.length===0&&<button data-role-sensitive onClick={openNew} className="mt-4 inline-flex items-center gap-2 rounded-sm bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4"/>Cadastrar primeiro período</button>}</div>:<div className="divide-y">{visibleGroups.map(group=>{
           const blocks=group.blocks;
