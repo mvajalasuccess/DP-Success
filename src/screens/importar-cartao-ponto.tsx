@@ -320,7 +320,7 @@ export function ImportarCartaoPonto() {
               </div>
               <div className="flex flex-col gap-3 border-t bg-muted/20 p-5 md:flex-row md:items-center md:justify-between">
                 <div className="text-xs text-muted-foreground"><strong>Importação:</strong> somente Crédito, Débito, Saldo do mês, HE 60% + 20% noturno e Interjornada. Os demais dados do relatório são ignorados.</div>
-                <button type="button" disabled={saving || unmatched.length > 0} onClick={() => void importRows()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
+                <button data-role-sensitive type="button" disabled={saving || unmatched.length > 0} onClick={() => void importRows()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                   {saving ? "Importando..." : "Importar lançamentos"}
                 </button>

@@ -205,8 +205,8 @@ textarea:disabled {
 }
 
 /* Ações mutáveis são ocultadas no modo consulta; RLS protege os dados. */
-body.role-consulta [data-guest-blocked],
-body.role-consulta [data-role-sensitive]:not([data-guest-event-create]):not([data-guest-event-form] *) {
+.role-consulta [data-guest-blocked],
+.role-consulta [data-role-sensitive] {
   display: none !important;
 }
 
@@ -1580,3 +1580,6 @@ main :is(h1, h2, h3) {
     font-size: 30px !important;
   }
 }
+
+[data-consulta-only] { display: none; }
+.role-consulta [data-consulta-only] { display: block; }

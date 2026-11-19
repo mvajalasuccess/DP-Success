@@ -211,7 +211,7 @@ export function Launches() {
   return (
     <ScreenShell section="Operação" title="Lançamentos" name="Lançamentos" subtitle="Registre créditos, débitos e adicionais do banco de horas por funcionário e data."
       error={open ? "" : error}
-      actions={<button className={btnPrimary} disabled={!periods.length} onClick={openNew}><Plus className="h-4 w-4" /> Novo lançamento</button>}>
+      actions={<button data-role-sensitive className={btnPrimary} disabled={!periods.length} onClick={openNew}><Plus className="h-4 w-4" /> Novo lançamento</button>}>
       <Card className="mt-6 grid gap-4 p-5 md:grid-cols-3">
         <label className="grid gap-1.5 text-sm font-medium">Empresa
           <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setEmployeeFilter(""); }} className={inputCls} />
@@ -253,13 +253,13 @@ export function Launches() {
                     <p className={`text-lg font-bold ${balanceOf(comp) < 0 ? "text-destructive" : "text-primary"}`}>Saldo {minutesToHours(launchBalance(comp, g.date), true)}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button className={btnOutline} disabled={saving} onClick={() => openEdit(g)}><Pencil className="h-3.5 w-3.5" /> Editar</button>
+                    <button data-role-sensitive className={btnOutline} disabled={saving} onClick={() => openEdit(g)}><Pencil className="h-3.5 w-3.5" /> Editar</button>
                     {confirmDelete === g.key ? (
                       <>
-                        <button className={btnDanger} disabled={saving} onClick={() => void doDelete(g)}>Confirmar exclusão</button>
+                        <button data-role-sensitive className={btnDanger} disabled={saving} onClick={() => void doDelete(g)}>Confirmar exclusão</button>
                         <button className={btnOutline} onClick={() => setConfirmDelete(null)}>Cancelar</button>
                       </>
-                    ) : <button className={btnDanger} disabled={saving} onClick={() => setConfirmDelete(g.key)}><Trash2 className="h-3.5 w-3.5" /> Excluir</button>}
+                    ) : <button data-role-sensitive className={btnDanger} disabled={saving} onClick={() => setConfirmDelete(g.key)}><Trash2 className="h-3.5 w-3.5" /> Excluir</button>}
                   </div>
                 </div>
               </Card>
@@ -269,7 +269,7 @@ export function Launches() {
 
       {open && (
         <Modal title={editing ? "Editar lançamento" : "Novo lançamento"} onClose={() => setOpen(false)}
-          footer={<><button className={btnOutline} onClick={() => setOpen(false)}>Cancelar</button><button className={btnPrimary} disabled={saving} onClick={() => void save()}>{saving ? "Salvando..." : "Salvar"}</button></>}>
+          footer={<><button className={btnOutline} onClick={() => setOpen(false)}>Cancelar</button><button data-role-sensitive className={btnPrimary} disabled={saving} onClick={() => void save()}>{saving ? "Salvando..." : "Salvar"}</button></>}>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium">Funcionário
               <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>

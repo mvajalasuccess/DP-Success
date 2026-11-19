@@ -77,17 +77,17 @@ function Dashboard() {
     const loadRole = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
       if (!sessionData.session) { if (active) setAccessRole(null); return; }
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", sessionData.session.user.id);
-      if (error) {
-        console.error("Não foi possível carregar o nível de acesso:", error);
+      const userId = sessionData.session.user.id;
+      const [{ data, error }, profile] = await Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", userId),
+        supabase.from("profiles").select("active").eq("id", userId).maybeSingle(),
+      ]);
+      if (error || profile.error || !profile.data?.active) {
         if (active) setAccessRole(null);
         return;
       }
       const roles = (data ?? []).map((item) => item.role);
-      if (active) setAccessRole(roles.includes("administrador") ? "administrador" : roles[0] ?? null);
+      if (active) setAccessRole(roles.includes("administrador") ? "administrador" : "convidado");
     };
     void loadRole();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => { queueMicrotask(() => { void loadRole(); }); });
@@ -105,13 +105,11 @@ function Dashboard() {
     const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const mutation = /(?:^|\s)(?:nov[oa]s?|criar|adicionar|editar|excluir|remover|salvar|cadastrar|registrar|importar|recalcular|sincronizar|confirmar|desativar|ativar|aplicar|finalizar|encerrar|reabrir|marcar como|concluir|pagar|programar|cancelar pagamento|estornar|gerar link|desmembrar|atualizar cadastro|limpar|zerar|restaurar|lancar|incluir|alterar|gravar|duplicar|transferir|entregar|devolver)(?:\s|$)/;
     function blocked(el: Element) {
-      if (el.closest(".dp-sidebar, [data-guest-event-create]")) return false;
-      if (el.closest("[data-guest-event-form]")) return false;
+      if (el.closest(".dp-sidebar")) return false;
       const text = normalize([el.textContent, el.getAttribute("title"), el.getAttribute("aria-label"), el.getAttribute("value")].filter(Boolean).join(" ")).trim();
       if (el.matches("[data-role-sensitive],button[type=submit],input[type=submit]")) return true;
-      if (el.querySelector("svg.lucide-plus,svg.lucide-pencil,svg.lucide-trash-2,svg.lucide-save,svg.lucide-power")) return true;
       if (/^(?:exportar|baixar|download|visualizar|consultar|atualizar kpis|atualizar dados|atualizar lista|atualizar tela|atualizar relatorio)\b/.test(text)) return false;
-      return mutation.test(text);
+      return mutation.test(text) || Boolean(el.querySelector("svg.lucide-plus,svg.lucide-pencil,svg.lucide-trash-2,svg.lucide-save,svg.lucide-power"));
     }
     function scan() {
       document.querySelectorAll("button, [role=button], input[type=submit], [data-role-sensitive]").forEach(el => {
@@ -121,7 +119,7 @@ function Dashboard() {
     function guard(e: Event) {
       const target=e.target instanceof Element?e.target:null;
       if (!target) return;
-      if(e.type==="submit"&&!target.closest("[data-guest-event-form]")){e.preventDefault();e.stopImmediatePropagation();return;}
+      if(e.type==="submit"){e.preventDefault();e.stopImmediatePropagation();return;}
       const el=target.closest("button,[role=button],input[type=submit],[data-role-sensitive]");
       if(el&&blocked(el)){e.preventDefault();e.stopImmediatePropagation();}
     }
@@ -165,6 +163,7 @@ function Dashboard() {
   return (
     <AppShell
       screen={screen}
+      isConsulta={isConsulta}
       collapsed={sidebarCollapsed}
       onNavigate={navigateToScreen}
       onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
@@ -183,9 +182,10 @@ function Dashboard() {
 }
 
 function AppShell({
-  screen, collapsed, onNavigate, onToggleCollapsed, children,
+  screen, isConsulta, collapsed, onNavigate, onToggleCollapsed, children,
 }: {
   screen: ScreenKey;
+  isConsulta: boolean;
   collapsed: boolean;
   onNavigate: (screen: ScreenKey) => void;
   onToggleCollapsed: () => void;
@@ -284,7 +284,7 @@ function AppShell({
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={isConsulta ? "role-consulta min-h-screen bg-background" : "min-h-screen bg-background"}>
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 shadow-sm backdrop-blur lg:hidden">
         <div className="flex min-w-0 items-center gap-2.5">
           <Clock3 className="h-5 w-5 shrink-0 dp-sidebar-brand-icon" strokeWidth={1.8} aria-hidden="true" />
@@ -1061,14 +1061,14 @@ function DashboardHome() {
                         <p className={`mt-3 whitespace-pre-wrap break-words text-sm leading-6 ${item.completed ? "text-muted-foreground" : ""}`}>{item.note}</p>
                       )}
                       <div className="mt-4 flex flex-wrap gap-2 border-t pt-3">
-                        <button type="button" onClick={() => void toggleCompetenceNoteCompleted(item.id, !item.completed)} disabled={noteActionId === item.id || editingNoteId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">
+                        <button data-role-sensitive type="button" onClick={() => void toggleCompetenceNoteCompleted(item.id, !item.completed)} disabled={noteActionId === item.id || editingNoteId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">
                           {item.completed ? <RotateCcw className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                           {item.completed ? "Reabrir" : "Marcar como concluído"}
                         </button>
-                        <button type="button" onClick={() => { setEditingNoteId(item.id); setEditingNoteText(item.note); }} disabled={noteActionId === item.id || editingNoteId !== null} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">
+                        <button data-role-sensitive type="button" onClick={() => { setEditingNoteId(item.id); setEditingNoteText(item.note); }} disabled={noteActionId === item.id || editingNoteId !== null} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">
                           <Pencil className="h-3.5 w-3.5" />Editar
                         </button>
-                        <button type="button" onClick={() => void deleteCompetenceNote(item.id)} disabled={noteActionId === item.id || editingNoteId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/5 disabled:opacity-50">
+                        <button data-role-sensitive type="button" onClick={() => void deleteCompetenceNote(item.id)} disabled={noteActionId === item.id || editingNoteId === item.id} className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/5 disabled:opacity-50">
                           <Trash2 className="h-3.5 w-3.5" />{noteActionId === item.id ? "Processando..." : "Excluir"}
                         </button>
                       </div>
@@ -1084,7 +1084,7 @@ function DashboardHome() {
                 className="mt-4 w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
               />
               <div className="mt-3 flex justify-end">
-                <button type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote || !competenceNote.trim()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">
+                <button data-role-sensitive type="button" onClick={() => void saveCompetenceNote()} disabled={savingNote || !competenceNote.trim()} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60">
                   <Save className="h-4 w-4" />
                   {savingNote ? "Salvando..." : "Adicionar comentário"}
                 </button>

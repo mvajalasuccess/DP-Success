@@ -84,7 +84,7 @@ export function DocumentAuditImport({ employees, mode = "documents", onImport, i
   }
 
   return <>
-    <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">
+    <button data-role-sensitive type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">
       <FileSpreadsheet className="h-4 w-4" /> Importar auditoria Excel
     </button>
     {open && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-3 sm:p-6">
@@ -209,7 +209,7 @@ export function DocumentAuditImport({ employees, mode = "documents", onImport, i
         </div>
         <div className="flex justify-end gap-2 border-t p-4">
           <button type="button" disabled={importing} onClick={close} className="rounded-md border px-4 py-2 text-sm hover:bg-muted">Fechar</button>
-          {mode === "documents" && onImport && result && <button type="button" disabled={busy || importing || !validRows.length || !!report} onClick={() => void confirmImport()} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{importing ? "Importando..." : "Importar " + validRows.length + " linhas aptas"}</button>}
+          {mode === "documents" && onImport && result && <button data-role-sensitive type="button" disabled={busy || importing || !validRows.length || !!report} onClick={() => void confirmImport()} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">{importing ? "Importando..." : "Importar " + validRows.length + " linhas aptas"}</button>}
         </div>
       </Card>
     </div>}

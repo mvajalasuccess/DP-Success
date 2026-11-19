@@ -526,7 +526,7 @@ export function Ocorrencias() {
               Registre faltas e folgas em dias. Folga descontada é apenas informativa; folga abonada entra em abonos.
             </p>
           </div>
-          <button onClick={startNew} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+          <button data-role-sensitive onClick={startNew} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             <Plus className="mr-2 inline h-4 w-4" />
             Novo registro
           </button>
@@ -564,7 +564,7 @@ export function Ocorrencias() {
                 <td className="px-5 py-4">{formatDate(item.row.occurrence_date)}{item.row.end_date ? " → " + formatDate(item.row.end_date) : ""}</td>
                 <td className="px-5 py-4">{item.row.occurrence_types?.name ?? "—"}</td>
                 <td className="px-5 py-4">{displayQuantity(item.row)}</td>
-                <td className="px-5 py-4 text-right"><button onClick={() => startEdit(item.row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(item.row)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td>
+                <td className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEdit(item.row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button data-role-sensitive onClick={() => void remove(item.row)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td>
               </tr>
             ) : (
               <tr key={"historical-" + item.row.id} className="transition-colors hover:bg-muted/25">
@@ -582,7 +582,7 @@ export function Ocorrencias() {
           <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Folgas</h2><p className="text-xs text-muted-foreground">{daysOffRows.length} registro(s)</p></div><button type="button" onClick={() => setShowDaysOff(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDaysOff ? "Ocultar folgas" : "Mostrar folgas"} aria-label={showDaysOff ? "Ocultar folgas" : "Mostrar folgas"}>{showDaysOff ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
           {showDaysOff && <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Tipo</th><th className="px-5 py-3">Quantidade</th><th className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">
             {daysOffRows.length === 0 && <tr><td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">Nenhuma folga encontrada para os filtros selecionados.</td></tr>}
-            {daysOffRows.map(row => <tr key={row.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(row.occurrence_date)}{row.end_date ? " → " + formatDate(row.end_date) : ""}</td><td className="px-5 py-4">{row.occurrence_types?.name ?? "—"}</td><td className="px-5 py-4">{displayQuantity(row)}</td><td className="px-5 py-4 text-right"><button onClick={() => startEdit(row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button onClick={() => void remove(row)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
+            {daysOffRows.map(row => <tr key={row.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{row.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(row.occurrence_date)}{row.end_date ? " → " + formatDate(row.end_date) : ""}</td><td className="px-5 py-4">{row.occurrence_types?.name ?? "—"}</td><td className="px-5 py-4">{displayQuantity(row)}</td><td className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEdit(row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button data-role-sensitive onClick={() => void remove(row)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>)}
           </tbody></table></div>}
         </Card>
       </main>
@@ -613,7 +613,7 @@ export function Ocorrencias() {
             {historicalSaveError && <p className="mt-3 text-sm text-destructive">{historicalSaveError}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setHistoricalEditing(null)} className="rounded-lg border px-4 py-2">Cancelar</button>
-              <button disabled={historicalSaving} onClick={() => void saveHistoricalDisplay()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{historicalSaving ? "Salvando..." : "Salvar visualização"}</button>
+              <button data-role-sensitive disabled={historicalSaving} onClick={() => void saveHistoricalDisplay()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">{historicalSaving ? "Salvando..." : "Salvar visualização"}</button>
             </div>
           </Card>
         </div>
@@ -674,7 +674,7 @@ export function Ocorrencias() {
 
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2">Cancelar</button>
-              <button disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">
+              <button data-role-sensitive disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-primary-foreground">
                 {saving ? "Salvando..." : "Salvar"}
               </button>
             </div>

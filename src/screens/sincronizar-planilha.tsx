@@ -726,7 +726,7 @@ export function SincronizarPlanilha() {
               >
                 Desmarcar todas
               </button>
-              <button className={btnPrimary} disabled={loading || !selectedIds.length} onClick={() => void importSelected()}>
+              <button data-role-sensitive className={btnPrimary} disabled={loading || !selectedIds.length} onClick={() => void importSelected()}>
                 <RefreshCw className="h-4 w-4" /> {loading ? "Importando..." : `Importar ${selectedIds.length} selecionada(s)`}
               </button>
             </div>

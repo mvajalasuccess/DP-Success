@@ -410,7 +410,7 @@ export function ImportacaoHistorico() {
                   <p className="font-semibold">Competência histórica</p>
                   <p className="text-xs text-muted-foreground">Janeiro/2026 será exibido como 11/12/2025 até 20/01/2026, conforme a orientação do RH. A data original usada na importação histórica e os cálculos da BASE permanecem preservados. A BASE será importada somente até julho/2026. Os valores de horas da BASE são horas decimais (ex.: 0,93 = 0h55m48s), e o sistema converte esses valores para minutos.</p>
                 </div>
-                <button type="button" disabled={loading} onClick={() => void importData()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+                <button data-role-sensitive type="button" disabled={loading} onClick={() => void importData()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
                   {loading ? "Importando..." : "Importar histórico"}
                 </button>
               </div>

@@ -100,7 +100,7 @@ export function Positions() {
               Cadastre os cargos utilizados pelos funcionários.
             </p>
           </div>
-          <button type="button" onClick={openNew} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+          <button data-role-sensitive type="button" onClick={openNew} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             <Plus className="mr-2 inline h-4 w-4" /> Novo cargo
           </button>
         </div>
@@ -144,10 +144,10 @@ export function Positions() {
                       <td className="px-5 py-4 font-medium">{row.name}</td>
                       <td className="px-5 py-4">{row.active ? "Ativo" : "Inativo"}</td>
                       <td className="px-5 py-4">
-                        <button type="button" onClick={() => { setError(""); setEditingId(row.id); setFormName(row.name); setOpen(true); }} className="mr-3 text-primary"><Pencil className="mr-1 inline h-4 w-4" />Editar</button><button type="button" onClick={() => void toggle(row)} className="mr-3 text-primary">
+                        <button data-role-sensitive type="button" onClick={() => { setError(""); setEditingId(row.id); setFormName(row.name); setOpen(true); }} className="mr-3 text-primary"><Pencil className="mr-1 inline h-4 w-4" />Editar</button><button data-role-sensitive type="button" onClick={() => void toggle(row)} className="mr-3 text-primary">
                           <Power className="mr-1 inline h-4 w-4" />
                           {row.active ? "Inativar" : "Ativar"}
-                        </button><button type="button" onClick={async () => { if (!window.confirm("Excluir este cargo?")) return; const r = await (supabase).from("positions").delete().eq("id", row.id); if (r.error) setError("Não foi possível excluir. Se o cargo já estiver sendo usado, inative-o em vez de excluir."); else await load(); }} className="text-destructive"><Trash2 className="mr-1 inline h-4 w-4" />Excluir</button>
+                        </button><button data-role-sensitive type="button" onClick={async () => { if (!window.confirm("Excluir este cargo?")) return; const r = await (supabase).from("positions").delete().eq("id", row.id); if (r.error) setError("Não foi possível excluir. Se o cargo já estiver sendo usado, inative-o em vez de excluir."); else await load(); }} className="text-destructive"><Trash2 className="mr-1 inline h-4 w-4" />Excluir</button>
                       </td>
                     </tr>
                   ))
@@ -191,7 +191,7 @@ export function Positions() {
               <button type="button" onClick={() => setOpen(false)} className="rounded-lg border px-4 py-2 text-sm">
                 Cancelar
               </button>
-              <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
+              <button data-role-sensitive type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">
                 {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Salvar cargo"}
               </button>
             </div>
