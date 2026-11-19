@@ -60,7 +60,9 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const [companies,setCompanies]=useState<Array<{id:string;name:string}>>([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
-  const [statusFilter,setStatusFilter]=useState<"all"|"open"|"done">("all");
+  const [recordView,setRecordView]=useState<"open"|"history">("open");
+  const [historyYear,setHistoryYear]=useState("");
+  const [historyEmployeeId,setHistoryEmployeeId]=useState("");
   const [planningCollapsed,setPlanningCollapsed]=useState(false);
   
   const [radarStatusFilter,setRadarStatusFilter]=useState<"all"|"available"|"acquisition"|"overdue"|"scheduled">("all");
@@ -93,36 +95,58 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const activeEmployees=useMemo(()=>employees.filter(isActiveEmployee),[employees]);
   const activeEmployeeIds=useMemo(()=>new Set(activeEmployees.map(e=>e.id)),[activeEmployees]);
   const activePeriods=useMemo(()=>periods.filter(p=>activeEmployeeIds.has(p.employee_id)),[periods,activeEmployeeIds]);
-  const visible=useMemo(()=>activePeriods.filter(p=>{
-    const employee=employees.find(e=>e.id===p.employee_id);
-    return (!companyFilter||employee?.company_id===companyFilter)&&(!employeeFilter||p.employee_id===employeeFilter)&&(statusFilter==="all"||(statusFilter==="done"?(p.completed||p.termination_paid):(!p.completed&&!p.termination_paid)));
-  }),[activePeriods,employees,statusFilter,companyFilter,employeeFilter]);
-  const filteredPeriods=activePeriods.filter(p=>{const employee=employees.find(e=>e.id===p.employee_id);return (!companyFilter||employee?.company_id===companyFilter)&&(!employeeFilter||p.employee_id===employeeFilter)});
-  const countGroups=new Map<string,Vacation[]>();
-  filteredPeriods.forEach(p=>{
-    const key=p.acquisition_start_date?p.employee_id+"::"+p.acquisition_start_date:p.employee_id+"::sem-periodo::"+p.id;
-    countGroups.set(key,[...(countGroups.get(key)||[]),p]);
+  const currentDate = today();
+  const startOf = (p: Vacation) => p.start_date || p.official_gozo_start_date || "";
+  const endOf = (p: Vacation) => p.end_date || p.official_gozo_end_date || "";
+  const hasStarted = (p: Vacation) => Boolean(startOf(p) && endOf(p) && startOf(p) <= currentDate);
+  const hasEnded = (p: Vacation) => hasStarted(p) && endOf(p) <= currentDate;
+  const filteredPeriods = activePeriods.filter(p => {
+    const employee = employees.find(e => e.id === p.employee_id);
+    return (!companyFilter || employee?.company_id === companyFilter) && (!employeeFilter || p.employee_id === employeeFilter);
   });
-  const periodGroups=[...countGroups.values()];
-  const counts={
-    total:periodGroups.length,
-    open:periodGroups.filter(group=>group.some(p=>!p.completed&&!p.termination_paid)).length,
-    done:periodGroups.filter(group=>group.every(p=>p.completed||p.termination_paid)).length,
-    upcoming:periodGroups.filter(group=>group.some(p=>!p.completed&&!p.termination_paid&&p.start_date!==null&&p.start_date>=today())).length
+  const countGroups = new Map<string, Vacation[]>();
+  filteredPeriods.forEach(p => {
+    const key = p.acquisition_start_date
+      ? p.employee_id + "::" + p.acquisition_start_date
+      : p.employee_id + "::sem-periodo::" + (p.title || p.id);
+    countGroups.set(key, [...(countGroups.get(key) || []), p]);
+  });
+  const periodGroups = [...countGroups.entries()].map(([key, blocks]) => ({
+    key,
+    blocks: blocks.sort((a, b) => startOf(a).localeCompare(startOf(b))),
+  }));
+  const isOpenBlock = (p: Vacation) => !p.termination_paid &&
+    (startOf(p) > currentDate || (!p.completed && !hasEnded(p)));
+  const counts = {
+    total: periodGroups.length,
+    open: periodGroups.filter(({ blocks }) => blocks.some(isOpenBlock)).length,
+    done: periodGroups.filter(({ blocks }) => blocks.every(p => p.termination_paid || hasEnded(p) || (p.completed && !startOf(p)))).length,
+    upcoming: periodGroups.filter(({ blocks }) => blocks.some(p => !p.termination_paid && startOf(p) > currentDate)).length,
   };
-  // Agrupa todos os blocos salvos do mesmo funcionário e período aquisitivo em um único card.
-  const visibleGroups=useMemo(()=>{
-    const groups=new Map<string,Vacation[]>();
-    activePeriods.forEach(p=>{
-      const key=p.acquisition_start_date
-        ? p.employee_id+"::"+p.acquisition_start_date
-        : p.employee_id+"::sem-periodo::"+(p.title||p.id);
-      groups.set(key,[...(groups.get(key)||[]),p]);
-    });
-    return [...groups.entries()]
-      .filter(([,blocks])=>blocks.some(p=>visible.some(v=>v.id===p.id)))
-      .map(([key,blocks])=>({key,blocks:blocks.sort((a,b)=>(a.start_date||"").localeCompare(b.start_date||""))}));
-  },[activePeriods,visible]);
+  const visibleGroups = periodGroups.filter(({ blocks }) => blocks.some(isOpenBlock));
+  const historyPeriods = periods.filter(p => {
+    const employee = employees.find(e => e.id === p.employee_id);
+    return (!companyFilter || employee?.company_id === companyFilter) &&
+      (hasStarted(p) || (!startOf(p) && (p.completed || p.termination_paid)));
+  });
+  const historyYears = new Set<string>();
+  historyPeriods.filter(p => isVacationLeave(p) && hasStarted(p)).forEach(p => {
+    const lastDate = endOf(p) < currentDate ? endOf(p) : currentDate;
+    for (let year = Number(startOf(p).slice(0, 4)); year <= Number(lastDate.slice(0, 4)); year++) {
+      historyYears.add(String(year));
+    }
+  });
+  const yearOptions = [...historyYears].sort((a, b) => b.localeCompare(a));
+  const selectedHistoryYear = historyYears.has(historyYear) ? historyYear : "";
+  const visibleHistory = historyPeriods.filter(p => {
+    if (historyEmployeeId && p.employee_id !== historyEmployeeId) return false;
+    return !selectedHistoryYear || (isVacationLeave(p) && hasStarted(p) &&
+      startOf(p) <= selectedHistoryYear + "-12-31" && endOf(p) >= selectedHistoryYear + "-01-01");
+  }).sort((a, b) => startOf(b).localeCompare(startOf(a)));
+  const historyGroups = new Map<string, Vacation[]>();
+  visibleHistory.forEach(p => historyGroups.set(p.employee_id, [...(historyGroups.get(p.employee_id) || []), p]));
+  const historyEmployeeOptions = employees.filter(e => historyPeriods.some(p => p.employee_id === e.id));
+  const vacationEmployeeCount = new Set(visibleHistory.filter(p => isVacationLeave(p) && hasStarted(p)).map(p => p.employee_id)).size;
 
   function openNew(){setEditing(null);setCompletionChanged(false);setEditingBlockNumber(1);setForm({...blank});setExtraBlocks([]);setBlocksExpanded(false);setModal(true);setError("")}
   function openEdit(p:Vacation){const siblings=periods.filter(item=>item.employee_id===p.employee_id&&item.acquisition_start_date===p.acquisition_start_date).sort((a,b)=>(a.start_date||a.official_gozo_start_date||"").localeCompare(b.start_date||b.official_gozo_start_date||""));setEditing(p);setCompletionChanged(false);setEditingBlockNumber(Math.max(1,siblings.findIndex(item=>item.id===p.id)+1));setForm({entitled_days:(()=>{const v=siblings.map(x=>x.entitled_days).filter(x=>x!=null);return v.length?String(Math.max(...v.map(Number))).replace(".",","):""})(),leave_type:p.leave_type||"ferias",days_quantity:p.days_quantity==null?"":String(p.days_quantity).replace(".",","),employee_id:p.employee_id,title:p.title||"",start_date:p.start_date||p.official_gozo_start_date||"",end_date:p.end_date||p.official_gozo_end_date||"",notes:p.notes||"",completed:p.completed,acquisition_start_date:p.acquisition_start_date||"",acquisition_end_date:p.acquisition_end_date||"",concession_start_date:p.concession_start_date||"",concession_end_date:p.concession_end_date||"",official_gozo_start_date:p.official_gozo_start_date||"",official_gozo_end_date:p.official_gozo_end_date||"",termination_paid:Boolean(p.termination_paid)});setExtraBlocks([]);setBlocksExpanded(true);setModal(true);setError("")}
@@ -250,7 +274,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
         const hasOfficialBlocks=uniqueOfficialBlocks.length>0;
         const terminationPaid=vacations.some(p=>p.termination_paid);
         const entitledDays=entitlementOf(vacations,raw.acquisitionStart,raw.acquisitionEnd);
-        const status:Entitlement["status"]=terminationPaid||officialDays>=entitledDays||(pj&&vacations.length>0&&vacations.every(p=>p.completed))?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
+        const status:Entitlement["status"]=terminationPaid||(officialDays>=entitledDays&&uniqueOfficialBlocks.every(p=>hasEnded(p)))||(pj&&vacations.length>0&&vacations.every(p=>p.completed&&(!startOf(p)||hasEnded(p))))?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
         cycles.push({...raw,status,vacations,entitledDays});
       }
       return cycles;
@@ -277,7 +301,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
         <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Períodos cadastrados</p><CalendarDays className="h-5 w-5 text-primary"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.total}</p><p className="mt-1 text-xs text-muted-foreground">Períodos aquisitivos distintos</p></div>
         <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Em aberto</p><Clock3 className="h-5 w-5 text-amber-600"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.open}</p><p className="mt-1 text-xs text-muted-foreground">Aguardando conclusão</p></div>
         <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Concluídos</p><CheckCircle2 className="h-5 w-5 text-emerald-600"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.done}</p><p className="mt-1 text-xs text-muted-foreground">Períodos finalizados</p></div>
-        <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Próximos períodos</p><CalendarCheck className="h-5 w-5 text-sky-600"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.upcoming}</p><p className="mt-1 text-xs text-muted-foreground">Com início hoje ou futuramente</p></div>
+        <div className="rounded-sm border bg-card p-5"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">Próximos períodos</p><CalendarCheck className="h-5 w-5 text-sky-600"/></div><p className="mt-3 font-display text-3xl font-semibold">{counts.upcoming}</p><p className="mt-1 text-xs text-muted-foreground">Com início futuro</p></div>
       </section>
 
       <section className="mt-6 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
@@ -287,32 +311,86 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
 <button type="button" onClick={()=>setRadarStatusFilter("scheduled")} aria-pressed={radarStatusFilter==="scheduled"} className={"min-w-0 rounded-sm border bg-card p-3 text-left transition hover:border-sky-300 hover:bg-sky-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 sm:p-4 "+(radarStatusFilter==="scheduled"?"ring-2 ring-sky-500 ring-offset-2":"")}><p className="text-xs leading-tight text-muted-foreground sm:text-sm">{pj?"Recessos programados":"Férias programadas"}</p><p className="mt-2 text-xl font-semibold text-sky-700 sm:text-2xl">{entitlementCounts.scheduled}</p><p className="mt-1 text-[11px] leading-tight text-muted-foreground sm:text-xs">Clique para ver os períodos</p></button>
 </section>
 <section className="mt-6 overflow-hidden rounded-sm border bg-card shadow-sm">
-<div className="flex flex-col gap-3 border-b p-4 sm:p-5"><div><h2 className="font-display text-lg font-semibold">{pj?"Radar de Recessos":"Radar de Férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Acompanhe as férias em aberto dos colaboradores.</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex"><select aria-label="Filtrar por empresa" value={companyFilter} onChange={e=>{setCompanyFilter(e.target.value);setEmployeeFilter("");}} className="h-10 rounded-sm border bg-background px-3 text-sm"><option value="">Todas as empresas</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar por funcionário" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} className="h-10 rounded-sm border bg-background px-3 text-sm"><option value="">{pj?"Todos os prestadores":"Todos os funcionários"}</option>{activeEmployees.filter(e=>!companyFilter||e.company_id===companyFilter).map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select><select aria-label="Filtrar Radar de Férias por situação" value={radarStatusFilter} onChange={e=>setRadarStatusFilter(e.target.value as "all"|"available"|"acquisition"|"overdue"|"scheduled")} className="h-10 w-full rounded-sm border bg-background px-3 text-sm sm:w-auto"><option value="all">Todas as situações</option><option value="available">Direito adquirido</option><option value="acquisition">Em aquisição</option><option value="overdue">Prazo concessivo vencido</option><option value="scheduled">{pj?"Recessos programados":"Férias programadas"}</option></select></div></div>
+<div className="flex flex-col gap-3 border-b p-4 sm:p-5"><div><h2 className="font-display text-lg font-semibold">{pj?"Radar de Recessos":"Radar de Férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Acompanhe as férias em aberto dos colaboradores.</p></div><div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex"><select aria-label="Filtrar por empresa" value={companyFilter} onChange={e=>{setCompanyFilter(e.target.value);setEmployeeFilter("");setHistoryEmployeeId("");}} className="h-10 rounded-sm border bg-background px-3 text-sm"><option value="">Todas as empresas</option>{companies.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><select aria-label="Filtrar por funcionário" value={employeeFilter} onChange={e=>setEmployeeFilter(e.target.value)} className="h-10 rounded-sm border bg-background px-3 text-sm"><option value="">{pj?"Todos os prestadores":"Todos os funcionários"}</option>{activeEmployees.filter(e=>!companyFilter||e.company_id===companyFilter).map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select><select aria-label="Filtrar Radar de Férias por situação" value={radarStatusFilter} onChange={e=>setRadarStatusFilter(e.target.value as "all"|"available"|"acquisition"|"overdue"|"scheduled")} className="h-10 w-full rounded-sm border bg-background px-3 text-sm sm:w-auto"><option value="all">Todas as situações</option><option value="available">Direito adquirido</option><option value="acquisition">Em aquisição</option><option value="overdue">Prazo concessivo vencido</option><option value="scheduled">{pj?"Recessos programados":"Férias programadas"}</option></select></div></div>
 {radarEntitlements.length===0?<div className="p-8 text-center"><p className="text-sm font-medium text-foreground">{radarStatusFilter==="all"?"Nenhum período encontrado para os filtros atuais.":radarStatusFilter==="available"?"Nenhum período com direito adquirido.":radarStatusFilter==="acquisition"?"Nenhum período em aquisição.":radarStatusFilter==="overdue"?"Nenhum prazo concessivo vencido.":"Nenhum período com férias programadas."}</p><p className="mt-1 text-xs text-muted-foreground">Experimente alterar os filtros de empresa, funcionário ou situação.</p></div>:<div className="divide-y">{radarEntitlements.map(e=><article key={e.employee.id+"-"+e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{e.employee.full_name}</h3><span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"||e.status==="completed"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="completed"?"Concluído":e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?(pj?"Recessos programados":"Férias programadas"):"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{(()=>{const unique=[...new Map((e.vacations||[]).filter(isVacationLeave).filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[blockKey(p),p])).values()];const days=unique.reduce((sum,p)=>sum+blockDays(p),0);return <p className="mt-1 text-xs text-muted-foreground">Direito adquirido: {fmtDays(e.entitledDays??30)} dias · Gozados: {fmtDays(days)} em {unique.length} bloco(s) · Saldo: {fmtDays(Math.max(0,(e.entitledDays??30)-days))} dias</p>})()}{e.status==="available"&&<p className="mt-1 text-xs font-medium text-emerald-700">Aviso para o RH: este funcionário já pode sair de férias.</p>}{e.status==="overdue"&&<p className="mt-1 text-xs font-medium text-red-700">Atenção: o prazo concessivo calculado já terminou.</p>}</div><div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">{e.status!=="completed"&&<button data-role-sensitive type="button" onClick={()=>{openNew();setForm(f=>({...f,employee_id:e.employee.id,acquisition_start_date:e.acquisitionStart,acquisition_end_date:e.acquisitionEnd,concession_start_date:e.concessionStart,concession_end_date:e.concessionEnd,...(pj?{entitled_days:String(e.entitledDays??30).replace(".",",")} : {}),title:(pj?"Recesso · período aquisitivo ":"Férias · período aquisitivo ")+dateLabel(e.acquisitionStart)+" a "+dateLabel(e.acquisitionEnd)}));}} className="rounded-sm bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">{e.status==="scheduled"?"Adicionar bloco":pj?"Programar recesso":"Programar férias"}</button>}{!pj&&(e.vacations?.some(p=>p.termination_paid)||e.status!=="completed")&&<button data-role-sensitive type="button" onClick={()=>void markTerminationPaid(e)} className="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100">{e.vacations?.some(p=>p.termination_paid)?"Desfazer":"Pago em rescisão"}</button>}</div></article>)}</div>}
 </section>
 <section className="mt-6 overflow-hidden rounded-sm border bg-card shadow-sm">
-        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"><div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><h2 className="font-display text-lg font-semibold">{pj?"Planejamento de recessos":"Planejamento de férias"}</h2><p className="mt-1 text-sm text-muted-foreground">Cadastre férias ou licenças remuneradas como blocos separados dentro do mesmo período aquisitivo. Somente férias reduzem o saldo adquirido.</p></div><button type="button" onClick={()=>setPlanningCollapsed(v=>!v)} aria-expanded={!planningCollapsed} aria-controls="vacation-planning-content" aria-label={planningCollapsed?"Expandir Planejamento de férias":"Minimizar Planejamento de férias"} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">{planningCollapsed?<ChevronDown className="h-4 w-4"/>:<ChevronUp className="h-4 w-4"/>}</button></div><div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"><select aria-label="Filtrar períodos" value={statusFilter} onChange={e=>setStatusFilter(e.target.value as any)} className="h-10 rounded-sm border bg-background px-3 text-sm"><option value="open">Em aberto</option><option value="done">Concluídos</option><option value="all">Todos os períodos</option></select></div></div>
+        <div className="flex items-start justify-between gap-4 border-b p-4 sm:items-center sm:p-5">
+          <div className="min-w-0">
+            <h2 className="font-display text-lg font-semibold">
+              {recordView === "history" ? (pj ? "Histórico de Recessos" : "Histórico de Férias") : (pj ? "Recessos em aberto" : "Férias em aberto")}
+            </h2>
+          </div>
+          <button type="button" onClick={() => setPlanningCollapsed(value => !value)} aria-expanded={!planningCollapsed} aria-controls="vacation-planning-content" aria-label={planningCollapsed ? "Expandir registros" : "Recolher registros"} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+            {planningCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+        </div>
         {!planningCollapsed&&<div id="vacation-planning-content">
         {error&&!modal&&<div role="alert" className="m-4 flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 p-3 text-sm text-red-800"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0"/><span>{error}</span></div>}
-        {loading?<div className="p-12 text-center text-sm text-muted-foreground">Carregando períodos...</div>:visibleGroups.length===0?<div className="flex flex-col items-center px-6 py-14 text-center"><div className="flex h-14 w-14 items-center justify-center rounded-sm bg-emerald-50 text-emerald-700"><CalendarDays className="h-7 w-7"/></div><h3 className="mt-4 font-semibold">{periods.length===0?"Vamos planejar as primeiras férias?":"Nenhum período encontrado"}</h3><p className="mt-1 max-w-md text-sm text-muted-foreground">{periods.length===0?"Adicione um período, escolha o funcionário e informe as datas para começar seu planejamento.":"Experimente alterar os filtros de empresa, funcionário ou situação."}</p>{periods.length===0&&<button data-role-sensitive onClick={openNew} className="mt-4 inline-flex items-center gap-2 rounded-sm bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4"/>Cadastrar primeiro período</button>}</div>:<div className="divide-y">{visibleGroups.map(group=>{
+        <div className="flex flex-wrap items-center gap-2 border-b p-4 sm:p-5">
+          <div role="group" aria-label="Exibição dos registros" className="inline-flex rounded-md border bg-muted/40 p-1">
+            <button type="button" aria-pressed={recordView === "open"} onClick={() => setRecordView("open")} className={`rounded px-3 py-1.5 text-sm ${recordView === "open" ? "bg-card font-semibold shadow-sm" : "text-muted-foreground"}`}>Em aberto</button>
+            <button type="button" aria-pressed={recordView === "history"} onClick={() => setRecordView("history")} className={`rounded px-3 py-1.5 text-sm ${recordView === "history" ? "bg-card font-semibold shadow-sm" : "text-muted-foreground"}`}>Histórico</button>
+          </div>
+          {recordView === "history" && <>
+            <select aria-label={pj ? "Ano do recesso" : "Ano de gozo"} value={selectedHistoryYear} onChange={event => setHistoryYear(event.target.value)} className="h-10 rounded-sm border bg-background px-3 text-sm">
+              <option value="">Todos os anos de gozo</option>
+              {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
+            <select aria-label={pj ? "Prestador no histórico" : "Funcionário no histórico"} value={historyEmployeeOptions.some(e => e.id === historyEmployeeId) ? historyEmployeeId : ""} onChange={event => setHistoryEmployeeId(event.target.value)} className="h-10 max-w-full rounded-sm border bg-background px-3 text-sm">
+              <option value="">{pj ? "Todos os prestadores" : "Todos os funcionários"}</option>
+              {historyEmployeeOptions.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+            </select>
+          </>}
+        </div>
+        {loading ? <div className="p-12 text-center text-sm text-muted-foreground">Carregando períodos...</div> : recordView === "history" ? (
+          <div className="space-y-3 p-4 sm:p-5">
+            <p aria-live="polite" className="text-sm text-muted-foreground">{vacationEmployeeCount} {pj ? "prestador(es) com recesso" : "funcionário(s) com férias gozadas ou em andamento"}</p>
+            {historyGroups.size === 0 && <p className="py-8 text-center text-sm text-muted-foreground">Nenhum registro encontrado para os filtros atuais.</p>}
+            {[...historyGroups.entries()].sort(([,a], [,b]) => employeeName(a[0]!).localeCompare(employeeName(b[0]!), "pt-BR")).map(([employeeId, blocks]) => (
+              <details key={employeeId} className="group rounded-md border bg-background">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0 break-words font-medium">{employeeName(blocks[0]!)}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">{blocks.length} bloco(s)<ChevronDown aria-hidden="true" className="h-4 w-4 group-open:rotate-180" /></span>
+                </summary>
+                <ul className="divide-y border-t">
+                  {blocks.map(p => (
+                    <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-medium">{!startOf(p) && p.termination_paid ? "Pago em rescisão" : isVacationLeave(p) ? (pj ? "Recesso" : "Férias") : (LEAVE_LABELS[p.leave_type || ""] || p.leave_type)}</p>
+                        {hasStarted(p) && <p className="text-muted-foreground">{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} dias no bloco{hasEnded(p) ? "" : " · Em andamento"}</p>}
+                        {p.acquisition_start_date && <p className="text-xs text-muted-foreground">Aquisitivo: {dateLabel(p.acquisition_start_date)} a {dateLabel(p.acquisition_end_date)}</p>}
+                        {p.notes && <p className="whitespace-pre-wrap text-muted-foreground">{p.notes}</p>}
+                      </div>
+                      {activeEmployeeIds.has(employeeId) && <div className="flex gap-2">
+                        <button data-role-sensitive type="button" onClick={() => openEdit(p)} aria-label="Editar bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border hover:bg-muted"><Pencil className="h-4 w-4" /></button>
+                        <button data-role-sensitive type="button" onClick={() => setConfirmDelete(p)} aria-label="Excluir bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" /></button>
+                      </div>}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
+          </div>
+        ) : visibleGroups.length===0?<div className="flex flex-col items-center px-6 py-14 text-center"><div className="flex h-14 w-14 items-center justify-center rounded-sm bg-emerald-50 text-emerald-700"><CalendarDays className="h-7 w-7"/></div><h3 className="mt-4 font-semibold">{periods.length===0?"Vamos planejar as primeiras férias?":"Nenhum período encontrado"}</h3><p className="mt-1 max-w-md text-sm text-muted-foreground">{periods.length===0?"Adicione um período, escolha o funcionário e informe as datas para começar seu planejamento.":"Experimente alterar os filtros de empresa, funcionário ou situação."}</p>{periods.length===0&&<button data-role-sensitive onClick={openNew} className="mt-4 inline-flex items-center gap-2 rounded-sm bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4"/>Cadastrar primeiro período</button>}</div>:<div className="divide-y">{visibleGroups.map(group=>{
           const blocks=group.blocks;
           const first=blocks[0];
           if(!first)return null;
           const officialBlocks=[...new Map(blocks.filter(isVacationLeave).filter(p=>(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)).map(p=>[blockKey(p),p])).values()];
           const totalDays=officialBlocks.reduce((sum,p)=>sum+blockDays(p),0);const paidLeaveDays=blocks.filter(p=>!isVacationLeave(p)).reduce((sum,p)=>sum+blockDays(p),0);
           const paidInTermination=blocks.some(p=>p.termination_paid);
-          const entitled=entitlementOf(blocks,first.acquisition_start_date||undefined,first.acquisition_end_date||undefined);const allCompleted=totalDays>=entitled||(pj&&blocks.every(p=>p.completed));
+          const entitled=entitlementOf(blocks,first.acquisition_start_date||undefined,first.acquisition_end_date||undefined);const allCompleted=(totalDays>=entitled&&officialBlocks.every(hasEnded))||(pj&&blocks.every(p=>p.completed&&(!startOf(p)||hasEnded(p))));
           return <article key={group.key} className={`p-4 transition-colors hover:bg-muted/20 sm:p-5 ${allCompleted?"opacity-80":""}`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex min-w-0 items-start gap-4"><div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-sm ${allCompleted?"bg-emerald-100 text-emerald-700":"bg-[#e7f8f2] text-[#087a62]"}`}>{allCompleted?<CheckCircle2 className="h-6 w-6"/>:<Palmtree className="h-6 w-6"/>}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{employeeName(first)}</h3><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${paidInTermination?"bg-amber-100 text-amber-900":allCompleted?"bg-emerald-100 text-emerald-800":blocks.some(p=>p.completed)?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800"}`}>{paidInTermination?"Pago em rescisão":allCompleted?"Concluído":blocks.some(p=>p.completed)?"Parcialmente concluído":"Em aberto"}</span><span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{blocks.length} bloco(s)</span></div>
-                {first.acquisition_start_date&&<><p className="mt-1 text-sm text-muted-foreground">Período aquisitivo: {dateLabel(first.acquisition_start_date)} a {dateLabel(first.acquisition_end_date)}</p>{first.concession_start_date&&first.concession_end_date&&<p className="text-sm text-muted-foreground">Período concessivo: {dateLabel(first.concession_start_date)} a {dateLabel(first.concession_end_date)}</p>}<p className="mt-1 text-sm font-medium text-emerald-800">Direito adquirido: {fmtDays(entitled)} dias{entitled<30?" (proporcional)":""} · Gozados: {fmtDays(totalDays)} dias · Saldo restante: {fmtDays(Math.max(0,entitled-totalDays))} dias</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Percentual do direito de férias utilizado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={entitled>0?Math.min(100,Math.round(totalDays/entitled*100)):0}><div className="h-full bg-[#06CAA0] transition-all" style={{width:(entitled>0?Math.min(100,totalDays/entitled*100):0)+"%"}}/></div>{paidLeaveDays>0&&<p className="text-sm text-muted-foreground">Licença remunerada: {fmtDays(paidLeaveDays)} dias (não consome saldo de férias)</p>}</>}
+                {first.acquisition_start_date&&<><p className="mt-1 text-sm text-muted-foreground">Período aquisitivo: {dateLabel(first.acquisition_start_date)} a {dateLabel(first.acquisition_end_date)}</p>{first.concession_start_date&&first.concession_end_date&&<p className="text-sm text-muted-foreground">Período concessivo: {dateLabel(first.concession_start_date)} a {dateLabel(first.concession_end_date)}</p>}<p className="mt-1 text-sm font-medium text-emerald-800">Direito adquirido: {fmtDays(entitled)} dias{entitled<30?" (proporcional)":""} · Registrados: {fmtDays(totalDays)} dias · Saldo restante: {fmtDays(Math.max(0,entitled-totalDays))} dias</p><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Percentual do direito de férias utilizado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={entitled>0?Math.min(100,Math.round(totalDays/entitled*100)):0}><div className="h-full bg-[#06CAA0] transition-all" style={{width:(entitled>0?Math.min(100,totalDays/entitled*100):0)+"%"}}/></div>{paidLeaveDays>0&&<p className="text-sm text-muted-foreground">Licença remunerada: {fmtDays(paidLeaveDays)} dias (não consome saldo de férias)</p>}</>}
                 {first.title&&!/^Férias\s*[·-]\s*período aquisitivo\b/i.test(first.title)&&<p className="mt-1 text-sm text-muted-foreground">{first.title}</p>}
                 <p className="mt-2 text-sm text-muted-foreground">{blocks.length?`${blocks.length} bloco(s) de afastamento cadastrado(s)`:"Nenhum bloco de afastamento cadastrado."}</p>{first.notes&&<p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">Observações: {first.notes}</p>}
               </div></div>
               <div className="shrink-0 text-xs text-muted-foreground">Blocos reunidos neste período</div>
             </div>
             <div className="mt-4 space-y-3 border-l-2 border-emerald-100 pl-4 sm:ml-6">
-              {blocks.map((p,index)=><div key={p.id} className="rounded-sm border bg-background p-3 sm:p-4">
+              {blocks.map((p,index)=>isOpenBlock(p)&&<div key={p.id} className="rounded-sm border bg-background p-3 sm:p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Bloco {index+1}</span><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${isVacationLeave(p)?"bg-muted":"bg-sky-100 text-sky-800"}`}>{pj&&isVacationLeave(p)?"Recesso":LEAVE_LABELS[p.leave_type||"ferias"]||p.leave_type}</span><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${p.completed?"bg-emerald-100 text-emerald-800":"bg-amber-100 text-amber-800"}`}>{p.completed?"Concluído":"Em aberto"}</span></div><div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground"><span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4"/> {(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)?dateLabel(p.start_date||p.official_gozo_start_date)+" a "+dateLabel(p.end_date||p.official_gozo_end_date):"Datas não informadas"}</span>{(p.start_date||p.official_gozo_start_date)&&(p.end_date||p.official_gozo_end_date)&&<span className="inline-flex items-center gap-1.5"><Clock3 className="h-4 w-4"/> {fmtDays(blockDays(p))} dias de {isVacationLeave(p)?pj?"recesso":"férias":"licença remunerada"}</span>}</div></div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end"><span className="rounded-sm bg-muted px-3 py-2 text-xs text-muted-foreground">{(pj?p.start_date&&p.end_date:p.official_gozo_start_date&&p.official_gozo_end_date)?fmtDays(blockDays(p))+" dias":"Sem datas"}</span><button data-role-sensitive type="button" onClick={()=>openEdit(p)} aria-label="Editar bloco de afastamento" className="flex h-9 w-9 items-center justify-center rounded-sm border hover:bg-muted"><Pencil className="h-4 w-4"/></button><button data-role-sensitive type="button" onClick={()=>setConfirmDelete(p)} aria-label="Excluir bloco informativo" className="flex h-9 w-9 items-center justify-center rounded-sm border border-red-200 text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4"/></button></div>
