@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { AlertTriangle, BadgeDollarSign, Building2, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, CalendarRange, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Settings2, SlidersHorizontal, Menu, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, Palmtree, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, Building, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, CalendarRange, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, FileText, FolderOpen, Gauge, LayoutDashboard, ListChecks, LogOut, Settings, Settings2, SlidersHorizontal, Menu, Network, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, X, Pencil, Trash2, CheckCircle2, RotateCcw, Palmtree, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { ScreenBrand } from "@/components/screen-brand";
 import { supabase } from "@/integrations/supabase/client";
@@ -262,8 +262,8 @@ function AppShell({
     { id: "closing", label: "Fechamento de Ponto", Icon: CalendarClock, open: closingMenuOpen, setOpen: setClosingMenuOpen, items: [
       ["Fechamento", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck],
     ] },
-    { id: "cadastro", label: "Cadastro", Icon: Building2, open: companyMenuOpen, setOpen: setCompanyMenuOpen, items: [
-      ["Empresas", "empresas", Building2], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Building2], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays],
+    { id: "cadastro", label: "Cadastro", Icon: FolderOpen, open: companyMenuOpen, setOpen: setCompanyMenuOpen, items: [
+      ["Empresas", "empresas", Building], ["Funcionários", "funcionarios", UsersRound], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Network], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays],
     ] },
     { id: "organization", label: "Organização", Icon: CalendarRange, open: tasksOpen, setOpen: setTasksOpen, items: [
       ["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Tarefas", "tarefas", ListChecks],
