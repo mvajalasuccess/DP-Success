@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { AlertTriangle, BadgeDollarSign, Building, BriefcaseBusiness, CalendarClock, CalendarDays, CalendarCheck, CalendarX, CalendarRange, ChartColumn, ChevronDown, ChevronLeft, ClipboardCheck, ClipboardList, Clock3, Contact, FilePenLine, FileText, FolderOpen, Gauge, GitCompare, LayoutDashboard, ListChecks, LogOut, Settings, Settings2, SlidersHorizontal, Menu, Network, CircleDollarSign, Upload, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, Timer, X, Pencil, Trash2, CheckCircle2, RotateCcw, Palmtree, type LucideIcon } from "lucide-react";
+import { CalendarCheck, CalendarX, ChevronDown, ChevronLeft, ClipboardCheck, Clock3, FilePenLine, FolderOpen, Gauge, LogOut, Settings, Settings2, Menu, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, Timer, X, Pencil, Trash2, CheckCircle2, RotateCcw, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { ScreenBrand } from "@/components/screen-brand";
+import { getScreenIcon, ScreenBrand } from "@/components/screen-brand";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { useAccountIdentity } from "@/hooks/use-account-identity";
@@ -248,33 +248,37 @@ function AppShell({
   const sectionButtonClass = (active: boolean) =>
     `dp-sidebar-group-label flex min-h-10 w-full items-center px-3 py-2 text-left text-xs font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${active ? "dp-sidebar-group-active" : ""} ${collapsed ? "justify-center px-0" : "justify-start gap-3"}`;
 
-  const groups: {
+  const sidebarGroups: {
     id: string;
     label: string;
     Icon: LucideIcon;
     open: boolean;
     setOpen: (value: boolean | ((current: boolean) => boolean)) => void;
-    items: [string, ScreenKey, LucideIcon][];
+    items: [string, ScreenKey][];
   }[] = [
     { id: "analysis", label: "Análise", Icon: Gauge, open: managementOpen, setOpen: setManagementOpen, items: [
-      ["Dashboard", "dashboard", LayoutDashboard], ["KPIs", "kpis", ChartColumn], ["Comparativos", "comparativos", GitCompare], ["Relatórios", "relatorios", FileText],
+      ["Dashboard", "dashboard"], ["KPIs", "kpis"], ["Comparativos", "comparativos"], ["Relatórios", "relatorios"],
     ] },
     { id: "closing", label: "Ponto", Icon: Timer, open: closingMenuOpen, setOpen: setClosingMenuOpen, items: [
-      ["Fechamento de Ponto", "fechamento-ponto", CalendarClock], ["Importar Cartão Ponto", "importar-cartao-ponto", Upload], ["Lançamentos", "lancamentos", ClipboardList], ["Banco de Horas", "banco-horas", Clock3], ["Pagamentos", "pagamentos", BadgeDollarSign], ["Faltas e Folgas", "ocorrencias", CalendarX], ["Declarações e Atestados", "atestados", ClipboardCheck],
+      ["Fechamento de Ponto", "fechamento-ponto"], ["Importar Cartão Ponto", "importar-cartao-ponto"], ["Lançamentos", "lancamentos"], ["Banco de Horas", "banco-horas"], ["Pagamentos", "pagamentos"], ["Faltas e Folgas", "ocorrencias"], ["Declarações e Atestados", "atestados"],
     ] },
     { id: "cadastro", label: "Cadastro", Icon: FilePenLine, open: companyMenuOpen, setOpen: setCompanyMenuOpen, items: [
-      ["Empresas", "empresas", Building], ["Funcionários", "funcionarios", Contact], ["Cargos", "cargos", BriefcaseBusiness], ["Departamentos", "departamentos", Network], ["Jornadas / Escalas", "jornadas-escalas", CalendarDays],
+      ["Empresas", "empresas"], ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas / Escalas", "jornadas-escalas"],
     ] },
     { id: "organization", label: "Organização", Icon: FolderOpen, open: tasksOpen, setOpen: setTasksOpen, items: [
-      ["Planejamento Mensal", "planejamento-mensal", CalendarRange], ["Tarefas", "tarefas", ListChecks],
+      ["Planejamento Mensal", "planejamento-mensal"], ["Tarefas", "tarefas"],
     ] },
     { id: "people", label: "Pessoas", Icon: UsersRound, open: peopleOpen, setOpen: setPeopleOpen, items: [
-      ["Férias", "ferias", Palmtree], ["Diário de Ocorrências", "diario-ocorrencias", ClipboardList],
+      ["Férias", "ferias"], ["Diário de Ocorrências", "diario-ocorrencias"],
     ] },
     { id: "settings", label: "Configurações", Icon: Settings2, open: settingsOpen, setOpen: setSettingsOpen, items: [
-      ["Parâmetros", "parametros", SlidersHorizontal],
+      ["Parâmetros", "parametros"],
     ] },
   ];
+  const groups = sidebarGroups.map(group => ({
+    ...group,
+    items: group.items.map(([label, key]) => [label, key, getScreenIcon(label)] as const),
+  }));
   const visibleGroups = isConsulta ? groups.filter(group => group.id !== "settings") : groups;
 
   const activeGroup = visibleGroups.find(group => group.items.some(([, key]) => key === screen))?.id;

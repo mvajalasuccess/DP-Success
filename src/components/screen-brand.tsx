@@ -1,19 +1,51 @@
-import { BadgeDollarSign, BriefcaseBusiness, Building2, CalendarClock, CalendarDays, CalendarRange, CalendarX, ChartColumn, ClipboardCheck, ClipboardList, Clock3, FileText, LayoutDashboard, ListChecks, Palmtree, Settings, UsersRound, Upload, type LucideIcon } from "lucide-react";
+import { BadgeDollarSign, BriefcaseBusiness, Building, CalendarClock, CalendarDays, CalendarRange, CalendarX, ChartColumn, ClipboardCheck, ClipboardList, Clock3, Contact, FilePenLine, FileText, FolderOpen, Gauge, GitCompare, LayoutDashboard, ListChecks, Network, Palmtree, SlidersHorizontal, Timer, Upload, UsersRound, type LucideIcon } from "lucide-react";
 
-const screenIcons: Record<string, LucideIcon> = {
-  "Dashboard": LayoutDashboard, "KPIs": ChartColumn, "Comparativos": UsersRound, "Relatórios": FileText,
-  "Fechamento de Ponto": CalendarClock, "Fechamento": CalendarClock, "Ponto": CalendarClock,
-  "Importar Cartão de Ponto": Upload, "Importar Cartão Ponto": Upload, "Lançamentos": ClipboardList,
-  "Banco de Horas": Clock3, "Pagamentos": BadgeDollarSign, "Faltas e Folgas": CalendarX,
-  "Declarações e Atestados": ClipboardCheck, "Atestados": ClipboardCheck, "Empresas": Building2,
-  "Funcionários": UsersRound, "Cargos": BriefcaseBusiness, "Departamentos": Building2,
-  "Jornadas / Escalas": CalendarDays, "Planejamento Mensal": CalendarRange,
-  "Diário de Ocorrências": ClipboardList, "Tarefas": ListChecks, "Férias": Palmtree,
-  "Configurações": Settings, "Parâmetros": Settings, "Cadastros": Building2,
+const screenIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
+  "Dashboard": LayoutDashboard,
+  "KPIs": ChartColumn,
+  "Comparativos": GitCompare,
+  "Relatórios": FileText,
+  "Fechamento de Ponto": CalendarClock,
+  "Importar Cartão Ponto": Upload,
+  "Lançamentos": ClipboardList,
+  "Banco de Horas": Clock3,
+  "Pagamentos": BadgeDollarSign,
+  "Faltas e Folgas": CalendarX,
+  "Declarações e Atestados": ClipboardCheck,
+  "Empresas": Building,
+  "Funcionários": Contact,
+  "Cargos": BriefcaseBusiness,
+  "Departamentos": Network,
+  "Jornadas / Escalas": CalendarDays,
+  "Planejamento Mensal": CalendarRange,
+  "Tarefas": ListChecks,
+  "Férias": Palmtree,
+  "Diário de Ocorrências": ClipboardList,
+  "Parâmetros": SlidersHorizontal,
+  "Análise": Gauge,
+  "Ponto": Timer,
+  "Cadastro": FilePenLine,
+  "Organização": FolderOpen,
+  "Pessoas": UsersRound,
 };
 
+const screenAliases: Readonly<Partial<Record<string, string>>> = {
+  "Configurações": "Parâmetros",
+  "Fechamento": "Fechamento de Ponto",
+  "Importar Cartão de Ponto": "Importar Cartão Ponto",
+  "Atestados": "Declarações e Atestados",
+  "Cadastro de Pessoas": "Funcionários",
+  "Recessos PJ": "Férias",
+  "Sincronizar Planilha": "Importar Cartão Ponto",
+  "Cadastros": "Cadastro",
+};
+
+export function getScreenIcon(name: string): LucideIcon {
+  return screenIcons[screenAliases[name] ?? name] ?? FileText;
+}
+
 export function ScreenBrand({ name, onDark = false }: { name: string; onDark?: boolean }) {
-  const Icon = screenIcons[name] ?? FileText;
+  const Icon = getScreenIcon(name);
   return <div className={`dp-brand${onDark ? " dp-brand-on-dark" : ""}`}>
     <span className="dp-brand-icon" aria-hidden="true"><Icon size={18} strokeWidth={1.8} /></span>
     <span className="dp-brand-label">DP Success • {name}</span>
