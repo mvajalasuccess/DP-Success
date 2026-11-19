@@ -57,6 +57,13 @@
       "when": 1794932903921,
       "tag": "0007_custom_document_records",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795098823990,
+      "tag": "0008_pj_read_for_all_users",
+      "breakpoints": true
     }
   ]
 }
