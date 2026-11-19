@@ -386,6 +386,59 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_asset_access: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delivered_on: string | null
+          employee_id: string
+          id: string
+          identifier: string | null
+          item_name: string
+          kind: string
+          notes: string | null
+          quantity: number
+          returned_on: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delivered_on?: string | null
+          employee_id: string
+          id?: string
+          identifier?: string | null
+          item_name: string
+          kind: string
+          notes?: string | null
+          quantity?: number
+          returned_on?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delivered_on?: string | null
+          employee_id?: string
+          id?: string
+          identifier?: string | null
+          item_name?: string
+          kind?: string
+          notes?: string | null
+          quantity?: number
+          returned_on?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_asset_access_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_audit_history: {
         Row: {
           category: string
@@ -432,6 +485,93 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_career_history: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          employee_id: string
+          id: string
+          movement_type: string
+          new_department_id: string | null
+          new_position_id: string | null
+          new_salary: number | null
+          notes: string | null
+          previous_department_id: string | null
+          previous_position_id: string | null
+          previous_salary: number | null
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_date: string
+          employee_id: string
+          id?: string
+          movement_type: string
+          new_department_id?: string | null
+          new_position_id?: string | null
+          new_salary?: number | null
+          notes?: string | null
+          previous_department_id?: string | null
+          previous_position_id?: string | null
+          previous_salary?: number | null
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          employee_id?: string
+          id?: string
+          movement_type?: string
+          new_department_id?: string | null
+          new_position_id?: string | null
+          new_salary?: number | null
+          notes?: string | null
+          previous_department_id?: string | null
+          previous_position_id?: string | null
+          previous_salary?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_career_history_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_career_history_new_department_id_fkey"
+            columns: ["new_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_career_history_new_position_id_fkey"
+            columns: ["new_position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_career_history_previous_department_id_fkey"
+            columns: ["previous_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_career_history_previous_position_id_fkey"
+            columns: ["previous_position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
             referencedColumns: ["id"]
           },
         ]
@@ -936,10 +1076,20 @@ export type Database = {
           absence_display_quantity: number | null
           absence_display_type: string | null
           certificate_cid: string | null
+          certificate_details: Json | null
+          certificate_display_days: number | null
+          certificate_display_end: string | null
+          certificate_display_notes: string | null
+          certificate_display_start: string | null
           certificate_end_date: string | null
           certificate_start_date: string | null
           certificate_type: string | null
           declaration_date: string | null
+          declaration_details: Json | null
+          declaration_display_end: string | null
+          declaration_display_minutes: number | null
+          declaration_display_reason: string | null
+          declaration_display_start: string | null
           declaration_observation: string | null
           historical_kpi_data_id: string
           id: string
@@ -953,10 +1103,20 @@ export type Database = {
           absence_display_quantity?: number | null
           absence_display_type?: string | null
           certificate_cid?: string | null
+          certificate_details?: Json | null
+          certificate_display_days?: number | null
+          certificate_display_end?: string | null
+          certificate_display_notes?: string | null
+          certificate_display_start?: string | null
           certificate_end_date?: string | null
           certificate_start_date?: string | null
           certificate_type?: string | null
           declaration_date?: string | null
+          declaration_details?: Json | null
+          declaration_display_end?: string | null
+          declaration_display_minutes?: number | null
+          declaration_display_reason?: string | null
+          declaration_display_start?: string | null
           declaration_observation?: string | null
           historical_kpi_data_id: string
           id?: string
@@ -970,10 +1130,20 @@ export type Database = {
           absence_display_quantity?: number | null
           absence_display_type?: string | null
           certificate_cid?: string | null
+          certificate_details?: Json | null
+          certificate_display_days?: number | null
+          certificate_display_end?: string | null
+          certificate_display_notes?: string | null
+          certificate_display_start?: string | null
           certificate_end_date?: string | null
           certificate_start_date?: string | null
           certificate_type?: string | null
           declaration_date?: string | null
+          declaration_details?: Json | null
+          declaration_display_end?: string | null
+          declaration_display_minutes?: number | null
+          declaration_display_reason?: string | null
+          declaration_display_start?: string | null
           declaration_observation?: string | null
           historical_kpi_data_id?: string
           id?: string
@@ -1385,6 +1555,225 @@ export type Database = {
             columns: ["time_record_id"]
             isOneToOne: false
             referencedRelation: "time_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pj_document_catalog: {
+        Row: {
+          active: boolean
+          category: string
+          id: string
+          name: string
+        }
+        Insert: {
+          active?: boolean
+          category: string
+          id?: string
+          name: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      pj_document_requirements: {
+        Row: {
+          catalog_id: string
+          id: string
+          is_applicable: boolean
+          person_id: string
+        }
+        Insert: {
+          catalog_id: string
+          id?: string
+          is_applicable?: boolean
+          person_id: string
+        }
+        Update: {
+          catalog_id?: string
+          id?: string
+          is_applicable?: boolean
+          person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pj_document_requirements_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "pj_document_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pj_document_requirements_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "pj_people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pj_documents: {
+        Row: {
+          category: string
+          completed_on: string | null
+          document_name: string
+          due_date: string | null
+          id: string
+          imported_from_audit: boolean
+          is_standard: boolean
+          no_due_date: boolean
+          notes: string | null
+          person_id: string
+          signature_status: string
+        }
+        Insert: {
+          category: string
+          completed_on?: string | null
+          document_name: string
+          due_date?: string | null
+          id?: string
+          imported_from_audit?: boolean
+          is_standard?: boolean
+          no_due_date?: boolean
+          notes?: string | null
+          person_id: string
+          signature_status?: string
+        }
+        Update: {
+          category?: string
+          completed_on?: string | null
+          document_name?: string
+          due_date?: string | null
+          id?: string
+          imported_from_audit?: boolean
+          is_standard?: boolean
+          no_due_date?: boolean
+          notes?: string | null
+          person_id?: string
+          signature_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pj_documents_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "pj_people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pj_people: {
+        Row: {
+          activity: string | null
+          birth_date: string | null
+          cnpj: string | null
+          company_id: string | null
+          cpf: string | null
+          end_date: string | null
+          full_name: string
+          id: string
+          start_date: string
+          status: string
+        }
+        Insert: {
+          activity?: string | null
+          birth_date?: string | null
+          cnpj?: string | null
+          company_id?: string | null
+          cpf?: string | null
+          end_date?: string | null
+          full_name: string
+          id?: string
+          start_date: string
+          status?: string
+        }
+        Update: {
+          activity?: string | null
+          birth_date?: string | null
+          cnpj?: string | null
+          company_id?: string | null
+          cpf?: string | null
+          end_date?: string | null
+          full_name?: string
+          id?: string
+          start_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pj_people_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pj_recesses: {
+        Row: {
+          acquisition_end_date: string | null
+          acquisition_start_date: string | null
+          completed: boolean
+          completed_at: string | null
+          concession_end_date: string | null
+          concession_start_date: string | null
+          created_at: string
+          days_quantity: number | null
+          end_date: string | null
+          entitled_days: number | null
+          id: string
+          leave_type: string
+          notes: string | null
+          person_id: string
+          start_date: string | null
+          title: string | null
+        }
+        Insert: {
+          acquisition_end_date?: string | null
+          acquisition_start_date?: string | null
+          completed?: boolean
+          completed_at?: string | null
+          concession_end_date?: string | null
+          concession_start_date?: string | null
+          created_at?: string
+          days_quantity?: number | null
+          end_date?: string | null
+          entitled_days?: number | null
+          id?: string
+          leave_type?: string
+          notes?: string | null
+          person_id: string
+          start_date?: string | null
+          title?: string | null
+        }
+        Update: {
+          acquisition_end_date?: string | null
+          acquisition_start_date?: string | null
+          completed?: boolean
+          completed_at?: string | null
+          concession_end_date?: string | null
+          concession_start_date?: string | null
+          created_at?: string
+          days_quantity?: number | null
+          end_date?: string | null
+          entitled_days?: number | null
+          id?: string
+          leave_type?: string
+          notes?: string | null
+          person_id?: string
+          start_date?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pj_recesses_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "pj_people"
             referencedColumns: ["id"]
           },
         ]
@@ -2094,6 +2483,7 @@ export type Database = {
         Args: { _full_name: string; _user_id: string }
         Returns: undefined
       }
+      apply_career_movement: { Args: { p_id: string }; Returns: undefined }
       can_manage: { Args: { _user_id: string }; Returns: boolean }
       cancel_invite: { Args: { _invite_id: string }; Returns: undefined }
       certificate_cid: { Args: { _certificate_id: string }; Returns: string }
