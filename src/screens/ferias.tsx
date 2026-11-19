@@ -470,7 +470,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
                       <div>
                         <p className="font-medium">{isVacationLeave(p) ? (pj ? "Recesso" : "Férias") : (LEAVE_LABELS[p.leave_type || ""] || p.leave_type)}</p>
-                        {startOf(p) && endOf(p) && <p className="text-muted-foreground">{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} dias no bloco{startOf(p) > currentDate ? " · Programado" : confirmedLeave(p) ? " · Concluído" : " · Aguardando confirmação"}</p>}
+                        {startOf(p) && endOf(p) && <p className="text-muted-foreground">{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} {blockDays(p) === 1 ? "dia" : "dias"}{startOf(p) > currentDate ? " · Programado" : confirmedLeave(p) ? " · Concluído" : " · Aguardando confirmação"}</p>}
                         {p.notes && <p className="whitespace-pre-wrap text-muted-foreground">{p.notes}</p>}
                       </div>
                       <div className="flex gap-2">
