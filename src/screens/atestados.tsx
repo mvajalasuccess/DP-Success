@@ -1,3 +1,4 @@
+import { canSelectNewAttendanceEmployee } from "@/lib/attendance-employee";
 // @ts-nocheck -- compact legacy code; strict index-signature checks disabled until refactor
 import {attendanceDetails,expandAttendance,type AttendanceDetail} from "@/lib/historical-attendance-details";
 import { ArrowLeft, ChevronDown, ChevronUp, Download, FileSpreadsheet, FileText, Pencil, Plus, Trash2 } from "lucide-react";
@@ -31,7 +32,7 @@ function countDays(start: string, end: string) {
 }
 
 type Declaration = { id: string; employee_id: string; occurrence_date: string; quantity: number; notes: string | null; employees?: { full_name: string } | null };
-type Period = { id: string; start_date: string; end_date: string };
+type Period = { id: string; start_date: string; end_date: string; status?: string };
 type HistoricalBaseRow = { id: string; employee_id: string | null; employee_name: string; registration: string | null; period_id: string; reference_year: number; reference_month: number; certificate_minutes: number; declaration_minutes: number; period_start?: string; period_end?: string; certificate_type?: string | null; certificate_cid?: string | null; declaration_observation?: string | null; certificate_display_start?:string|null; certificate_display_end?:string|null; certificate_display_days?:number|null; certificate_display_notes?:string|null; declaration_display_start?:string|null; declaration_display_end?:string|null; declaration_display_minutes?:number|null; declaration_display_reason?:string|null };
 type HistoricalAnnotationForm = { details:AttendanceDetail[]; row: HistoricalBaseRow; certificate_type: string; certificate_cid: string; declaration_observation: string; kind:"atestado"|"declaracao"; start:string; end:string; days:string; quantity:string; notes:string; reason:string };
 
@@ -60,10 +61,16 @@ export function Atestados() {
   const [editingDeclaration, setEditingDeclaration] = useState<Declaration | null>(null);
 
   const referenceDate = mode === "declaracao" ? declarationForm.occurrence_date : form.start_date;
-  const employeesForDate = employees.filter(e =>
-    (!companyFilter || e.company_id === companyFilter) &&
-    (!referenceDate || ((!e.hire_date || e.hire_date <= referenceDate) && (!e.termination_date || e.termination_date >= referenceDate)))
-  );
+  const selectedEditingRecord = (mode === "declaracao" ? editingDeclaration : editing);
+  const openPeriod = periods.find(period => period.status === "aberto");
+  const employeesForDate = employees.filter(employee => {
+    if (employee.id === selectedEditingRecord?.employee_id) return true;
+    if (companyFilter && employee.company_id !== companyFilter) return false;
+    const matchesDate = !referenceDate ||
+      ((!employee.hire_date || employee.hire_date <= referenceDate) &&
+       (!employee.termination_date || employee.termination_date >= referenceDate));
+    return matchesDate && (selectedEditingRecord || canSelectNewAttendanceEmployee(employee, openPeriod));
+  });
 
   async function load() {
     setError("");
@@ -75,7 +82,7 @@ export function Atestados() {
     else setRows((data ?? []) as Certificate[]);
     const decl = await supabase.from("occurrences").select("id,employee_id,occurrence_date,quantity,notes,employees(full_name),occurrence_types!inner(code)").eq("occurrence_types.code", "declaracao_horas").order("occurrence_date", { ascending: false });
     if (!decl.error) setDeclarations((decl.data ?? []) as unknown as Declaration[]);
-    const { data: periodData } = await supabase.from("time_periods").select("id,start_date,end_date").order("start_date", { ascending: false });
+    const { data: periodData } = await supabase.from("time_periods").select("id,start_date,end_date,status").order("start_date", { ascending: false });
     const loadedPeriods = (periodData ?? []) as Period[];
     setPeriods(loadedPeriods);
 
@@ -433,6 +440,13 @@ export function Atestados() {
   }
   async function save() {
     setError("");
+    if (!selectedEditingRecord) {
+      const employeeId = mode === "declaracao" ? declarationForm.employee_id : form.employee_id;
+      if (!openPeriod || (employeeId && !employeesForDate.some(employee => employee.id === employeeId))) {
+        setError(openPeriod ? "Selecione um funcionário ativo na competência em aberto." : "Nenhuma competência de ponto em aberto.");
+        return;
+      }
+    }
     if (mode === "declaracao") {
       const [h, m] = declarationForm.quantity.split(":").map(Number);
       const minutes = (h || 0) * 60 + (m || 0);
@@ -568,7 +582,7 @@ export function Atestados() {
     {open && mode === "atestado" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-xl overflow-y-auto p-6">
       <h2 className="text-xl font-bold">{editing ? "Editar atestado" : "Novo atestado"}</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <label className="grid gap-1 text-sm md:col-span-2">Funcionário<select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+        <label className="grid gap-1 text-sm md:col-span-2">Funcionário<select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2"><option value="">{!selectedEditingRecord && !openPeriod ? "Nenhuma competência em aberto" : "Funcionário"}</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         <label className="grid gap-1 text-sm ">Início<input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
         <label className="grid gap-1 text-sm ">Fim<input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
         <label className="grid gap-1 text-sm ">Quantidade de dias<input type="number" min="1" step="1" placeholder={`Quantidade de dias (automático: ${countDays(form.start_date, form.end_date) || "—"})`} value={form.days} onChange={e => setForm({ ...form, days: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
@@ -582,7 +596,7 @@ export function Atestados() {
       <h2 className="text-xl font-bold">{editingDeclaration ? "Editar declaração de horas" : "Nova declaração de horas"}</h2>
       <p className="mt-1 text-sm text-muted-foreground">Informe somente as horas que serão efetivamente abonadas.</p>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <label className="grid gap-1 text-sm md:col-span-2">Funcionário<select value={declarationForm.employee_id} onChange={e => setDeclarationForm({ ...declarationForm, employee_id: e.target.value })} className="rounded-lg border px-3 py-2"><option value="">Funcionário</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
+        <label className="grid gap-1 text-sm md:col-span-2">Funcionário<select value={declarationForm.employee_id} onChange={e => setDeclarationForm({ ...declarationForm, employee_id: e.target.value })} className="rounded-lg border px-3 py-2"><option value="">{!selectedEditingRecord && !openPeriod ? "Nenhuma competência em aberto" : "Funcionário"}</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         <label className="grid gap-1 text-sm ">Data da declaração<input type="date" value={declarationForm.occurrence_date} onChange={e => setDeclarationForm({ ...declarationForm, occurrence_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
         <label className="grid gap-1 text-sm ">Horas abonadas<input type="time" value={declarationForm.quantity} onChange={e => setDeclarationForm({ ...declarationForm, quantity: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
         <label className="grid gap-1 text-sm md:col-span-2">Categoria<select value={declarationForm.reason} onChange={e => setDeclarationForm({ ...declarationForm, reason: e.target.value })} className="rounded-lg border px-3 py-2">{declarationReasons.map(reason => <option key={reason} value={reason}>{reason}</option>)}</select></label>

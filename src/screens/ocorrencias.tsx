@@ -1,3 +1,4 @@
+import { canSelectNewAttendanceEmployee } from "@/lib/attendance-employee";
 import { ArrowLeft, ChevronDown, ChevronUp, Download, FileSpreadsheet, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useEffect, useMemo, useState } from "react";
@@ -70,7 +71,7 @@ export function Ocorrencias() {
   const [historicalAnnotationsReady, setHistoricalAnnotationsReady] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [types, setTypes] = useState<OccType[]>([]);
-  const [periods, setPeriods] = useState<{ id: string; start_date: string; end_date: string }[]>([]);
+  const [periods, setPeriods] = useState<{ id: string; start_date: string; end_date: string; status?: string }[]>([]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Occ | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -91,14 +92,17 @@ export function Ocorrencias() {
   const selectedCode = selectedType?.code ?? "";
   const isFalta = ["folga_abonada", "folga_descontada", "falta_justificada", "falta_injustificada"].includes(selectedCode);
 
-  const employeesForDate = useMemo(() => {
+  const selectedEditingRecord = editing;
+  const openPeriod = periods.find(period => period.status === "aberto");
+  const employeesForDate = employees.filter(employee => {
+    if (employee.id === selectedEditingRecord?.employee_id) return true;
+    if (companyFilter && employee.company_id !== companyFilter) return false;
     const referenceDate = form.occurrence_date;
-    return employees.filter(e =>
-      (!companyFilter || e.company_id === companyFilter) &&
-      (!referenceDate || ((!e.hire_date || e.hire_date <= referenceDate) &&
-        (!e.termination_date || e.termination_date >= referenceDate)))
-    );
-  }, [employees, form.occurrence_date, companyFilter]);
+    const matchesDate = !referenceDate ||
+      ((!employee.hire_date || employee.hire_date <= referenceDate) &&
+       (!employee.termination_date || employee.termination_date >= referenceDate));
+    return matchesDate && (selectedEditingRecord || canSelectNewAttendanceEmployee(employee, openPeriod));
+  });
 
   async function load() {
     setError("");
@@ -141,12 +145,12 @@ export function Ocorrencias() {
     const [e, t, p] = await Promise.all([
       (supabase as any).from("employees").select("id,full_name,registration,status,hire_date,termination_date,company_id").order("full_name"),
       supabase.from("occurrence_types").select("id,code,name,unit,requires_justification,affects_balance").eq("active", true).order("name"),
-      supabase.from("time_periods").select("id,start_date,end_date").order("start_date", { ascending: false }),
+      supabase.from("time_periods").select("id,start_date,end_date,status").order("start_date", { ascending: false }),
     ]);
 
     setEmployees((e.data ?? []) as Employee[]);
     setTypes((t.data ?? []) as OccType[]);
-    setPeriods((p.data ?? []) as { id: string; start_date: string; end_date: string }[]);
+    setPeriods((p.data ?? []) as { id: string; start_date: string; end_date: string; status?: string }[]);
   }
 
   useEffect(() => {
@@ -238,7 +242,7 @@ export function Ocorrencias() {
     const value = row.absence_display_quantity ?? row.absence_quantity;
     return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   }
-  function periodLabel(period: { id: string; start_date: string; end_date: string }) {
+  function periodLabel(period: { id: string; start_date: string; end_date: string; status?: string }) {
     return `${formatDate(displayPeriodStart(period.start_date, period.end_date))} a ${formatDate(period.end_date)}`;
   }
 
@@ -279,6 +283,13 @@ export function Ocorrencias() {
 
   async function save() {
     setError("");
+    if (!selectedEditingRecord) {
+      const employeeId = form.employee_id;
+      if (!openPeriod || (employeeId && !employeesForDate.some(employee => employee.id === employeeId))) {
+        setError(openPeriod ? "Selecione um funcionário ativo na competência em aberto." : "Nenhuma competência de ponto em aberto.");
+        return;
+      }
+    }
 
     if (!form.employee_id || !form.occurrence_type_id || !form.occurrence_date) {
       setError("Informe funcionário, tipo e data.");
@@ -629,7 +640,7 @@ export function Ocorrencias() {
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2">
-                <option value="">Funcionário</option>
+                <option value="">{!selectedEditingRecord && !openPeriod ? "Nenhuma competência em aberto" : "Funcionário"}</option>
                 {employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
               </select>
 
