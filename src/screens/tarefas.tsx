@@ -11,8 +11,8 @@ type Task = {
   created_by:string|null; recurrence:"none"|"daily"|"weekly"|"monthly"|"yearly"; recurrence_until:string|null;
 };
 type ChecklistItem={id:string;task_id:string;title:string;completed:boolean;position:number};
-type Employee={id:string;full_name:string};
-type Profile={id:string;full_name:string|null;email:string|null};
+type Employee={id:string;full_name:string;status?:string|null};
+type Profile={id:string;full_name:string|null;email:string|null;active?:boolean|null};
 
 const priorities=[["urgent","Urgente"],["high","Alta"],["medium","Média"],["low","Baixa"]];
 const categories=["RH","DP","Admissão","Demissão","Férias","Benefícios","SST","Ponto","Folha","Ação de RH","Outros"];
@@ -30,8 +30,8 @@ export function Tarefas(){
   async function load(){
     const[t,e,p,c]=await Promise.all([
       (supabase as any).from("tasks").select("*").order("due_date",{ascending:true,nullsFirst:false}).order("created_at",{ascending:false}),
-      supabase.from("employees").select("id,full_name").order("full_name"),
-      (supabase as any).from("profiles").select("id,full_name,email").order("full_name"),
+      supabase.from("employees").select("id,full_name,status").order("full_name"),
+      (supabase as any).from("profiles").select("id,full_name,email,active").order("full_name"),
       (supabase as any).from("task_checklist_items").select("*").order("position",{ascending:true})
     ]);
     const er=[t,e,p,c].find(x=>x.error)?.error;if(er)setError(er.message);
@@ -107,8 +107,8 @@ export function Tarefas(){
           <Field label="Status"><select value={form.status} onChange={e=>setForm({...form,status:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="todo">A fazer</option><option value="in_progress">Em andamento</option><option value="done">Concluída</option></select></Field>
           <Field label="Prioridade"><select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} className="w-full rounded-lg border px-3 py-2.5">{priorities.map(p=><option key={p[0]} value={p[0]}>{p[1]}</option>)}</select></Field>
           <Field label="Categoria"><select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="w-full rounded-lg border px-3 py-2.5">{categories.map(c=><option key={c}>{c}</option>)}</select></Field>
-          <Field label="Funcionário relacionado"><select value={form.employee_id} onChange={e=>setForm({...form,employee_id:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="">Nenhum</option>{employees.map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></Field>
-          <Field label="Responsável"><select value={form.assignee_id} onChange={e=>setForm({...form,assignee_id:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="">Eu / sem responsável</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.full_name||p.email||"Usuário"}</option>)}</select></Field>
+          <Field label="Funcionário relacionado"><select value={form.employee_id} onChange={e=>setForm({...form,employee_id:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="">Nenhum</option>{employees.filter(e=>e.id===editing?.employee_id||e.status?.trim().toLowerCase()==="ativo").map(e=><option key={e.id} value={e.id}>{e.full_name}</option>)}</select></Field>
+          <Field label="Responsável"><select value={form.assignee_id} onChange={e=>setForm({...form,assignee_id:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="">Eu / sem responsável</option>{profiles.filter(p=>p.id===editing?.assignee_id||p.active===true).map(p=><option key={p.id} value={p.id}>{p.full_name||p.email||"Usuário"}</option>)}</select></Field>
           <Field label="Prazo"><input type="date" value={form.due_date} onChange={e=>setForm({...form,due_date:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>
           <Field label="Lembrar em"><input type="datetime-local" value={form.reminder_at} onChange={e=>setForm({...form,reminder_at:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>
           <Field label="Repetir"><select value={form.recurrence} onChange={e=>setForm({...form,recurrence:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="none">Não repetir</option><option value="daily">Diariamente</option><option value="weekly">Semanalmente</option><option value="monthly">Mensalmente</option><option value="yearly">Anualmente</option></select></Field>

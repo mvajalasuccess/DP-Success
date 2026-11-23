@@ -105,7 +105,7 @@ export function Launches() {
   const names = new Map(employees.map(e => [e.id, e.full_name]));
 
   function openNew() {
-    setEditing(null); setEmployeeId(employeeFilter); setDate(period?.end_date ?? "");
+    setEditing(null); setEmployeeId(employeesInPeriod.some(e => e.id === employeeFilter && e.status?.trim().toLowerCase() === "ativo") ? employeeFilter : ""); setDate(period?.end_date ?? "");
     setLines([{ type: "HE_60", hours: "00:00" }]); setDebitHours("00:00"); setError(""); setOpen(true);
   }
   function openEdit(g: Group) {
@@ -163,6 +163,12 @@ export function Launches() {
     if (!employeeId || !date) return setError("Selecione o funcionário e a data.");
     const target = periodForDate(periods, date);
     if (!target) return setError("Não existe competência cadastrada que contenha esta data. Crie o fechamento em Fechamento de Ponto.");
+    if (!editing && !employees.some(employee => employee.id === employeeId &&
+      employee.status?.trim().toLowerCase() === "ativo" &&
+      (!employee.hire_date || employee.hire_date <= date) &&
+      (!employee.termination_date || employee.termination_date >= date))) {
+      return setError("Selecione um funcionário ativo com vínculo na data do lançamento.");
+    }
     if (target.status === "fechado" && !editing) return setError("A competência desta data está fechada. Reabra-a para criar novos lançamentos.");
     const valid = lines.map(l => ({ type: l.type, minutes: hoursToMinutes(l.hours) })).filter(l => l.minutes > 0);
     const debit = hoursToMinutes(debitHours);
@@ -274,7 +280,7 @@ export function Launches() {
             <label className="grid gap-1.5 text-sm font-medium">Funcionário
               <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
                 <option value="">Selecione</option>
-                {employeesInPeriod.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                {employeesInPeriod.filter(e => e.id === editing?.employee_id || e.status?.trim().toLowerCase() === "ativo").map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
               </select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium">Data

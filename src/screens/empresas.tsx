@@ -77,6 +77,10 @@ export function Companies() {
     const { count, error: countError } = await (supabase as any).from("employees").select("id", { count: "exact", head: true }).eq("company_id", company.id);
     if (countError) { setError(countError.message); return; }
     if ((count ?? 0) > 0) { setError("Esta empresa possui funcionários vinculados. Transfira ou desvincule esses funcionários antes de excluir."); return; }
+    const { count: contractorCount, error: contractorError } = await (supabase as any).from("pj_people")
+      .select("id", { count: "exact", head: true }).eq("company_id", company.id);
+    if (contractorError) { setError(contractorError.message); return; }
+    if ((contractorCount ?? 0) > 0) { setError("Esta empresa possui prestadores PJ vinculados."); return; }
     const { error } = await (supabase as any).from("companies").delete().eq("id", company.id);
     if (error) setError(error.message);
     else await loadCompanies();

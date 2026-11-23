@@ -286,7 +286,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
         const hasOfficialBlocks=uniqueOfficialBlocks.length>0;
         const terminationPaid=vacations.some(p=>p.termination_paid);
         const entitledDays=entitlementOf(vacations,raw.acquisitionStart,raw.acquisitionEnd);
-        const status:Entitlement["status"]=terminationPaid||(officialDays>=entitledDays&&uniqueOfficialBlocks.every(confirmedLeave))||(pj&&vacations.length>0&&vacations.every(p=>p.completed&&(!startOf(p)||hasEnded(p))))?"completed":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
+        const status:Entitlement["status"]=terminationPaid||(officialDays>=entitledDays&&uniqueOfficialBlocks.every(confirmedLeave))||(pj&&vacations.length>0&&vacations.every(p=>p.completed&&(!startOf(p)||hasEnded(p))))?"completed":current>raw.concessionEnd&&officialDays<entitledDays?"overdue":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
         cycles.push({...raw,status,vacations,entitledDays});
       }
       return cycles;

@@ -441,6 +441,13 @@ export function Atestados() {
   async function save() {
     setError("");
     if (!selectedEditingRecord) {
+      const launchDate = referenceDate;
+      const endDate = mode === "atestado" ? form.end_date : "";
+      if (openPeriod && ((launchDate && (launchDate < openPeriod.start_date || launchDate > openPeriod.end_date)) ||
+        (endDate && (endDate < openPeriod.start_date || endDate > openPeriod.end_date)))) {
+        setError("Informe uma data dentro da competência em aberto.");
+        return;
+      }
       const employeeId = mode === "declaracao" ? declarationForm.employee_id : form.employee_id;
       if (!openPeriod || (employeeId && !employeesForDate.some(employee => employee.id === employeeId))) {
         setError(openPeriod ? "Selecione um funcionário ativo na competência em aberto." : "Nenhuma competência de ponto em aberto.");
@@ -454,7 +461,7 @@ export function Atestados() {
       const { data: type } = await supabase.from("occurrence_types").select("id").eq("code", "declaracao_horas").single();
       if (!type?.id) { setError("Tipo de declaração não encontrado."); return; }
       const { data: periods } = await supabase.from("time_periods").select("id,start_date,end_date");
-      const period = (periods ?? []).find((p: any) => declarationForm.occurrence_date >= p.start_date && declarationForm.occurrence_date <= p.end_date);
+      const period = !editingDeclaration ? openPeriod : (periods ?? []).find((p: any) => declarationForm.occurrence_date >= p.start_date && declarationForm.occurrence_date <= p.end_date);
       const notes = declarationForm.reason + (declarationForm.notes.trim() ? " — " + declarationForm.notes.trim() : "");
       setSaving(true);
       const result = editingDeclaration

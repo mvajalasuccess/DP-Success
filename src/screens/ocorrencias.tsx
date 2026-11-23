@@ -284,6 +284,13 @@ export function Ocorrencias() {
   async function save() {
     setError("");
     if (!selectedEditingRecord) {
+      const launchDate = form.occurrence_date;
+      const endDate = form.end_date;
+      if (openPeriod && ((launchDate && (launchDate < openPeriod.start_date || launchDate > openPeriod.end_date)) ||
+        (endDate && (endDate < openPeriod.start_date || endDate > openPeriod.end_date)))) {
+        setError("Informe uma data dentro da competência em aberto.");
+        return;
+      }
       const employeeId = form.employee_id;
       if (!openPeriod || (employeeId && !employeesForDate.some(employee => employee.id === employeeId))) {
         setError(openPeriod ? "Selecione um funcionário ativo na competência em aberto." : "Nenhuma competência de ponto em aberto.");
@@ -312,7 +319,7 @@ export function Ocorrencias() {
 
     setSaving(true);
 
-    const period = periods.find(p => form.occurrence_date >= p.start_date && form.occurrence_date <= p.end_date);
+    const period = !editing ? openPeriod : periods.find(p => form.occurrence_date >= p.start_date && form.occurrence_date <= p.end_date);
     const quantity = Number(form.quantity);
 
     const notes = form.notes.trim() || null;

@@ -227,7 +227,7 @@ export function Comparativos() {
 
   const visibleEmployees = useMemo(() => {
     const q = employeeSearch.trim().toLowerCase();
-    return employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || (e.status ?? "").toLowerCase() === employeeStatusFilter) && (!q || e.full_name.toLowerCase().includes(q)));
+    return employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || e.status?.trim().toLowerCase() === employeeStatusFilter) && (!q || e.full_name.toLowerCase().includes(q)));
   }, [employees, employeeSearch, companyFilter, employeeStatusFilter]);
 
   const visiblePeriods = useMemo(() => {
@@ -235,11 +235,11 @@ export function Comparativos() {
     return periods.filter(p => !q || `${String(p.reference_month).padStart(2, "0")}/${p.reference_year}`.includes(q));
   }, [periods, periodSearch]);
 
-  useEffect(() => { setSelectedEmployees(employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || (e.status ?? "").toLowerCase() === employeeStatusFilter)).map(e => e.id)); }, [companyFilter, employeeStatusFilter, employees]);
+  useEffect(() => { setSelectedEmployees(employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || e.status?.trim().toLowerCase() === employeeStatusFilter)).map(e => e.id)); }, [companyFilter, employeeStatusFilter, employees]);
 
   function toggleEmployee(id: string) { setSelectedEmployees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function togglePeriod(id: string) { setSelectedPeriods(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
-  function selectAllEmployees() { setSelectedEmployees(employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || (e.status ?? "").toLowerCase() === employeeStatusFilter)).map(e => e.id)); }
+  function selectAllEmployees() { setSelectedEmployees(employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || e.status?.trim().toLowerCase() === employeeStatusFilter)).map(e => e.id)); }
   function selectAllPeriods() { setSelectedPeriods(periods.map(p => p.id)); }
 
   const columns: [keyof Totals, string][] = [

@@ -41,7 +41,7 @@ export function BankHours() {
     void (async () => {
       const r = await (supabase as any).from("employees").select("id,full_name,status,termination_date,company_id").order("full_name");
       if (r.error) setError(r.error.message);
-      else { setEmployees(r.data ?? []); const active = (r.data ?? []).find((e: any) => e.status !== "inativo"); if (active) setEmployeeId(active.id); else if (r.data?.[0]) setEmployeeId(r.data[0].id); }
+      else { setEmployees(r.data ?? []); const active = (r.data ?? []).find((e: any) => e.status?.trim().toLowerCase() === "ativo"); if (active) setEmployeeId(active.id); else if (r.data?.[0]) setEmployeeId(r.data[0].id); }
     })();
   }, []);
 
@@ -76,7 +76,7 @@ export function BankHours() {
 
   useEffect(() => { void loadBankData(); }, [employeeId]);
 
-  const visibleEmployees = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (statusFilter === "todos" || (statusFilter === "ativo" ? e.status !== "inativo" : e.status === "inativo")));
+  const visibleEmployees = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (statusFilter === "todos" || (statusFilter === "ativo" ? e.status?.trim().toLowerCase() === "ativo" : e.status?.trim().toLowerCase() === "inativo")));
 
   function goToPreviousEmployee() {
     if (!visibleEmployees.length) return;
@@ -273,13 +273,13 @@ export function BankHours() {
       <Card className="mt-6 p-4">
         <div className="flex flex-wrap items-end gap-4">
           <label className="grid w-full min-w-0 gap-1.5 text-sm font-medium sm:w-[220px]">Empresa
-            <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(x => (!value || x.company_id === value) && (statusFilter === "todos" || (statusFilter === "ativo" ? x.status !== "inativo" : x.status === "inativo"))); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
+            <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(x => (!value || x.company_id === value) && (statusFilter === "todos" || (statusFilter === "ativo" ? x.status?.trim().toLowerCase() === "ativo" : x.status?.trim().toLowerCase() === "inativo"))); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
           </label>
           <label className="grid w-full min-w-0 gap-1.5 text-sm font-medium sm:w-[150px]">Status
             <select className={inputCls} value={statusFilter} onChange={e => {
               const next = e.target.value as "ativo" | "inativo" | "todos";
               setStatusFilter(next);
-              const first = employees.find(x => (!companyFilter || x.company_id === companyFilter) && (next === "todos" || (next === "ativo" ? x.status !== "inativo" : x.status === "inativo")));
+              const first = employees.find(x => (!companyFilter || x.company_id === companyFilter) && (next === "todos" || (next === "ativo" ? x.status?.trim().toLowerCase() === "ativo" : x.status?.trim().toLowerCase() === "inativo")));
               setEmployeeId(first?.id ?? "");
             }}>
               <option value="ativo">Ativos</option>

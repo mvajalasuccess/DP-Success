@@ -95,7 +95,11 @@ export function PlanejamentoMensal() {
       if(d.slice(0,4)===String(year)&&Number(d.slice(5,7))===month+1)
         all.push({id:"t-"+t.id,date:d,title:t.title||"Prazo",detail:t.category||"Tarefa",kind:"task"});
     });
+    const activeCltIds = new Set((emp.data ?? []).filter((employee: any) =>
+      employee.status?.trim().toLowerCase() === "ativo" && (!employee.termination_date || employee.termination_date > dateKey(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())))
+      .map((employee: any) => employee.id));
     (docs.data||[]).forEach((doc:any)=>{
+      if (!activeCltIds.has(doc.employee_id)) return;
       const d=String(doc.due_date||"").slice(0,10);
       if(d.slice(0,4)!==String(year)||Number(d.slice(5,7))!==month+1) return;
       const label=String(doc.document_name||"Documento");

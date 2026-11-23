@@ -104,114 +104,27 @@ export function ImportarCartaoPonto() {
     setError("");
     setMessage("");
 
-    let insertedCredits = 0;
-    let insertedDebits = 0;
-    let insertedSummary = 0;
-
     try {
-      // launch_group_id é UUID no banco; não podemos usar LIKE nem gravar
-      // o identificador textual "pdf:..." nessa coluna. Usamos a fingerprint
-      // no campo de observação para detectar uma mesma importação.
-      const importFingerprint = `[PDF_IMPORT:${document.fingerprint}]`;
-      const overtimeDuplicateCheck = await supabase
-        .from("overtime_records")
-        .select("id")
-        .ilike("notes", `%${importFingerprint}%`)
-        .limit(1);
-      if (overtimeDuplicateCheck.error) throw new Error(overtimeDuplicateCheck.error.message);
-
-      const bankDuplicateCheck = await supabase
-        .from("bank_hours")
-        .select("id")
-        .ilike("justification", `%${importFingerprint}%`)
-        .limit(1);
-      if (bankDuplicateCheck.error) throw new Error(bankDuplicateCheck.error.message);
-
-      if (overtimeDuplicateCheck.data?.length || bankDuplicateCheck.data?.length) {
-        // Reenviar o mesmo PDF corrige a categoria da importação anterior sem duplicar lançamentos.
-        const wronglyClassified = await supabase
-          .from("overtime_records")
-          .select("id")
-          .eq("launch_type", "ADICIONAL_NOTURNO")
-          .ilike("notes", `%${importFingerprint}%`)
-          .ilike("notes", "%Importado do Cartão Ponto — Adicional noturno%");
-        if (wronglyClassified.error) throw new Error(wronglyClassified.error.message);
-
-        if (wronglyClassified.data?.length) {
-          const repaired = await supabase
-            .from("overtime_records")
-            .update({
-              launch_type: "HE_60_NOTURNO",
-              rate_percent: 80,
-              notes: `${importFingerprint} Importado do Cartão Ponto — HE 60% + 20% noturno`,
-            })
-            .eq("launch_type", "ADICIONAL_NOTURNO")
-            .ilike("notes", `%${importFingerprint}%`)
-            .ilike("notes", "%Importado do Cartão Ponto — Adicional noturno%");
-          if (repaired.error) throw new Error(repaired.error.message);
-          setMessage(`Correção concluída: ${formatCount(wronglyClassified.data.length)} lançamento(s) foram reclassificados para HE 60% + 20% noturno. Nenhum crédito ou débito foi duplicado.`);
-          return;
-        }
-
-        throw new Error("Este PDF já foi importado e não há lançamentos pendentes dessa correção. Nenhum registro foi duplicado.");
+      const { data, error } = await (supabase as any).rpc("import_point_card_pdf", {
+        fingerprint: document.fingerprint,
+        entries: matches.map(row => ({
+          employee_id: row.employeeId,
+          period_id: row.period!.id,
+          credit: row.creditMinutes,
+          debit: row.debitMinutes,
+          balance: row.monthBalanceMinutes,
+          interjornada: row.interjornadaMinutes,
+          night: row.he60NightMinutes,
+        })),
+      });
+      if (error) throw new Error(error.message);
+      if (data.repaired > 0) {
+        setMessage(`Correção concluída: ${formatCount(data.repaired)} lançamento(s) reclassificados para HE 60% + 20% noturno.`);
+      } else {
+        setMessage(`Importação concluída: ${formatCount(data.credits)} créditos, ${formatCount(data.debits)} débitos e ${formatCount(data.summary)} lançamentos de resumo.`);
       }
-
-      const { data: auth } = await supabase.auth.getUser();
-      for (const row of matches) {
-        // Cada funcionário do PDF recebe um único grupo UUID. Assim, Crédito,
-        // Débito, Interjornada e HE 60% + 20% noturno permanecem vinculados e podem ser
-        // editados/excluídos juntos na tela de Lançamentos.
-        const groupId = crypto.randomUUID();
-
-        if (row.creditMinutes > 0) {
-          const result = await supabase.from("overtime_records").insert({
-            employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
-            minutes: row.creditMinutes, launch_type: "HE_60", rate_percent: 60, launch_group_id: groupId,
-            notes: `${importFingerprint} Importado do Cartão Ponto — Crédito total do período`,
-          });
-          if (result.error) throw new Error(row.employeeName + ": " + result.error.message);
-          insertedCredits++;
-        }
-
-        if (row.debitMinutes > 0) {
-          const result = await supabase.from("bank_hours").insert({
-            employee_id: row.employeeId!, entry_date: row.period!.end_date, period_id: row.period!.id,
-            kind: "debito", minutes: row.debitMinutes, previous_balance_minutes: 0, balance_minutes: row.monthBalanceMinutes,
-            launch_group_id: groupId,
-            justification: `${importFingerprint} Importado do Cartão Ponto — Débito total do período`,
-            created_by: auth.user?.id ?? null,
-          });
-          if (result.error) throw new Error(row.employeeName + ": " + result.error.message);
-          insertedDebits++;
-        }
-
-        const summaryRows: Array<{ employee_id: string; reference_date: string; period_id: string; minutes: number; launch_type: "INTERJORNADA_50" | "HE_60_NOTURNO"; rate_percent: number; launch_group_id: string; notes: string }> = [];
-        if (row.interjornadaMinutes > 0) summaryRows.push({
-          employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
-          minutes: row.interjornadaMinutes, launch_type: "INTERJORNADA_50", rate_percent: 50, launch_group_id: groupId,
-          notes: `${importFingerprint} Importado do Cartão Ponto — Interjornada`,
-        });
-        if (row.he60NightMinutes > 0) summaryRows.push({
-          employee_id: row.employeeId!, reference_date: row.period!.end_date, period_id: row.period!.id,
-          minutes: row.he60NightMinutes, launch_type: "HE_60_NOTURNO", rate_percent: 80, launch_group_id: groupId,
-          notes: `${importFingerprint} Importado do Cartão Ponto — HE 60% + 20% noturno`,
-        });
-        if (summaryRows.length) {
-          const result = await supabase.from("overtime_records").insert(summaryRows);
-          if (result.error) throw new Error(row.employeeName + ": " + result.error.message);
-          insertedSummary += summaryRows.length;
-        }
-      }
-
-      setMessage(`Importação concluída: ${formatCount(insertedCredits)} créditos, ${formatCount(insertedDebits)} débitos e ${formatCount(insertedSummary)} lançamentos de resumo.`);
-    } catch (e) {
-      const reason = (e as Error).message || "Não foi possível concluir a importação.";
-      const insertedTotal = insertedCredits + insertedDebits + insertedSummary;
-      setError(
-        insertedTotal > 0
-          ? reason + " A importação foi interrompida após gravar " + formatCount(insertedCredits) + " créditos, " + formatCount(insertedDebits) + " débitos e " + formatCount(insertedSummary) + " lançamentos de resumo. Não tente importar o mesmo PDF novamente; confira os registros já gravados em Lançamentos e Banco de Horas."
-          : reason,
-      );
+    } catch (error) {
+      setError((error as Error).message || "Não foi possível concluir a importação.");
     } finally {
       savingRef.current = false;
       setSaving(false);

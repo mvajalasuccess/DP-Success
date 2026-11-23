@@ -138,8 +138,7 @@ function Dashboard() {
   const navigateToScreen = (target: ScreenKey) => {
     setScreen(target);
     const url = new URL(window.location.href);
-    if (target === "dashboard") url.searchParams.delete("tela");
-    else url.searchParams.set("tela", target);
+    url.searchParams.set("tela", target);
     window.history.pushState({ screen: target }, "", url);
   };
 
@@ -749,6 +748,10 @@ function DashboardHome() {
       const periodLabel = competence
         ? `Competência ${String(competence.reference_month).padStart(2, "0")}/${competence.reference_year}`
         : "Nenhuma competência";
+      const turnoverHeadcount = competence && competence.end_date > "2026-07-20"
+        ? allEmployees.filter((employee: any) => (!employee.hire_date || employee.hire_date <= competence.end_date) &&
+            (!employee.termination_date || employee.termination_date > competence.end_date)).length
+        : employees.length;
       setMetrics({
         employees: employees.length,
         overtime,
@@ -757,9 +760,9 @@ function DashboardHome() {
         absenteeism: expectedMinutes > 0
           ? Math.round((absenceMinutes / expectedMinutes) * 1000) / 10
           : 0,
-        turnover: employees.length > 0
+        turnover: turnoverHeadcount > 0
           ? (((allEmployees.filter((e: any) => competence && e.hire_date >= competence.start_date && e.hire_date <= competence.end_date).length +
-              allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length) / 2) / employees.length) * 100
+              allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length) / 2) / turnoverHeadcount) * 100
           : 0,
         admissions: allEmployees.filter((e: any) => competence && e.hire_date >= competence.start_date && e.hire_date <= competence.end_date).length,
         terminations: allEmployees.filter((e: any) => competence && e.termination_date && e.termination_date >= competence.start_date && e.termination_date <= competence.end_date).length,
