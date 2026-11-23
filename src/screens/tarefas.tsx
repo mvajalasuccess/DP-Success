@@ -29,6 +29,7 @@ export function Tarefas(){
   const[checklists,setChecklists]=useState<Record<string,ChecklistItem[]>>({});
   const[view,setView]=useState<"list"|"kanban"|"calendar">("list"),[status,setStatus]=useState("all"),[priority,setPriority]=useState("all"),[category,setCategory]=useState("all"),[search,setSearch]=useState("");
   const[modal,setModal]=useState(false),[editing,setEditing]=useState<Task|null>(null),[error,setError]=useState(""),[saving,setSaving]=useState(false);
+  const [checklistDraft, setChecklistDraft] = useState("");
   const[form,setForm]=useState<any>({title:"",description:"",status:"todo",priority:"medium",due_date:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:""});
 
   async function load(){
@@ -68,17 +69,40 @@ export function Tarefas(){
     return status === "all" || task.status === status;
   });
 
-  function newTask(){setError("");setEditing(null);setForm({title:"",description:"",status:"todo",priority:"medium",due_date:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:""});setModal(true)}
+  function newTask(){setChecklistDraft("");setError("");setEditing(null);setForm({title:"",description:"",status:"todo",priority:"medium",due_date:"",reminder_at:"",category:"RH",assignee_id:"",employee_id:"",recurrence:"none",recurrence_until:""});setModal(true)}
   function editTask(t:Task){
+    setChecklistDraft("");
     setError("");
     setEditing(t);setForm({title:t.title,description:t.description||"",status:t.status,priority:t.priority,due_date:t.due_date||"",reminder_at:t.reminder_at?new Date(Date.parse(t.reminder_at) - new Date(t.reminder_at).getTimezoneOffset() * 60_000).toISOString().slice(0,16):"",category:t.category,assignee_id:t.assignee_id||"",employee_id:t.employee_id||"",recurrence:t.recurrence,recurrence_until:t.recurrence_until||""});setModal(true);
   }
   async function save(){
-    if(!form.title.trim())return;setSaving(true);setError("");
+    if(saving||!form.title.trim())return;setSaving(true);setError("");
     const sessionResult=await supabase.auth.getSession();
     const payload={title:form.title.trim(),description:form.description.trim()||null,status:form.status,priority:form.priority,due_date:form.due_date||null,due_time:editing?.due_time??null,reminder_at:form.reminder_at?new Date(form.reminder_at).toISOString():null,category:form.category,assignee_id:form.assignee_id||null,employee_id:form.employee_id||null,created_by:editing?.created_by||sessionResult.data.session?.user.id||null,recurrence:form.recurrence,recurrence_until:form.recurrence_until||null};
     const r=editing?await(supabase as any).from("tasks").update(payload).eq("id",editing.id).select("*").single():await(supabase as any).from("tasks").insert(payload).select("*").single();
     if(r.error){setError(r.error.message);setSaving(false);return}
+    const titles = checklistDraft.split("\n").map(title => title.trim()).filter(Boolean);
+    if (titles.length) {
+      // Reuse the task if checklist saving fails so retrying cannot create another task.
+      setEditing(r.data);
+      const { data: lastItem, error: positionError } = await (supabase as any)
+        .from("task_checklist_items").select("position").eq("task_id", r.data.id)
+        .order("position", { ascending: false }).limit(1).maybeSingle();
+      if (positionError) {
+        setError("A tarefa foi salva. Não foi possível carregar as etapas para adicionar o checklist.");
+        setSaving(false);
+        return;
+      }
+      const firstPosition = (lastItem?.position ?? -1) + 1;
+      const { error: checklistError } = await (supabase as any).from("task_checklist_items")
+        .insert(titles.map((title, index) => ({ task_id: r.data.id, title, position: firstPosition + index })));
+      if (checklistError) {
+        setError("A tarefa foi salva, mas as novas etapas não foram gravadas. " + checklistError.message);
+        setSaving(false);
+        return;
+      }
+      setChecklistDraft("");
+    }
     setModal(false);setSaving(false);await load();
   }
   async function setTaskStatus(t:Task,s:Task["status"]){const{error:e}=await(supabase as any).from("tasks").update({status:s}).eq("id",t.id);if(e)setError(e.message);else setTasks(x=>x.map(a=>a.id===t.id?{...a,status:s}:a))}
@@ -146,6 +170,28 @@ export function Tarefas(){
               <Field label="Lembrar em"><input type="datetime-local" value={form.reminder_at} onChange={e=>setForm({...form,reminder_at:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>
               <Field label="Repetir"><select value={form.recurrence} onChange={e=>setForm({...form,recurrence:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="none">Não repetir</option><option value="daily">Diariamente</option><option value="weekly">Semanalmente</option><option value="monthly">Mensalmente</option><option value="yearly">Anualmente</option></select></Field>
               {form.recurrence!=="none"&&<Field label="Repetir até"><input type="date" value={form.recurrence_until} onChange={e=>setForm({...form,recurrence_until:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>}
+            </div>
+          </details>
+          <details className="group rounded-xl border">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+              Checklist <ChevronDown className="size-4 group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="space-y-3 border-t p-4">
+              {editing && Boolean(checklists[editing.id]?.length) && (
+                <ul className="space-y-1 text-sm">
+                  {checklists[editing.id]?.map(item => (
+                    <li key={item.id} className="flex items-center gap-2">
+                      {item.completed ? <CheckCircle2 aria-label="Concluída" className="size-4 shrink-0 text-primary" /> : <Circle aria-label="Pendente" className="size-4 shrink-0 text-muted-foreground" />}
+                      <span className={item.completed ? "text-muted-foreground line-through" : ""}>{item.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <label className="grid gap-1.5 text-sm font-medium">
+                Adicionar etapas
+                <textarea value={checklistDraft} onChange={event => setChecklistDraft(event.target.value)} rows={3}
+                  placeholder="Uma etapa por linha" className="w-full rounded-lg border bg-background px-3 py-2.5 font-normal" />
+              </label>
             </div>
           </details>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
