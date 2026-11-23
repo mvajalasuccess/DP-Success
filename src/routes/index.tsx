@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { CalendarCheck, CalendarX, ChevronDown, ChevronLeft, ClipboardCheck, Clock3, FilePenLine, FolderOpen, Gauge, LogOut, Settings, Settings2, Menu, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, Timer, X, Pencil, Trash2, CheckCircle2, RotateCcw, type LucideIcon } from "lucide-react";
+import { CalendarCheck, CalendarX, ChevronDown, ChevronLeft, ClipboardCheck, Clock3, FilePenLine, FolderOpen, Gauge, LogOut, Settings, Menu, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, Timer, X, Pencil, Trash2, CheckCircle2, RotateCcw, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { getScreenIcon, ScreenBrand } from "@/components/screen-brand";
 import { supabase } from "@/integrations/supabase/client";
@@ -194,7 +194,6 @@ function AppShell({
   const [companyMenuOpen, setCompanyMenuOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [collapsedFlyout, setCollapsedFlyout] = useState<{ group: string; top: number } | null>(null);
 
@@ -270,17 +269,13 @@ function AppShell({
     { id: "people", label: "Pessoas", Icon: UsersRound, open: peopleOpen, setOpen: setPeopleOpen, items: [
       ["Férias", "ferias"], ["Diário de Ocorrências", "diario-ocorrencias"],
     ] },
-    { id: "settings", label: "Configurações", Icon: Settings2, open: settingsOpen, setOpen: setSettingsOpen, items: [
-      ["Parâmetros", "parametros"],
-    ] },
   ];
   const groups = sidebarGroups.map(group => ({
     ...group,
     items: group.items.map(([label, key]) => [label, key, getScreenIcon(label)] as const),
   }));
-  const visibleGroups = isConsulta ? groups.filter(group => group.id !== "settings") : groups;
 
-  const activeGroup = visibleGroups.find(group => group.items.some(([, key]) => key === screen))?.id;
+  const activeGroup = groups.find(group => group.items.some(([, key]) => key === screen))?.id;
   const openCollapsedGroup = (event: MouseEvent<HTMLButtonElement>, groupId: string) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setCollapsedFlyout(current => current?.group === groupId ? null : { group: groupId, top: rect.top });
@@ -310,7 +305,7 @@ function AppShell({
               <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Fechar menu"><X className="h-5 w-5" strokeWidth={1.8} /></button>
             </div>
             <nav aria-label="Navegação principal" className="dp-sidebar-nav sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3">
-              {visibleGroups.map(group => (
+              {groups.map(group => (
                 <section key={group.id} className="dp-sidebar-group mb-3">
                   <button type="button" onClick={() => group.setOpen(value => !value)} className={sectionButtonClass(group.id === activeGroup)} aria-expanded={group.open}>
                     <span>{group.label}</span><ChevronDown className={`h-4 w-4 transition-transform duration-150 ${group.open ? "rotate-0" : "-rotate-90"}`} strokeWidth={1.8} />
@@ -354,7 +349,7 @@ function AppShell({
         </div>
 
         <nav aria-label="Navegação principal" className="dp-sidebar-nav sidebar-scrollbar-hidden flex-1 space-y-2 overflow-x-visible overflow-y-auto">
-          {visibleGroups.map(group => (
+          {groups.map(group => (
             <section key={group.id} className="dp-sidebar-group relative" data-sidebar-flyout-root>
               <button
                 type="button"
