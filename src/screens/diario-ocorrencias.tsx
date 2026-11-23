@@ -583,7 +583,8 @@ export function DiarioOcorrencias() {
                 </div>
                 <button
                   type="button"
-                  data-role-sensitive
+                  data-role-sensitive={editingEvent ? "" : undefined}
+                  data-occurrence-star
                   aria-label="Atribuir um ponto"
                   aria-pressed={eventForm.is_star}
                   onClick={() => setEventForm(current => ({ ...current, is_star: !current.is_star }))}
