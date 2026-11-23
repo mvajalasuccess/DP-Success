@@ -104,7 +104,7 @@ function Dashboard() {
     const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const mutation = /(?:^|\s)(?:nov[oa]s?|criar|adicionar|editar|excluir|remover|salvar|cadastrar|registrar|importar|recalcular|sincronizar|confirmar|desativar|ativar|aplicar|finalizar|encerrar|reabrir|marcar como|concluir|pagar|programar|cancelar pagamento|estornar|gerar link|desmembrar|atualizar cadastro|limpar|zerar|restaurar|lancar|incluir|alterar|gravar|duplicar|transferir|entregar|devolver)(?:\s|$)/;
     function blocked(el: Element) {
-      if (el.closest(".dp-sidebar")) return false;
+      if (el.closest(".dp-sidebar") || el.matches("[data-guest-occurrence-create], [data-guest-occurrence-form] button[type=submit]")) return false;
       const text = normalize([el.textContent, el.getAttribute("title"), el.getAttribute("aria-label"), el.getAttribute("value")].filter(Boolean).join(" ")).trim();
       if (el.matches("[data-role-sensitive],button[type=submit],input[type=submit]")) return true;
       if (/^(?:exportar|baixar|download|visualizar|consultar|atualizar kpis|atualizar dados|atualizar lista|atualizar tela|atualizar relatorio)\b/.test(text)) return false;
@@ -118,7 +118,7 @@ function Dashboard() {
     function guard(e: Event) {
       const target=e.target instanceof Element?e.target:null;
       if (!target) return;
-      if(e.type==="submit"){e.preventDefault();e.stopImmediatePropagation();return;}
+      if(e.type==="submit" && !target.matches("form[data-guest-occurrence-form]")){e.preventDefault();e.stopImmediatePropagation();return;}
       const el=target.closest("button,[role=button],input[type=submit],[data-role-sensitive]");
       if(el&&blocked(el)){e.preventDefault();e.stopImmediatePropagation();}
     }

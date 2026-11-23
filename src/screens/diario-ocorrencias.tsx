@@ -37,6 +37,7 @@ const emptyDoc = {employee_id:"",document_name:"",no_due_date:false,has_document
 export function DiarioOcorrencias() {
   const {role}=useAccountIdentity();
   const canManageEvents=role==="administrador";
+  const canCreateEvents=canManageEvents||role==="convidado";
   const [tab,setTab]=useState<(typeof tabs)[number]["id"]>(()=>sessionStorage.getItem("dp-career-employee")?"career":"diario");
   const [documentLink,setDocumentLink]=useState<"clt"|"pj">("clt");
   const [employees,setEmployees]=useState<Employee[]>([]);
@@ -106,10 +107,10 @@ export function DiarioOcorrencias() {
     setLoading(false);
   }
   useEffect(()=>{void load();},[]);
-  function openNewEvent(){if(!canManageEvents)return;setEditingEvent(null);setEventForm({...emptyEvent,employee_id:employeeFilter!=="todos"?employeeFilter:""});setError("");setEventOpen(true);}
+  function openNewEvent(){if(!canCreateEvents)return;setEditingEvent(null);setEventForm({...emptyEvent,employee_id:employeeFilter!=="todos"?employeeFilter:""});setError("");setEventOpen(true);}
   function editEvent(e:LifeEvent){if(!canManageEvents)return;setEditingEvent(e);setEventForm({employee_id:e.employee_id,event_date:e.event_date,category:e.category,direction:e.direction,title:e.title,description:e.description??"",is_star:e.direction==="positive"&&e.score>0});setEventOpen(true);setError("");}
   async function saveEvent(){
-    if(!canManageEvents){setError("Sua conta não tem permissão para esta ação.");return;}
+    if(!canCreateEvents || (editingEvent && !canManageEvents)){setError("Sua conta não tem permissão para esta ação.");return;}
     if(loading)return;
     if(!eventForm.employee_id||!eventForm.event_date||!eventForm.title.trim()){setError("Preencha funcionário, data e título da ocorrência.");return;}
     setLoading(true);const user=await (supabase as any).auth.getUser();
@@ -391,8 +392,8 @@ export function DiarioOcorrencias() {
               <h2 id="occurrence-list-title" className="font-semibold">Ocorrências por funcionário e competência</h2>
               <p className="text-xs text-muted-foreground">{visibleEvents.length} registro(s) no filtro atual</p>
             </div>
-            {canManageEvents && (
-              <button type="button" data-role-sensitive onClick={openNewEvent} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+            {canCreateEvents && (
+              <button type="button" data-guest-occurrence-create onClick={openNewEvent} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
                 <Plus className="size-4" aria-hidden="true" /> Nova ocorrência
               </button>
             )}
@@ -522,13 +523,13 @@ export function DiarioOcorrencias() {
       </div>}
       {tab==="checklists"&&<><EmployeeAssetsAccess employees={employees} companyFilter={companyFilter}/></>}
           </main>
-    {canManageEvents && (
+    {canCreateEvents && (!editingEvent || canManageEvents) && (
       <Dialog open={eventOpen} onOpenChange={setEventOpen}>
         <DialogContent aria-describedby={undefined} className="max-h-[90vh] w-[calc(100%_-_2rem)] gap-0 overflow-y-auto rounded-xl p-0 sm:max-w-xl">
           <DialogHeader className="border-b px-5 py-5 pr-12 text-left sm:px-6">
             <DialogTitle>{editingEvent ? "Editar ocorrência" : "Nova ocorrência"}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={event => { event.preventDefault(); if (!loading) void saveEvent(); }} className="grid gap-4 px-5 py-5 sm:px-6">
+          <form data-guest-occurrence-form={!editingEvent ? "" : undefined} onSubmit={event => { event.preventDefault(); if (!loading) void saveEvent(); }} className="grid gap-4 px-5 py-5 sm:px-6">
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.6fr)]">
               <label className="grid gap-1.5 text-sm font-medium">
                 Funcionário
@@ -596,7 +597,7 @@ export function DiarioOcorrencias() {
 
             <div className="flex justify-end gap-2 border-t pt-4">
               <button type="button" onClick={() => setEventOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button>
-              <button type="submit" data-role-sensitive disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Salvar ocorrência</button>
+              <button type="submit" disabled={loading} className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">Salvar ocorrência</button>
             </div>
           </form>
         </DialogContent>
