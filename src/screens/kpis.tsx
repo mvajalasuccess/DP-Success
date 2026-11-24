@@ -1627,6 +1627,11 @@ export function Kpis() {
               const average = (values: number[]) => values.length ? values.reduce((a,b)=>a+b,0)/values.length : 0;
               const ageAverage = average(ages);
               const tenureAverage = average(tenure);
+              const profileSeries = [
+                { name: "Feminino", color: "#ec4899" },
+                { name: "Masculino", color: "#3b82f6" },
+                { name: "Outro / não informado", color: "#8b5cf6" },
+              ];
               return <>
                 <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Explore a composição do quadro por sexo, idade, tempo de empresa e setor. Passe o cursor nos gráficos para ver os detalhes.</p></div>
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="text-sm font-semibold">Situação dos funcionários</p><p className="text-xs text-muted-foreground">Filtra todos os indicadores e gráficos desta seção.</p></div><select aria-label="Filtrar situação dos funcionários nos indicadores demográficos" className="h-10 min-w-44 rounded-lg border bg-background px-3 text-sm" value={demographicStatusFilter} onChange={e => setDemographicStatusFilter(e.target.value as "todos" | "ativos" | "inativos")}><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></div>
@@ -1660,7 +1665,33 @@ export function Kpis() {
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Mapa de perfil: idade × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Encontre perfis mais jovens com longa permanência, pessoas experientes recém-admitidas e concentrações por sexo.</p>
-                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:12,right:16,bottom:18,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis type="number" dataKey="idade" name="Idade" domain={[0, "dataMax"]} tick={{fontSize:10}} label={{value:"Idade (anos)",position:"insideBottom",offset:-12,fontSize:11}}/><YAxis type="number" dataKey="tempo" name="Tempo de empresa" tick={{fontSize:10}} label={{value:"Tempo de empresa (anos)",angle:-90,position:"insideLeft",fontSize:11}}/><ZAxis range={[55,55]}/><Tooltip cursor={{strokeDasharray:"3 3"}} formatter={(value:number,name:string)=>[name==="Idade"?value+" anos":Number(value).toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos",name]} labelFormatter={(_,payload)=>payload?.[0]?.payload?.nome || ""}/><Legend/><Scatter name="Feminino" data={ageTenurePoints.filter(e=>e.sexo==="Feminino")} fill="#ec4899"/><Scatter name="Masculino" data={ageTenurePoints.filter(e=>e.sexo==="Masculino")} fill="#3b82f6"/><Scatter name="Outro / não informado" data={ageTenurePoints.filter(e=>e.sexo==="Outro / não informado")} fill="#8b5cf6"/></ScatterChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72 min-w-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ScatterChart margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis type="number" dataKey="idade" name="Idade" domain={[0, "dataMax"]} tick={{ fontSize: 10 }} />
+                          <YAxis type="number" dataKey="tempo" name="Tempo de empresa" tick={{ fontSize: 10 }} label={{ value: "Tempo de empresa (anos)", angle: -90, position: "insideLeft", fontSize: 11 }} />
+                          <ZAxis range={[55, 55]} />
+                          <Tooltip
+                            cursor={{ strokeDasharray: "3 3" }}
+                            formatter={(value: number, name: string) => [name === "Idade" ? value + " anos" : Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos", name]}
+                            labelFormatter={(_, payload) => payload?.[0]?.payload?.nome || ""}
+                          />
+                          {profileSeries.map(({ name, color }) => (
+                            <Scatter key={name} name={name} data={ageTenurePoints.filter(point => point.sexo === name)} fill={color} />
+                          ))}
+                        </ScatterChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <p className="text-center text-xs text-muted-foreground">Idade (anos)</p>
+                    <ul aria-label="Legenda por sexo" className="my-4 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                      {profileSeries.map(({ name, color }) => (
+                        <li key={name} className="flex items-center gap-1.5">
+                          <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
                     <p className="text-xs text-muted-foreground">Considera somente funcionários com nascimento e admissão preenchidos. Para inativos, o tempo vai até a data de desligamento cadastrada.</p>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Tempo médio de empresa por faixa etária</h3><p className="text-xs text-muted-foreground">Ajuda a perceber se o quadro mais jovem tem menor permanência ou se há retenção em faixas etárias específicas.</p>
