@@ -530,7 +530,7 @@ export function Atestados() {
       <div className="mb-4 flex justify-end"><DocumentAuditImport employees={employees} mode="attendance" /></div>
         <Card className="mt-6 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-medium"><span>Filtros</span><span className="text-xs font-normal text-muted-foreground">Aplicados às duas listas</span></div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Empresa</span><CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setFilterEmployee("todos"); }} /></label>
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => { setFilterPeriod(e.target.value); setFilterEmployee("todos"); }} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
@@ -560,12 +560,12 @@ export function Atestados() {
     {historicalEdit && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-xl overflow-y-auto p-6">
       <h2 className="text-xl font-bold">{historicalEdit.kind==="atestado"?"Editar atestado":"Editar declaração de horas"}</h2>
       <p className="mt-1 text-sm text-muted-foreground">Dados informativos para o histórico e dossiê. Os cálculos originais permanecem intactos.</p>
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-4">
         <label className="grid gap-1 text-sm">Funcionário<input readOnly className="rounded-lg border bg-muted px-3 py-2" value={historicalEmployeeName(historicalEdit.row)}/></label>
         <div className="rounded-md border bg-muted/30 p-3 text-sm">Competência original: {formatDate(historicalEdit.row.period_start||"")} a {formatDate(historicalEdit.row.period_end||"")}<br/>Total histórico: {formatHistoricalHours(historicalEdit.kind==="atestado"?historicalEdit.row.certificate_minutes:historicalEdit.row.declaration_minutes)} h · {historicalEdit.details.length} registro(s)</div>
         {historicalEdit.details.map((d,i)=>{
           const patch=(value:Partial<AttendanceDetail>)=>setHistoricalEdit(old=>old?{...old,details:old.details.map(x=>x.id===d.id?{...x,...value}:x)}:old);
-          return <div key={d.id} className="rounded-lg border p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">{historicalEdit.kind==="atestado"?"Atestado":"Declaração"} {i+1}</h3><button type="button" title="Excluir detalhe" onClick={()=>setHistoricalEdit(old=>old?{...old,details:old.details.filter(x=>x.id!==d.id)}:old)} className="rounded-md border p-2 text-destructive"><Trash2 className="h-4 w-4"/></button></div><div className="grid gap-3 sm:grid-cols-2">
+          return <div key={d.id} className="rounded-lg border p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">{historicalEdit.kind==="atestado"?"Atestado":"Declaração"} {i+1}</h3><button type="button" title="Excluir detalhe" onClick={()=>setHistoricalEdit(old=>old?{...old,details:old.details.filter(x=>x.id!==d.id)}:old)} className="rounded-md border p-2 text-destructive"><Trash2 className="h-4 w-4"/></button></div><div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
           <label className="grid gap-1 text-sm">Início<input type="date" value={d.start} onChange={e=>patch({start:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
           <label className="grid gap-1 text-sm">Fim<input type="date" value={d.end} onChange={e=>patch({end:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
           {historicalEdit.kind==="atestado"?<>
@@ -573,7 +573,7 @@ export function Atestados() {
             <label className="grid gap-1 text-sm">Categoria<select value={d.category} onChange={e=>patch({category:e.target.value})} className="rounded-lg border bg-background px-3 py-2"><option value="medico">Médico</option><option value="odontologico">Odontológico</option><option value="acompanhamento">Acompanhamento</option><option value="outro">Outro</option></select></label>
             <label className="grid gap-1 text-sm sm:col-span-2">CID (opcional)<input value={d.cid||""} onChange={e=>patch({cid:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
           </>:<>
-            <div className="grid grid-cols-2 gap-2"><label className="grid gap-1 text-sm">Horas<input type="number" min="0" step="1" value={Math.floor((d.minutes??0)/60)} onChange={e=>patch({minutes:Number(e.target.value)*60+(d.minutes??0)%60})} className="min-w-0 rounded-lg border bg-background px-3 py-2"/></label><label className="grid gap-1 text-sm">Minutos<input type="number" min="0" max="59" step="1" value={(d.minutes??0)%60} onChange={e=>patch({minutes:Math.floor((d.minutes??0)/60)*60+Math.min(59,Math.max(0,Number(e.target.value)))})} className="min-w-0 rounded-lg border bg-background px-3 py-2"/></label></div>
+            <div className="grid grid-cols-2 gap-4"><label className="grid gap-1 text-sm">Horas<input type="number" min="0" step="1" value={Math.floor((d.minutes??0)/60)} onChange={e=>patch({minutes:Number(e.target.value)*60+(d.minutes??0)%60})} className="min-w-0 rounded-lg border bg-background px-3 py-2"/></label><label className="grid gap-1 text-sm">Minutos<input type="number" min="0" max="59" step="1" value={(d.minutes??0)%60} onChange={e=>patch({minutes:Math.floor((d.minutes??0)/60)*60+Math.min(59,Math.max(0,Number(e.target.value)))})} className="min-w-0 rounded-lg border bg-background px-3 py-2"/></label></div>
             <label className="grid gap-1 text-sm">Categoria<select value={d.category} onChange={e=>patch({category:e.target.value})} className="rounded-lg border bg-background px-3 py-2">{declarationReasons.map(r=><option key={r}>{r}</option>)}</select></label>
           </>}
           <label className="grid gap-1 text-sm sm:col-span-2">Observações<textarea value={d.notes} onChange={e=>patch({notes:e.target.value})} className="rounded-lg border bg-background px-3 py-2"/></label>
@@ -588,7 +588,7 @@ export function Atestados() {
     </Card></div>}
     {open && mode === "atestado" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-xl overflow-y-auto p-6">
       <h2 className="text-xl font-bold">{editing ? "Editar atestado" : "Novo atestado"}</h2>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 grid gap-x-6 gap-y-5 md:grid-cols-2">
         <label className="grid gap-1 text-sm md:col-span-2">Funcionário<select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2"><option value="">{!selectedEditingRecord && !openPeriod ? "Nenhuma competência em aberto" : "Funcionário"}</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         <label className="grid gap-1 text-sm ">Início<input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
         <label className="grid gap-1 text-sm ">Fim<input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
@@ -602,7 +602,7 @@ export function Atestados() {
     {open && mode === "declaracao" && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="max-h-[90vh] w-full max-w-xl overflow-y-auto p-6">
       <h2 className="text-xl font-bold">{editingDeclaration ? "Editar declaração de horas" : "Nova declaração de horas"}</h2>
       <p className="mt-1 text-sm text-muted-foreground">Informe somente as horas que serão efetivamente abonadas.</p>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 grid gap-x-6 gap-y-5 md:grid-cols-2">
         <label className="grid gap-1 text-sm md:col-span-2">Funcionário<select value={declarationForm.employee_id} onChange={e => setDeclarationForm({ ...declarationForm, employee_id: e.target.value })} className="rounded-lg border px-3 py-2"><option value="">{!selectedEditingRecord && !openPeriod ? "Nenhuma competência em aberto" : "Funcionário"}</option>{employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         <label className="grid gap-1 text-sm ">Data da declaração<input type="date" value={declarationForm.occurrence_date} onChange={e => setDeclarationForm({ ...declarationForm, occurrence_date: e.target.value })} className="rounded-lg border px-3 py-2" /></label>
         <label className="grid gap-1 text-sm ">Horas abonadas<input type="time" value={declarationForm.quantity} onChange={e => setDeclarationForm({ ...declarationForm, quantity: e.target.value })} className="rounded-lg border px-3 py-2" /></label>

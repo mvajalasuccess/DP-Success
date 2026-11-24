@@ -137,7 +137,7 @@ export function Tarefas(){
           </button>
         ))}
       </div>
-      <Card className="p-4"><div className="flex flex-wrap items-center gap-2">
+      <Card className="p-4"><div className="flex flex-wrap items-center gap-4">
         <div className="relative min-w-0 basis-full sm:basis-48 sm:flex-1"><input value={search} onChange={e=>setSearch(e.target.value)} aria-label="Buscar tarefas" placeholder="Buscar tarefas..." className="w-full rounded-lg border bg-background px-3 py-2 pl-9 text-sm"/><Filter className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"/></div>
         <select aria-label="Situação da tarefa" value={status} onChange={e=>setStatus(e.target.value)} className="rounded-lg border px-3 py-2 text-sm"><option value="all">Todas as situações</option><option value="focus">Foco de hoje</option><option value="overdue">Atrasadas</option><option value="todo">A fazer</option><option value="in_progress">Em andamento</option><option value="done">Concluídas</option></select>
         <select aria-label="Filtrar por prioridade" value={priority} onChange={e=>setPriority(e.target.value)} className="rounded-lg border px-3 py-2 text-sm"><option value="all">Todas as prioridades</option>{priorities.map(p=><option key={p[0]} value={p[0]}>{p[1]}</option>)}</select>
@@ -153,7 +153,7 @@ export function Tarefas(){
         <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background px-6 py-4"><div><h2 className="font-bold">{editing?"Editar tarefa":"Nova tarefa"}</h2></div><button onClick={()=>setModal(false)} aria-label="Fechar formulário" className="rounded-lg p-2 hover:bg-muted"><X className="h-5 w-5"/></button></div>
         <div className="grid gap-5 px-4 py-5 sm:px-6">
           <label className="min-w-0"><span className="mb-1 block text-sm font-medium">Tarefa *</span><input autoFocus value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className="w-full rounded-lg border px-3 py-2.5" placeholder="Ex.: Conferir documentação da admissão"/></label>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             <Field label="Prazo"><input type="date" value={form.due_date} onChange={e=>setForm({...form,due_date:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"/></Field>
             <Field label="Responsável"><select value={form.assignee_id} onChange={e=>setForm({...form,assignee_id:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="">Sem responsável</option>{profiles.filter(p=>p.id===editing?.assignee_id||p.active===true).map(p=><option key={p.id} value={p.id}>{p.full_name||p.email||"Usuário"}</option>)}</select></Field>
           </div>
@@ -161,7 +161,7 @@ export function Tarefas(){
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
               Mais opções <ChevronDown className="size-4 group-open:rotate-180" aria-hidden="true" />
             </summary>
-            <div className="grid gap-4 border-t p-4 md:grid-cols-2">
+            <div className="grid gap-x-6 gap-y-5 border-t p-4 md:grid-cols-2">
               <label className="md:col-span-2"><span className="mb-1 block text-sm font-medium">Descrição</span><textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} className="min-h-24 w-full rounded-lg border px-3 py-2.5"/></label>
               <Field label="Status"><select value={form.status} onChange={e=>setForm({...form,status:e.target.value})} className="w-full rounded-lg border px-3 py-2.5"><option value="todo">A fazer</option><option value="in_progress">Em andamento</option><option value="done">Concluída</option></select></Field>
               <Field label="Prioridade"><select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} className="w-full rounded-lg border px-3 py-2.5">{priorities.map(p=><option key={p[0]} value={p[0]}>{p[1]}</option>)}</select></Field>
@@ -176,7 +176,7 @@ export function Tarefas(){
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
               Checklist <ChevronDown className="size-4 group-open:rotate-180" aria-hidden="true" />
             </summary>
-            <div className="space-y-3 border-t p-4">
+            <div className="space-y-4 border-t p-4">
               {editing && Boolean(checklists[editing.id]?.length) && (
                 <ul className="space-y-1 text-sm">
                   {checklists[editing.id]?.map(item => (

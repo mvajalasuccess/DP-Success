@@ -263,7 +263,7 @@ export function Payments() {
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-5 w-5" /></div>
             <div><h2 className="font-display text-base font-semibold">Dados do pagamento</h2><p className="mt-1 text-sm text-muted-foreground">Selecione uma competência ou todas para consultar o saldo acumulado disponível para pagamento.</p></div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
             <label className="grid gap-1.5 text-sm font-medium">Empresa
               <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(e => (!value || e.company_id === value) && (employeeStatusFilter === "todos" || (employeeStatusFilter === "ativos" ? e.status?.trim().toLowerCase() === "ativo" : e.status?.trim().toLowerCase() === "inativo")) && (allCompetencies || !period || !e.hire_date || e.hire_date <= period.end_date) && (allCompetencies || !period || !e.termination_date || e.termination_date >= period.start_date)); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
             </label>
@@ -277,7 +277,7 @@ export function Payments() {
               </select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium sm:col-span-2">Funcionário
-              <div className="flex min-w-0 items-center gap-1.5">
+              <div className="flex min-w-0 items-center gap-3">
                 <button type="button" aria-label="Funcionário anterior" title="Funcionário anterior" onClick={() => navigateEmployee(-1)} disabled={loading || selectableEmployees.length < 2 || selectedEmployeeIndex <= 0} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>
                 <select className={inputCls + " min-w-0 flex-1"} value={employeeId} onChange={e => setEmployeeId(e.target.value)} disabled={loading}>
                   <option value="">Selecione o funcionário</option>

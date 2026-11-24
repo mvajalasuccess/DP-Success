@@ -74,7 +74,7 @@ export function Schedules() {
     </main>
     {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><Card className="w-full max-w-md p-6">
       <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">{editingId ? "Editar jornada" : "Nova jornada"}</h2><p className="text-xs text-muted-foreground">Informe o nome e a carga semanal da jornada.</p></div><button type="button" onClick={() => setOpen(false)}><X className="h-5 w-5" /></button></div>
-      <div className="mt-5 grid gap-3">
+      <div className="mt-5 grid gap-5">
         <label className="grid gap-1 text-sm font-medium">Nome<input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-lg border px-3 py-2 font-normal" placeholder="Ex.: Administrativo 44h" /></label>
         <label className="grid gap-1 text-sm font-medium">Horas semanais<input type="number" min="1" step="0.01" value={form.weekly} onChange={(e) => setForm({ ...form, weekly: e.target.value })} className="rounded-lg border px-3 py-2 font-normal" /></label>
         

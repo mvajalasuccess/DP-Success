@@ -218,7 +218,7 @@ export function Launches() {
     <ScreenShell section="Operação" title="Lançamentos" name="Lançamentos" subtitle="Registre créditos, débitos e adicionais do banco de horas por funcionário e data."
       error={open ? "" : error}
       actions={<button data-role-sensitive className={btnPrimary} disabled={!periods.length} onClick={openNew}><Plus className="h-4 w-4" /> Novo lançamento</button>}>
-      <Card className="mt-6 grid gap-4 p-5 md:grid-cols-3">
+      <Card className="mt-6 grid gap-x-6 gap-y-4 p-5 md:grid-cols-3">
         <label className="grid gap-1.5 text-sm font-medium">Empresa
           <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setEmployeeFilter(""); }} className={inputCls} />
         </label>
@@ -276,7 +276,7 @@ export function Launches() {
       {open && (
         <Modal title={editing ? "Editar lançamento" : "Novo lançamento"} onClose={() => setOpen(false)}
           footer={<><button className={btnOutline} onClick={() => setOpen(false)}>Cancelar</button><button data-role-sensitive className={btnPrimary} disabled={saving} onClick={() => void save()}>{saving ? "Salvando..." : "Salvar"}</button></>}>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium">Funcionário
               <select className={inputCls} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
                 <option value="">Selecione</option>
@@ -292,9 +292,9 @@ export function Launches() {
           <div className="mt-5">
             <div className="flex items-center justify-between"><p className="text-sm font-semibold">1. Crédito</p>
               <button type="button" className={btnOutline} onClick={() => setLines(ls => [...ls, { type: "ADICIONAL_NOTURNO", hours: "00:00" }])}><Plus className="h-3.5 w-3.5" /> Adicionar tipo</button></div>
-            <div className="mt-2 space-y-2">
+            <div className="mt-3 space-y-4">
               {lines.map((l, i) => (
-                <div key={i} className="grid grid-cols-[1fr_120px_36px] gap-2">
+                <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,5rem)_2rem] items-center gap-3 sm:grid-cols-[minmax(0,1fr)_7.5rem_2.25rem] sm:gap-4">
                   <select className={inputCls} value={l.type} onChange={e => setLines(ls => ls.map((x, j) => j === i ? { ...x, type: e.target.value as CreditType } : x))}>
                     {CREDIT_TYPE_KEYS.map(k => <option key={k} value={k}>{CREDIT_TYPES[k].label}</option>)}
                   </select>

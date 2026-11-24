@@ -556,7 +556,7 @@ export function Ocorrencias() {
         <div className="mb-4 flex justify-end"><DocumentAuditImport employees={employees} mode="absences" /></div>
         <Card className="mt-6 p-4">
           <div className="mb-3 text-sm font-medium">Filtros</div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Empresa</span><CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setFilterEmployee("todos"); }} /></label>
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => { setFilterPeriod(e.target.value); setFilterEmployee("todos"); }} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
             <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
@@ -612,7 +612,7 @@ export function Ocorrencias() {
             <p className="mt-1 text-sm text-muted-foreground">
               Registro importado da BASE. As alterações abaixo são somente para visualização e não modificam a BASE original, os cálculos, abonos ou banco de horas.
             </p>
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="mt-5 grid gap-x-6 gap-y-5 md:grid-cols-2">
               <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm md:col-span-2">
                 <span className="text-muted-foreground">Funcionário: </span><strong>{historicalEditing.employee_name}</strong>
               </div>
@@ -645,7 +645,7 @@ export function Ocorrencias() {
               Registre a falta ou folga e a quantidade de dias correspondente.
             </p>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="mt-5 grid gap-x-6 gap-y-5 md:grid-cols-2">
               <select value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className="rounded-lg border px-3 py-2 md:col-span-2">
                 <option value="">{!selectedEditingRecord && !openPeriod ? "Nenhuma competência em aberto" : "Funcionário"}</option>
                 {employeesForDate.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}

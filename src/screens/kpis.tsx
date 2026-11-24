@@ -1511,7 +1511,7 @@ export function Kpis() {
           </div>
 
           <div className="mt-4 border-y border-[var(--kpi-border)] bg-[var(--kpi-surface)] px-3 py-4 sm:px-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.2fr_0.62fr_1.15fr_1fr_1.55fr_auto] xl:items-end">
+            <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 lg:items-end 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.62fr)_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1.55fr)_auto]">
               <label className="kpi-toolbar-label">
                 <span>Empresa</span>
                 <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setSelectedEmployees([]); setSelectedDepartment("todos"); }} className={`kpi-control ${companyFilter ? "is-filtered" : ""}`} />

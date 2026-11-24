@@ -271,7 +271,7 @@ export function BankHours() {
     <ScreenShell section="Operação" title="Banco de Horas" name="Banco de Horas" subtitle="Saldo por funcionário e competência." error={error}>
 
       <Card className="mt-6 p-4">
-        <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
           <label className="grid w-full min-w-0 gap-1.5 text-sm font-medium sm:w-[220px]">Empresa
             <CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); const first = employees.find(x => (!value || x.company_id === value) && (statusFilter === "todos" || (statusFilter === "ativo" ? x.status?.trim().toLowerCase() === "ativo" : x.status?.trim().toLowerCase() === "inativo"))); setEmployeeId(first?.id ?? ""); }} className={inputCls} />
           </label>
@@ -287,7 +287,7 @@ export function BankHours() {
               <option value="todos">Todos</option>
             </select>
           </label>
-          <div className="grid min-w-0 w-full max-w-[760px] flex-1 mx-auto gap-1.5 text-sm font-medium">
+          <div className="grid min-w-0 w-full max-w-[760px] basis-full flex-1 sm:basis-64 mx-auto gap-1.5 text-sm font-medium">
             <span>Funcionário</span>
             <div className="flex items-center gap-2">
               <button type="button" onClick={goToPreviousEmployee} disabled={visibleEmployees.length < 2} title="Funcionário anterior" aria-label="Funcionário anterior" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40">
@@ -392,7 +392,7 @@ export function BankHours() {
             </div>
             <div className="mt-5 grid gap-4">
               <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">{employees.find(e => e.id === employeeId)?.full_name ?? "—"}</div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
                 <label className="grid gap-1.5 text-sm font-medium">Tipo<select className={inputCls} value={adjustmentDirection} onChange={e => setAdjustmentDirection(e.target.value as "credito" | "debito")}><option value="credito">Crédito</option><option value="debito">Débito</option></select></label>
                 <label className="grid gap-1.5 text-sm font-medium">Data<input type="date" className={inputCls} value={adjustmentDate} onChange={e => setAdjustmentDate(e.target.value)} /></label>
               </div>

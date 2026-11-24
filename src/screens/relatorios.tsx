@@ -1349,7 +1349,7 @@ export function Relatorios() {
           </p>
         </section>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="mt-5 grid gap-x-6 gap-y-4 md:grid-cols-2">
           <label className="grid gap-1.5 text-sm font-medium">Empresa
             <CompanyFilter value={companyFilter} onChange={setCompanyFilter} className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm" />
           </label>

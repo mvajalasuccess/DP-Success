@@ -715,7 +715,7 @@ export function PointClosing() {
               </button>
             </div>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="mt-5 grid gap-x-6 gap-y-5 sm:grid-cols-2">
               <label className="grid gap-1.5 text-sm font-medium">Data inicial<input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setRangeMode("personalizado"); }} className="rounded-lg border bg-background px-3 py-2.5 font-normal" /></label>
               <label className="grid gap-1.5 text-sm font-medium">Data final<input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setRangeMode("personalizado"); }} className="rounded-lg border bg-background px-3 py-2.5 font-normal" /></label>
             </div>

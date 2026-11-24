@@ -1583,3 +1583,13 @@ main :is(h1, h2, h3) {
 
 [data-consulta-only] { display: none; }
 .role-consulta [data-consulta-only] { display: block; }
+
+/* Campos longos devem encolher dentro da coluna sem ocupar o espaço do campo vizinho. */
+:where(.dp-app-main, [role="dialog"]) label:has(> :is(select, textarea, input:not([type="checkbox"], [type="radio"], [type="hidden"]))) {
+  min-inline-size: 0;
+}
+
+:where(.dp-app-main, [role="dialog"]) label > :is(select, textarea, input:not([type="checkbox"], [type="radio"], [type="hidden"])) {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
