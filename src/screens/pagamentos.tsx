@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BadgeCheck, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, RotateCcw, ShieldCheck, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { ScreenShell, inputCls } from "@/components/screen-shell";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
+import { calculateDsr } from "@/lib/dsr";
 import { balancesByEmployee, fetchLaunches, minutesToHours, type PeriodBalance } from "@/lib/dp-model";
 
 type Period = { id: string; reference_year: number; reference_month: number; start_date: string; end_date: string; status: string };
@@ -30,6 +31,9 @@ export function Payments() {
   const [companyFilter, setCompanyFilter] = useState("");
   const [employeeStatusFilter, setEmployeeStatusFilter] = useState("ativos");
   const [details, setDetails] = useState<Detail[]>([]);
+  const [holidayDates, setHolidayDates] = useState<ReadonlySet<string> | null>(null);
+  const [loadedDetailsKey, setLoadedDetailsKey] = useState<string | null>(null);
+  const detailRequest = useRef(0);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [balances, setBalances] = useState<PeriodBalance[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +53,20 @@ export function Payments() {
   const totalMinutes = details.reduce((sum, item) => sum + item.minutes, 0);
   const divisor = employee?.work_schedules?.weekly_minutes ? (Number(employee.work_schedules.weekly_minutes) / 60) * 5 : 220;
   const hourlyRate = Number((Number(employee?.salary || 0) / divisor).toFixed(4));
-  const totalValue = details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0);
+  const detailKey = `${periodId}:${employeeId}`;
+  const detailsReady = loadedDetailsKey === detailKey && !loadingDetails;
+  const latestDetailKey = useRef(detailKey);
+  useEffect(() => { latestDetailKey.current = detailKey; }, [detailKey]);
+  const subtotalCents = Math.round(details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0) * 100);
+  const totalValue = subtotalCents / 100;
+  const dsr = period && !allCompetencies && holidayDates && detailsReady
+    ? calculateDsr(subtotalCents, period.reference_year, period.reference_month, holidayDates)
+    : null;
+  const paymentValue = (subtotalCents + (dsr?.amountCents ?? 0)) / 100;
+  const messageDsr = allCompetencies
+    ? "Selecione uma competência específica para calcular o DSR."
+    : !holidayDates ? "DSR indisponível enquanto o calendário de feriados não for carregado."
+    : "DSR indisponível para o mês de referência.";
   const balanceForPeriod = balances.find(b => b.period.id === period?.id);
   const hasPositiveGeneralBalance = balances.length > 0 && Number(balances[balances.length - 1]!.accumulated ?? 0) > 0;
 
@@ -82,11 +99,24 @@ export function Payments() {
 
   useEffect(() => { void loadBase(); }, [loadBase]);
 
+  useEffect(() => {
+    let active = true;
+    void supabase.from("holidays").select("holiday_date").eq("is_demo", false).then(({ data, error }) => {
+      if (active && !error) setHolidayDates(new Set((data ?? []).map(row => row.holiday_date)));
+    });
+    return () => { active = false; };
+  }, []);
+
   const loadDetails = useCallback(async () => {
+    if (latestDetailKey.current !== detailKey) return;
+    const request = ++detailRequest.current;
+    setLoadedDetailsKey(null);
+    setConfirmPayment(false);
     if (!period || !employeeId) {
       setDetails([]);
       setPayments([]);
       setBalances([]);
+      setLoadingDetails(false);
       return;
     }
     setLoadingDetails(true);
@@ -102,10 +132,12 @@ export function Payments() {
         balancesByEmployee(employeeId),
         fetchLaunches({ employeeId, start: period.start_date, end: period.end_date }),
       ]);
+      if (request !== detailRequest.current) return;
       if (historicalResult.error) throw new Error(historicalResult.error.message);
       if (overrideResult.error && !String(overrideResult.error.message ?? "").toLowerCase().includes("point_closing_overrides")) throw new Error(overrideResult.error.message);
       if (paymentResult.error) throw new Error(paymentResult.error.message);
 
+      setLoadedDetailsKey(detailKey);
       const historical = historicalResult.data as any;
       const override = overrideResult.data as any;
       const source = override ?? historical;
@@ -163,17 +195,20 @@ export function Payments() {
       setPayments((paymentResult.data ?? []) as PaymentRow[]);
       setBalances(balanceResult);
     } catch (e) {
-      setError((e as Error).message);
-      setDetails([]);
+      if (request === detailRequest.current) {
+        setLoadedDetailsKey(null);
+        setError((e as Error).message);
+        setDetails([]);
+      }
     } finally {
-      setLoadingDetails(false);
+      if (request === detailRequest.current) setLoadingDetails(false);
     }
-  }, [period, employeeId]);
+  }, [period, employeeId, allCompetencies, detailKey]);
 
   useEffect(() => { void loadDetails(); }, [loadDetails]);
 
   async function confirmPay() {
-    if (!period || !employee || totalMinutes <= 0) return;
+    if (!period || !employee || !detailsReady || totalMinutes <= 0 || (!allCompetencies && !dsr)) return;
     if (activePayment) {
       setError("Já existe um pagamento ativo para este funcionário nesta competência. Estorne-o antes de registrar outro.");
       setConfirmPayment(false);
@@ -185,6 +220,7 @@ export function Payments() {
       const { data: session } = await supabase.auth.getSession();
       const date = todayLocal();
       const breakdown = details.filter(d => d.minutes > 0).map(d => `${d.label}: ${hhmm(d.minutes)} × ${money(hourlyRate)}/h × fator ${d.multiplier.toLocaleString("pt-BR")} = ${money((d.minutes / 60) * hourlyRate * d.multiplier)}`).join(" | ");
+      const dsrBreakdown = dsr ? ` | Base DSR: ${money(totalValue)} | DSR: ${money(dsr.amountCents / 100)} (${dsr.workingDays} dias úteis, ${dsr.restDays} dias de repouso)` : "";
       const result = await supabase.from("bank_hours").insert({
         employee_id: employee.id,
         period_id: period.id,
@@ -192,7 +228,7 @@ export function Payments() {
         kind: "pagamento_he",
         minutes: totalMinutes,
         adjustment_direction: "debito",
-        justification: `Pagamento HE DP SUCCESS | ${periodLabel(period)} | Total: ${hhmm(totalMinutes)} | Valor: ${money(totalValue)} | ${breakdown}`,
+        justification: `Pagamento HE DP SUCCESS | ${periodLabel(period)} | Total: ${hhmm(totalMinutes)} | Valor: ${money(paymentValue)}${dsrBreakdown} | ${breakdown}`,
         created_by: session.session?.user.id ?? null,
       });
       if (result.error) throw new Error(result.error.message);
@@ -297,25 +333,30 @@ export function Payments() {
           </div>
           <div className="mt-3 overflow-hidden rounded-xl border">
             <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] gap-2 bg-muted/50 px-3 py-3 text-xs font-semibold text-muted-foreground sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span>Tipo de hora</span><span className="text-right">Horas</span><span className="text-right">Valor</span></div>
-            {loadingDetails ? <div className="p-6 text-center text-sm text-muted-foreground">Carregando composição...</div> : !hasPositiveGeneralBalance ? <div className="p-6 text-center text-sm text-muted-foreground">Sem cálculo: o saldo geral do Banco de Horas não está positivo.</div> : details.map(item => <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t px-3 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span className="font-medium">{item.label}</span><span className="text-right font-mono tabular-nums">{hhmm(item.minutes)}</span><span className="text-right font-semibold tabular-nums">{money((item.minutes / 60) * hourlyRate * item.multiplier)}</span></div>)}
-            {hasPositiveGeneralBalance && <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t bg-muted/40 px-3 py-4 text-sm font-bold sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span>Total do pagamento</span><span className="text-right font-mono tabular-nums">{hhmm(totalMinutes)}</span><span className="text-right tabular-nums">{money(totalValue)}</span></div>}
+            {loadingDetails ? <div className="p-6 text-center text-sm text-muted-foreground">Carregando composição...</div> : !hasPositiveGeneralBalance ? <div className="p-6 text-center text-sm text-muted-foreground">Sem cálculo: o saldo geral do Banco de Horas não está positivo.</div> : detailsReady && details.map(item => <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t px-3 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span className="font-medium">{item.label}</span><span className="text-right font-mono tabular-nums">{hhmm(item.minutes)}</span><span className="text-right font-semibold tabular-nums">{money((item.minutes / 60) * hourlyRate * item.multiplier)}</span></div>)}
+            {detailsReady && hasPositiveGeneralBalance && <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t px-3 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4">
+              <span className="font-medium">DSR sobre verbas variáveis</span>
+              <span className="text-right text-muted-foreground">—</span>
+              <span className="text-right font-semibold tabular-nums">{dsr ? money(dsr.amountCents / 100) : "—"}</span>
+            </div>}
+            {detailsReady && hasPositiveGeneralBalance && <div className="grid grid-cols-[minmax(0,1fr)_82px_112px] items-center gap-2 border-t bg-muted/40 px-3 py-4 text-sm font-bold sm:grid-cols-[minmax(0,1fr)_100px_130px] sm:px-4"><span>{dsr ? "Total do pagamento com DSR" : "Subtotal das verbas variáveis"}</span><span className="text-right font-mono tabular-nums">{hhmm(totalMinutes)}</span><span className="text-right tabular-nums">{money(paymentValue)}</span></div>}
           </div>
-          {employee && hasPositiveGeneralBalance && <div className="mt-4 rounded-lg border p-3 text-sm"><p className="font-semibold">Memória de cálculo</p><p className="mt-1 text-muted-foreground">Hora normal: {money(hourlyRate)} ({money(Number(employee.salary || 0))} ÷ {divisor}h). HE 60%: hora normal × 1,60. HE 60% + 20% noturno: hora normal × 1,60 × 1,20 = fator 1,92. Os valores são calculados com precisão decimal e exibidos em reais com duas casas decimais.</p><p className="mt-1 text-xs text-muted-foreground">A categoria noturna deve ser usada somente para horas elegíveis conforme a jornada e a convenção coletiva aplicável.</p></div>}
+          {detailsReady && employee && hasPositiveGeneralBalance && <div className="mt-4 rounded-lg border p-3 text-sm"><p className="font-semibold">Memória de cálculo</p><p className="mt-1 text-muted-foreground">Hora normal: {money(hourlyRate)} ({money(Number(employee.salary || 0))} ÷ {divisor}h). HE 60%: hora normal × 1,60. HE 60% + 20% noturno: hora normal × 1,60 × 1,20 = fator 1,92. Os valores são calculados com precisão decimal e exibidos em reais com duas casas decimais.</p><p className="mt-1 text-xs text-muted-foreground">A categoria noturna deve ser usada somente para horas elegíveis conforme a jornada e a convenção coletiva aplicável.</p><p className="mt-2 text-xs text-muted-foreground">{dsr && period ? `DSR de ${String(period.reference_month).padStart(2, "0")}/${period.reference_year}: (${money(totalValue)} ÷ ${dsr.workingDays} dias úteis) × ${dsr.restDays} dias de repouso = ${money(dsr.amountCents / 100)}.` : messageDsr}</p></div>}
           {employee && balances.length > 0 && balances[balances.length - 1]!.accumulated <= 0 && <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm"><p className="font-semibold">Pagamento indisponível</p><p className="mt-1 text-muted-foreground">O funcionário não possui saldo positivo no Banco de Horas geral. Nenhuma hora ou valor será calculado para pagamento.</p></div>}
           {employee && balanceForPeriod && balances.length > 0 && balances[balances.length - 1]!.accumulated > 0 && <div className="mt-4 flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm"><WalletCards className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><div><span className="font-semibold">Saldo do mês (líquido):</span> <span className="font-mono">{hhmm(balanceForPeriod.monthBalance)}</span><p className="mt-1 text-xs text-muted-foreground">{allCompetencies ? "Considera o saldo geral acumulado de todas as competências, já descontados os pagamentos registrados." : "O cálculo usa o saldo mensal como base de HE 60%, descontando a categoria especial aplicável sem duplicar horas."}</p></div></div>}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4 text-primary" />O histórico será mantido; o saldo será debitado pelo total de horas.</div>
-            <button data-role-sensitive type="button" onClick={() => setConfirmPayment(true)} disabled={!period || !employee || totalMinutes <= 0 || loadingDetails || saving || Boolean(activePayment) || balances.length === 0 || balances[balances.length - 1]!.accumulated <= 0 || isConsultaOnly()} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><CircleDollarSign className="h-4 w-4" />{activePayment ? "Pagamento já registrado" : "Confirmar pagamento"}</button>
+            <button data-role-sensitive type="button" onClick={() => setConfirmPayment(true)} disabled={!period || !employee || totalMinutes <= 0 || !detailsReady || (!allCompetencies && !dsr) || saving || Boolean(activePayment) || balances.length === 0 || balances[balances.length - 1]!.accumulated <= 0 || isConsultaOnly()} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><CircleDollarSign className="h-4 w-4" />{activePayment ? "Pagamento já registrado" : "Confirmar pagamento"}</button>
           </div>
           {activePayment && <p className="mt-2 text-xs text-amber-700">Já existe um pagamento ativo para esta competência e funcionário. Para corrigir, utilize o estorno no histórico abaixo.</p>}
-          {confirmPayment && <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4"><p className="font-semibold">Confirmar pagamento?</p><p className="mt-1 text-sm text-muted-foreground">Serão registrados {hhmm(totalMinutes)} e {money(totalValue)} para {employee?.full_name}. O saldo geral será debitado em {hhmm(totalMinutes)}; os cálculos históricos não serão recalculados.</p><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setConfirmPayment(false)} className="rounded-lg border px-3 py-2 text-sm">Cancelar</button><button data-role-sensitive type="button" onClick={() => void confirmPay()} disabled={saving} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{saving ? "Registrando..." : "Sim, confirmar"}</button></div></div>}
+          {confirmPayment && detailsReady && <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4"><p className="font-semibold">Confirmar pagamento?</p><p className="mt-1 text-sm text-muted-foreground">Serão registrados {hhmm(totalMinutes)} e {money(paymentValue)} {dsr ? `(inclui ${money(dsr.amountCents / 100)} de DSR)` : "(subtotal das verbas variáveis)"} para {employee?.full_name}. O saldo geral será debitado em {hhmm(totalMinutes)}; os cálculos históricos não serão recalculados.</p><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => setConfirmPayment(false)} className="rounded-lg border px-3 py-2 text-sm">Cancelar</button><button data-role-sensitive type="button" onClick={() => void confirmPay()} disabled={saving} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">{saving ? "Registrando..." : "Sim, confirmar"}</button></div></div>}
         </Card>
         <div className="space-y-4">
           <Card className="p-5">
             <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Resumo</h2><p className="text-xs text-muted-foreground">{allCompetencies ? "Visão consolidada do saldo acumulado" : "Visão consolidada deste pagamento"}</p></div></div>
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Total de horas</p><p className="mt-2 text-2xl font-bold tabular-nums">{hasPositiveGeneralBalance ? hhmm(totalMinutes) : "—"}</p></div>
-              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Valor total</p><p className="mt-2 text-xl font-bold tabular-nums">{hasPositiveGeneralBalance ? money(totalValue) : "—"}</p></div>
+              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Total de horas</p><p className="mt-2 text-2xl font-bold tabular-nums">{detailsReady && hasPositiveGeneralBalance ? hhmm(totalMinutes) : "—"}</p></div>
+              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">{dsr ? "Valor total com DSR" : "Subtotal das verbas variáveis"}</p><p className="mt-2 text-xl font-bold tabular-nums">{detailsReady && hasPositiveGeneralBalance ? money(paymentValue) : "—"}</p></div>
             </div>
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">O sistema mantém o detalhamento por tipo de hora, mas lança apenas um débito equivalente ao total pago no Banco de Horas.</p>
           </Card>
@@ -323,7 +364,7 @@ export function Payments() {
             <div className="flex items-center justify-between gap-3"><div className="flex min-w-0 items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground"><BadgeCheck className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Histórico de pagamentos</h2><p className="text-xs text-muted-foreground">{allCompetencies ? "Todas as competências" : period ? periodLabel(period) : "Selecione uma competência"}</p></div></div><button type="button" onClick={() => setHistoryVisible(value => !value)} aria-expanded={historyVisible} className="shrink-0 rounded-lg border px-3 py-2 text-xs font-medium transition hover:bg-muted">{historyVisible ? "Ocultar registros" : "Mostrar registros"}</button></div>
             {historyVisible && <div className="mt-4 space-y-3">
               {!history.length ? <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhum pagamento registrado {allCompetencies ? "nas competências selecionadas" : "nesta competência"}.</p> : history.map(payment => <div key={payment.id} className="rounded-xl border p-3">
-                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{employees.find(e => e.id === payment.employee_id)?.full_name ?? "Funcionário"}</p><p className="mt-1 text-xs text-muted-foreground">{dateBR(payment.entry_date)} · {hhmm(payment.minutes)}</p><p className="mt-1 text-sm font-semibold tabular-nums">{payment.justification?.match(/Valor: (R\$\s*[\d.,]+)/)?.[1] ?? "Valor não informado"}</p></div><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${isReversed(payment) ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>{isReversed(payment) ? "Estornado" : "Pago"}</span></div>
+                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{employees.find(e => e.id === payment.employee_id)?.full_name ?? "Funcionário"}</p><p className="mt-1 text-xs text-muted-foreground">{dateBR(payment.entry_date)} · {hhmm(payment.minutes)}</p><p className="mt-1 text-sm font-semibold tabular-nums">{payment.justification?.match(/Valor: (R\$\s*[\d.,]+)/)?.[1] ?? "Valor não informado"}</p>{payment.justification?.match(/ \| DSR: (R\$\s*[\d.,]+)/)?.[1] && <p className="mt-1 text-xs text-muted-foreground">DSR incluído: {payment.justification.match(/ \| DSR: (R\$\s*[\d.,]+)/)?.[1]}</p>}</div><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${isReversed(payment) ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>{isReversed(payment) ? "Estornado" : "Pago"}</span></div>
                 {payment.employee_id === employeeId && !isReversed(payment) && <button data-role-sensitive type="button" onClick={() => setConfirmReversal(payment)} disabled={saving || isConsultaOnly()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50"><RotateCcw className="h-3.5 w-3.5" />Estornar pagamento</button>}
               </div>)}
             </div>}
