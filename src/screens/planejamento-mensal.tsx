@@ -37,7 +37,12 @@ export function PlanejamentoMensal() {
       (supabase as any).from("employee_document_records").select("id,employee_id,document_name,due_date,status,employees(full_name),employee_document_catalog(alert_days,category)").not("due_date","is",null).eq("status","active"),
       (supabase as any).from("vacation_periods").select("id,employee_id,acquisition_start_date,start_date,end_date,official_gozo_start_date,official_gozo_end_date,notes,leave_type,employees(full_name,status,termination_date)").not("start_date","is",null).not("end_date","is",null)
     ]);
-    if(emp.error || hol.error || tasks.error || docs.error || vacations.error) setError("Algumas informações não puderam ser carregadas. Verifique os cadastros e as permissões.");
+    const unavailable: string[] = [];
+    if (emp.error) unavailable.push("Funcionários");
+    if (hol.error) unavailable.push("Feriados");
+    if (tasks.error) unavailable.push("Tarefas");
+    if (docs.error) unavailable.push("Documentos CLT");
+    if (vacations.error) unavailable.push("Férias");
     const all:EventItem[]=[];
     // Separate organizational queries: PJ identifiers never enter CLT calculations.
     async function readPj(table:string){
@@ -48,8 +53,22 @@ export function PlanejamentoMensal() {
         rows.push(...(data??[]));if(!data||data.length<500)return rows;
       }
     }
-    try{
-      const [people,pjDocs,recesses]=await Promise.all([readPj("pj_people"),readPj("pj_documents"),readPj("pj_recesses")]);
+    const pjResults = await Promise.allSettled([
+      readPj("pj_people"),
+      readPj("pj_documents"),
+      readPj("pj_recesses"),
+    ]);
+    const labels = ["Prestadores PJ", "Documentos PJ", "Recessos PJ"];
+    const [people, pjDocs, recesses] = pjResults.map((result, index) => {
+      if (result.status === "fulfilled") return result.value;
+      unavailable.push(labels[index]);
+      return [];
+    });
+    if (unavailable.length) {
+      setError(`Algumas informações do calendário não puderam ser carregadas (${unavailable.join(", ")}).`);
+    }
+
+    if (people.length) {
       const active=new Map(people.filter(p=>p.status==="ativo"&&(!p.end_date||p.end_date>dateKey(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()))).map(p=>[p.id,p]));
       const prefix=String(year)+"-"+String(month+1).padStart(2,"0");
       const monthStart=dateKey(year,month,1),monthEnd=dateKey(year,month,new Date(year,month+1,0).getDate());
@@ -76,7 +95,7 @@ export function PlanejamentoMensal() {
           all.push({id:"pj-r-"+r.id+"-"+date,date,title:"Recesso · "+p.full_name,detail:dateLabel(r.start_date)+" a "+dateLabel(r.end_date),employeeId:"pj-"+p.id,groupId:"pj-r-"+r.id,kind:"recess"});
         }
       }
-    }catch(e){setError(current=>[current,"Não foi possível carregar a organização PJ: "+(e instanceof Error?e.message:String(e))].filter(Boolean).join(" "));}
+    }
 
     (emp.data||[]).forEach((e:any)=>{
       const dob=e.birth_date||e.date_of_birth||e.birthdate||e.data_nascimento;
