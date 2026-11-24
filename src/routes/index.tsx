@@ -100,40 +100,16 @@ function Dashboard() {
     return () => document.body.classList.remove("role-consulta");
   }, [isConsulta]);
 
-  // UI guard supplements database RLS; it is not an authorization boundary.
   useEffect(() => {
     if (!isConsulta) return;
-    const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const mutation = /(?:^|\s)(?:nov[oa]s?|criar|adicionar|editar|excluir|remover|salvar|cadastrar|registrar|importar|recalcular|sincronizar|confirmar|desativar|ativar|aplicar|finalizar|encerrar|reabrir|marcar como|concluir|pagar|programar|cancelar pagamento|estornar|gerar link|desmembrar|atualizar cadastro|limpar|zerar|restaurar|lancar|incluir|alterar|gravar|duplicar|transferir|entregar|devolver)(?:\s|$)/;
-    function blocked(el: Element) {
-      if (el.closest(".dp-sidebar") || el.matches("[data-guest-occurrence-create], [data-guest-occurrence-form] button[type=submit], [data-guest-occurrence-form] button[data-occurrence-star]")) return false;
-      const text = normalize([el.textContent, el.getAttribute("title"), el.getAttribute("aria-label"), el.getAttribute("value")].filter(Boolean).join(" ")).trim();
-      if (el.matches("[data-role-sensitive],button[type=submit],input[type=submit]")) return true;
-      if (/^(?:exportar|baixar|download|visualizar|consultar|atualizar kpis|atualizar dados|atualizar lista|atualizar tela|atualizar relatorio)\b/.test(text)) return false;
-      return mutation.test(text) || Boolean(el.querySelector("svg.lucide-plus,svg.lucide-pencil,svg.lucide-trash-2,svg.lucide-save,svg.lucide-power"));
-    }
-    function scan() {
-      document.querySelectorAll("button, [role=button], input[type=submit], [data-role-sensitive]").forEach(el => {
-        el.toggleAttribute("data-guest-blocked",blocked(el));
-      });
-    }
-    function guard(e: Event) {
-      const target=e.target instanceof Element?e.target:null;
-      if (!target) return;
-      if(e.type==="submit" && !target.matches("form[data-guest-occurrence-form]")){e.preventDefault();e.stopImmediatePropagation();return;}
-      const el=target.closest("button,[role=button],input[type=submit],[data-role-sensitive]");
-      if(el&&blocked(el)){e.preventDefault();e.stopImmediatePropagation();}
-    }
-    scan();
-    const observer=new MutationObserver(scan);
-    observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:["title","aria-label","class"]});
-    document.addEventListener("click",guard,true);
-    document.addEventListener("submit",guard,true);
-    return ()=>{
-      observer.disconnect();
-      document.removeEventListener("click",guard,true);
-      document.removeEventListener("submit",guard,true);
-      document.querySelectorAll("[data-guest-blocked]").forEach(el=>el.removeAttribute("data-guest-blocked"));
+    const guardMutation = (event: Event) => {
+      if (!(event.target instanceof Element) || !event.target.closest("[data-role-sensitive]")) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    for (const type of ["click", "change", "submit"]) document.addEventListener(type, guardMutation, true);
+    return () => {
+      for (const type of ["click", "change", "submit"]) document.removeEventListener(type, guardMutation, true);
     };
   }, [isConsulta]);
 
@@ -168,17 +144,18 @@ function Dashboard() {
     <AppShell
       screen={screen}
       isConsulta={isConsulta}
+      canOpenSettings={Boolean(accessRole)}
       collapsed={sidebarCollapsed}
       onNavigate={navigateToScreen}
       onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
     >
-      {screen === "parametros" && accessRole !== "administrador" ? (
+      {screen === "parametros" && !accessRole ? (
         <div className="flex min-h-[60vh] items-center justify-center p-6 text-center text-sm text-muted-foreground">
-          {accessRole === undefined ? "Verificando acesso..." : "Acesso restrito: somente Administradores podem abrir as Configurações."}
+          {accessRole === undefined ? "Verificando acesso..." : "Entre com uma conta ativa para consultar as Configurações."}
         </div>
       ) : Screen ? (
           <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Carregando tela...</div>}>
-            <Screen />
+            {screen === "parametros" ? <Parametros readOnly={isConsulta} /> : <Screen />}
           </Suspense>
         ) : <DashboardHome />}
     </AppShell>
@@ -186,10 +163,11 @@ function Dashboard() {
 }
 
 function AppShell({
-  screen, isConsulta, collapsed, onNavigate, onToggleCollapsed, children,
+  screen, isConsulta, canOpenSettings, collapsed, onNavigate, onToggleCollapsed, children,
 }: {
   screen: ScreenKey;
   isConsulta: boolean;
+  canOpenSettings: boolean;
   collapsed: boolean;
   onNavigate: (screen: ScreenKey) => void;
   onToggleCollapsed: () => void;
@@ -326,7 +304,7 @@ function AppShell({
                 </section>
               ))}
             </nav>
-            <SidebarProfile canOpenSettings={!isConsulta} collapsed={false} onNavigate={go} />
+            <SidebarProfile canOpenSettings={canOpenSettings} collapsed={false} onNavigate={go} />
           </aside>
         </div>
       )}
@@ -397,7 +375,7 @@ function AppShell({
             </section>
           ))}
         </nav>
-        <SidebarProfile canOpenSettings={!isConsulta} collapsed={collapsed} onNavigate={go} />
+        <SidebarProfile canOpenSettings={canOpenSettings} collapsed={collapsed} onNavigate={go} />
       </aside>
 
       <main className={`dp-app-main min-h-screen min-w-0 transition-[padding] duration-300 ease-in-out ${collapsed ? "lg:pl-[76px]" : "lg:pl-[248px]"}`}>
@@ -1060,7 +1038,7 @@ function DashboardHome() {
                           <textarea value={editingNoteText} onChange={event => setEditingNoteText(event.target.value)} rows={3} className="w-full resize-y rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
                           <div className="flex flex-wrap justify-end gap-2">
                             <button type="button" onClick={() => { setEditingNoteId(null); setEditingNoteText(""); }} disabled={noteActionId === item.id} className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted">Cancelar</button>
-                            <button type="button" onClick={() => void updateCompetenceNote(item.id)} disabled={noteActionId === item.id || !editingNoteText.trim()} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60">
+                            <button data-role-sensitive type="button" onClick={() => void updateCompetenceNote(item.id)} disabled={noteActionId === item.id || !editingNoteText.trim()} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60">
                               <Save className="h-3.5 w-3.5" />{noteActionId === item.id ? "Salvando..." : "Salvar edição"}
                             </button>
                           </div>
@@ -1085,6 +1063,7 @@ function DashboardHome() {
                 </div>
               )}
               <textarea
+                data-role-sensitive
                 value={competenceNote}
                 onChange={event => setCompetenceNote(event.target.value)}
                 placeholder="Escreva uma nova observação sobre o fechamento desta competência..."

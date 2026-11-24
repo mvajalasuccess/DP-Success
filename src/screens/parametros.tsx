@@ -36,11 +36,17 @@ export function inviteStatus(i: Pick<Invite,"used_at"|"canceled_at"|"expires_at"
 function brDateTime(v:string){ return new Date(v).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}); }
 function brDate(v:string){ const parts=v.slice(0,10).split("-"); return parts[2]+"/"+parts[1]+"/"+parts[0]; }
 
-export function Parametros(){
+export function Parametros({ readOnly = false }: { readOnly?: boolean }){
   const [settings,setSettings]=useState<Setting[]>([]),[company,setCompany]=useState<any>({}),[holidays,setHolidays]=useState<Holiday[]>([]),[profiles,setProfiles]=useState<any[]>([]),[currentProfile,setCurrentProfile]=useState<any>(null),[error,setError]=useState(""),[saved,setSaved]=useState(""),[holidayForm,setHolidayForm]=useState({date:"",name:"",scope:"nacional"}),[holidayYear,setHolidayYear]=useState(String(new Date().getFullYear()));
   async function load(){
     setError("");
     const { data: sessionData } = await supabase.auth.getSession();
+    if (readOnly) {
+      const { data, error } = await supabase.from("holidays").select("id,holiday_date,name,scope,is_demo").order("holiday_date");
+      setHolidays(data ?? []);
+      if (error) setError(error.message);
+      return;
+    }
     const [s,c,h,p]=await Promise.all([
       (supabase as any).from("system_settings").select("id,setting_group,setting_key,setting_value,label,description").order("setting_group").order("label"),
       (supabase as any).from("company_settings").select("*").limit(1).maybeSingle(),
@@ -52,11 +58,12 @@ export function Parametros(){
     setSettings(s.data??[]);setCompany(c.data??{});setHolidays(h.data??[]);setProfiles(p.data??[]);
     setCurrentProfile((p.data ?? []).find((x:any) => x.id === sessionData.session?.user.id) ?? null);
   }
-  useEffect(()=>{void load()},[]);
+  useEffect(()=>{void load()},[readOnly]);
 
   // Mantém a lista de usuários sincronizada com o banco mesmo quando um
   // usuário é excluído diretamente pelo Supabase/SQL ou por outra sessão.
   useEffect(() => {
+    if (readOnly) return;
     const refreshProfiles = async () => {
       const { data } = await (supabase as any)
         .from("profiles")
@@ -73,8 +80,8 @@ export function Parametros(){
       window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);
     };
-  }, []);
-  const isAdmin = currentProfile?.role === "administrador";
+  }, [readOnly]);
+  const isAdmin = !readOnly && currentProfile?.role === "administrador";
   const [editing,setEditing]=useState<{id:string;name:string}|null>(null);
   const [invites,setInvites]=useState<Invite[]>([]),[inviteRole,setInviteRole]=useState<"convidado"|"administrador">("convidado"),[inviteOpen,setInviteOpen]=useState(false);
   async function loadInvites(){
@@ -167,10 +174,10 @@ export function Parametros(){
       <div className="relative isolate mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#102b35] via-[#123c40] to-[#075c50] px-5 py-6 text-white shadow-lg sm:px-7 sm:py-7 [&_p]:!text-white/75 [&_h1]:!text-white"><p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Configurações</p><h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Configurações do sistema</h1><p className="text-sm text-muted-foreground">Centralize dados da empresa e regras usadas pelo RH e pelo DP.</p></div>
       {error&&<div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}{saved&&<div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-primary">{saved}</div>}
       <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Feriados</h2><p className="text-xs text-muted-foreground">Cadastre e remova feriados que impactam os cálculos de dias úteis.</p></div></div><label className="flex items-center gap-2 text-sm font-medium">Ano<select aria-label="Filtrar feriados por ano" value={holidayYear} onChange={e=>setHolidayYear(e.target.value)} className="rounded-lg border bg-background px-3 py-2 text-sm">{holidayYears.length===0?<option value="">Nenhum ano cadastrado</option>:holidayYears.map(year=><option key={year} value={year}>{year}</option>)}</select></label></div>
-        <div className="grid gap-x-6 gap-y-4 p-5 sm:grid-cols-2 xl:grid-cols-[minmax(0,180px)_minmax(0,1fr)_minmax(0,180px)_auto]"><input type="date" value={holidayForm.date} onChange={e=>setHolidayForm({...holidayForm,date:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><input placeholder="Nome do feriado" value={holidayForm.name} onChange={e=>setHolidayForm({...holidayForm,name:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><select value={holidayForm.scope} onChange={e=>setHolidayForm({...holidayForm,scope:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="nacional">Nacional</option><option value="estadual">Estadual</option><option value="municipal">Municipal</option></select><button data-role-sensitive onClick={()=>void addHoliday()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Adicionar</button></div>
+        <div data-role-sensitive className="grid gap-x-6 gap-y-4 p-5 sm:grid-cols-2 xl:grid-cols-[minmax(0,180px)_minmax(0,1fr)_minmax(0,180px)_auto]"><input type="date" value={holidayForm.date} onChange={e=>setHolidayForm({...holidayForm,date:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><input placeholder="Nome do feriado" value={holidayForm.name} onChange={e=>setHolidayForm({...holidayForm,name:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"/><select value={holidayForm.scope} onChange={e=>setHolidayForm({...holidayForm,scope:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="nacional">Nacional</option><option value="estadual">Estadual</option><option value="municipal">Municipal</option></select><button data-role-sensitive onClick={()=>void addHoliday()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Adicionar</button></div>
         <div className="divide-y">{visibleHolidays.length===0?<p className="p-6 text-center text-sm text-muted-foreground">Nenhum feriado cadastrado para {holidayYear}.</p>:visibleHolidays.map(h=><div key={h.id} className="flex items-center justify-between p-4"><div><b className="text-sm">{h.name}</b><p className="text-xs text-muted-foreground">{brDate(h.holiday_date)} · {h.scope}</p></div><button data-role-sensitive onClick={()=>void deleteHoliday(h.id)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir"><Trash2 className="h-4 w-4"/></button></div>)}</div>
       </Card>
-      <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Administrador tem acesso total. Convidado pode apenas visualizar.</p></div></div>
+      {!readOnly && <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Administrador tem acesso total. Convidado pode apenas visualizar.</p></div></div>
         {!isAdmin && <div className="m-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Seu usuário é Convidado. O acesso deste perfil é somente para visualização.</div>}
         <div className="divide-y">{profiles.map(p=>{ const viewOnly = p.role !== "administrador"; return <div key={p.id} className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -190,7 +197,7 @@ export function Parametros(){
             <p className="mt-2 text-xs text-muted-foreground">{viewOnly ? "Este usuário pode consultar as informações, mas não pode criar, editar ou excluir registros." : "Este usuário pode visualizar, criar, editar e excluir os registros do sistema."}</p>
           </div>
         </div>; })}</div>
-      </Card>
+      </Card>}
       {isAdmin && <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div className="flex items-center gap-3"><Link2 className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Links de convite</h2><p className="text-xs text-muted-foreground">Cada link vale para um único cadastro, por 7 dias, com o tipo de acesso definido aqui.</p></div></div><button data-role-sensitive onClick={()=>setInviteOpen(true)} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Gerar link de convite</button></div>
         {inviteOpen && <div className="flex flex-wrap items-end gap-4 border-b bg-muted/20 p-5"><label className="grid gap-1 text-sm font-medium">Tipo de acesso<select aria-label="Tipo de acesso do convite" value={inviteRole} onChange={e=>setInviteRole(e.target.value as "convidado"|"administrador")} className="rounded-lg border bg-background px-3 py-2 text-sm"><option value="convidado">Convidado</option><option value="administrador">Administrador</option></select></label><button data-role-sensitive onClick={()=>void generateInvite()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Gerar e copiar link</button><button onClick={()=>setInviteOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button></div>}
         <div className="divide-y">{invites.length===0 ? <p className="p-6 text-center text-sm text-muted-foreground">Nenhum convite gerado.</p> : invites.map(i=>{ const st=inviteStatus(i); return <div key={i.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div><p className="text-sm font-medium">{i.role==="administrador"?"Administrador":"Convidado"} <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${st==="Pendente"?"bg-primary/10 text-primary":"bg-muted text-muted-foreground"}`}>{st}</span></p><p className="text-xs text-muted-foreground">Gerado em {brDateTime(i.created_at)} · {st==="Utilizado"?`usado por ${i.used_email??"—"} em ${brDateTime(i.used_at!)}`:`válido até ${brDateTime(i.expires_at)}`}</p></div>{st==="Pendente" && <div className="flex gap-2"><button onClick={()=>void copyInvite(i.token)} className="rounded-lg border px-3 py-2 text-sm"><Copy className="mr-1 inline h-4 w-4"/>Copiar link</button><button data-role-sensitive onClick={()=>void cancelInvite(i.id)} className="rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><X className="mr-1 inline h-4 w-4"/>Cancelar</button></div>}</div>; })}</div>

@@ -590,7 +590,7 @@ export function Ocorrencias() {
                 <td className="px-5 py-4">{formatDate(item.row.absence_display_date || historicalDisplayStart(item.row))}{(item.row.absence_display_end_date || item.row.period_end) ? " → " + formatDate(item.row.absence_display_end_date || item.row.period_end) : ""}</td>
                 <td className="px-5 py-4">{item.row.absence_display_type || "Falta importada da BASE"}</td>
                 <td className="px-5 py-4">{displayHistoricalQuantity(item.row)}</td>
-                <td className="px-5 py-4 text-right"><button onClick={() => startHistoricalEdit(item.row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><span className="inline-block px-2 text-xs text-muted-foreground" title="Registro histórico: não excluir dados originais">BASE</span></td>
+                <td className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startHistoricalEdit(item.row)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><span className="inline-block px-2 text-xs text-muted-foreground" title="Registro histórico: não excluir dados originais">BASE</span></td>
               </tr>
             ))}
           </tbody></table></div>}

@@ -37,7 +37,6 @@ const emptyDoc = {employee_id:"",document_name:"",no_due_date:false,has_document
 export function DiarioOcorrencias() {
   const {role}=useAccountIdentity();
   const canManageEvents=role==="administrador";
-  const canCreateEvents=canManageEvents||role==="convidado";
   const [tab,setTab]=useState<(typeof tabs)[number]["id"]>(()=>sessionStorage.getItem("dp-career-employee")?"career":"diario");
   const [documentLink,setDocumentLink]=useState<"clt"|"pj">("clt");
   const [employees,setEmployees]=useState<Employee[]>([]);
@@ -107,10 +106,10 @@ export function DiarioOcorrencias() {
     setLoading(false);
   }
   useEffect(()=>{void load();},[]);
-  function openNewEvent(){if(!canCreateEvents)return;setEditingEvent(null);setEventForm({...emptyEvent,employee_id:employeeFilter!=="todos"?employeeFilter:""});setError("");setEventOpen(true);}
+  function openNewEvent(){if(!canManageEvents)return;setEditingEvent(null);setEventForm({...emptyEvent,employee_id:employeeFilter!=="todos"?employeeFilter:""});setError("");setEventOpen(true);}
   function editEvent(e:LifeEvent){if(!canManageEvents)return;setEditingEvent(e);setEventForm({employee_id:e.employee_id,event_date:e.event_date,category:e.category,direction:e.direction,title:e.title,description:e.description??"",is_star:e.direction==="positive"&&e.score>0});setEventOpen(true);setError("");}
   async function saveEvent(){
-    if(!canCreateEvents || (editingEvent && !canManageEvents)){setError("Sua conta não tem permissão para esta ação.");return;}
+    if(!canManageEvents){setError("Sua conta não tem permissão para esta ação.");return;}
     if(loading)return;
     if(!eventForm.employee_id||!eventForm.event_date||!eventForm.title.trim()){setError("Preencha funcionário, data e título da ocorrência.");return;}
     setLoading(true);const user=await (supabase as any).auth.getUser();
@@ -392,8 +391,8 @@ export function DiarioOcorrencias() {
               <h2 id="occurrence-list-title" className="font-semibold">Ocorrências por funcionário e competência</h2>
               <p className="text-xs text-muted-foreground">{visibleEvents.length} registro(s) no filtro atual</p>
             </div>
-            {canCreateEvents && (
-              <button type="button" data-guest-occurrence-create onClick={openNewEvent} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+            {canManageEvents && (
+              <button type="button" data-role-sensitive onClick={openNewEvent} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
                 <Plus className="size-4" aria-hidden="true" /> Nova ocorrência
               </button>
             )}
@@ -482,7 +481,7 @@ export function DiarioOcorrencias() {
             const openCustom=()=>{setEditingDoc(null);setDocForm({...emptyDoc,employee_id:requirementEmployee,document_name:""});setSelectedDocCategory(normCat(category));setSelectedCatalog(CUSTOM_DOC);setError("");setDocOpen(true);setOpenNewRecordCategory(null);};
             const categoryLabel=category==="Pessoais"?"Documentos Pessoais":category==="Contratação"?"Contrato":category==="Responsabilidades anuais"?"Responsabilidades Anuais":category;
             return <Card key={category} className="overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3"><div className="flex items-center gap-2"><button type="button" aria-label={collapsedDocCategories.includes(category)?"Expandir seção":"Minimizar seção"} aria-expanded={!collapsedDocCategories.includes(category)} onClick={()=>setCollapsedDocCategories(current=>current.includes(category)?current.filter(value=>value!==category):[...current,category])} className="rounded-sm p-1 hover:bg-muted" title={collapsedDocCategories.includes(category)?"Expandir seção":"Minimizar seção"}><ChevronDown className={"h-4 w-4 transition-transform "+(collapsedDocCategories.includes(category)? "-rotate-90":"")}/></button><div><h3 className="font-semibold">{categoryLabel}</h3><p className="text-xs text-muted-foreground">{sortedDocumentRows.length} item(ns)</p></div></div><div className="relative"><button data-role-sensitive type="button" aria-label={`Criar novo registro em ${categoryLabel}`} aria-expanded={openNewRecordCategory===category} onClick={()=>setOpenNewRecordCategory(current=>current===category?null:category)} className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted"><Plus className="h-4 w-4"/>Criar novo registro</button>{openNewRecordCategory===category&&<div className="absolute right-0 top-full z-30 mt-1 max-h-64 min-w-[240px] overflow-y-auto rounded-md border bg-background p-1 shadow-lg">{items.length>0?items.map(item=><button key={item.id} type="button" onClick={()=>{setEditingDoc(null);setDocForm({...emptyDoc,employee_id:requirementEmployee});setSelectedDocCategory(item.category==="Documentos Pessoais"?"Pessoais":item.category==="Contrato"?"Contratação":item.category==="Responsabilidades Anuais"?"Responsabilidades anuais":item.category);setSelectedCatalog(item.id);setError("");setDocOpen(true);setOpenNewRecordCategory(null);}} className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">{item.name}</button>):<p className="px-3 py-2 text-xs text-muted-foreground">Nenhum item cadastrado nesta seção.</p>}<button data-role-sensitive type="button" onClick={openCustom} className="mt-1 block w-full rounded-sm border-t px-3 py-2 text-left text-sm font-medium hover:bg-muted">Outro</button></div>}</div></div>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3"><div className="flex items-center gap-2"><button type="button" aria-label={collapsedDocCategories.includes(category)?"Expandir seção":"Minimizar seção"} aria-expanded={!collapsedDocCategories.includes(category)} onClick={()=>setCollapsedDocCategories(current=>current.includes(category)?current.filter(value=>value!==category):[...current,category])} className="rounded-sm p-1 hover:bg-muted" title={collapsedDocCategories.includes(category)?"Expandir seção":"Minimizar seção"}><ChevronDown className={"h-4 w-4 transition-transform "+(collapsedDocCategories.includes(category)? "-rotate-90":"")}/></button><div><h3 className="font-semibold">{categoryLabel}</h3><p className="text-xs text-muted-foreground">{sortedDocumentRows.length} item(ns)</p></div></div><div className="relative"><button data-role-sensitive type="button" aria-label={`Criar novo registro em ${categoryLabel}`} aria-expanded={openNewRecordCategory===category} onClick={()=>setOpenNewRecordCategory(current=>current===category?null:category)} className="inline-flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted"><Plus className="h-4 w-4"/>Criar novo registro</button>{openNewRecordCategory===category&&<div className="absolute right-0 top-full z-30 mt-1 max-h-64 min-w-[240px] overflow-y-auto rounded-md border bg-background p-1 shadow-lg">{items.length>0?items.map(item=><button data-role-sensitive key={item.id} type="button" onClick={()=>{setEditingDoc(null);setDocForm({...emptyDoc,employee_id:requirementEmployee});setSelectedDocCategory(item.category==="Documentos Pessoais"?"Pessoais":item.category==="Contrato"?"Contratação":item.category==="Responsabilidades Anuais"?"Responsabilidades anuais":item.category);setSelectedCatalog(item.id);setError("");setDocOpen(true);setOpenNewRecordCategory(null);}} className="block w-full rounded-sm px-3 py-2 text-left text-sm hover:bg-muted">{item.name}</button>):<p className="px-3 py-2 text-xs text-muted-foreground">Nenhum item cadastrado nesta seção.</p>}<button data-role-sensitive type="button" onClick={openCustom} className="mt-1 block w-full rounded-sm border-t px-3 py-2 text-left text-sm font-medium hover:bg-muted">Outro</button></div>}</div></div>
               {!collapsedDocCategories.includes(category)&&<>
               <div className="overflow-x-auto"><table className="w-full min-w-[1120px] table-fixed text-left text-sm">
                 <thead className="bg-muted/50 text-xs text-muted-foreground"><tr><th className="w-[280px] px-5 py-3">Documento, exame ou treinamento</th><th className="w-[120px] px-5 py-3 text-center">Padrão?</th><th className="w-[200px] px-5 py-3">Data de vencimento</th><th className="w-[130px] px-5 py-3 text-center">Assinado?</th><th className="w-[250px] px-5 py-3">Observação</th><th className="w-[140px] px-5 py-3 text-center">Ação</th></tr></thead>
@@ -494,17 +493,17 @@ export function DiarioOcorrencias() {
                     const latest=row.record;
                     return <tr key={latest?.id??item.id} className={!isStandard?"opacity-60":""}>
                       <td className="px-5 py-4"><span className="font-medium">{item.name}</span></td>
-                      <td className="px-5 py-4 text-center"><select data-role-sensitive aria-label={"Padrão para "+item.name} value={isStandard?"sim":"nao"} onChange={e=>void saveRequirement(item.id,{is_applicable:e.target.value==="sim",is_required:e.target.value==="sim"?(rule?.is_required??false):false,requires_signature:e.target.value==="sim"?(rule?.requires_signature??false):false})} className="h-9 min-w-[76px] rounded-md border bg-background px-3 text-xs"><option value="sim">Sim</option><option value="nao">Não</option></select></td>
+                      <td className="px-5 py-4 text-center"><span data-consulta-only>{isStandard ? "Sim" : "Não"}</span><select data-role-sensitive aria-label={"Padrão para "+item.name} value={isStandard?"sim":"nao"} onChange={e=>void saveRequirement(item.id,{is_applicable:e.target.value==="sim",is_required:e.target.value==="sim"?(rule?.is_required??false):false,requires_signature:e.target.value==="sim"?(rule?.requires_signature??false):false})} className="h-9 min-w-[76px] rounded-md border bg-background px-3 text-xs"><option value="sim">Sim</option><option value="nao">Não</option></select></td>
                       <td className="px-5 py-4">{latest?.no_due_date?<span className="text-muted-foreground">Não possui vencimento</span>:latest?.due_date?dateLabel(latest.due_date):<span className="text-muted-foreground">Não informado</span>}{latest&&!latest.no_due_date&&latest.due_date&&<span className={"ml-2 text-xs "+(dueState(latest)==="Vencido"?"text-rose-600":dueState(latest)==="Próximo do vencimento"?"text-amber-600":"text-emerald-600")}>{dueState(latest)}</span>}</td>
                       <td className="px-5 py-4 text-center"><span className={latest?.signature_status==="signed"?"font-medium text-emerald-600":"text-muted-foreground"}>{latest?.signature_status==="not_applicable"?"Não se aplica":latest?.signature_status==="signed"?"Sim":"Não"}</span></td>
                       <td className="px-5 py-4"><span className="block max-w-[280px] whitespace-normal break-words text-xs text-muted-foreground">{latest?.notes||"—"}</span></td>
-                      <td className="whitespace-nowrap px-5 py-4 text-center">{latest?<button data-role-sensitive onClick={()=>editDoc(latest)} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted">Editar registro</button>:<button onClick={()=>{setEditingDoc(null);setDocForm({...emptyDoc,employee_id:requirementEmployee});setSelectedDocCategory(category);setSelectedCatalog(item.id);setDocOpen(true);}} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"><Plus className="mr-1 inline h-3.5 w-3.5"/>Cadastrar</button>}</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-center">{latest?<button data-role-sensitive onClick={()=>editDoc(latest)} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted">Editar registro</button>:<button data-role-sensitive onClick={()=>{setEditingDoc(null);setDocForm({...emptyDoc,employee_id:requirementEmployee});setSelectedDocCategory(category);setSelectedCatalog(item.id);setDocOpen(true);}} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"><Plus className="mr-1 inline h-3.5 w-3.5"/>Cadastrar</button>}</td>
                     </tr>;
                   }
                   const latest=row.record;
                   return <tr key={"custom-"+latest.id}>
                     <td className="px-5 py-4"><span className="font-medium">{latest.document_name}</span></td>
-                    <td className="px-5 py-4 text-center"><select data-role-sensitive aria-label={"Padrão para "+latest.document_name} value={latest.is_standard?"sim":"nao"} onChange={e=>void saveCustomStandard([latest],e.target.value==="sim")} className="h-9 min-w-[76px] rounded-md border bg-background px-3 text-xs"><option value="sim">Sim</option><option value="nao">Não</option></select></td>
+                    <td className="px-5 py-4 text-center"><span data-consulta-only>{latest.is_standard ? "Sim" : "Não"}</span><select data-role-sensitive aria-label={"Padrão para "+latest.document_name} value={latest.is_standard?"sim":"nao"} onChange={e=>void saveCustomStandard([latest],e.target.value==="sim")} className="h-9 min-w-[76px] rounded-md border bg-background px-3 text-xs"><option value="sim">Sim</option><option value="nao">Não</option></select></td>
                     <td className="px-5 py-4">{latest.no_due_date?<span className="text-muted-foreground">Não possui vencimento</span>:latest.due_date?dateLabel(latest.due_date):<span className="text-muted-foreground">Não informado</span>}{!latest.no_due_date&&latest.due_date&&<span className={"ml-2 text-xs "+(dueState(latest)==="Vencido"?"text-rose-600":dueState(latest)==="Próximo do vencimento"?"text-amber-600":"text-emerald-600")}>{dueState(latest)}</span>}</td>
                     <td className="px-5 py-4 text-center"><span className={latest.signature_status==="signed"?"font-medium text-emerald-600":"text-muted-foreground"}>{latest.signature_status==="not_applicable"?"Não se aplica":latest.signature_status==="signed"?"Sim":"Não"}</span></td>
                     <td className="px-5 py-4"><span className="block max-w-[280px] whitespace-normal break-words text-xs text-muted-foreground">{latest.notes||"—"}</span></td>
@@ -523,13 +522,13 @@ export function DiarioOcorrencias() {
       </div>}
       {tab==="checklists"&&<><EmployeeAssetsAccess employees={employees} companyFilter={companyFilter}/></>}
           </main>
-    {canCreateEvents && (!editingEvent || canManageEvents) && (
+    {canManageEvents && (
       <Dialog open={eventOpen} onOpenChange={setEventOpen}>
         <DialogContent aria-describedby={undefined} className="max-h-[90vh] w-[calc(100%_-_2rem)] gap-0 overflow-y-auto rounded-xl p-0 sm:max-w-xl">
           <DialogHeader className="border-b px-5 py-5 pr-12 text-left sm:px-6">
             <DialogTitle>{editingEvent ? "Editar ocorrência" : "Nova ocorrência"}</DialogTitle>
           </DialogHeader>
-          <form data-guest-occurrence-form={!editingEvent ? "" : undefined} onSubmit={event => { event.preventDefault(); if (!loading) void saveEvent(); }} className="grid gap-5 px-5 py-5 sm:px-6">
+          <form data-role-sensitive onSubmit={event => { event.preventDefault(); if (!loading) void saveEvent(); }} className="grid gap-5 px-5 py-5 sm:px-6">
             <div className="grid gap-x-6 gap-y-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.6fr)]">
               <label className="grid gap-1.5 text-sm font-medium">
                 Funcionário

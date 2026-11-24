@@ -205,7 +205,6 @@ textarea:disabled {
 }
 
 /* Ações mutáveis são ocultadas no modo consulta; RLS protege os dados. */
-.role-consulta [data-guest-blocked],
 .role-consulta [data-role-sensitive] {
   display: none !important;
 }
