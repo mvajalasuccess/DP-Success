@@ -1,21 +1,20 @@
-import { isBrazilNationalHoliday } from "./feriados";
-
 export function calculateDsr(
   variablePayCents: number,
-  referenceYear: number,
-  referenceMonth: number,
-  additionalHolidayDates: ReadonlySet<string>,
+  startDate: string,
+  endDate: string,
+  holidayDates: ReadonlySet<string>,
 ) {
-  if (!Number.isInteger(referenceYear) || referenceYear < 1900 ||
-      !Number.isInteger(referenceMonth) || referenceMonth < 1 || referenceMonth > 12) return null;
+  const date = new Date(`${startDate}T00:00:00Z`);
+  const lastDate = new Date(`${endDate}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || !Number.isFinite(lastDate.getTime()) || date > lastDate) return null;
+  if (date.toISOString().slice(0, 10) !== startDate || lastDate.toISOString().slice(0, 10) !== endDate) return null;
 
-  const date = new Date(Date.UTC(referenceYear, referenceMonth - 1, 1));
   let workingDays = 0;
   let restDays = 0;
 
-  while (date.getUTCMonth() === referenceMonth - 1) {
+  while (date <= lastDate) {
     const day = date.toISOString().slice(0, 10);
-    if (date.getUTCDay() === 0 || additionalHolidayDates.has(day) || isBrazilNationalHoliday(day)) {
+    if (date.getUTCDay() === 0 || holidayDates.has(day)) {
       restDays += 1;
     } else {
       workingDays += 1;

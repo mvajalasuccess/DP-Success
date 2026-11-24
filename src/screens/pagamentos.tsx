@@ -60,13 +60,13 @@ export function Payments() {
   const subtotalCents = Math.round(details.reduce((sum, item) => sum + (item.minutes / 60) * hourlyRate * item.multiplier, 0) * 100);
   const totalValue = subtotalCents / 100;
   const dsr = period && !allCompetencies && holidayDates && detailsReady
-    ? calculateDsr(subtotalCents, period.reference_year, period.reference_month, holidayDates)
+    ? calculateDsr(subtotalCents, period.start_date, period.end_date, holidayDates)
     : null;
   const paymentValue = (subtotalCents + (dsr?.amountCents ?? 0)) / 100;
   const messageDsr = allCompetencies
     ? "Selecione uma competência específica para calcular o DSR."
     : !holidayDates ? "DSR indisponível enquanto o calendário de feriados não for carregado."
-    : "DSR indisponível para o mês de referência.";
+    : "DSR indisponível para o período da competência.";
   const balanceForPeriod = balances.find(b => b.period.id === period?.id);
   const hasPositiveGeneralBalance = balances.length > 0 && Number(balances[balances.length - 1]!.accumulated ?? 0) > 0;
 
@@ -342,7 +342,7 @@ export function Payments() {
               <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
                 <div>
                   <h3 id="payment-dsr-title" className="text-sm font-semibold">Cálculo do DSR</h3>
-                  {dsr && period && <p className="mt-1 text-xs text-muted-foreground">Mês de referência {String(period.reference_month).padStart(2, "0")}/{period.reference_year}</p>}
+                  {!allCompetencies && period && <p className="mt-1 text-xs text-muted-foreground">Competência de {periodLabel(period)}</p>}
                 </div>
                 {dsr && <p className="text-xl font-bold tabular-nums">{money(dsr.amountCents / 100)}</p>}
               </div>
