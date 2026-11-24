@@ -363,10 +363,21 @@ export function Payments() {
         <div className="space-y-4">
           <Card className="p-5">
             <div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Clock3 className="h-5 w-5" /></div><div><h2 className="font-display font-semibold">Resumo</h2><p className="text-xs text-muted-foreground">{allCompetencies ? "Visão consolidada do saldo acumulado" : "Visão consolidada deste pagamento"}</p></div></div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Total de horas</p><p className="mt-2 text-2xl font-bold tabular-nums">{detailsReady && hasPositiveGeneralBalance ? hhmm(totalMinutes) : "—"}</p></div>
-              <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">{dsr ? "Valor total com DSR" : "Subtotal das verbas variáveis"}</p><p className="mt-2 text-xl font-bold tabular-nums">{detailsReady && hasPositiveGeneralBalance ? money(paymentValue) : "—"}</p></div>
-            </div>
+            <dl className="mt-5 grid grid-cols-2 gap-3">
+              {[
+                { label: "Total de horas", value: hhmm(totalMinutes) },
+                { label: "Valor total de horas extras", value: money(totalValue) },
+                { label: "Valor do DSR", value: dsr ? money(dsr.amountCents / 100) : "—" },
+                { label: "Valor total com DSR", value: dsr ? money(paymentValue) : "—" },
+              ].map(({ label, value }) => (
+                <div key={label} className="min-w-0 rounded-xl border p-3 sm:p-4">
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd className="mt-2 break-words text-lg font-bold tabular-nums sm:text-xl">
+                    {detailsReady && hasPositiveGeneralBalance ? value : "—"}
+                  </dd>
+                </div>
+              ))}
+            </dl>
             <p className="mt-4 text-xs leading-relaxed text-muted-foreground">O sistema mantém o detalhamento por tipo de hora, mas lança apenas um débito equivalente ao total pago no Banco de Horas.</p>
           </Card>
           <Card className="p-5">
