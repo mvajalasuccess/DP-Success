@@ -1,11 +1,12 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { createFileRoute, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
+import { lazy, Suspense, useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { CalendarCheck, CalendarX, ChevronDown, ChevronLeft, ClipboardCheck, Clock3, FilePenLine, FolderOpen, Gauge, LogOut, Settings, Menu, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, Timer, X, Pencil, Trash2, CheckCircle2, RotateCcw, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { getScreenIcon, ScreenBrand } from "@/components/screen-brand";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { useAccountIdentity } from "@/hooks/use-account-identity";
+import { PLANNING_SCREEN, planningPublicUrl } from "@/lib/planning-url";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
 const Companies = lazy(() => import("@/screens/empresas").then(m => ({ default: m.Companies })));
 const Positions = lazy(() => import("@/screens/cargos").then(m => ({ default: m.Positions })));
@@ -57,15 +58,16 @@ function fmt(minutes: number) {
   return sign + Math.floor(value / 60) + "h " + String(value % 60).padStart(2, "0") + "m";
 }
 
-function getScreenFromUrl(): ScreenKey {
-  if (typeof window === "undefined") return "planejamento-mensal";
-  const value = new URLSearchParams(window.location.search).get("tela") as ScreenKey | null;
+function getScreenFromUrl(search: string): ScreenKey {
+  const value = new URLSearchParams(search).get("tela") as ScreenKey | null;
   const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importar-cartao-ponto", "ferias"];
-  return value && validScreens.includes(value) ? value : "planejamento-mensal";
+  return value && validScreens.includes(value) ? value : PLANNING_SCREEN;
 }
 
 function Dashboard() {
-  const [screen, setScreen] = useState<ScreenKey>(getScreenFromUrl);
+  const router = useRouter();
+  const { publicHref, searchStr } = useLocation();
+  const screen = getScreenFromUrl(searchStr);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   // undefined = carregando; o perfil vem do banco (user_roles), nunca do navegador.
   const [accessRole, setAccessRole] = useState<string | null | undefined>(undefined);
@@ -135,26 +137,30 @@ function Dashboard() {
     };
   }, [isConsulta]);
 
-  const navigateToScreen = (target: ScreenKey) => {
-    setScreen(target);
+  useEffect(() => {
+    if (screen !== PLANNING_SCREEN) return;
+    const canonical = planningPublicUrl(new URL(window.location.href));
+    if (canonical) router.history.replace(canonical.pathname + canonical.search + canonical.hash);
+  }, [router, screen, publicHref]);
+
+  const navigateToScreen = useCallback((target: ScreenKey) => {
     const url = new URL(window.location.href);
+    url.pathname = "/";
     url.searchParams.set("tela", target);
-    window.history.pushState({ screen: target }, "", url);
-  };
+    const destination = planningPublicUrl(url) ?? url;
+    if (destination.href !== window.location.href) {
+      router.history.push(destination.pathname + destination.search + destination.hash);
+    }
+  }, [router]);
 
   useEffect(() => {
     const onNavigate = (event: Event) => {
       const target = (event as CustomEvent<ScreenKey>).detail;
       if (target) navigateToScreen(target);
     };
-    const onPopState = () => setScreen(getScreenFromUrl());
     window.addEventListener("dp-success:navigate", onNavigate);
-    window.addEventListener("popstate", onPopState);
-    return () => {
-      window.removeEventListener("dp-success:navigate", onNavigate);
-      window.removeEventListener("popstate", onPopState);
-    };
-  }, []);
+    return () => window.removeEventListener("dp-success:navigate", onNavigate);
+  }, [navigateToScreen]);
 
   const Screen = screen === "dashboard" ? null : screenComponents[screen];
 
