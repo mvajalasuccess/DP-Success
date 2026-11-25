@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CalendarDays, Copy, Link2, Pencil, Save, Shield, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 
 import { ScreenBrand } from "@/components/screen-brand";
@@ -27,6 +31,29 @@ const DEFAULT_PERMISSIONS: Record<AccessKey, {view:boolean; edit:boolean}> = Obj
   ACCESS_OPTIONS.map(([key]) => [key, { view: true, edit: true }]),
 ) as Record<AccessKey, {view:boolean; edit:boolean}>;
 
+type AccountProfile = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  role: string;
+  active: boolean;
+  is_protected_account?: boolean;
+};
+type AccountRole = "administrador" | "convidado";
+type AccountAction = { id: string } & (
+  { kind: "delete" } |
+  { kind: "role"; role: AccountRole } |
+  { kind: "active"; active: boolean }
+);
+
+async function fetchAccountProfiles() {
+  const fromProfiles = () => (supabase as any).from("profiles");
+  const result = await fromProfiles()
+    .select("id,email,full_name,role,active,is_protected_account").order("full_name");
+  if (result.error?.code !== "42703" && result.error?.code !== "PGRST204") return result;
+  return fromProfiles().select("id,email,full_name,role,active").order("full_name");
+}
+
 type Invite = { id:string; token:string; role:string; created_at:string; expires_at:string; used_at:string|null; used_email:string|null; canceled_at:string|null };
 export function inviteStatus(i: Pick<Invite,"used_at"|"canceled_at"|"expires_at">, now = Date.now()): "Pendente"|"Utilizado"|"Expirado"|"Cancelado" {
   if (i.canceled_at) return "Cancelado";
@@ -37,7 +64,7 @@ function brDateTime(v:string){ return new Date(v).toLocaleString("pt-BR",{dateSt
 function brDate(v:string){ const parts=v.slice(0,10).split("-"); return parts[2]+"/"+parts[1]+"/"+parts[0]; }
 
 export function Parametros({ readOnly = false }: { readOnly?: boolean }){
-  const [settings,setSettings]=useState<Setting[]>([]),[company,setCompany]=useState<any>({}),[holidays,setHolidays]=useState<Holiday[]>([]),[profiles,setProfiles]=useState<any[]>([]),[currentProfile,setCurrentProfile]=useState<any>(null),[error,setError]=useState(""),[saved,setSaved]=useState(""),[holidayForm,setHolidayForm]=useState({date:"",name:"",scope:"nacional"}),[holidayYear,setHolidayYear]=useState(String(new Date().getFullYear()));
+  const [settings,setSettings]=useState<Setting[]>([]),[company,setCompany]=useState<any>({}),[holidays,setHolidays]=useState<Holiday[]>([]),[profiles,setProfiles]=useState<AccountProfile[]>([]),[currentProfile,setCurrentProfile]=useState<AccountProfile | null>(null),[error,setError]=useState(""),[saved,setSaved]=useState(""),[holidayForm,setHolidayForm]=useState({date:"",name:"",scope:"nacional"}),[holidayYear,setHolidayYear]=useState(String(new Date().getFullYear()));
   async function load(){
     setError("");
     const { data: sessionData } = await supabase.auth.getSession();
@@ -51,12 +78,12 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
       (supabase as any).from("system_settings").select("id,setting_group,setting_key,setting_value,label,description").order("setting_group").order("label"),
       (supabase as any).from("company_settings").select("*").limit(1).maybeSingle(),
       (supabase as any).from("holidays").select("id,holiday_date,name,scope,is_demo").order("holiday_date"),
-      (supabase as any).from("profiles").select("id,email,full_name,role,active,permissions").order("full_name"),
+      fetchAccountProfiles(),
     ]);
     const firstError=[s,c,h,p].find(x=>x.error)?.error;
     if(firstError)setError(firstError.message);
     setSettings(s.data??[]);setCompany(c.data??{});setHolidays(h.data??[]);setProfiles(p.data??[]);
-    setCurrentProfile((p.data ?? []).find((x:any) => x.id === sessionData.session?.user.id) ?? null);
+    setCurrentProfile((p.data ?? []).find((x: AccountProfile) => x.id === sessionData.session?.user.id) ?? null);
   }
   useEffect(()=>{void load()},[readOnly]);
 
@@ -65,10 +92,7 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
   useEffect(() => {
     if (readOnly) return;
     const refreshProfiles = async () => {
-      const { data } = await (supabase as any)
-        .from("profiles")
-        .select("id,email,full_name,role,active,permissions")
-        .order("full_name");
+      const { data } = await fetchAccountProfiles();
       if (data) setProfiles(data);
     };
 
@@ -82,6 +106,15 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
     };
   }, [readOnly]);
   const isAdmin = !readOnly && currentProfile?.role === "administrador";
+  const [accountAction, setAccountAction] = useState<AccountAction | null>(null);
+  const [savingAccountAction, setSavingAccountAction] = useState(false);
+  const actionTarget = profiles.find(profile => profile.id === accountAction?.id);
+  const actionTargetLabel = actionTarget?.email || actionTarget?.full_name || "este usuário";
+  const accountActionDescription = accountAction?.kind === "delete"
+    ? `A conta de ${actionTargetLabel} será excluída definitivamente. Esta ação não pode ser desfeita.`
+    : accountAction?.kind === "role"
+      ? `Confirma a alteração do perfil de ${actionTargetLabel} para ${accountAction.role === "administrador" ? "Administrador" : "Convidado"}?`
+      : `Confirma que deseja ${accountAction?.active ? "ativar" : "desativar"} o acesso de ${actionTargetLabel}?`;
   const [editing,setEditing]=useState<{id:string;name:string}|null>(null);
   const [invites,setInvites]=useState<Invite[]>([]),[inviteRole,setInviteRole]=useState<"convidado"|"administrador">("convidado"),[inviteOpen,setInviteOpen]=useState(false);
   const [deletingInviteId, setDeletingInviteId] = useState<string | null>(null);
@@ -140,7 +173,10 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
     try { await navigator.clipboard.writeText(inviteLink(token)); setSaved("Link copiado."); } catch { window.prompt("Copie o link:", inviteLink(token)); }
   }
   async function saveName(){
-    if (!editing) return;
+    if (!isAdmin || !editing) return;
+    const target = profiles.find(profile => profile.id === editing.id);
+    if (!target || !(target.is_protected_account === false ||
+      (target.is_protected_account === true && target.id === currentProfile?.id))) return;
     setError(""); setSaved("");
     const { error } = await (supabase as any).rpc("admin_update_user_name",{ _user_id: editing.id, _full_name: editing.name });
     if (error) { setError(error.message); return; }
@@ -177,27 +213,33 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
     void load();
   }
 
-  async function updateProfile(id: string, patch: { role?: string; active?: boolean }) {
-    setError(""); setSaved("");
-    const { data, error } = await supabase.functions.invoke("update-user-access", {
-      body: { user_id: id, ...patch },
-    });
-    const message = error?.message ?? (data && typeof data === "object" && "error" in data
-      ? String((data as { error: unknown }).error)
-      : "");
-    if (message) { setError(message); return; }
-    setSaved("Acesso atualizado.");
-    void load();
+  async function confirmAccountAction() {
+    if (!isAdmin || !accountAction || !actionTarget || savingAccountAction ||
+      actionTarget.id === currentProfile?.id || actionTarget.is_protected_account !== false) return;
+
+    const deleting = accountAction.kind === "delete";
+    const body = accountAction.kind === "role" ? { user_id: accountAction.id, role: accountAction.role }
+      : accountAction.kind === "active" ? { user_id: accountAction.id, active: accountAction.active }
+      : { user_id: accountAction.id };
+    setAccountAction(null);
+    setSavingAccountAction(true);
+    setError("");
+    setSaved("");
+    try {
+      const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
+        deleting ? "delete-user" : "update-user-access", { body },
+      );
+      if (error || data?.success !== true) {
+        setError(data?.error ?? error?.message ?? "Não foi possível concluir a ação.");
+        return;
+      }
+      await load();
+      setSaved(deleting ? "Usuário excluído." : "Acesso atualizado.");
+    } finally {
+      setSavingAccountAction(false);
+    }
   }
-  async function deleteProfile(id: string, email: string) {
-    if (!window.confirm(`Excluir o acesso de ${email}? Esta ação não pode ser desfeita.`)) return;
-    setError(""); setSaved("");
-    const { data, error } = await supabase.functions.invoke("delete-user", { body: { user_id: id } });
-    const message = error?.message ?? (data && typeof data === "object" && "error" in data ? String((data as { error: unknown }).error) : "");
-    if (message) { setError(message); return; }
-    setSaved("Acesso excluído.");
-    void load();
-  }
+
   return <div className="dp-screen min-h-screen bg-background">
     <header className="dp-screen-topbar border-b bg-card/80 px-4 py-4 backdrop-blur sm:px-6"><div className="mx-auto flex max-w-[1180px] items-center justify-between"><a href="/" className="text-sm text-muted-foreground"><ArrowLeft className="mr-1 inline h-4 w-4"/>Voltar</a><ScreenBrand name="Configurações" /></div></header>
     <main className="mx-auto max-w-[1180px] px-6 py-7 space-y-6">
@@ -209,14 +251,24 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
       </Card>
       {!readOnly && <Card className="overflow-hidden"><div className="border-b p-5 flex items-center gap-3"><Shield className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Usuários e permissões</h2><p className="text-xs text-muted-foreground">Administradores têm acesso total. Convidados podem consultar o sistema e criar ocorrências no Diário de Ocorrências.</p></div></div>
         {!isAdmin && <div className="m-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Seu perfil é Convidado. Convidados podem consultar o sistema e criar ocorrências no Diário de Ocorrências.</div>}
-        <div className="divide-y">{profiles.map(p=>{ const viewOnly = p.role !== "administrador"; return <div key={p.id} className="p-5">
+        {isAdmin && profiles.some(profile => profile.is_protected_account === undefined) && (
+          <p role="status" className="border-b px-5 py-3 text-sm text-muted-foreground">
+            As alterações de usuários ficam indisponíveis até a atualização da proteção de contas no banco.
+          </p>
+        )}
+        <div className="divide-y">{profiles.map(p=>{
+          const viewOnly = p.role !== "administrador";
+          const isSelf = p.id === currentProfile?.id;
+          const canRename = isAdmin && (p.is_protected_account === false || (p.is_protected_account === true && isSelf));
+          const canChangeAccess = isAdmin && !isSelf && p.is_protected_account === false && !savingAccountAction;
+          return <div key={p.id} className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            {editing && editing.id===p.id ? <div className="flex flex-wrap items-center gap-2"><input aria-label="Nome completo" autoFocus value={editing.name} onChange={e=>setEditing({id:p.id,name:e.target.value})} onKeyDown={e=>{if(e.key==="Enter")void saveName();}} className="rounded-lg border px-3 py-2 text-sm"/><button data-role-sensitive onClick={()=>void saveName()} className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Save className="mr-1 inline h-4 w-4"/>Salvar</button><button onClick={()=>setEditing(null)} className="rounded-lg border px-3 py-2 text-sm">Cancelar</button><p className="w-full text-xs text-muted-foreground">{p.email}</p></div>
-            : <div className="flex items-start gap-2"><div><p className="text-sm font-medium">{p.full_name||"Usuário"}</p><p className="text-xs text-muted-foreground">{p.email}</p></div>{isAdmin && <button data-role-sensitive onClick={()=>setEditing({id:p.id,name:p.full_name??""})} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted" title="Editar nome" aria-label={`Editar nome de ${p.email}`}><Pencil className="h-4 w-4"/></button>}</div>}
+            {canRename && editing && editing.id===p.id ? <div className="flex flex-wrap items-center gap-2"><input aria-label="Nome completo" autoFocus value={editing.name} onChange={e=>setEditing({id:p.id,name:e.target.value})} onKeyDown={e=>{if(e.key==="Enter")void saveName();}} className="rounded-lg border px-3 py-2 text-sm"/><button data-role-sensitive onClick={()=>void saveName()} className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground"><Save className="mr-1 inline h-4 w-4"/>Salvar</button><button onClick={()=>setEditing(null)} className="rounded-lg border px-3 py-2 text-sm">Cancelar</button><p className="w-full text-xs text-muted-foreground">{p.email}</p></div>
+            : <div className="flex items-start gap-2"><div><p className="text-sm font-medium">{p.full_name||"Usuário"}</p><p className="text-xs text-muted-foreground">{p.email}</p>{p.is_protected_account && <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-medium">Conta principal protegida</span>}</div>{canRename && <button data-role-sensitive onClick={()=>setEditing({id:p.id,name:p.full_name??""})} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted" title="Editar nome" aria-label={`Editar nome de ${p.email}`}><Pencil className="h-4 w-4"/></button>}</div>}
             <div className="flex items-center gap-2">
-              <select data-role-sensitive aria-label="Tipo de acesso" disabled={!isAdmin || p.id === currentProfile?.id} value={viewOnly ? "convidado" : "administrador"} onChange={e=>void updateProfile(p.id,{role:e.target.value})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="convidado">Convidado</option></select>
-              <label className="flex items-center gap-2 text-sm"><input data-role-sensitive disabled={!isAdmin || p.id === currentProfile?.id} type="checkbox" checked={p.active!==false} onChange={e=>void updateProfile(p.id,{active:e.target.checked})}/>Ativo</label>
-              {isAdmin && p.id !== currentProfile?.id && <button data-role-sensitive onClick={()=>void deleteProfile(p.id,p.email)} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir usuário"><Trash2 className="h-4 w-4"/></button>}
+              <select data-role-sensitive aria-label="Tipo de acesso" disabled={!canChangeAccess} value={viewOnly ? "convidado" : "administrador"} onChange={e=>setAccountAction({id:p.id,kind:"role",role:e.target.value as AccountRole})} className="rounded-lg border px-3 py-2 text-sm"><option value="administrador">Administrador</option><option value="convidado">Convidado</option></select>
+              <label className="flex items-center gap-2 text-sm"><input data-role-sensitive disabled={!canChangeAccess} type="checkbox" checked={p.active!==false} onChange={e=>setAccountAction({id:p.id,kind:"active",active:e.target.checked})}/>Ativo</label>
+              {canChangeAccess && <button type="button" data-role-sensitive onClick={()=>setAccountAction({id:p.id,kind:"delete"})} className="rounded-lg p-2 text-destructive hover:bg-destructive/10" title="Excluir usuário"><Trash2 className="h-4 w-4"/></button>}
             </div>
           </div>
           <div className="mt-4 rounded-lg border bg-muted/20 p-4">
@@ -245,6 +297,24 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
           )}
         </div>; })}</div>
       </Card>}
+      <AlertDialog open={accountAction !== null} onOpenChange={open => { if (!open) setAccountAction(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{accountAction?.kind === "delete" ? "Excluir usuário?" : "Alterar acesso?"}</AlertDialogTitle>
+            <AlertDialogDescription>{accountActionDescription}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!actionTarget || savingAccountAction}
+              className={accountAction?.kind === "delete" ? "bg-destructive text-white hover:bg-destructive/90" : undefined}
+              onClick={event => { event.preventDefault(); void confirmAccountAction(); }}
+            >
+              {accountAction?.kind === "delete" ? "Excluir usuário" : "Confirmar alteração"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   </div>;
 }
