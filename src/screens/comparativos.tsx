@@ -22,7 +22,7 @@ export function Comparativos() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [companyFilter, setCompanyFilter] = useState("");
-  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"ativo" | "inativo" | "todos">("todos");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [periodSearch, setPeriodSearch] = useState("");
