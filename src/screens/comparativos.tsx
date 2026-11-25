@@ -573,19 +573,19 @@ export function Comparativos() {
           <div><h2 className="font-semibold">Comparação lado a lado por colaborador</h2><p className="mt-1 text-xs text-muted-foreground">Funcionários nas linhas e indicadores nas colunas para comparar os valores diretamente.</p></div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground"><FileSpreadsheet className="h-4 w-4" />Tabela comparativa</div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1250px] text-left text-sm">
+        <div className="overflow-x-auto bg-inherit">
+          <table className="w-full min-w-[1250px] bg-inherit text-left text-sm">
             <thead className="sticky top-0 bg-muted/70 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="sticky left-0 z-20 min-w-[230px] bg-muted/90 px-4 py-3 font-semibold">Colaborador</th>
+                <th className="sticky left-0 z-20 min-w-[230px] px-4 py-3 font-semibold">Colaborador</th>
                 {columns.map(([, label]) => <th key={label} className="whitespace-nowrap px-4 py-3 font-semibold">{label}</th>)}
                 <th className="whitespace-nowrap px-4 py-3 font-semibold">Faltas (dias)</th>
                 <th className="whitespace-nowrap px-4 py-3 font-semibold">Atestados (dias)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/70">
-              {selectedEmployeeRows.map(({id, employee, totals: t}) => <tr key={id} className="transition-colors hover:bg-muted/30">
-                <th scope="row" className="sticky left-0 z-[1] max-w-[300px] bg-card px-4 py-3.5 font-medium">{employee!.full_name}</th>
+            <tbody className="divide-y divide-border/70 bg-inherit [&>tr+tr>th]:border-t [&>tr+tr>th]:border-t-[color-mix(in_oklab,var(--color-border)_78%,white)]">
+              {selectedEmployeeRows.map(({id, employee, totals: t}) => <tr key={id} className="group bg-inherit transition-colors hover:bg-muted/30">
+                <th scope="row" className="sticky left-0 z-[1] max-w-[300px] bg-inherit px-4 py-[0.7rem] font-medium text-[color:color-mix(in_oklab,var(--dp-premium-ink)_94%,white)] group-hover:bg-[oklch(0.97_0.018_165)]">{employee!.full_name}</th>
                 {columns.map(([key]) => <td key={key} className="whitespace-nowrap px-4 py-3.5 tabular-nums">{fmt(t[key])}</td>)}
                 <td className="whitespace-nowrap px-4 py-3.5 tabular-nums">{t.faltas.toLocaleString("pt-BR", {maximumFractionDigits: 2})}</td>
                 <td className="whitespace-nowrap px-4 py-3.5 tabular-nums">{t.atestados.toLocaleString("pt-BR", {maximumFractionDigits: 2})}</td>
