@@ -37,6 +37,7 @@ const emptyDoc = {employee_id:"",document_name:"",no_due_date:false,has_document
 export function DiarioOcorrencias() {
   const {role}=useAccountIdentity();
   const canManageEvents=role==="administrador";
+  const canCreateEvents=canManageEvents || role==="convidado";
   const [tab,setTab]=useState<(typeof tabs)[number]["id"]>(()=>sessionStorage.getItem("dp-career-employee")?"career":"diario");
   const [documentLink,setDocumentLink]=useState<"clt"|"pj">("clt");
   const [employees,setEmployees]=useState<Employee[]>([]);
@@ -106,10 +107,10 @@ export function DiarioOcorrencias() {
     setLoading(false);
   }
   useEffect(()=>{void load();},[]);
-  function openNewEvent(){if(!canManageEvents)return;setEditingEvent(null);setEventForm({...emptyEvent,employee_id:employeeFilter!=="todos"?employeeFilter:""});setError("");setEventOpen(true);}
+  function openNewEvent(){if(!canCreateEvents)return;setEditingEvent(null);setEventForm({...emptyEvent,employee_id:employeeFilter!=="todos"?employeeFilter:""});setError("");setEventOpen(true);}
   function editEvent(e:LifeEvent){if(!canManageEvents)return;setEditingEvent(e);setEventForm({employee_id:e.employee_id,event_date:e.event_date,category:e.category,direction:e.direction,title:e.title,description:e.description??"",is_star:e.direction==="positive"&&e.score>0});setEventOpen(true);setError("");}
   async function saveEvent(){
-    if(!canManageEvents){setError("Sua conta não tem permissão para esta ação.");return;}
+    if(editingEvent ? !canManageEvents : !canCreateEvents){setError("Sua conta não tem permissão para esta ação.");return;}
     if(loading)return;
     if(!eventForm.employee_id||!eventForm.event_date||!eventForm.title.trim()){setError("Preencha funcionário, data e título da ocorrência.");return;}
     setLoading(true);const user=await (supabase as any).auth.getUser();
@@ -119,7 +120,7 @@ export function DiarioOcorrencias() {
     const score = eventForm.direction === "negative" || hasStar ? 1 : 0;
     const payload={employee_id:eventForm.employee_id,event_date:eventForm.event_date,period_id:period?.id??null,category:eventForm.category.trim()||"Geral",direction:eventForm.direction,title:eventForm.title.trim(),description:eventForm.description.trim()||null,score,is_star:hasStar,source:"manual",...(editingEvent?{}:{created_by:user.data.user.id})};
     const result=editingEvent?await (supabase as any).from("employee_life_events").update(payload).eq("id",editingEvent.id):await (supabase as any).from("employee_life_events").insert(payload);
-    setLoading(false);if(result.error){setError(/row-level security/i.test(result.error.message)?"Sua conta não tem permissão para salvar esta ocorrência. Verifique as permissões e a migração do Diário de Ocorrências.":result.error.message);return;}setEventOpen(false);setNotice("Ocorrência salva.");await load();
+    setLoading(false);if(result.error){setError(/row-level security/i.test(result.error.message)?"Sua conta não tem permissão para salvar esta ocorrência.":result.error.message);return;}setEventOpen(false);setNotice("Ocorrência salva.");await load();
   }
   async function deleteEvent(e:LifeEvent){
     if(!canManageEvents)return;
@@ -391,8 +392,8 @@ export function DiarioOcorrencias() {
               <h2 id="occurrence-list-title" className="font-semibold">Ocorrências por funcionário e competência</h2>
               <p className="text-xs text-muted-foreground">{visibleEvents.length} registro(s) no filtro atual</p>
             </div>
-            {canManageEvents && (
-              <button type="button" data-role-sensitive onClick={openNewEvent} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+            {canCreateEvents && (
+              <button type="button" onClick={openNewEvent} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
                 <Plus className="size-4" aria-hidden="true" /> Nova ocorrência
               </button>
             )}
@@ -454,7 +455,7 @@ export function DiarioOcorrencias() {
           </div>
           {requirementEmployee&&<div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-md border px-3 py-2"><strong>{docCatalog.length}</strong> itens no catálogo</span>
-            <span className="rounded-md border px-3 py-2"><strong>{docCatalog.filter(item=>(requirements.find(r=>r.employee_id===requirementEmployee&&r.catalog_id===item.id)?.is_applicable??true)).length+new Set(documents.filter(d=>d.employee_id===requirementEmployee&&d.is_custom&&d.is_standard).map(d=>normCat(d.category)+"::"+d.document_name.trim().toLowerCase())).size}</strong> padrões para este funcionário</span>
+            <span className="rounded-md border px-3 py-2"><strong>{docCatalog.filter(item=>(requirements.find(r=>r.employee_id===requirementEmployee&&r.catalog_id===item.id)?.is_applicable??true)).length+new Set(documents.filter(d=>d.employee_id===requirementEmployee&&d.is_custom&&d.is_standard).map(d=>normCat(d.category)+"::"+d.document_name.trim().toLowerCase())).size}</strong> documentos padrão para este funcionário</span>
             <span className="rounded-md border px-3 py-2"><strong>{documents.filter(d=>d.employee_id===requirementEmployee&&d.signature_status==="signed").length}</strong> assinados</span>
           </div>}
         </Card>
@@ -494,8 +495,8 @@ export function DiarioOcorrencias() {
                     return <tr key={latest?.id??item.id} className={!isStandard?"opacity-60":""}>
                       <td className="px-5 py-4"><span className="font-medium">{item.name}</span></td>
                       <td className="px-5 py-4 text-center"><span data-consulta-only>{isStandard ? "Sim" : "Não"}</span><select data-role-sensitive aria-label={"Padrão para "+item.name} value={isStandard?"sim":"nao"} onChange={e=>void saveRequirement(item.id,{is_applicable:e.target.value==="sim",is_required:e.target.value==="sim"?(rule?.is_required??false):false,requires_signature:e.target.value==="sim"?(rule?.requires_signature??false):false})} className="h-9 min-w-[76px] rounded-md border bg-background px-3 text-xs"><option value="sim">Sim</option><option value="nao">Não</option></select></td>
-                      <td className="px-5 py-4">{latest?.no_due_date?<span className="text-muted-foreground">Não possui vencimento</span>:latest?.due_date?dateLabel(latest.due_date):<span className="text-muted-foreground">Não informado</span>}{latest&&!latest.no_due_date&&latest.due_date&&<span className={"ml-2 text-xs "+(dueState(latest)==="Vencido"?"text-rose-600":dueState(latest)==="Próximo do vencimento"?"text-amber-600":"text-emerald-600")}>{dueState(latest)}</span>}</td>
-                      <td className="px-5 py-4 text-center"><span className={latest?.signature_status==="signed"?"font-medium text-emerald-600":"text-muted-foreground"}>{latest?.signature_status==="not_applicable"?"Não se aplica":latest?.signature_status==="signed"?"Sim":"Não"}</span></td>
+                      <td className="px-5 py-4">{latest?.no_due_date?<span className="text-muted-foreground">Sem vencimento</span>:latest?.due_date?dateLabel(latest.due_date):<span className="text-muted-foreground">Não informado</span>}{latest&&!latest.no_due_date&&latest.due_date&&<span className={"ml-2 text-xs "+(dueState(latest)==="Vencido"?"text-rose-600":dueState(latest)==="Próximo do vencimento"?"text-amber-600":"text-emerald-600")}>{dueState(latest)}</span>}</td>
+                      <td className="px-5 py-4 text-center"><span className={latest?.signature_status==="signed"?"font-medium text-emerald-600":"text-muted-foreground"}>{latest?.signature_status==="not_applicable"?"Dispensa assinatura":latest?.signature_status==="signed"?"Sim":"Não"}</span></td>
                       <td className="px-5 py-4"><span className="block max-w-[280px] whitespace-normal break-words text-xs text-muted-foreground">{latest?.notes||"—"}</span></td>
                       <td className="whitespace-nowrap px-5 py-4 text-center">{latest?<button data-role-sensitive onClick={()=>editDoc(latest)} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted">Editar registro</button>:<button data-role-sensitive onClick={()=>{setEditingDoc(null);setDocForm({...emptyDoc,employee_id:requirementEmployee});setSelectedDocCategory(category);setSelectedCatalog(item.id);setDocOpen(true);}} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"><Plus className="mr-1 inline h-3.5 w-3.5"/>Cadastrar</button>}</td>
                     </tr>;
@@ -504,8 +505,8 @@ export function DiarioOcorrencias() {
                   return <tr key={"custom-"+latest.id}>
                     <td className="px-5 py-4"><span className="font-medium">{latest.document_name}</span></td>
                     <td className="px-5 py-4 text-center"><span data-consulta-only>{latest.is_standard ? "Sim" : "Não"}</span><select data-role-sensitive aria-label={"Padrão para "+latest.document_name} value={latest.is_standard?"sim":"nao"} onChange={e=>void saveCustomStandard([latest],e.target.value==="sim")} className="h-9 min-w-[76px] rounded-md border bg-background px-3 text-xs"><option value="sim">Sim</option><option value="nao">Não</option></select></td>
-                    <td className="px-5 py-4">{latest.no_due_date?<span className="text-muted-foreground">Não possui vencimento</span>:latest.due_date?dateLabel(latest.due_date):<span className="text-muted-foreground">Não informado</span>}{!latest.no_due_date&&latest.due_date&&<span className={"ml-2 text-xs "+(dueState(latest)==="Vencido"?"text-rose-600":dueState(latest)==="Próximo do vencimento"?"text-amber-600":"text-emerald-600")}>{dueState(latest)}</span>}</td>
-                    <td className="px-5 py-4 text-center"><span className={latest.signature_status==="signed"?"font-medium text-emerald-600":"text-muted-foreground"}>{latest.signature_status==="not_applicable"?"Não se aplica":latest.signature_status==="signed"?"Sim":"Não"}</span></td>
+                    <td className="px-5 py-4">{latest.no_due_date?<span className="text-muted-foreground">Sem vencimento</span>:latest.due_date?dateLabel(latest.due_date):<span className="text-muted-foreground">Não informado</span>}{!latest.no_due_date&&latest.due_date&&<span className={"ml-2 text-xs "+(dueState(latest)==="Vencido"?"text-rose-600":dueState(latest)==="Próximo do vencimento"?"text-amber-600":"text-emerald-600")}>{dueState(latest)}</span>}</td>
+                    <td className="px-5 py-4 text-center"><span className={latest.signature_status==="signed"?"font-medium text-emerald-600":"text-muted-foreground"}>{latest.signature_status==="not_applicable"?"Dispensa assinatura":latest.signature_status==="signed"?"Sim":"Não"}</span></td>
                     <td className="px-5 py-4"><span className="block max-w-[280px] whitespace-normal break-words text-xs text-muted-foreground">{latest.notes||"—"}</span></td>
                     <td className="whitespace-nowrap px-5 py-4 text-center"><button data-role-sensitive onClick={()=>editDoc(latest)} className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted">Editar registro</button></td>
                   </tr>;
@@ -522,13 +523,13 @@ export function DiarioOcorrencias() {
       </div>}
       {tab==="checklists"&&<><EmployeeAssetsAccess employees={employees} companyFilter={companyFilter}/></>}
           </main>
-    {canManageEvents && (
+    {(editingEvent ? canManageEvents : canCreateEvents) && (
       <Dialog open={eventOpen} onOpenChange={setEventOpen}>
         <DialogContent aria-describedby={undefined} className="max-h-[90vh] w-[calc(100%_-_2rem)] gap-0 overflow-y-auto rounded-xl p-0 sm:max-w-xl">
           <DialogHeader className="border-b px-5 py-5 pr-12 text-left sm:px-6">
             <DialogTitle>{editingEvent ? "Editar ocorrência" : "Nova ocorrência"}</DialogTitle>
           </DialogHeader>
-          <form data-role-sensitive onSubmit={event => { event.preventDefault(); if (!loading) void saveEvent(); }} className="grid gap-5 px-5 py-5 sm:px-6">
+          <form data-role-sensitive={editingEvent ? "" : undefined} onSubmit={event => { event.preventDefault(); if (!loading) void saveEvent(); }} className="grid gap-5 px-5 py-5 sm:px-6">
             <div className="grid gap-x-6 gap-y-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.6fr)]">
               <label className="grid gap-1.5 text-sm font-medium">
                 Funcionário

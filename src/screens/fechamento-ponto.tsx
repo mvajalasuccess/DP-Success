@@ -627,22 +627,11 @@ export function PointClosing() {
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Operação</p>
             <h1 className="mt-1 text-3xl font-bold">Fechamento de Ponto</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Gerencie as competências do ponto. O padrão é do dia 21 ao dia 20, com opção de período personalizado.</p>
           </div>
           <button data-role-sensitive disabled={saving} onClick={openNew} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"><Plus className="h-4 w-4" /> Nova competência</button>
         </div>
 
         {error && <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</div>}
-
-        <Card className="mt-6 p-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><CalendarDays className="h-5 w-5" /></div>
-            <div>
-              <p className="font-semibold">Período do fechamento</p>
-              <p className="text-sm text-muted-foreground">O padrão continua sendo dia 21 até dia 20, mas cada novo fechamento pode ter datas próprias.</p>
-            </div>
-          </div>
-        </Card>
 
         {selectedPeriod ? (
           <div className="mt-6">
@@ -708,7 +697,7 @@ export function PointClosing() {
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <button type="button" onClick={() => chooseMode("padrao")} className={`rounded-xl border p-4 text-left ${rangeMode === "padrao" ? "border-primary bg-primary/5" : ""}`}>
-                <p className="font-semibold">Padrão 21 → 20</p><p className="mt-1 text-xs text-muted-foreground">Usa automaticamente o ciclo atual.</p>
+                <p className="font-semibold">Padrão</p><p className="mt-1 text-xs text-muted-foreground">Do dia 21 de um mês ao dia 20 do mês seguinte.</p>
               </button>
               <button type="button" onClick={() => chooseMode("personalizado")} className={`rounded-xl border p-4 text-left ${rangeMode === "personalizado" ? "border-primary bg-primary/5" : ""}`}>
                 <p className="font-semibold">Personalizado</p><p className="mt-1 text-xs text-muted-foreground">Escolha qualquer data inicial e final.</p>

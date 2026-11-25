@@ -91,7 +91,7 @@ export function Tarefas(){
         .from("task_checklist_items").select("position").eq("task_id", r.data.id)
         .order("position", { ascending: false }).limit(1).maybeSingle();
       if (positionError) {
-        setError("A tarefa foi salva. Não foi possível carregar as etapas para adicionar o checklist.");
+        setError("A tarefa foi salva, mas as novas etapas não foram adicionadas. Clique em Salvar tarefa para tentar novamente.");
         setSaving(false);
         return;
       }
@@ -99,7 +99,7 @@ export function Tarefas(){
       const { error: checklistError } = await (supabase as any).from("task_checklist_items")
         .insert(titles.map((title, index) => ({ task_id: r.data.id, title, position: firstPosition + index })));
       if (checklistError) {
-        setError("A tarefa foi salva, mas as novas etapas não foram gravadas. " + checklistError.message);
+        setError("A tarefa foi salva, mas as novas etapas não foram adicionadas. Clique em Salvar tarefa para tentar novamente.");
         setSaving(false);
         return;
       }

@@ -380,7 +380,7 @@ export function Comparativos() {
   function togglePeriod(id: string) { setSelectedPeriods(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
 
   const columns: [keyof Totals, string][] = [
-    ["he60", "HE 60%"], ["he60_20", "HE 60%20"], ["he100", "HE 100%"], ["he20", "HE 20%"],
+    ["he60", "HE 60%"], ["he60_20", "HE 60% + 20% noturno"], ["he100", "HE 100%"], ["he20", "HE 20%"],
     ["interjornada", "Interjornada"], ["debitos", "Débitos"]
   ];
 
@@ -522,7 +522,6 @@ export function Comparativos() {
         ].map(item => <Card key={item.label} className="rounded-2xl border-border/70 p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3"><span className="text-sm text-muted-foreground">{item.label}</span><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#06CAA0]/10 text-emerald-700 dark:text-emerald-300">{item.icon}</span></div>
           <div className="mt-3 text-2xl font-semibold tabular-nums">{item.value}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Total acumulado · HH:MM</p>
         </Card>)}
       </div>
 
@@ -558,7 +557,7 @@ export function Comparativos() {
       </div>
 
       <Card className="mt-4 rounded-2xl border-border/70 p-4 shadow-sm sm:p-5">
-        <div className="mb-4"><h3 className="font-semibold">Débitos, faltas e atestados</h3><p className="mt-1 text-xs text-muted-foreground">Horas e dias são apresentados em unidades próprias para evitar comparações enganosas.</p></div>
+        <div className="mb-4"><h3 className="font-semibold">Débitos, faltas e atestados</h3><p className="mt-1 text-xs text-muted-foreground">Débitos em horas. Faltas e atestados em dias.</p></div>
         {hasChartData && occurrenceChart.some(item => item.quantidade > 0) ? <div className="h-[250px] w-full">
           <ResponsiveContainer width="100%" height="100%"><BarChart data={occurrenceChart} margin={{top:8,right:12,left:0,bottom:8}}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" tick={{fontSize:12}} /><YAxis tick={{fontSize:11}} />

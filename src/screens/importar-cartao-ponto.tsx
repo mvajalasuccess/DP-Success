@@ -153,7 +153,7 @@ export function ImportarCartaoPonto() {
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-white/75">Fechamento de Ponto</p>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-[30px]">Importar Cartão Ponto</h1>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-[30px]">Importar cartão de ponto</h1>
               <p className="mt-1 max-w-3xl text-sm text-white/80">Envie o PDF do cartão ponto e importe somente Crédito, Débito, Saldo do mês, HE 60% + 20% noturno e Interjornada.</p>
             </div>
             {document && <button type="button" onClick={clear} className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white transition-colors hover:bg-white/15"><RotateCcw className="h-4 w-4" />Novo PDF</button>}

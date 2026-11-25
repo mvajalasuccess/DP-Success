@@ -6,7 +6,7 @@ const screenIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
   "Comparativos": GitCompare,
   "Relatórios": FileText,
   "Fechamento de Ponto": CalendarClock,
-  "Importar Cartão Ponto": Upload,
+  "Importar cartão de ponto": Upload,
   "Lançamentos": ClipboardList,
   "Banco de Horas": Clock3,
   "Pagamentos": BadgeDollarSign,
@@ -32,11 +32,12 @@ const screenIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
 const screenAliases: Readonly<Partial<Record<string, string>>> = {
   "Configurações": "Parâmetros",
   "Fechamento": "Fechamento de Ponto",
-  "Importar Cartão de Ponto": "Importar Cartão Ponto",
+  "Importar Cartão de Ponto": "Importar cartão de ponto",
+  "Importar Cartão Ponto": "Importar cartão de ponto",
   "Atestados": "Declarações e Atestados",
   "Cadastro de Pessoas": "Funcionários",
   "Recessos PJ": "Férias",
-  "Sincronizar Planilha": "Importar Cartão Ponto",
+  "Sincronizar Planilha": "Importar cartão de ponto",
   "Cadastros": "Cadastro",
 };
 

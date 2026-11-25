@@ -242,7 +242,7 @@ function AppShell({
       ["Dashboard", "dashboard"], ["KPIs", "kpis"], ["Comparativos", "comparativos"], ["Relatórios", "relatorios"],
     ] },
     { id: "closing", label: "Ponto", Icon: Timer, open: closingMenuOpen, setOpen: setClosingMenuOpen, items: [
-      ["Fechamento de Ponto", "fechamento-ponto"], ["Importar Cartão Ponto", "importar-cartao-ponto"], ["Lançamentos", "lancamentos"], ["Banco de Horas", "banco-horas"], ["Pagamentos", "pagamentos"], ["Faltas e Folgas", "ocorrencias"], ["Declarações e Atestados", "atestados"],
+      ["Fechamento de Ponto", "fechamento-ponto"], ["Importar cartão de ponto", "importar-cartao-ponto"], ["Lançamentos", "lancamentos"], ["Banco de Horas", "banco-horas"], ["Pagamentos", "pagamentos"], ["Faltas e Folgas", "ocorrencias"], ["Declarações e Atestados", "atestados"],
     ] },
     { id: "cadastro", label: "Cadastro", Icon: FilePenLine, open: companyMenuOpen, setOpen: setCompanyMenuOpen, items: [
       ["Empresas", "empresas"], ["Funcionários", "funcionarios"], ["Cargos", "cargos"], ["Departamentos", "departamentos"], ["Jornadas / Escalas", "jornadas-escalas"],
@@ -822,7 +822,8 @@ function DashboardHome() {
       .single();
 
     if (error || !savedRow) {
-      window.alert("O comentário não foi salvo. Verifique se a migração de comentários múltiplos foi aplicada no banco de dados. " + (error?.message ?? ""));
+      console.error("Falha ao salvar comentário da competência:", error?.message);
+      window.alert("Não foi possível salvar o comentário. Tente novamente.");
       setSavingNote(false);
       return;
     }
@@ -1170,7 +1171,7 @@ function DashboardHome() {
                     })()}
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Total débitos</span>
+                    <span className="text-xs text-muted-foreground">Total de débitos</span>
                     <span className="text-lg font-bold tabular-nums">{fmt(-individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
                   </div>
                 </div>

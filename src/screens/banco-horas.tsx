@@ -387,7 +387,7 @@ export function BankHours() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <Card className="w-full max-w-lg p-6 shadow-xl">
             <div className="flex items-center justify-between">
-              <div><h2 className="text-xl font-bold">Lançar ajuste no Banco de Horas</h2><p className="mt-1 text-sm text-muted-foreground">Saldo anterior, pagamento/zeragem ou correção.</p></div>
+              <div><h2 className="text-xl font-bold">Lançar ajuste no Banco de Horas</h2><p className="mt-1 text-sm text-muted-foreground">Use para registrar saldo inicial, pagamento de horas ou correção de saldo.</p></div>
               <button type="button" onClick={() => setAdjustmentOpen(false)}><X className="h-5 w-5" /></button>
             </div>
             <div className="mt-5 grid gap-4">

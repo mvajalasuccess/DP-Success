@@ -1633,7 +1633,7 @@ export function Kpis() {
                 { name: "Outro / não informado", color: "#8b5cf6" },
               ];
               return <>
-                <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Explore a composição do quadro por sexo, idade, tempo de empresa e setor. Passe o cursor nos gráficos para ver os detalhes.</p></div>
+                <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Passe o cursor sobre os gráficos para ver os detalhes.</p></div>
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="text-sm font-semibold">Situação dos funcionários</p><p className="text-xs text-muted-foreground">Filtra todos os indicadores e gráficos desta seção.</p></div><select aria-label="Filtrar situação dos funcionários nos indicadores demográficos" className="h-10 min-w-44 rounded-lg border bg-background px-3 text-sm" value={demographicStatusFilter} onChange={e => setDemographicStatusFilter(e.target.value as "todos" | "ativos" | "inativos")}><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-background p-5 dark:from-pink-950/30"><p className="text-sm text-muted-foreground">Funcionários na seleção</p><p className="mt-2 text-3xl font-bold">{base.length}</p><p className="mt-1 text-xs text-muted-foreground">Conforme os filtros aplicados</p></Card>
@@ -1664,7 +1664,7 @@ export function Kpis() {
                   </Card>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
-                  <Card className="p-5"><h3 className="font-bold">Mapa de perfil: idade × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Encontre perfis mais jovens com longa permanência, pessoas experientes recém-admitidas e concentrações por sexo.</p>
+                  <Card className="p-5"><h3 className="font-bold">Mapa de perfil: idade × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Os eixos mostram idade e tempo de empresa.</p>
                     <div className="mt-3 h-72 min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <ScatterChart margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
@@ -1787,7 +1787,7 @@ export function Kpis() {
                   </Card>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
-                  <Card className="p-5"><h3 className="font-bold">Remuneração × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Permite observar como os salários se distribuem conforme a permanência e comparar padrões por sexo, sem assumir que funções diferentes são equivalentes.</p>
+                  <Card className="p-5"><h3 className="font-bold">Remuneração × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Os eixos mostram salário e tempo de empresa.</p>
                     <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:12,right:16,bottom:18,left:8}}><CartesianGrid strokeDasharray="3 3"/><XAxis type="number" dataKey="tempo" name="Tempo de empresa" tick={{fontSize:10}} label={{value:"Tempo de empresa (anos)",position:"insideBottom",offset:-12,fontSize:11}}/><YAxis type="number" dataKey="salario" name="Salário" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><ZAxis range={[55,55]}/><Tooltip formatter={(value:number,name:string)=>[name==="Salário"?money(value):Number(value).toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos",name]} labelFormatter={(_,payload)=>payload?.[0]?.payload?.nome || ""}/><Legend/><Scatter name="Feminino" data={salaryTenurePoints.filter(e=>e.sexo==="Feminino")} fill="#ec4899"/><Scatter name="Masculino" data={salaryTenurePoints.filter(e=>e.sexo==="Masculino")} fill="#3b82f6"/><Scatter name="Outro / não informado" data={salaryTenurePoints.filter(e=>e.sexo==="Outro / não informado")} fill="#8b5cf6"/></ScatterChart></ResponsiveContainer></div>
                     <p className="text-xs text-muted-foreground">Usa salário cadastrado e tempo desde a admissão (até hoje ou até o desligamento). Não inclui encargos, benefícios ou adicionais.</p>
                   </Card>
