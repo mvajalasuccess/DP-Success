@@ -22,7 +22,7 @@ export function Comparativos() {
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [companyFilter, setCompanyFilter] = useState("");
-  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"ativo" | "inativo" | "todos">("todos");
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [periodSearch, setPeriodSearch] = useState("");
@@ -43,18 +43,14 @@ export function Comparativos() {
         const employeeList = (employeeData ?? []) as Employee[];
         const periodList = (periodData ?? []) as Period[];
         setEmployees(employeeList);
-        setSelectedEmployees(employeeList.map(e => e.id));
         setPeriods(periodList);
-        setSelectedPeriods(periodList.map(p => p.id));
       } catch (e: any) {
         setError(e.message ?? "Não foi possível carregar os filtros.");
       } finally { setLoading(false); }
     })();
   }, []);
 
-  async function loadComparison(employeeIds: string[], periodIds: string[]) {
-    if (!employeeIds.length || !periodIds.length) { setTotals({}); return; }
-    setError("");
+  async function loadComparison(employeeIds: string[], periodIds: string[], isCurrent: () => boolean) {
     try {
       const db = supabase as any;
       const periodsSelected = periods.filter(p => periodIds.includes(p.id));
@@ -217,29 +213,48 @@ export function Comparativos() {
         t.atestados += Math.max(0, Number(row.certificate_minutes || 0)) / 528;
       }
 
-      setTotals(next);
+      if (isCurrent()) setTotals(next);
     } catch (e: any) {
-      setError(e.message ?? "Não foi possível carregar os comparativos.");
+      if (isCurrent()) setError(e.message ?? "Não foi possível carregar os comparativos.");
     }
   }
 
-  useEffect(() => { if (!loading) void loadComparison(selectedEmployees, selectedPeriods); }, [selectedEmployees, selectedPeriods, loading, periods]);
+  useEffect(() => {
+    if (loading) return;
+    setTotals({});
+    if (!selectedEmployees.length || !selectedPeriods.length) return;
+
+    setError("");
+    let current = true;
+    void loadComparison(selectedEmployees, selectedPeriods, () => current);
+    return () => { current = false; };
+  }, [selectedEmployees, selectedPeriods, loading, periods]);
+
+  const eligibleEmployees = useMemo(() => employees.filter(e =>
+    (!companyFilter || e.company_id === companyFilter) &&
+    (employeeStatusFilter === "todos" || e.status?.trim().toLowerCase() === employeeStatusFilter)
+  ), [employees, companyFilter, employeeStatusFilter]);
 
   const visibleEmployees = useMemo(() => {
     const q = employeeSearch.trim().toLowerCase();
-    return employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || e.status?.trim().toLowerCase() === employeeStatusFilter) && (!q || e.full_name.toLowerCase().includes(q)));
-  }, [employees, employeeSearch, companyFilter, employeeStatusFilter]);
+    return eligibleEmployees.filter(e => !q || e.full_name.toLowerCase().includes(q));
+  }, [eligibleEmployees, employeeSearch]);
 
   const visiblePeriods = useMemo(() => {
     const q = periodSearch.trim().toLowerCase();
     return periods.filter(p => !q || `${String(p.reference_month).padStart(2, "0")}/${p.reference_year}`.includes(q));
   }, [periods, periodSearch]);
 
-  useEffect(() => { setSelectedEmployees(employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || e.status?.trim().toLowerCase() === employeeStatusFilter)).map(e => e.id)); }, [companyFilter, employeeStatusFilter, employees]);
+  useEffect(() => {
+    const eligibleIds = new Set(eligibleEmployees.map(e => e.id));
+    setSelectedEmployees(prev => prev.every(id => eligibleIds.has(id))
+      ? prev
+      : prev.filter(id => eligibleIds.has(id)));
+  }, [eligibleEmployees]);
 
   function toggleEmployee(id: string) { setSelectedEmployees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function togglePeriod(id: string) { setSelectedPeriods(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
-  function selectAllEmployees() { setSelectedEmployees(employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (employeeStatusFilter === "todos" || e.status?.trim().toLowerCase() === employeeStatusFilter)).map(e => e.id)); }
+  function selectAllEmployees() { setSelectedEmployees(eligibleEmployees.map(e => e.id)); }
   function selectAllPeriods() { setSelectedPeriods(periods.map(p => p.id)); }
 
   const columns: [keyof Totals, string][] = [
