@@ -1,6 +1,6 @@
-import { ArrowLeft, Search, BarChart3, Users, CalendarRange, Clock3, FileSpreadsheet, TrendingUp } from "lucide-react";
+import { ArrowLeft, Search, BarChart3, Users, CalendarRange, Clock3, FileSpreadsheet, TrendingUp, Check, ListChecks, SlidersHorizontal } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -17,15 +17,142 @@ function fmt(minutes: number) {
   return String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0");
 }
 
+const EMPLOYEE_STATUSES = [
+  { value: "ativo", label: "Ativos" },
+  { value: "inativo", label: "Inativos" },
+  { value: "todos", label: "Todos" },
+] as const;
+
+type EmployeeStatus = typeof EMPLOYEE_STATUSES[number]["value"];
+type ComparisonOption = { id: string; label: string; detail?: string };
+
+function normalizeSearch(value: string) {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+}
+
+function ComparisonPicker({
+  title, icon: Icon, searchLabel, placeholder, options, selected, loading, onToggle, onSelectionChange,
+}: {
+  title: string;
+  icon: typeof Users;
+  searchLabel: string;
+  placeholder: string;
+  options: ComparisonOption[];
+  selected: string[];
+  loading: boolean;
+  onToggle: (id: string) => void;
+  onSelectionChange: (ids: string[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [selectedOnly, setSelectedOnly] = useState(false);
+  const query = normalizeSearch(search);
+  const selectedIds = new Set(selected);
+  const matches = options.filter(option => normalizeSearch(option.label).includes(query));
+  const visible = selectedOnly ? matches.filter(option => selectedIds.has(option.id)) : matches;
+  const allMatchesSelected = matches.every(option => selectedIds.has(option.id));
+
+  function selectMatches() {
+    onSelectionChange([...new Set([...selected, ...matches.map(option => option.id)])]);
+  }
+
+  function clearSelection() {
+    onSelectionChange([]);
+    setSelectedOnly(false);
+  }
+
+  return (
+    <section aria-label={title} className="@container min-w-0 rounded-2xl border border-border/70 bg-card p-3 sm:p-4">
+      <div className="flex items-center gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary-strong">
+          <Icon aria-hidden="true" className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {loading ? "Carregando opções…" : `${selected.length} de ${options.length} na seleção`}
+          </p>
+        </div>
+      </div>
+
+      <div className="relative mt-4">
+        <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="search"
+          aria-label={searchLabel}
+          value={search}
+          onChange={event => setSearch(event.target.value)}
+          placeholder={placeholder}
+          className="h-10 w-full rounded-lg border bg-background pl-9 pr-3 text-sm"
+        />
+      </div>
+
+      <div className="my-2 flex flex-wrap items-center gap-x-1 gap-y-0.5">
+        <button
+          type="button"
+          onClick={selectMatches}
+          disabled={allMatchesSelected}
+          className="inline-flex min-h-9 items-center gap-1.5 px-2 text-xs font-semibold text-primary-strong hover:bg-primary/10 disabled:opacity-40"
+        >
+          <ListChecks aria-hidden="true" className="h-4 w-4" />
+          {query ? "Selecionar resultados" : "Selecionar todos"}
+        </button>
+        <button
+          type="button"
+          aria-pressed={selectedOnly}
+          onClick={() => setSelectedOnly(value => !value)}
+          className="min-h-9 px-2 text-xs font-medium text-muted-foreground hover:bg-muted aria-pressed:bg-primary/15 aria-pressed:text-primary-strong"
+        >
+          Só selecionados
+        </button>
+        <button
+          type="button"
+          onClick={clearSelection}
+          disabled={!selected.length}
+          className="ml-auto min-h-9 px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+        >
+          Limpar
+        </button>
+      </div>
+
+      <div className="grid max-h-64 min-h-24 auto-rows-min grid-cols-1 gap-2 overflow-y-auto overscroll-contain rounded-xl bg-muted/35 p-2 @md:grid-cols-2">
+        {visible.map(option => (
+          <label
+            key={option.id}
+            className="group relative flex min-h-12 min-w-0 items-center gap-2.5 rounded-lg border border-border/75 bg-background px-2.5 py-2 transition-colors hover:border-primary/60 has-[:checked]:border-primary/70 has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary"
+          >
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={selectedIds.has(option.id)}
+              onChange={() => onToggle(option.id)}
+            />
+            <span aria-hidden="true" className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-border bg-background group-has-[:checked]:border-primary-strong group-has-[:checked]:bg-primary-strong group-has-[:checked]:text-white">
+              <Check className="h-3.5 w-3.5 opacity-0 group-has-[:checked]:opacity-100" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium leading-snug [overflow-wrap:anywhere]">{option.label}</span>
+              {option.detail && <span className="mt-1 block text-xs leading-tight text-muted-foreground">{option.detail}</span>}
+            </span>
+          </label>
+        ))}
+        {!loading && !visible.length && (
+          <p role="status" className="col-span-full px-3 py-5 text-center text-sm text-muted-foreground">
+            {selectedOnly && !query ? "Nenhum item selecionado." : "Nenhum resultado para este filtro."}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function Comparativos() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [companyFilter, setCompanyFilter] = useState("");
-  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<EmployeeStatus>("ativo");
+  const statusGroupName = useId();
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([]);
-  const [employeeSearch, setEmployeeSearch] = useState("");
-  const [periodSearch, setPeriodSearch] = useState("");
   const [totals, setTotals] = useState<Record<string, Totals>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -235,15 +362,12 @@ export function Comparativos() {
     (employeeStatusFilter === "todos" || e.status?.trim().toLowerCase() === employeeStatusFilter)
   ), [employees, companyFilter, employeeStatusFilter]);
 
-  const visibleEmployees = useMemo(() => {
-    const q = employeeSearch.trim().toLowerCase();
-    return eligibleEmployees.filter(e => !q || e.full_name.toLowerCase().includes(q));
-  }, [eligibleEmployees, employeeSearch]);
-
-  const visiblePeriods = useMemo(() => {
-    const q = periodSearch.trim().toLowerCase();
-    return periods.filter(p => !q || `${String(p.reference_month).padStart(2, "0")}/${p.reference_year}`.includes(q));
-  }, [periods, periodSearch]);
+  const employeeOptions = eligibleEmployees.map(employee => ({ id: employee.id, label: employee.full_name }));
+  const periodOptions = periods.map(period => ({
+    id: period.id,
+    label: `${String(period.reference_month).padStart(2, "0")}/${period.reference_year}`,
+    detail: `${period.start_date.split("-").reverse().join("/")} a ${period.end_date.split("-").reverse().join("/")}`,
+  }));
 
   useEffect(() => {
     const eligibleIds = new Set(eligibleEmployees.map(e => e.id));
@@ -254,8 +378,6 @@ export function Comparativos() {
 
   function toggleEmployee(id: string) { setSelectedEmployees(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
   function togglePeriod(id: string) { setSelectedPeriods(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]); }
-  function selectAllEmployees() { setSelectedEmployees(eligibleEmployees.map(e => e.id)); }
-  function selectAllPeriods() { setSelectedPeriods(periods.map(p => p.id)); }
 
   const columns: [keyof Totals, string][] = [
     ["he60", "HE 60%"], ["he60_20", "HE 60%20"], ["he100", "HE 100%"], ["he20", "HE 20%"],
@@ -323,48 +445,64 @@ export function Comparativos() {
 
       {error && <div className="mb-5 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>}
 
-      <Card className="overflow-hidden rounded-xl border-border/60 bg-card shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3.5 sm:px-5">
-          <div><h2 className="text-sm font-semibold tracking-tight">Filtros da análise</h2><p className="mt-0.5 text-xs text-muted-foreground">Personalize o recorte sem alterar os dados salvos.</p></div>
-          <span className="rounded-md bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">Seleção atual</span>
+      <Card className="overflow-hidden rounded-2xl border-border/70 bg-card p-0 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 bg-muted/30 px-4 py-4 sm:px-5">
+          <div className="flex items-center gap-3">
+            <SlidersHorizontal aria-hidden="true" className="h-5 w-5 shrink-0 text-primary-strong" />
+            <h2 className="font-semibold tracking-tight">Filtros da análise</h2>
+          </div>
+          <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-[minmax(0,15rem)_auto] sm:items-end">
+            <div className="min-w-0">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Empresa</span>
+              <CompanyFilter
+                value={companyFilter}
+                onChange={setCompanyFilter}
+                className="block h-10 w-full min-w-0 rounded-lg border bg-background px-3 text-sm"
+              />
+            </div>
+            <fieldset className="min-w-0">
+              <legend className="mb-1 text-xs font-medium text-muted-foreground">Status</legend>
+              <div className="grid grid-cols-3 gap-0.5 rounded-xl border border-border/70 bg-background p-0.5">
+                {EMPLOYEE_STATUSES.map(status => (
+                  <label key={status.value} className="relative grid min-h-9 place-items-center rounded-lg px-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted has-[:checked]:bg-primary/15 has-[:checked]:text-primary-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary">
+                    <input
+                      type="radio"
+                      name={statusGroupName}
+                      value={status.value}
+                      checked={employeeStatusFilter === status.value}
+                      onChange={() => setEmployeeStatusFilter(status.value)}
+                      className="sr-only"
+                    />
+                    {status.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
         </div>
-        <div className="grid gap-5 p-4 sm:p-5 xl:grid-cols-2">
-          <div className="min-w-0">
-            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1.4fr)_minmax(140px,1fr)]">
-              <div className="min-w-0">
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">EMPRESA</label>
-                <CompanyFilter value={companyFilter} onChange={setCompanyFilter} className="block min-h-10 w-full min-w-0 max-w-full rounded-lg border-border/70 bg-muted/20 px-3 py-2 text-sm outline-none transition focus:border-[#06CAA0] focus:bg-background focus:ring-2 focus:ring-[#06CAA0]/10" />
-              </div>
-              <div className="min-w-0">
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">STATUS</label>
-                <select value={employeeStatusFilter} onChange={e => setEmployeeStatusFilter(e.target.value as "ativo" | "inativo" | "todos")} className="min-h-10 w-full rounded-lg border-border/70 bg-muted/20 px-3 py-2 text-sm outline-none transition focus:border-[#06CAA0] focus:bg-background focus:ring-2 focus:ring-[#06CAA0]/10">
-                  <option value="ativo">Ativos</option>
-                  <option value="inativo">Inativos</option>
-                  <option value="todos">Todos</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-4">
-              <div><h3 className="text-sm font-semibold">Colaboradores</h3><p className="mt-1 text-xs text-muted-foreground">{selectedEmployees.length} selecionado(s) · {employeeStatusFilter === "todos" ? "ativos e inativos" : employeeStatusFilter === "ativo" ? "somente ativos" : "somente inativos"}</p></div>
-              <div className="flex gap-2"><button onClick={selectAllEmployees} className="rounded-md border-border/60 bg-transparent px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">Selecionar todos</button><button onClick={() => setSelectedEmployees([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
-            </div>
-            <div className="relative mt-3"><Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground/70" /><input value={employeeSearch} onChange={e => setEmployeeSearch(e.target.value)} placeholder="Buscar colaborador..." className="min-h-9 w-full rounded-lg border-border/60 bg-transparent py-2 pl-8 pr-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-[#06CAA0] focus:bg-background focus:ring-2 focus:ring-[#06CAA0]/10" /></div>
-            <div className="mt-2 grid max-h-52 gap-1.5 overflow-y-auto rounded-lg border border-border/50 bg-muted/15 p-1.5 sm:grid-cols-2">
-              {visibleEmployees.map(e => <label key={e.id} className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md border border-transparent px-2.5 py-2 transition hover:bg-[#06CAA0]/8"><input type="checkbox" className="accent-[#06CAA0]" checked={selectedEmployees.includes(e.id)} onChange={() => toggleEmployee(e.id)} /><span className="truncate text-sm">{e.full_name}</span></label>)}
-              {!visibleEmployees.length && <p className="col-span-full px-3 py-6 text-center text-sm text-muted-foreground">Nenhum colaborador encontrado para este filtro.</p>}
-            </div>
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-4 xl:border-t-0 xl:pt-0">
-              <div><h3 className="text-sm font-semibold">Competências</h3><p className="mt-1 text-xs text-muted-foreground">{selectedPeriods.length} selecionada(s)</p></div>
-              <div className="flex gap-2"><button type="button" aria-label="Selecionar todas as competências" title="Selecionar todas as competências" onClick={selectAllPeriods} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Selecionar todos</button><button onClick={() => setSelectedPeriods([])} className="rounded-lg border bg-background px-3 py-2 text-xs font-medium transition-colors hover:bg-muted">Limpar</button></div>
-            </div>
-            <div className="relative mt-3"><Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground/70" /><input value={periodSearch} onChange={e => setPeriodSearch(e.target.value)} placeholder="Buscar competência (ex.: 08/2026)..." className="min-h-9 w-full rounded-lg border-border/60 bg-transparent py-2 pl-8 pr-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-[#06CAA0] focus:bg-background focus:ring-2 focus:ring-[#06CAA0]/10" /></div>
-            <div className="mt-2 grid max-h-52 gap-1.5 overflow-y-auto rounded-lg border border-border/50 bg-muted/15 p-1.5 sm:grid-cols-2">
-              {visiblePeriods.map(p => <label key={p.id} className="flex cursor-pointer items-start gap-2 rounded-md border border-transparent px-2.5 py-2 transition hover:bg-[#06CAA0]/8"><input type="checkbox" className="mt-1 accent-[#06CAA0]" checked={selectedPeriods.includes(p.id)} onChange={() => togglePeriod(p.id)} /><span className="min-w-0 text-sm"><span className="block font-medium">{String(p.reference_month).padStart(2, "0")}/{p.reference_year}</span><span className="mt-0.5 block text-xs text-muted-foreground">{p.start_date.split("-").reverse().join("/")} a {p.end_date.split("-").reverse().join("/")}</span></span></label>)}
-              {!visiblePeriods.length && <p className="col-span-full px-3 py-6 text-center text-sm text-muted-foreground">Nenhuma competência encontrada.</p>}
-            </div>
-          </div>
+        <div className="grid gap-3 bg-muted/15 p-3 md:grid-cols-2 sm:p-4">
+          <ComparisonPicker
+            title="Colaboradores"
+            icon={Users}
+            searchLabel="Buscar colaborador"
+            placeholder="Buscar por nome"
+            options={employeeOptions}
+            selected={selectedEmployees}
+            loading={loading}
+            onToggle={toggleEmployee}
+            onSelectionChange={setSelectedEmployees}
+          />
+          <ComparisonPicker
+            title="Competências"
+            icon={CalendarRange}
+            searchLabel="Buscar competência"
+            placeholder="Buscar por mês/ano"
+            options={periodOptions}
+            selected={selectedPeriods}
+            loading={loading}
+            onToggle={togglePeriod}
+            onSelectionChange={setSelectedPeriods}
+          />
         </div>
       </Card>
 
