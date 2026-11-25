@@ -84,6 +84,7 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
   const isAdmin = !readOnly && currentProfile?.role === "administrador";
   const [editing,setEditing]=useState<{id:string;name:string}|null>(null);
   const [invites,setInvites]=useState<Invite[]>([]),[inviteRole,setInviteRole]=useState<"convidado"|"administrador">("convidado"),[inviteOpen,setInviteOpen]=useState(false);
+  const [deletingInviteId, setDeletingInviteId] = useState<string | null>(null);
   async function loadInvites(){
     const { data, error } = await (supabase as any).from("user_invites").select("id,token,role,created_at,expires_at,used_at,used_email,canceled_at").order("created_at",{ascending:false});
     if (error) { setError(error.message); return; }
@@ -106,6 +107,35 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
     if (error) { setError(error.message); return; }
     setSaved("Convite cancelado."); void loadInvites();
   }
+  async function deleteCanceledInvite(invite: Invite) {
+    if (!isAdmin || !invite.canceled_at || invite.used_at || deletingInviteId) return;
+    if (!window.confirm("Excluir definitivamente este convite cancelado?")) return;
+
+    setError("");
+    setSaved("");
+    setDeletingInviteId(invite.id);
+    const { data, error } = await supabase.from("user_invites")
+      .delete()
+      .eq("id", invite.id)
+      .not("canceled_at", "is", null)
+      .is("used_at", null)
+      .select("id")
+      .maybeSingle();
+    setDeletingInviteId(null);
+    if (error) {
+      console.error("Falha ao excluir convite cancelado:", error.message);
+      setError("Não foi possível excluir o convite cancelado. Tente novamente.");
+      return;
+    }
+    if (!data) {
+      await loadInvites();
+      setError("O convite não está mais disponível para exclusão.");
+      return;
+    }
+    setInvites(current => current.filter(item => item.id !== data.id));
+    setSaved("Convite excluído.");
+  }
+
   async function copyInvite(token:string){
     try { await navigator.clipboard.writeText(inviteLink(token)); setSaved("Link copiado."); } catch { window.prompt("Copie o link:", inviteLink(token)); }
   }
@@ -200,7 +230,20 @@ export function Parametros({ readOnly = false }: { readOnly?: boolean }){
       </Card>}
       {isAdmin && <Card className="overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b p-5"><div className="flex items-center gap-3"><Link2 className="h-5 w-5 text-primary"/><div><h2 className="font-bold">Links de convite</h2><p className="text-xs text-muted-foreground">Cada link vale para um único cadastro, por 7 dias, com o tipo de acesso definido aqui.</p></div></div><button data-role-sensitive onClick={()=>setInviteOpen(true)} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Gerar link de convite</button></div>
         {inviteOpen && <div className="flex flex-wrap items-end gap-4 border-b bg-muted/20 p-5"><label className="grid gap-1 text-sm font-medium">Tipo de acesso<select aria-label="Tipo de acesso do convite" value={inviteRole} onChange={e=>setInviteRole(e.target.value as "convidado"|"administrador")} className="rounded-lg border bg-background px-3 py-2 text-sm"><option value="convidado">Convidado</option><option value="administrador">Administrador</option></select></label><button data-role-sensitive onClick={()=>void generateInvite()} className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground">Gerar e copiar link</button><button onClick={()=>setInviteOpen(false)} className="rounded-lg border px-4 py-2 text-sm">Cancelar</button></div>}
-        <div className="divide-y">{invites.length===0 ? <p className="p-6 text-center text-sm text-muted-foreground">Nenhum convite gerado.</p> : invites.map(i=>{ const st=inviteStatus(i); return <div key={i.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div><p className="text-sm font-medium">{i.role==="administrador"?"Administrador":"Convidado"} <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${st==="Pendente"?"bg-primary/10 text-primary":"bg-muted text-muted-foreground"}`}>{st}</span></p><p className="text-xs text-muted-foreground">Gerado em {brDateTime(i.created_at)} · {st==="Utilizado"?`usado por ${i.used_email??"—"} em ${brDateTime(i.used_at!)}`:`válido até ${brDateTime(i.expires_at)}`}</p></div>{st==="Pendente" && <div className="flex gap-2"><button onClick={()=>void copyInvite(i.token)} className="rounded-lg border px-3 py-2 text-sm"><Copy className="mr-1 inline h-4 w-4"/>Copiar link</button><button data-role-sensitive onClick={()=>void cancelInvite(i.id)} className="rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><X className="mr-1 inline h-4 w-4"/>Cancelar</button></div>}</div>; })}</div>
+        <div className="divide-y">{invites.length===0 ? <p className="p-6 text-center text-sm text-muted-foreground">Nenhum convite gerado.</p> : invites.map(i=>{ const st=inviteStatus(i); return <div key={i.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div><p className="text-sm font-medium">{i.role==="administrador"?"Administrador":"Convidado"} <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${st==="Pendente"?"bg-primary/10 text-primary":"bg-muted text-muted-foreground"}`}>{st}</span></p><p className="text-xs text-muted-foreground">Gerado em {brDateTime(i.created_at)} · {st==="Utilizado"?`usado por ${i.used_email??"—"} em ${brDateTime(i.used_at!)}`:`válido até ${brDateTime(i.expires_at)}`}</p></div>{st==="Pendente" && <div className="flex gap-2"><button onClick={()=>void copyInvite(i.token)} className="rounded-lg border px-3 py-2 text-sm"><Copy className="mr-1 inline h-4 w-4"/>Copiar link</button><button data-role-sensitive onClick={()=>void cancelInvite(i.id)} className="rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10"><X className="mr-1 inline h-4 w-4"/>Cancelar</button></div>}
+          {st === "Cancelado" && !i.used_at && (
+            <button
+              type="button"
+              data-role-sensitive
+              disabled={deletingInviteId !== null}
+              onClick={() => void deleteCanceledInvite(i)}
+              className="rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            >
+              <Trash2 aria-hidden="true" className="mr-1 inline h-4 w-4" />
+              {deletingInviteId === i.id ? "Excluindo…" : "Excluir"}
+            </button>
+          )}
+        </div>; })}</div>
       </Card>}
     </main>
   </div>;
