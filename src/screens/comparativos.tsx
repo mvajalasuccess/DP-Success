@@ -574,7 +574,7 @@ export function Comparativos() {
           <div className="flex items-center gap-2 text-xs text-muted-foreground"><FileSpreadsheet className="h-4 w-4" />Tabela comparativa</div>
         </div>
         <div className="overflow-x-auto bg-inherit">
-          <table className="w-full min-w-[1250px] bg-inherit text-left text-sm">
+          <table className="w-full min-w-[1250px] bg-inherit text-center text-sm">
             <thead className="sticky top-0 bg-muted/70 text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="sticky left-0 z-20 min-w-[230px] px-4 py-3 font-semibold">Colaborador</th>
