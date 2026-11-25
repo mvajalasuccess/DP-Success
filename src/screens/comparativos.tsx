@@ -507,7 +507,7 @@ export function Comparativos() {
       </Card>
 
       <div className="mt-7 mb-4 flex items-end justify-between gap-3">
-        <div><h2 className="text-xl font-semibold tracking-tight">Resumo da seleção</h2><p className="mt-1 text-sm text-muted-foreground">Totais agregados do recorte selecionado, sem incluir dados inventados.</p></div>
+        <div><h2 className="text-xl font-semibold tracking-tight">Resumo da seleção</h2></div>
         <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"><Clock3 className="h-3.5 w-3.5" />Horas em HH:MM na tabela</span>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
