@@ -128,7 +128,7 @@ export function Positions() {
                 <tr>
                   <th className="px-5 py-3">Cargo</th>
                   <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Ações</th>
+                  <th data-role-sensitive className="px-5 py-3">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -143,7 +143,7 @@ export function Positions() {
                     <tr key={row.id}>
                       <td className="px-5 py-4 font-medium">{row.name}</td>
                       <td className="px-5 py-4">{row.active ? "Ativo" : "Inativo"}</td>
-                      <td className="px-5 py-4">
+                      <td data-role-sensitive className="px-5 py-4">
                         <button data-role-sensitive type="button" onClick={() => { setError(""); setEditingId(row.id); setFormName(row.name); setOpen(true); }} className="mr-3 text-primary"><Pencil className="mr-1 inline h-4 w-4" />Editar</button><button data-role-sensitive type="button" onClick={() => void toggle(row)} className="mr-3 text-primary">
                           <Power className="mr-1 inline h-4 w-4" />
                           {row.active ? "Inativar" : "Ativar"}
