@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useBlocker } from "@tanstack/react-router";
-import { CalendarRange, Check, Clock3, FileClock, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
+import { CalendarRange, Check, Clock3, FileClock, Pencil, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -27,12 +27,48 @@ const fieldClass = "grid min-w-0 gap-1.5 text-sm font-medium";
 const tone = (value: number) => value > 0 ? "text-emerald-800 dark:text-emerald-300"
   : value < 0 ? "text-rose-700 dark:text-rose-300" : "";
 
-function newCardDraft() {
+type CardDraft = { person_name: string; kind: CardKind; start: string; end: string };
+
+function newCardDraft(): CardDraft {
   const today = new Intl.DateTimeFormat("sv-SE", {
     timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
   const [year, month] = today.split("-").map(Number);
-  return { person_name: "", kind: "freelancer" as CardKind, ...monthRange(year!, month!) };
+  return { person_name: "", kind: "freelancer", ...monthRange(year!, month!) };
+}
+
+function CardDetailsFields({ draft, onChange, disabled }: { draft: CardDraft; onChange: (value: CardDraft) => void; disabled: boolean }) {
+  return (
+    <fieldset disabled={disabled} className="grid min-w-0 gap-4">
+      <label className={fieldClass}>Nome da pessoa
+        <input className={inputCls} value={draft.person_name} required maxLength={140}
+          onChange={event => onChange({ ...draft, person_name: event.target.value })} />
+      </label>
+      <label className={fieldClass}>Tipo de controle
+        <select className={inputCls} value={draft.kind}
+          onChange={event => onChange({ ...draft, kind: event.target.value as CardKind })}>
+          {Object.entries(cardKinds).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className={fieldClass}>Início
+          <input type="date" className={inputCls} required value={draft.start}
+            onChange={event => onChange({ ...draft, start: event.target.value })} />
+        </label>
+        <label className={fieldClass}>Fim
+          <input type="date" className={inputCls} required min={draft.start} value={draft.end}
+            onChange={event => onChange({ ...draft, end: event.target.value })} />
+        </label>
+      </div>
+    </fieldset>
+  );
+}
+
+function validateCardDraft(draft: CardDraft) {
+  if (!draft.person_name.trim()) return "Informe o nome da pessoa.";
+  const range = datesInRange(draft.start, draft.end);
+  if (!range.length || range.length > 366) return "Informe um período válido de até 366 dias.";
+  return "";
 }
 
 function durationInput(minutes: number) {
@@ -121,13 +157,9 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
   async function createCard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canEdit || creating || dirty) return;
-    if (!draft.person_name.trim()) {
-      setCreateError("Informe o nome da pessoa.");
-      return;
-    }
-    const range = datesInRange(draft.start, draft.end);
-    if (!range.length || range.length > 366) {
-      setCreateError("Informe um período válido de até 366 dias.");
+    const validationError = validateCardDraft(draft);
+    if (validationError) {
+      setCreateError(validationError);
       return;
     }
     setCreating(true);
@@ -148,6 +180,12 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
     } finally {
       setCreating(false);
     }
+  }
+
+  function updateCardDetails(updated: ManualCard) {
+    setList(current => current.map(item => item.id === updated.id ? updated : item)
+      .sort((first, second) => second.start_date.localeCompare(first.start_date) || first.id.localeCompare(second.id)));
+    setCard(current => current?.id === updated.id ? updated : current);
   }
 
   function removeFromList(id: string) {
@@ -191,7 +229,7 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
       {card && (
         <CardEditor key={card.id + ":" + reload} card={card} canEdit={canEdit} onDirty={setDirty}
           onReload={() => { setDirty(false); setReload(value => value + 1); }}
-          onDelete={() => removeFromList(card.id)} />
+          onUpdate={updateCardDetails} onDelete={() => removeFromList(card.id)} />
       )}
 
       <Dialog open={open} onOpenChange={value => { if (!creating) setOpen(value); }}>
@@ -201,26 +239,7 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
             <DialogDescription>Escolha a pessoa e as datas que o cartão deve cobrir.</DialogDescription>
           </DialogHeader>
           <form className="grid gap-4" onSubmit={createCard}>
-            <label className={fieldClass}>Nome da pessoa
-              <input className={inputCls} value={draft.person_name} required maxLength={140}
-                onChange={event => setDraft(current => ({ ...current, person_name: event.target.value }))} />
-            </label>
-            <label className={fieldClass}>Tipo de controle
-              <select className={inputCls} value={draft.kind}
-                onChange={event => setDraft(current => ({ ...current, kind: event.target.value as CardKind }))}>
-                {Object.entries(cardKinds).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </select>
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className={fieldClass}>Início
-                <input type="date" className={inputCls} required value={draft.start}
-                  onChange={event => setDraft(current => ({ ...current, start: event.target.value }))} />
-              </label>
-              <label className={fieldClass}>Fim
-                <input type="date" className={inputCls} required min={draft.start} value={draft.end}
-                  onChange={event => setDraft(current => ({ ...current, end: event.target.value }))} />
-              </label>
-            </div>
+            <CardDetailsFields draft={draft} onChange={setDraft} disabled={creating} />
             {createError && <p role="alert" className="text-sm text-destructive">{createError}</p>}
             <DialogFooter>
               <button type="button" className={btnOutline} disabled={creating} onClick={() => setOpen(false)}>Cancelar</button>
@@ -250,9 +269,9 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
   );
 }
 
-function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
+function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
   card: ManualCard; canEdit: boolean; onDirty: (value: boolean) => void;
-  onReload: () => void; onDelete: () => void;
+  onReload: () => void; onUpdate: (updated: ManualCard) => void; onDelete: () => void;
 }) {
   const [saved, setSaved] = useState(card);
   const [entries, setEntries] = useState(card.entries);
@@ -263,6 +282,8 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [conflict, setConflict] = useState(false);
+  const [editDraft, setEditDraft] = useState<CardDraft | null>(null);
+  const [editError, setEditError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [showSchedule, setShowSchedule] = useState(!card.weekday_minutes.some(Boolean));
   const schedule = week.map(parseDuration);
@@ -327,6 +348,58 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
     }
   }
 
+  function beginEditDetails() {
+    if (!canEdit || busy || dirty || conflict) return;
+    setEditError("");
+    setEditDraft({ person_name: saved.person_name, kind: saved.kind, start: saved.start_date, end: saved.end_date });
+  }
+
+  async function saveDetails(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canEdit || !editDraft || busy || dirty || conflict) return;
+    const validationError = validateCardDraft(editDraft);
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
+    if (Object.keys(saved.entries).some(date => date < editDraft.start || date > editDraft.end)) {
+      setEditError("O período precisa incluir todos os dias que já têm batidas ou tipo do dia registrado.");
+      return;
+    }
+
+    setBusy(true);
+    setEditError("");
+    setError("");
+    setNotice("");
+    try {
+      const { data, error: saveError } = await cards().update({
+        person_name: editDraft.person_name.trim(),
+        kind: editDraft.kind,
+        start_date: editDraft.start,
+        end_date: editDraft.end,
+        revision: saved.revision + 1,
+      }).eq("id", saved.id).eq("revision", saved.revision).select(cardColumns).maybeSingle();
+
+      if (saveError) {
+        setEditError(dbError("Não foi possível editar o cartão.", saveError));
+      } else if (!data) {
+        setEditDraft(null);
+        setConflict(true);
+        setError("O cartão mudou em outra sessão. Recarregue o cartão antes de continuar.");
+      } else {
+        setSaved(data);
+        setEntries(data.entries);
+        setStart(data.start_date);
+        setEnd(data.end_date);
+        onUpdate(data);
+        setEditDraft(null);
+        setNotice("Dados do cartão atualizados.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deleteCard() {
     if (!canEdit || busy || dirty || conflict) return;
     setDeleteOpen(false);
@@ -363,8 +436,16 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
               aria-controls="manual-card-schedule" onClick={() => setShowSchedule(value => !value)}>
               <SlidersHorizontal aria-hidden="true" className="h-4 w-4" /> Jornada semanal
             </button>
-            {canEdit && <button type="button" data-role-sensitive className={btnDanger} disabled={busy || dirty || conflict}
-              aria-label="Excluir cartão" onClick={() => setDeleteOpen(true)}><Trash2 aria-hidden="true" className="h-4 w-4" /></button>}
+            {canEdit && (
+              <>
+                <button type="button" data-role-sensitive className={btnOutline} disabled={busy || dirty || conflict} onClick={beginEditDetails}>
+                  <Pencil aria-hidden="true" className="h-4 w-4" /> Editar cartão
+                </button>
+                <button type="button" data-role-sensitive className={btnDanger} disabled={busy || dirty || conflict} onClick={() => setDeleteOpen(true)}>
+                  <Trash2 aria-hidden="true" className="h-4 w-4" /> Excluir cartão
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div id="manual-card-schedule" hidden={!showSchedule} className="px-4 py-4 sm:px-5">
@@ -519,6 +600,24 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
           </div>}
         </div>
       )}
+      <Dialog open={editDraft !== null} onOpenChange={open => { if (!open && !busy) setEditDraft(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar cartão</DialogTitle>
+            <DialogDescription>O período deve cobrir as datas que já têm registros.</DialogDescription>
+          </DialogHeader>
+          {editDraft && (
+            <form className="grid gap-4" onSubmit={saveDetails}>
+              <CardDetailsFields draft={editDraft} onChange={setEditDraft} disabled={busy} />
+              {editError && <p role="alert" className="text-sm text-destructive">{editError}</p>}
+              <DialogFooter>
+                <button type="button" className={btnOutline} disabled={busy} onClick={() => setEditDraft(null)}>Cancelar</button>
+                <button type="submit" className={btnPrimary} disabled={!canEdit || busy}>{busy ? "Salvando…" : "Salvar dados do cartão"}</button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
