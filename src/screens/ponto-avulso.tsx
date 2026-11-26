@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useBlocker } from "@tanstack/react-router";
-import { CalendarRange, Check, Clock3, FileClock, Pencil, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
+import { CalendarRange, Check, Clock3, FileClock, FileText, Pencil, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -273,6 +273,7 @@ function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
   card: ManualCard; canEdit: boolean; onDirty: (value: boolean) => void;
   onReload: () => void; onUpdate: (updated: ManualCard) => void; onDelete: () => void;
 }) {
+  const punchesTable = useRef<HTMLTableElement>(null);
   const [saved, setSaved] = useState(card);
   const [entries, setEntries] = useState(card.entries);
   const [week, setWeek] = useState(() => card.weekday_minutes.map(durationInput));
@@ -346,6 +347,13 @@ function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
     } finally {
       setBusy(false);
     }
+  }
+
+  function focusPunches() {
+    if (!canEdit || busy || conflict) return;
+    const fields = Array.from(punchesTable.current?.querySelectorAll<HTMLInputElement>('input[type="time"]:enabled') ?? []);
+    const firstPunch = fields.find(field => field.value) ?? fields[0];
+    firstPunch?.focus();
   }
 
   function beginEditDetails() {
@@ -438,8 +446,11 @@ function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
             </button>
             {canEdit && (
               <>
+                <button type="button" data-role-sensitive className={btnPrimary} disabled={busy || conflict} onClick={focusPunches}>
+                  <Pencil aria-hidden="true" className="h-4 w-4" /> Editar batidas
+                </button>
                 <button type="button" data-role-sensitive className={btnOutline} disabled={busy || dirty || conflict} onClick={beginEditDetails}>
-                  <Pencil aria-hidden="true" className="h-4 w-4" /> Editar cartão
+                  <FileText aria-hidden="true" className="h-4 w-4" /> Dados do cartão
                 </button>
                 <button type="button" data-role-sensitive className={btnDanger} disabled={busy || dirty || conflict} onClick={() => setDeleteOpen(true)}>
                   <Trash2 aria-hidden="true" className="h-4 w-4" /> Excluir cartão
@@ -518,7 +529,7 @@ function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
           <p className="text-xs text-muted-foreground" aria-live="polite">{totals.reviewed} {totals.reviewed === 1 ? "dia apurado" : "dias apurados"} · {totals.pending} {totals.pending === 1 ? "pendência" : "pendências"}</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-left text-xs">
+          <table ref={punchesTable} className="w-full min-w-[1000px] text-left text-xs">
             <thead className="bg-muted">
               <tr>
                 <th scope="col" className="sticky left-0 z-10 min-w-[130px] bg-muted px-3 py-2">Data</th>
@@ -603,7 +614,7 @@ function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
       <Dialog open={editDraft !== null} onOpenChange={open => { if (!open && !busy) setEditDraft(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar cartão</DialogTitle>
+            <DialogTitle>Dados do cartão</DialogTitle>
             <DialogDescription>O período deve cobrir as datas que já têm registros.</DialogDescription>
           </DialogHeader>
           {editDraft && (
