@@ -51,6 +51,7 @@ export function Atestados() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [filterEmployee, setFilterEmployee] = useState("todos");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [companyFilter, setCompanyFilter] = useState("");
   const [filterPeriod, setFilterPeriod] = useState("todos");
   const [showCertificates, setShowCertificates] = useState(true);
@@ -145,8 +146,15 @@ export function Atestados() {
   useEffect(() => { void load(); void loadEmployees(); }, []);
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
-  const employeesForFilter = employees.filter(e => (!companyFilter || e.company_id === companyFilter) && (!selectedPeriod || ((!e.hire_date || e.hire_date <= selectedPeriod.end_date) && (!e.termination_date || e.termination_date >= selectedPeriod.start_date))));
-  const companyEmployeeIds = new Set(employees.filter(e => !companyFilter || e.company_id === companyFilter).map(e => e.id));
+  const employeesById = new Map(employees.map(employee => [employee.id, employee]));
+  const matchesEmployeeStatus = (employee?: Employee) =>
+    employeeStatusFilter === "todos" || employee?.status?.trim().toLowerCase() === employeeStatusFilter;
+  const companyEmployees = employees.filter(employee =>
+    (!companyFilter || employee.company_id === companyFilter) && matchesEmployeeStatus(employee));
+  const employeesForFilter = companyEmployees.filter(employee => !selectedPeriod ||
+    ((!employee.hire_date || employee.hire_date <= selectedPeriod.end_date) &&
+      (!employee.termination_date || employee.termination_date >= selectedPeriod.start_date)));
+  const companyEmployeeIds = new Set(companyEmployees.map(employee => employee.id));
   const filteredRows = rows.filter(row =>
     companyEmployeeIds.has(row.employee_id) &&
     (filterEmployee === "todos" || row.employee_id === filterEmployee) &&
@@ -170,13 +178,13 @@ export function Atestados() {
   }
 
   const filteredHistoricalBaseRows = historicalBaseRows.filter(row => {
-    const matchedEmployee = row.employee_id ? employees.find(employee => employee.id === row.employee_id) : null;
-    // Registros sem vínculo precisam continuar visíveis para corrigir o funcionário.
+    const matchedEmployee = row.employee_id ? employeesById.get(row.employee_id) : undefined;
+    // Registros sem vínculo não têm situação verificável e aparecem em Todos.
     const companyMatches = !companyFilter || !matchedEmployee || matchedEmployee.company_id === companyFilter;
-    const employeeMatches = filterEmployee === "todos" || !row.employee_id || row.employee_id === filterEmployee;
+    const employeeMatches = filterEmployee === "todos" || row.employee_id === filterEmployee;
     const periodMatches = !selectedPeriod ||
       (String(row.period_start ?? "") <= selectedPeriod.end_date && String(row.period_end ?? "") >= selectedPeriod.start_date);
-    return companyMatches && employeeMatches && periodMatches;
+    return companyMatches && employeeMatches && periodMatches && matchesEmployeeStatus(matchedEmployee);
   });
 
   const historicalCertificates = expandAttendance(filteredHistoricalBaseRows.filter(row => Number(row.certificate_minutes ?? 0) > 0),"atestado");
@@ -543,9 +551,22 @@ export function Atestados() {
       <div className="mb-4 flex justify-end"><DocumentAuditImport employees={employees} mode="attendance" /></div>
         <Card className="mt-6 p-4">
         <div className="mb-3 flex items-center gap-2 text-sm font-medium"><span>Filtros</span><span className="text-xs font-normal text-muted-foreground">Aplicados às duas listas</span></div>
-        <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Empresa</span><CompanyFilter value={companyFilter} onChange={value => { setCompanyFilter(value); setFilterEmployee("todos"); }} /></label>
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Competência</span><select value={filterPeriod} onChange={e => { setFilterPeriod(e.target.value); setFilterEmployee("todos"); }} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todas as competências</option>{periods.map(p => <option key={p.id} value={p.id}>{periodLabel(p)}</option>)}</select></label>
+          <label className="grid gap-1 text-sm">
+            <span className="text-muted-foreground">Situação do funcionário</span>
+            <select value={employeeStatusFilter}
+              onChange={event => {
+                setEmployeeStatusFilter(event.target.value as typeof employeeStatusFilter);
+                setFilterEmployee("todos");
+              }}
+              className="rounded-lg border bg-background px-3 py-2">
+              <option value="ativo">Ativos</option>
+              <option value="inativo">Inativos</option>
+              <option value="todos">Todos</option>
+            </select>
+          </label>
           <label className="grid gap-1 text-sm"><span className="text-muted-foreground">Funcionário</span><select value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} className="rounded-lg border bg-background px-3 py-2"><option value="todos">Todos os funcionários</option>{employeesForFilter.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}</select></label>
         </div>
       </Card>
