@@ -1,10 +1,11 @@
-import { BadgeDollarSign, BriefcaseBusiness, Building, CalendarClock, CalendarDays, CalendarRange, CalendarX, ChartColumn, ClipboardCheck, ClipboardList, Clock3, Contact, FileClock, FilePenLine, FileText, FolderOpen, Gauge, GitCompare, LayoutDashboard, ListChecks, Network, Palmtree, SlidersHorizontal, Timer, Upload, UsersRound, type LucideIcon } from "lucide-react";
+import { BadgeDollarSign, BriefcaseBusiness, Building, CalendarClock, CalendarDays, CalendarRange, CalendarX, ChartColumn, ClipboardCheck, ClipboardList, Clock3, Contact, FileClock, FilePenLine, FileText, FolderOpen, Gauge, GitCompare, Landmark, LayoutDashboard, ListChecks, Network, Palmtree, SlidersHorizontal, Timer, Upload, UsersRound, type LucideIcon } from "lucide-react";
 
 const screenIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
   "Dashboard": LayoutDashboard,
   "KPIs": ChartColumn,
   "Comparativos": GitCompare,
   "Relatórios": FileText,
+  "Passivos": Landmark,
   "Fechamento de Ponto": CalendarClock,
   "Importar cartão de ponto": Upload,
   "Lançamentos": ClipboardList,

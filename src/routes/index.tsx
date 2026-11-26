@@ -28,6 +28,7 @@ const PlanejamentoMensal = lazy(() => import("@/screens/planejamento-mensal").th
 const DiarioOcorrencias = lazy(() => import("@/screens/diario-ocorrencias").then(m => ({ default: m.DiarioOcorrencias })));
 const ImportarCartaoPonto = lazy(() => import("@/screens/importar-cartao-ponto").then(m => ({ default: m.ImportarCartaoPonto })));
 const Ferias = lazy(() => import("@/screens/ferias").then(m => ({ default: m.Ferias })));
+const Passivos = lazy(() => import("@/screens/passivos").then(m => ({ default: m.Passivos })));
 const PontoAvulso = lazy(() => import("@/screens/ponto-avulso").then(m => ({ default: m.PontoAvulso })));
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees } from "@/lib/dp-model";
@@ -44,13 +45,13 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importar-cartao-ponto" | "ferias" | "ponto-avulso";
+type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importar-cartao-ponto" | "ferias" | "ponto-avulso" | "passivos";
 
 const screenComponents = {
   empresas: Companies, funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours, pagamentos: Payments,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
-  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importar-cartao-ponto": ImportarCartaoPonto, ferias: Ferias, "ponto-avulso": PontoAvulso,
+  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importar-cartao-ponto": ImportarCartaoPonto, ferias: Ferias, "ponto-avulso": PontoAvulso, passivos: Passivos,
 };
 
 
@@ -62,7 +63,7 @@ function fmt(minutes: number) {
 
 function getScreenFromUrl(search: string): ScreenKey {
   const value = new URLSearchParams(search).get("tela") as ScreenKey | null;
-  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importar-cartao-ponto", "ferias", "ponto-avulso"];
+  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importar-cartao-ponto", "ferias", "ponto-avulso", "passivos"];
   return value && validScreens.includes(value) ? value : PLANNING_SCREEN;
 }
 
@@ -241,7 +242,7 @@ function AppShell({
     items: [string, ScreenKey][];
   }[] = [
     { id: "analysis", label: "Análise", Icon: Gauge, open: managementOpen, setOpen: setManagementOpen, items: [
-      ["Dashboard", "dashboard"], ["KPIs", "kpis"], ["Comparativos", "comparativos"], ["Relatórios", "relatorios"],
+      ["Dashboard", "dashboard"], ["KPIs", "kpis"], ["Comparativos", "comparativos"], ["Relatórios", "relatorios"], ["Passivos", "passivos"],
     ] },
     { id: "closing", label: "Ponto", Icon: Timer, open: closingMenuOpen, setOpen: setClosingMenuOpen, items: [
       ["Fechamento de Ponto", "fechamento-ponto"], ["Importar cartão de ponto", "importar-cartao-ponto"], ["Lançamentos", "lancamentos"], ["Banco de Horas", "banco-horas"], ["Pagamentos", "pagamentos"], ["Faltas e Folgas", "ocorrencias"], ["Declarações e Atestados", "atestados"],

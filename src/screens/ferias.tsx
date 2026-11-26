@@ -3,43 +3,16 @@ import { ArrowLeft, Palmtree, Plus, Pencil, Trash2, X, AlertCircle, ChevronDown,
 import { supabase } from "@/integrations/supabase/client";
 
 import { settlementNote, isSettlementOnly } from "@/lib/vacation-settlement";
+import { addYears, blockDays, blockKey, dayCount, endOf, entitledOf, getRegisteredVacationBlocks, getVacationCycles, isVacationLeave, shiftDate, startOf, type Vacation, type Employee } from "@/lib/vacation-periods";
 import { ScreenBrand } from "@/components/screen-brand";
 
-type Vacation = { id:string; employee_id:string; title:string|null; start_date:string|null; end_date:string|null; notes:string|null; completed:boolean; completed_at:string|null; created_at:string; acquisition_start_date?:string|null; acquisition_end_date?:string|null; concession_start_date?:string|null; concession_end_date?:string|null; official_gozo_start_date?:string|null; official_gozo_end_date?:string|null; termination_paid?:boolean|null; leave_type?:string|null; days_quantity?:number|string|null; entitled_days?:number|string|null; employees?:{full_name:string}|null };
-type Employee = { id:string; full_name:string; status?:string|null; termination_date?:string|null; hire_date?:string|null; company_id?:string|null };
 type Entitlement = { employee:Employee; acquisitionStart:string; acquisitionEnd:string; concessionStart:string; concessionEnd:string; cycle:number; status:"acquisition"|"available"|"overdue"|"scheduled"|"completed"; vacations?:Vacation[]; entitledDays?:number };
-const addMonths=(iso:string,months:number)=>{const [y=0,m=1,d=1]=iso.split("-").map(Number);const target=new Date(Date.UTC(y,m-1+months,1));const last=new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth()+1,0)).getUTCDate();return new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth(),Math.min(d,last))).toISOString().slice(0,10);};
-const proportionalEntitlement=(start:string,end:string)=>{if(!start||!end||end<start)return 30;let months=0;let cursor=start;while(months<12){const next=addMonths(start,months+1);if(next<=end){months++;cursor=next}else break;}const remaining=Math.floor((Date.parse(end+"T00:00:00Z")-Date.parse(cursor+"T00:00:00Z"))/86400000)+1;if(remaining>=15)months++;return Math.min(30,months*2.5);};
-const entitledOf=(rows:Vacation[],fallbackStart?:string,fallbackEnd?:string)=>{const v=rows.map(r=>r.entitled_days).filter(x=>x!=null&&x!=="").map(Number).filter(Number.isFinite);if(v.length)return Math.max(...v);const period=rows.find(r=>r.acquisition_start_date&&r.acquisition_end_date);const start=period?.acquisition_start_date||fallbackStart;const end=period?.acquisition_end_date||fallbackEnd;return start&&end?proportionalEntitlement(start,end):30;};
 const today = () => new Date().toISOString().slice(0,10);
 const isActiveEmployee = (e:Employee|undefined) => Boolean(e && String(e.status||"").trim().toLocaleLowerCase("pt-BR") === "ativo" && !e.termination_date);
-const shiftDate = (iso:string, days:number) => { const d=new Date(iso+"T12:00:00"); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); };
-const addYears = (iso:string, years:number) => { const [y,m,d]=iso.split("-").map(Number); if(y===undefined||m===undefined||d===undefined)return iso; const targetYear=y+years; const last=new Date(targetYear,m,0).getDate(); return String(targetYear)+"-"+String(m).padStart(2,"0")+"-"+String(Math.min(d,last)).padStart(2,"0"); };
-const makeEntitlement = (employee:Employee, cycle:number) => { const acquisitionStart=addYears(employee.hire_date!,cycle); const nextAnniversary=addYears(employee.hire_date!,cycle+1); const concessionEnd=shiftDate(addYears(employee.hire_date!,cycle+2),-1); return { employee, cycle:cycle+1, acquisitionStart, acquisitionEnd:shiftDate(nextAnniversary,-1), concessionStart:nextAnniversary, concessionEnd }; };
 const dateLabel = (v:string|null|undefined) => v ? v.slice(8,10)+"/"+v.slice(5,7)+"/"+v.slice(0,4) : "—";
-const calendarDayCount = (a:string,b:string) => Math.max(1,Math.round((new Date(b+"T00:00:00").getTime()-new Date(a+"T00:00:00").getTime())/86400000)+1);
-const dayCount = (a:string,b:string) => {
-  if (b < a) return 0;
-  // Blocos iniciados a partir de 21/12/2023 contam dias corridos, incluindo feriados.
-  if (a >= "2023-12-21") return calendarDayCount(a,b);
-  // Para blocos iniciados antes de 21/12/2023, mantém-se a regra histórica:
-  // Natal (25/12) e Ano-Novo (01/01) não consomem dias do bloco.
-  const start = new Date(a+"T00:00:00Z");
-  const end = new Date(b+"T00:00:00Z");
-  let total = 0;
-  for (const date = new Date(start); date <= end; date.setUTCDate(date.getUTCDate()+1)) {
-    const month = date.getUTCMonth()+1;
-    const day = date.getUTCDate();
-    if (!((month === 12 && day === 25) || (month === 1 && day === 1))) total++;
-  }
-  return total;
-};
 const LEAVE_LABELS:Record<string,string>={ferias:"Férias",licenca_remunerada:"Licença remunerada"};
-const isVacationLeave=(p:{leave_type?:string|null})=>(p.leave_type||"ferias")==="ferias";
 const parseDays=(v:string)=>{const n=Number(String(v).replace(",","."));return Number.isFinite(n)?n:NaN;};
 const fmtDays=(n:number)=>n.toLocaleString("pt-BR",{maximumFractionDigits:1});
-const blockDays=(p:Vacation)=>{const q=p.days_quantity==null?null:Number(p.days_quantity);const a=p.start_date||p.official_gozo_start_date;const b=p.end_date||p.official_gozo_end_date;return q!=null&&Number.isFinite(q)?q:(a&&b?dayCount(a,b):0);};
-const blockKey=(p:Vacation)=>(p.start_date||p.official_gozo_start_date)+"|"+(p.end_date||p.official_gozo_end_date)+"|"+(p.leave_type||"ferias");
 const blank = {entitled_days:"",leave_type:"ferias",days_quantity:"",employee_id:"",title:"",start_date:"",end_date:"",notes:"",completed:false,acquisition_start_date:"",acquisition_end_date:"",concession_start_date:"",concession_end_date:"",official_gozo_start_date:"",official_gozo_end_date:"",termination_paid:false};
 
 export function Ferias() {
@@ -109,8 +82,6 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
   const activeEmployees=useMemo(()=>employees.filter(isActiveEmployee),[employees]);
   const activeEmployeeIds=useMemo(()=>new Set(activeEmployees.map(e=>e.id)),[activeEmployees]);
   const currentDate = today();
-  const startOf = (p: Vacation) => isSettlementOnly(p) ? "" : p.start_date || p.official_gozo_start_date || "";
-  const endOf = (p: Vacation) => isSettlementOnly(p) ? "" : p.end_date || p.official_gozo_end_date || "";
   const hasStarted = (p: Vacation) => Boolean(startOf(p) && endOf(p) && startOf(p) <= currentDate);
   const hasEnded = (p: Vacation) => hasStarted(p) && endOf(p) <= currentDate;
   const confirmedLeave = (p: Vacation) => p.completed && hasEnded(p);
@@ -261,37 +232,26 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
     if(e||!data){setError(e?.message||"O registro não foi excluído. Verifique sua permissão e tente novamente.");return;}
     setConfirmDelete(null);await load();
   }
-  const entitlements=useMemo<Entitlement[]>(()=>{
-    const current=today();
-    return activeEmployees.filter(e=>e.hire_date).flatMap(employee=>{
-      const cycles:Entitlement[]=[];
-      for(let n=0;n<60;n++){
-        const generated=makeEntitlement(employee,n);
-        if(generated.acquisitionStart>current) break;
-        // Períodos editados no Planejamento também são a referência do Radar.
-        const savedPeriod=periods.find(p=>
-          p.employee_id===employee.id&&p.acquisition_start_date&&p.acquisition_end_date&&
-          p.acquisition_start_date<=generated.acquisitionEnd&&p.acquisition_end_date>=generated.acquisitionStart
-        );
-        const raw=savedPeriod?{
-          ...generated,
-          acquisitionStart:savedPeriod.acquisition_start_date!,
-          acquisitionEnd:savedPeriod.acquisition_end_date!,
-          concessionStart:savedPeriod.concession_start_date||shiftDate(savedPeriod.acquisition_end_date!,1),
-          concessionEnd:savedPeriod.concession_end_date||shiftDate(addYears(savedPeriod.concession_start_date||shiftDate(savedPeriod.acquisition_end_date!,1),1),-1),
-        }:generated;
-        const vacations=periods.filter(p=>p.employee_id===employee.id&&p.acquisition_start_date===raw.acquisitionStart);
-        const uniqueOfficialBlocks=[...new Map(vacations.filter(isVacationLeave).filter(p=>startOf(p)&&endOf(p)).map(p=>[blockKey(p),p])).values()];
-        const officialDays=uniqueOfficialBlocks.reduce((sum,p)=>sum+blockDays(p),0);
-        const hasOfficialBlocks=uniqueOfficialBlocks.length>0;
-        const terminationPaid=vacations.some(p=>p.termination_paid);
-        const entitledDays=entitlementOf(vacations,raw.acquisitionStart,raw.acquisitionEnd);
-        const status:Entitlement["status"]=terminationPaid||(officialDays>=entitledDays&&uniqueOfficialBlocks.every(confirmedLeave))||(pj&&vacations.length>0&&vacations.every(p=>p.completed&&(!startOf(p)||hasEnded(p))))?"completed":current>raw.concessionEnd&&officialDays<entitledDays?"overdue":hasOfficialBlocks?"scheduled":current<raw.concessionStart?"acquisition":current<=raw.concessionEnd?"available":"overdue";
-        cycles.push({...raw,status,vacations,entitledDays});
-      }
-      return cycles;
-    }).filter(e=>(!companyFilter||e.employee.company_id===companyFilter)&&(!employeeFilter||e.employee.id===employeeFilter)).sort((a,b)=>a.concessionEnd.localeCompare(b.concessionEnd));
-  },[activeEmployees,periods,companyFilter,employeeFilter]);
+  const entitlements = useMemo<Entitlement[]>(() => {
+    const current = today();
+    return activeEmployees.flatMap(employee => getVacationCycles(employee, periods, current).map(cycle => {
+      const uniqueOfficialBlocks = getRegisteredVacationBlocks(cycle.vacations);
+      const officialDays = uniqueOfficialBlocks.reduce((sum, period) => sum + blockDays(period), 0);
+      const terminationPaid = cycle.vacations.some(period => period.termination_paid);
+      const entitledDays = entitlementOf(cycle.vacations, cycle.acquisitionStart, cycle.acquisitionEnd);
+      const status: Entitlement["status"] =
+        terminationPaid || (officialDays >= entitledDays && uniqueOfficialBlocks.every(confirmedLeave)) ||
+          (pj && cycle.vacations.length > 0 && cycle.vacations.every(period => period.completed && (!startOf(period) || hasEnded(period))))
+          ? "completed"
+          : current > cycle.concessionEnd && officialDays < entitledDays ? "overdue"
+            : uniqueOfficialBlocks.length ? "scheduled"
+              : current < cycle.concessionStart ? "acquisition"
+                : current <= cycle.concessionEnd ? "available" : "overdue";
+      return { ...cycle, status, entitledDays };
+    })).filter(period => (!companyFilter || period.employee.company_id === companyFilter) &&
+      (!employeeFilter || period.employee.id === employeeFilter))
+      .sort((first, second) => first.concessionEnd.localeCompare(second.concessionEnd));
+  }, [activeEmployees, periods, companyFilter, employeeFilter]);
   const radarStatus = {
     overdue: { label: "Prazo vencido", tone: "bg-red-100 text-red-800" },
     available: { label: "Direito adquirido", tone: "bg-emerald-100 text-emerald-800" },
@@ -389,7 +349,7 @@ function VacationView({pj,vacationLink,setVacationLink}:{pj:boolean;vacationLink
             </span>
           </summary>
           <div className="divide-y border-t bg-muted/20 sm:pl-5">
-            {personPeriods.map(e => (<article key={e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">Período aquisitivo</h3>{!e.vacations?.length&&<span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">Nenhum bloco programado</span>}<span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"||e.status==="completed"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="completed"?"Concluído":e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?(pj?"Recessos programados":"Férias programadas"):"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{(()=>{const unique=[...new Map((e.vacations||[]).filter(isVacationLeave).filter(p=>startOf(p)&&endOf(p)).map(p=>[blockKey(p),p])).values()];const days=unique.reduce((sum,p)=>sum+blockDays(p),0);return <p className="mt-1 text-xs text-muted-foreground">Direito adquirido: {fmtDays(e.entitledDays??30)} dias · Registrados: {fmtDays(days)} em {unique.length} bloco(s) · Saldo: {fmtDays(Math.max(0,(e.entitledDays??30)-days))} dias</p>})()}{(e.vacations ?? []).filter(p => startOf(p) && endOf(p)).length > 0 && (
+            {personPeriods.map(e => (<article key={e.acquisitionStart} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">Período aquisitivo</h3>{!e.vacations?.length&&<span className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground">Nenhum bloco programado</span>}<span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold "+(e.status==="overdue"?"bg-red-100 text-red-800":e.status==="available"||e.status==="completed"?"bg-emerald-100 text-emerald-800":e.status==="scheduled"?"bg-sky-100 text-sky-800":"bg-amber-100 text-amber-800")}>{e.status==="completed"?"Concluído":e.status==="overdue"?"Prazo vencido":e.status==="available"?"Direito adquirido":e.status==="scheduled"?(pj?"Recessos programados":"Férias programadas"):"Em aquisição"}</span></div><p className="mt-1 text-sm text-muted-foreground">Aquisitivo: {dateLabel(e.acquisitionStart)} a {dateLabel(e.acquisitionEnd)}</p><p className="text-sm text-muted-foreground">Concessivo: {dateLabel(e.concessionStart)} a {dateLabel(e.concessionEnd)}</p>{(()=>{const unique=getRegisteredVacationBlocks(e.vacations ?? []);const days=unique.reduce((sum,p)=>sum+blockDays(p),0);return <p className="mt-1 text-xs text-muted-foreground">Direito adquirido: {fmtDays(e.entitledDays??30)} dias · Registrados: {fmtDays(days)} em {unique.length} bloco(s) · Saldo: {fmtDays(Math.max(0,(e.entitledDays??30)-days))} dias</p>})()}{(e.vacations ?? []).filter(p => startOf(p) && endOf(p)).length > 0 && (
   <ul aria-label="Blocos registrados" className="mt-2 space-y-1 border-l-2 border-emerald-200 pl-3 text-xs text-muted-foreground">
     {(e.vacations ?? []).filter(p => startOf(p) && endOf(p)).map(p => (
       <li key={p.id}>{dateLabel(startOf(p))} a {dateLabel(endOf(p))} · {fmtDays(blockDays(p))} dias{p.completed ? " · Concluído" : ""}</li>
