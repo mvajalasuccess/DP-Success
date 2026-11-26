@@ -28,6 +28,11 @@ function compareNewestAttendanceFirst(first?: string | null, second?: string | n
   return first && second ? compareAttendanceDates(second, first) : compareAttendanceDates(first, second);
 }
 
+function formatDeclarationDate(start: string, end: string) {
+  if (start && end && start !== end) return `${formatDate(start)} a ${formatDate(end)}`;
+  return formatDate(start || end);
+}
+
 function countDays(start: string, end: string) {
   if (!start || !end) return 0;
   const a = new Date(start + "T00:00:00");
@@ -639,7 +644,7 @@ export function Atestados() {
           ].sort((first, second) => compareNewestAttendanceFirst(first.date, second.date)).map(item => {
             if (item.historical) {
               const r = item.row;
-              return <tr key={"base-decl-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.declaration_display_start || r.period_start || "")} a {formatDate(r.declaration_display_end || r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_display_minutes ?? closingMinutes(r, "declaracao"))}</td><td className="px-5 py-4">{[r.declaration_display_reason,r.declaration_observation].filter(Boolean).join(" — ")||"—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "declaracao")} className="rounded-md border p-2" title="Editar observação do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
+              return <tr key={"base-decl-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDeclarationDate(r.declaration_display_start || r.period_start || "", r.declaration_display_end || r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_display_minutes ?? closingMinutes(r, "declaracao"))}</td><td className="px-5 py-4">{[r.declaration_display_reason,r.declaration_observation].filter(Boolean).join(" — ")||"—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "declaracao")} className="rounded-md border p-2" title="Editar observação do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
             }
             const d = item.row;
             return <tr key={d.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{d.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(d.occurrence_date)}</td><td className="px-5 py-4">{String(Math.floor(Number(d.quantity) || 0)).padStart(2,"0")}:{String(Math.round(((Number(d.quantity)||0)%1)*60)).padStart(2,"0")}</td><td className="px-5 py-4">{d.notes ?? "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditDeclaration(d)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button data-role-sensitive onClick={() => void removeDeclaration(d)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>;
