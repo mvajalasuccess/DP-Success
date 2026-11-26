@@ -18,6 +18,19 @@ type Certificate = {
 
 const emptyForm = { employee_id: "", start_date: "", end_date: "", days: "", certificate_type: "medico", cid: "", notes: "" };
 
+function certificateTypeLabel(value?: string | null) {
+  const label = value?.trim();
+  if (!label) return "Tipo não informado";
+  const key = label.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const labels: Record<string, string> = {
+    medico: "Médico",
+    odontologico: "Odontológico",
+    acompanhamento: "Acompanhamento",
+    outro: "Outro",
+  };
+  return Object.prototype.hasOwnProperty.call(labels, key) ? labels[key] : label;
+}
+
 function formatDate(value: string) {
   if (!value) return "—";
   const [year, month, day] = value.split("-");
@@ -292,7 +305,7 @@ export function Atestados() {
         "Data final": row.end_date,
         "Dias": displayedDays(row),
         "Horas abonadas": "",
-        "Tipo / motivo": row.certificate_type ?? "",
+        "Tipo / motivo": certificateTypeLabel(row.certificate_type),
         "CID": row.cid ?? "",
         "Observação": row.notes ?? "",
       })),
@@ -303,7 +316,7 @@ export function Atestados() {
         "Data final": row.certificate_display_end ?? row.period_end ?? "",
         "Dias": row.certificate_display_days ?? "",
         "Horas abonadas": row.detail ? "" : formatHistoricalHours(closingMinutes(row, "atestado")),
-        "Tipo / motivo": row.certificate_type ? (({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[row.certificate_type] || row.certificate_type) : "Tipo não informado",
+        "Tipo / motivo": certificateTypeLabel(row.certificate_type),
         "CID": row.certificate_cid ?? "",
         "Observação": row.certificate_display_notes ?? "",
       })),
@@ -631,10 +644,10 @@ export function Atestados() {
           ].sort((first, second) => compareNewestAttendanceFirst(first.date, second.date)).map(item => {
             if (item.historical) {
               const r = item.row;
-              return <tr key={"base-cert-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_start || r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_end || r.period_end || "")}</td><td className="px-5 py-4">{r.certificate_display_days??"—"}</td><td className="px-5 py-4">{(r.certificate_type ? ({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[r.certificate_type] || r.certificate_type : "Tipo não informado") + (r.detail?"":" · " + formatHistoricalHours(closingMinutes(r, "atestado")) + " h")}</td><td className="px-5 py-4">{r.certificate_cid || "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "atestado")} className="rounded-md border p-2" title="Editar tipo e CID do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
+              return <tr key={"base-cert-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_start || r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_end || r.period_end || "")}</td><td className="px-5 py-4">{r.certificate_display_days??"—"}</td><td className="px-5 py-4">{certificateTypeLabel(r.certificate_type) + (r.detail?"":" · " + formatHistoricalHours(closingMinutes(r, "atestado")) + " h")}</td><td className="px-5 py-4">{r.certificate_cid || "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "atestado")} className="rounded-md border p-2" title="Editar tipo e CID do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
             }
             const r = item.row;
-            return <tr key={r.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{r.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(r.start_date)}</td><td className="px-5 py-4">{formatDate(r.end_date)}</td><td className="px-5 py-4">{displayedDays(r)}</td><td className="px-5 py-4">{r.certificate_type}</td><td className="px-5 py-4">{r.cid ?? "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => void startEdit(r)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button data-role-sensitive onClick={() => void remove(r)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>;
+            return <tr key={r.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{r.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(r.start_date)}</td><td className="px-5 py-4">{formatDate(r.end_date)}</td><td className="px-5 py-4">{displayedDays(r)}</td><td className="px-5 py-4">{certificateTypeLabel(r.certificate_type)}</td><td className="px-5 py-4">{r.cid ?? "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => void startEdit(r)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button data-role-sensitive onClick={() => void remove(r)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>;
           })}
         </tbody></table></div>}
       </Card>
