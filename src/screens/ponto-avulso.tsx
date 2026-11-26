@@ -19,7 +19,7 @@ type CardSummary = Pick<ManualCard, "id" | "person_name" | "kind" | "start_date"
 const summaryColumns = "id,person_name,kind,start_date,end_date";
 const cardColumns = summaryColumns + ",weekday_minutes,entries,revision";
 const cards = () => (supabase as any).from("manual_time_cards");
-const marks = ["Entrada 1", "Saída 1", "Entrada 2", "Saída 2", "Entrada 3", "Saída 3", "Entrada 4", "Saída 4"];
+const marks = ["Entrada 1", "Saída 1", "Entrada 2", "Saída 2", "Entrada 3", "Saída 3"];
 const modes: Record<EntryMode, string> = {
   normal: "Normal", overnight: "Virada de dia", absence: "Ausência", excused: "Abonado", waived: "Dispensado",
 };
@@ -290,6 +290,8 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
 
   function changePunch(date: string, entry: DayEntry, index: number, value: string) {
     const punches = marks.map((_, position) => position === index ? value : entry.punches[position] ?? "");
+    // Older cards can already contain a fourth pair.
+    punches.push(...entry.punches.slice(marks.length));
     changeEntry(date, { ...entry, punches });
   }
 
@@ -435,7 +437,7 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
           <p className="text-xs text-muted-foreground" aria-live="polite">{totals.reviewed} {totals.reviewed === 1 ? "dia apurado" : "dias apurados"} · {totals.pending} {totals.pending === 1 ? "pendência" : "pendências"}</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] text-left text-xs">
+          <table className="w-full min-w-[1000px] text-left text-xs">
             <thead className="bg-muted">
               <tr>
                 <th scope="col" className="sticky left-0 z-10 min-w-[130px] bg-muted px-3 py-2">Data</th>
@@ -452,10 +454,16 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
               {rows.map(row => {
                 const balance = validSchedule ? row.balance : null;
                 const dateLabel = formatDate(row.date);
+                const previousPair = row.entry.punches.slice(marks.length);
                 return (
                   <tr key={row.date} className={row.expected === 0 ? "bg-muted/30" : ""}>
                     <th scope="row" className="sticky left-0 z-10 border-b border-border/60 bg-card px-3 py-2 font-medium whitespace-nowrap">
                       {dateLabel} <span className="ml-1 text-muted-foreground">{weekdayShort(row.date)}</span>
+                      {previousPair.some(Boolean) && (
+                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                          Par anterior · {previousPair[0] || "—"} a {previousPair[1] || "—"}
+                        </span>
+                      )}
                     </th>
                     {marks.map((label, index) => (
                       <td key={label} className={`px-1 py-1 text-center ${index % 2 === 1 ? "border-r border-border/60" : ""}`}>
