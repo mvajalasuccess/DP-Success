@@ -1368,10 +1368,10 @@ export function Kpis() {
   const toneLabel = (tone: string) => tone === "critical" ? "Crítico" : tone === "warning" ? "Atenção" : "Dentro da faixa";
   const kpiItems: Array<{ label: string; value: string; support: string; tone: string; title: string; primary?: boolean; status?: string }> = activeSection === "demograficos"
     ? [
-        { label: "Funcionários na seleção", value: String(demographicKpiEmployees.length), support: "Conforme filtros e situação", tone: "neutral", title: "Quantidade de funcionários na seleção demográfica.", primary: true },
-        { label: "Idade média", value: demographicAges.length ? (demographicAges.reduce((sum, age) => sum + age, 0) / demographicAges.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados", support: `${demographicAges.length} cadastro(s) com nascimento`, tone: "neutral", title: "Idade média calculada a partir das datas de nascimento." },
-        { label: "Tempo médio de empresa", value: demographicTenures.length ? (demographicTenures.reduce((sum, years) => sum + years, 0) / demographicTenures.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados", support: `${demographicTenures.length} cadastro(s) com admissão`, tone: "neutral", title: "Tempo médio desde a admissão até hoje ou desligamento." },
-        { label: "Nascimento preenchido", value: demographicKpiEmployees.length ? Math.round(demographicAges.length / demographicKpiEmployees.length * 100) + "%" : "0%", support: `${demographicKpiEmployees.length - demographicAges.length} sem idade calculável`, tone: "neutral", title: "Percentual de funcionários com data de nascimento válida." },
+        { label: "Funcionários na seleção", value: String(demographicKpiEmployees.length), support: "Total de pessoas que atendem aos filtros desta seção", tone: "neutral", title: "Quantidade de funcionários na seleção demográfica.", primary: true },
+        { label: "Idade média", value: demographicAges.length ? (demographicAges.reduce((sum, age) => sum + age, 0) / demographicAges.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados", support: `Média das idades de ${demographicAges.length} funcionários com data de nascimento válida`, tone: "neutral", title: "Idade média calculada a partir das datas de nascimento." },
+        { label: "Tempo médio de empresa", value: demographicTenures.length ? (demographicTenures.reduce((sum, years) => sum + years, 0) / demographicTenures.length).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " anos" : "Sem dados", support: `Tempo médio desde a admissão, com base em ${demographicTenures.length} cadastros`, tone: "neutral", title: "Tempo médio desde a admissão até hoje ou desligamento." },
+        { label: "Nascimento preenchido", value: demographicKpiEmployees.length ? Math.round(demographicAges.length / demographicKpiEmployees.length * 100) + "%" : "0%", support: "Parcela da equipe com data de nascimento válida", tone: "neutral", title: "Percentual de funcionários com data de nascimento válida." },
       ]
     : activeSection === "salariais"
     ? [
@@ -1382,20 +1382,20 @@ export function Kpis() {
       ]
     : activeSection === "horas-extras"
     ? [
-        { label: "Horas extras", value: fmt(Math.max(0, totalOvertime - metrics.interjornada)), support: "Total de HE, sem interjornada", tone: "neutral", title: "Soma dos tipos de hora extra já apurados nesta seleção.", primary: true },
-        { label: "Funcionários com HE", value: String(overtimeEmployees.filter(item => item.total - item.interjornada > 0).length), support: "Com horas extras no período", tone: "neutral", title: "Contagem de funcionários com horas extras na seleção." },
-        { label: "Interjornada", value: fmt(metrics.interjornada), support: "Exibida separadamente; não soma ao saldo", tone: "neutral", title: "Interjornada é exibida separadamente e não compõe o saldo." },
-        { label: "Banco de horas", value: fmt(bankBalance), support: "Saldo acumulado até o fim da seleção", tone: "neutral", title: "Saldo apurado pelo modelo atual de Banco de Horas." },
+        { label: "Horas extras", value: fmt(Math.max(0, totalOvertime - metrics.interjornada)), support: "Horas trabalhadas além da jornada prevista", tone: "neutral", title: "Soma dos tipos de hora extra já apurados nesta seleção.", primary: true },
+        { label: "Funcionários com HE", value: String(overtimeEmployees.filter(item => item.total - item.interjornada > 0).length), support: "Quantidade de pessoas que registraram horas extras no período", tone: "neutral", title: "Contagem de funcionários com horas extras na seleção." },
+        { label: "Interjornada", value: fmt(metrics.interjornada), support: "Horas registradas de descanso insuficiente entre jornadas", tone: "neutral", title: "Interjornada é exibida separadamente e não compõe o saldo." },
+        { label: "Banco de horas", value: fmt(bankBalance), support: "Diferença acumulada entre créditos e débitos até o fim do período", tone: "neutral", title: "Saldo apurado pelo modelo atual de Banco de Horas." },
       ]
     : activeSection === "turnover"
     ? [
         { label: "Turnover", value: pct(metrics.turnover), support: `${metrics.admissions} admissões · ${metrics.terminations} desligamentos`, tone: turnoverTone, status: toneLabel(turnoverTone), title: `[(Admissões + Desligamentos) ÷ 2] ÷ Funcionários ativos × 100. Faixas gerenciais: atenção a partir de ${turnoverThresholds.attention}% e crítico a partir de ${turnoverThresholds.critical}%.`, primary: true },
         { label: "Funcionários no período", value: String(Math.round(metrics.employees)), support: appliedMonth === "todos" ? "Pessoas distintas no período selecionado" : "Quadro ativo da competência", tone: "neutral", title: "Quantidade de funcionários considerados na seleção." },
-        { label: "Admissões", value: String(metrics.admissions), support: "Dentro do período selecionado", tone: "neutral", title: "Admissões com data dentro do período selecionado." },
-        { label: "Desligamentos", value: String(metrics.terminations), support: "Dentro do período selecionado", tone: "neutral", title: "Desligamentos com data dentro do período selecionado." },
+        { label: "Admissões", value: String(metrics.admissions), support: "Funcionários que ingressaram no período selecionado", tone: "neutral", title: "Admissões com data dentro do período selecionado." },
+        { label: "Desligamentos", value: String(metrics.terminations), support: "Funcionários cujo vínculo terminou no período selecionado", tone: "neutral", title: "Desligamentos com data dentro do período selecionado." },
       ]
     : [
-        { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: "(Débitos + Faltas + Abonos) ÷ horas previstas", tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100. Referência gerencial: atenção a partir de 3% e crítico a partir de 5%.", primary: true },
+        { label: "Absenteísmo", value: metrics.expected > 0 ? pct(absenteeismRate) : "Sem dados", support: "Parcela da jornada prevista que deixou de ser trabalhada", tone: absenteeismTone, status: toneLabel(absenteeismTone), title: "(Débitos + Faltas + Abonos) ÷ Horas previstas × 100. Referência gerencial: atenção a partir de 3% e crítico a partir de 5%.", primary: true },
         { label: "Horas previstas", value: fmt(metrics.expected), support: "Carga horária prevista no período selecionado", tone: "neutral", title: "Total de horas previstas para os funcionários considerados na seleção." },
         { label: "Horas perdidas", value: fmt(metrics.absenceMinutes), support: "Débitos + faltas + abonos considerados no absenteísmo", tone: "neutral", title: "Total de horas perdidas usadas no cálculo do absenteísmo." },
         { label: "Horas trabalhadas", value: fmt(metrics.worked), support: "Total registrado ou apurado no período selecionado", tone: "neutral", title: "Total de horas trabalhadas conforme os registros e a base histórica já existente." },
@@ -1631,13 +1631,13 @@ export function Kpis() {
                 { name: "Outro / não informado", color: "#8b5cf6" },
               ];
               return <>
-                <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Passe o cursor sobre os gráficos para ver os detalhes.</p></div>
+                <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Perfil do quadro</p><h2 className="mt-1 text-2xl font-bold">Indicadores demográficos</h2><p className="mt-1 text-sm text-muted-foreground">Mostra a composição da equipe por sexo, faixa etária, tempo de empresa e setor.</p></div>
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="text-sm font-semibold">Situação dos funcionários</p><p className="text-xs text-muted-foreground">Filtra todos os indicadores e gráficos desta seção.</p></div><select aria-label="Filtrar situação dos funcionários nos indicadores demográficos" className="h-10 min-w-44 rounded-lg border bg-background px-3 text-sm" value={demographicStatusFilter} onChange={e => setDemographicStatusFilter(e.target.value as "todos" | "ativos" | "inativos")}><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-background p-5 dark:from-pink-950/30"><p className="text-sm text-muted-foreground">Funcionários na seleção</p><p className="mt-2 text-3xl font-bold">{base.length}</p><p className="mt-1 text-xs text-muted-foreground">Conforme os filtros aplicados</p></Card>
-                  <Card className="border-violet-200 bg-gradient-to-br from-violet-50 to-background p-5 dark:from-violet-950/30"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-3xl font-bold">{ages.length ? ageAverage.toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos" : "Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">{ages.length} cadastro(s) com nascimento</p></Card>
-                  <Card className="border-sky-200 bg-gradient-to-br from-sky-50 to-background p-5 dark:from-sky-950/30"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-3xl font-bold">{tenure.length ? tenureAverage.toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos" : "Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">{tenure.length} cadastro(s) com admissão</p></Card>
-                  <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-background p-5 dark:from-emerald-950/30"><p className="text-sm text-muted-foreground">Dados de nascimento preenchidos</p><p className="mt-2 text-3xl font-bold">{base.length ? Math.round(ages.length/base.length*100) : 0}%</p><p className="mt-1 text-xs text-muted-foreground">{base.length-ages.length} cadastro(s) sem idade calculável</p></Card>
+                  <Card className="border-pink-200 bg-gradient-to-br from-pink-50 to-background p-5 dark:from-pink-950/30"><p className="text-sm text-muted-foreground">Funcionários na seleção</p><p className="mt-2 text-3xl font-bold">{base.length}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas incluídas pelos filtros desta seção.</p></Card>
+                  <Card className="border-violet-200 bg-gradient-to-br from-violet-50 to-background p-5 dark:from-violet-950/30"><p className="text-sm text-muted-foreground">Idade média</p><p className="mt-2 text-3xl font-bold">{ages.length ? ageAverage.toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos" : "Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">Média das idades de {ages.length} pessoas com data de nascimento válida.</p></Card>
+                  <Card className="border-sky-200 bg-gradient-to-br from-sky-50 to-background p-5 dark:from-sky-950/30"><p className="text-sm text-muted-foreground">Tempo médio de empresa</p><p className="mt-2 text-3xl font-bold">{tenure.length ? tenureAverage.toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos" : "Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">Tempo médio desde a admissão, com base em {tenure.length} cadastros.</p></Card>
+                  <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-background p-5 dark:from-emerald-950/30"><p className="text-sm text-muted-foreground">Dados de nascimento preenchidos</p><p className="mt-2 text-3xl font-bold">{base.length ? Math.round(ages.length/base.length*100) : 0}%</p><p className="mt-1 text-xs text-muted-foreground">Parcela da equipe com data de nascimento válida.</p></Card>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Distribuição por sexo</h3><p className="text-xs text-muted-foreground">Quantidade e proporção de cada categoria cadastrada.</p>
@@ -1754,13 +1754,13 @@ export function Kpis() {
               });
               const salaryColors = ["#06b6d4","#8b5cf6","#f97316","#22c55e","#ec4899"];
               return <>
-                <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Visão interativa da folha cadastrada, faixas salariais, diferenças entre setores e pensões alimentícias. Valores respeitam os filtros aplicados.</p></div>
+                <div className="mb-4"><p className="text-xs font-semibold uppercase tracking-wider text-primary">Remuneração</p><h2 className="mt-1 text-2xl font-bold">Indicadores salariais</h2><p className="mt-1 text-sm text-muted-foreground">Mostra como os salários cadastrados se distribuem entre os funcionários e setores da seleção. Também indica quantas pessoas pagam pensão alimentícia.</p></div>
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"><div><p className="text-sm font-semibold">Situação dos funcionários</p><p className="text-xs text-muted-foreground">Filtra todos os indicadores e gráficos desta seção.</p></div><select aria-label="Filtrar situação dos funcionários nos indicadores salariais" className="h-10 min-w-44 rounded-lg border bg-background px-3 text-sm" value={salaryStatusFilter} onChange={e => setSalaryStatusFilter(e.target.value as "todos" | "ativos" | "inativos")}><option value="ativos">Ativos</option><option value="inativos">Inativos</option><option value="todos">Todos</option></select></div>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <Card className="border-cyan-200 bg-gradient-to-br from-cyan-50 to-background p-5 dark:from-cyan-950/30"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{salaries.length?money(avg):"Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">Base de {salaries.length} salário(s) cadastrado(s)</p></Card>
+                  <Card className="border-cyan-200 bg-gradient-to-br from-cyan-50 to-background p-5 dark:from-cyan-950/30"><p className="text-sm text-muted-foreground">Salário médio</p><p className="mt-2 text-2xl font-bold">{salaries.length?money(avg):"Sem dados"}</p><p className="mt-1 text-xs text-muted-foreground">Média dos {salaries.length} salários cadastrados na seleção</p></Card>
                   <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50 to-background p-5 dark:from-indigo-950/30"><p className="text-sm text-muted-foreground">Folha mensal estimada</p><p className="mt-2 text-2xl font-bold">{money(totalPayroll)}</p><p className="mt-1 text-xs text-muted-foreground">Soma dos salários cadastrados, sem encargos</p></Card>
-                  <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-background p-5 dark:from-rose-950/30"><p className="text-sm text-muted-foreground">Funcionários que pagam pensão</p><p className="mt-2 text-2xl font-bold">{pensioned.length}</p><p className="mt-1 text-xs text-muted-foreground">Marcados como “Sim” no cadastro</p></Card>
-                  <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-background p-5 dark:from-amber-950/30"><p className="text-sm text-muted-foreground">Percentual que paga pensão</p><p className="mt-2 text-2xl font-bold">{base.length ? (pensioned.length / base.length * 100).toLocaleString("pt-BR",{maximumFractionDigits:1})+"%" : "0%"}</p><p className="mt-1 text-xs text-muted-foreground">Sobre os {base.length} funcionários da seleção</p></Card>
+                  <Card className="border-rose-200 bg-gradient-to-br from-rose-50 to-background p-5 dark:from-rose-950/30"><p className="text-sm text-muted-foreground">Funcionários que pagam pensão</p><p className="mt-2 text-2xl font-bold">{pensioned.length}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas com valor de pensão informado no cadastro</p></Card>
+                  <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-background p-5 dark:from-amber-950/30"><p className="text-sm text-muted-foreground">Percentual que paga pensão</p><p className="mt-2 text-2xl font-bold">{base.length ? (pensioned.length / base.length * 100).toLocaleString("pt-BR",{maximumFractionDigits:1})+"%" : "0%"}</p><p className="mt-1 text-xs text-muted-foreground">Parcela dos {base.length} funcionários que pagam pensão</p></Card>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Distribuição por faixa salarial e sexo</h3><p className="text-xs text-muted-foreground">Quantidade de funcionários por faixa, comparando feminino e masculino.</p>
@@ -1801,12 +1801,12 @@ export function Kpis() {
         )}
         {activeSection === "absenteismo" && (
           <section id="kpi-panel-absenteismo" role="tabpanel" aria-labelledby="kpi-tab-absenteismo" tabIndex={0} className="mt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--kpi-accent)]">
-          <div className="flex items-end justify-between gap-4">
+          <div className="flex flex-wrap items-end justify-between gap-4 sm:flex-nowrap">
             <div>
               <h2 className="mt-1 text-2xl font-bold">Absenteísmo</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Horas perdidas consideradas ÷ horas previstas × 100.</p>
+              <p className="mt-1 text-sm text-muted-foreground">O absenteísmo mostra a parcela da jornada prevista que deixou de ser trabalhada. No DP Success, ele considera débitos de ponto, faltas e horas abonadas no período.</p>
             </div>
-            <button type="button" onClick={() => setShowAbsenceCalculation(v => !v)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted">
+            <button type="button" onClick={() => setShowAbsenceCalculation(v => !v)} aria-expanded={showAbsenceCalculation} className="inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium hover:bg-muted">
               <Info className="h-4 w-4" /> Como é calculado
             </button>
           </div>
@@ -1927,9 +1927,9 @@ export function Kpis() {
               <div className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-primary" /><h3 className="font-bold">Atenção do RH</h3></div>
               <p className="mt-1 text-xs text-muted-foreground">Pontos operacionais para acompanhar nesta competência.</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Funcionários com HE</p><p className="mt-1 text-2xl font-bold">{overtimeEmployees.length}</p></div>
-                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Horas abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.abonosMinutes)}</p></div>
-                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Desligamentos</p><p className="mt-1 text-2xl font-bold">{metrics.terminations}</p></div>
+                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Funcionários com HE</p><p className="mt-1 text-2xl font-bold">{overtimeEmployees.length}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas com lançamentos na apuração de horas extras.</p></div>
+                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Horas abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.abonosMinutes)}</p><p className="mt-1 text-xs text-muted-foreground">Horas de ausência justificadas e registradas como abono.</p></div>
+                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Desligamentos</p><p className="mt-1 text-2xl font-bold">{metrics.terminations}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas cujo vínculo terminou durante o período.</p></div>
               </div>
             </Card>
             <Card className="p-5">
@@ -1940,10 +1940,10 @@ export function Kpis() {
           </div>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="kpi-metric-card kpi-metric-blue p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p></Card>
-            <Card className="kpi-metric-card kpi-metric-purple p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Folgas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.folgasDays)}</p></Card>
-            <Card className="kpi-metric-card kpi-metric-green p-5"><FileText className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p></Card>
-            <Card className="kpi-metric-card kpi-metric-amber p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações de horas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p></Card>
+            <Card className="kpi-metric-card kpi-metric-blue p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Faltas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.faltasDays)}</p><p className="mt-1 text-xs text-muted-foreground">Dias de ausência registrados como falta.</p></Card>
+            <Card className="kpi-metric-card kpi-metric-purple p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Folgas</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.folgasDays)}</p><p className="mt-1 text-xs text-muted-foreground">Dias registrados como folga abonada ou descontada.</p></Card>
+            <Card className="kpi-metric-card kpi-metric-green p-5"><FileText className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Atestados</p><p className="mt-1 text-2xl font-bold">{daysFmt(metrics.atestadosDays)}</p><p className="mt-1 text-xs text-muted-foreground">Dias de afastamento registrados por atestado.</p></Card>
+            <Card className="kpi-metric-card kpi-metric-amber p-5"><CalendarX2 className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Declarações de horas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.declaracoesMinutes)}</p><p className="mt-1 text-xs text-muted-foreground">Horas abonadas com base em declarações de comparecimento.</p></Card>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -1964,7 +1964,7 @@ export function Kpis() {
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <h2 className="mt-1 text-2xl font-bold">Horas Extras</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Visão consolidada das horas extras do período.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Horas extras são horas trabalhadas além da jornada prevista. O indicador reúne as horas extras registradas no período selecionado, por tipo de adicional.</p>
               </div>
               <div className="rounded-2xl border bg-card px-6 py-4 text-right shadow-sm">
                 <p className="text-xs text-muted-foreground">Total de horas extras</p>
@@ -1975,16 +1975,17 @@ export function Kpis() {
             <p className="mb-4 text-xs text-muted-foreground">Valores conforme os lançamentos e a base histórica importada, sem recalcular competências fechadas.</p>
             <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
               {[
-                ["HE 60%", metrics.he60],
-                ["HE 60% + 20%", metrics.he60Night],
-                ["HE 100%", metrics.he100],
-                ["HE 100% + 20%", metrics.he100Night],
-                ["HE 20%", metrics.he20],
-                ["Interjornada", metrics.interjornada],
-              ].map(([label, value]) => (
+                ["HE 60%", metrics.he60, "Horas extras registradas com adicional de 60%."],
+                ["HE 60% + 20%", metrics.he60Night, "Horas extras com adicional de 60% e adicional noturno de 20%."],
+                ["HE 100%", metrics.he100, "Horas extras registradas com adicional de 100%."],
+                ["HE 100% + 20%", metrics.he100Night, "Horas extras com adicional de 100% e adicional noturno de 20%."],
+                ["HE 20%", metrics.he20, "Horas registradas na categoria de adicional noturno de 20%."],
+                ["Interjornada", metrics.interjornada, "Horas registradas por descanso insuficiente entre jornadas."],
+              ].map(([label, value, description]) => (
                 <Card key={String(label)} className={`kpi-metric-card ${["kpi-metric-blue", "kpi-metric-purple", "kpi-metric-green", "kpi-metric-amber", "kpi-metric-cyan", "kpi-metric-rose"][["HE 60%", "HE 60% + 20%", "HE 100%", "HE 100% + 20%", "HE 20%", "Interjornada"].indexOf(String(label))]} p-5`}>
                   <p className="text-sm text-muted-foreground">{label}</p>
                   <p className="mt-2 text-2xl font-bold">{fmt(Number(value))}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{description}</p>
                 </Card>
               ))}
             </div>
@@ -2081,7 +2082,7 @@ export function Kpis() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h3 className="font-bold">Interjornada</h3>
-                    <p className="text-xs text-muted-foreground">Funcionários que possuem interjornada no período selecionado.</p>
+                    <p className="text-xs text-muted-foreground">Interjornada é o descanso entre o fim de uma jornada e o início da seguinte. Aqui aparecem as horas registradas de descanso insuficiente no período.</p>
                   </div>
                   <label className="grid gap-1.5 text-sm font-medium">Situação
                     <select value={interjornadaStatus} onChange={e => setInterjornadaStatus(e.target.value as "ativo" | "inativo" | "todos")} className="h-9 min-w-36 rounded-lg border bg-background px-3 text-sm"><option value="ativo">Ativos</option><option value="inativo">Inativos</option><option value="todos">Todos</option></select>
@@ -2117,13 +2118,13 @@ export function Kpis() {
             <div className="mb-5 flex items-end justify-between gap-4">
               <div>
                 <h2 className="mt-1 text-2xl font-bold">Turnover</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Calculado automaticamente pelas datas de desligamento cadastradas.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Turnover é a taxa de rotatividade da equipe. Ela relaciona as admissões e os desligamentos ao número de funcionários ativos no período selecionado.</p>
               </div>
 </div>
             <div className="grid gap-4 md:grid-cols-3">
-              <Card className="kpi-metric-card kpi-metric-cyan p-6"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Admissões</p><p className="mt-1 text-3xl font-bold">{metrics.admissions}</p></Card>
-              <Card className="kpi-metric-card kpi-metric-rose p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Desligamentos</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p></Card>
-              <Card className="kpi-metric-card kpi-metric-violet p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários ativos</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.activeHeadcount).toLocaleString("pt-BR")}</p></Card>
+              <Card className="kpi-metric-card kpi-metric-cyan p-6"><TrendingUp className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Admissões</p><p className="mt-1 text-3xl font-bold">{metrics.admissions}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas que ingressaram na empresa durante o período.</p></Card>
+              <Card className="kpi-metric-card kpi-metric-rose p-6"><UserMinus className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Desligamentos</p><p className="mt-1 text-3xl font-bold">{metrics.terminations}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas cujo vínculo terminou durante o período.</p></Card>
+              <Card className="kpi-metric-card kpi-metric-violet p-6"><Users className="h-5 w-5 text-primary" /><p className="mt-4 text-sm text-muted-foreground">Média de funcionários ativos</p><p className="mt-1 text-3xl font-bold">{Math.round(metrics.activeHeadcount).toLocaleString("pt-BR")}</p><p className="mt-1 text-xs text-muted-foreground">Tamanho médio do quadro ativo nas competências selecionadas.</p></Card>
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
