@@ -13,8 +13,8 @@ type Estimate = ReturnType<typeof calculateLiability>;
 type Metric = "fgts" | "fine" | "thirteenth" | "vacation" | "third" | "total";
 type SortKey = Metric | "name";
 const metrics = [
-  { key: "fgts", label: "FGTS mensal", short: "FGTS · 8%", help: "8% do salário base cadastrado.", Icon: Landmark, color: "bg-sky-100 text-sky-800" },
-  { key: "fine", label: "40% do FGTS", short: "FGTS · 40%", help: "40% sobre o FGTS mensal estimado.", Icon: Coins, color: "bg-amber-100 text-amber-800" },
+  { key: "fgts", label: "FGTS acumulado estimado", short: "FGTS acumulado", help: "Depósito mensal de 8% × meses completos de empresa.", Icon: Landmark, color: "bg-sky-100 text-sky-800" },
+  { key: "fine", label: "40% do FGTS", short: "FGTS · 40%", help: "40% sobre o FGTS acumulado estimado.", Icon: Coins, color: "bg-amber-100 text-amber-800" },
   { key: "thirteenth", label: "13º proporcional", short: "13º proporcional", help: "Salário ÷ 12 × avos apurados até a data-base.", Icon: CalendarRange, color: "bg-violet-100 text-violet-800" },
   { key: "vacation", label: "Saldo de férias", short: "Férias", help: "Salário ÷ 30 × dias em aberto e proporcionais.", Icon: Palmtree, color: "bg-emerald-100 text-emerald-800" },
   { key: "third", label: "1/3 de férias", short: "1/3 de férias", help: "Valor das férias dividido por três.", Icon: Wallet, color: "bg-teal-100 text-teal-800" },
@@ -214,7 +214,7 @@ export function Passivos() {
               </div>
             </Card>
             <p className="px-1 text-xs leading-5 text-muted-foreground">
-              Estimativa pelo salário base cadastrado. O FGTS mensal é a base de cálculo dos 40%.
+              O FGTS acumulado usa o salário base cadastrado e os meses completos desde a admissão até a data-base ou o desligamento.
               O total provisionado reúne os 40% do FGTS, o 13º, as férias e o terço constitucional.
             </p>
           </>
@@ -241,7 +241,12 @@ function LiabilityDetails({ row }: { row: Estimate }) {
         {row.salary === null && <p className="mt-3 text-sm text-muted-foreground">Cadastre o salário base para calcular os valores.</p>}
         {!dates && <p className="mt-3 text-sm text-muted-foreground">Confira a data de admissão e, para desligados, a data de desligamento.</p>}
         {dates && (
-          <dl className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
+          <dl className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-lg border bg-background p-3">
+              <dt className="text-xs text-muted-foreground">Meses de FGTS</dt>
+              <dd className="mt-1 font-semibold tabular-nums">{dates.fgtsMonths}</dd>
+              {row.monthlyFgts !== null && <dd className="text-xs text-muted-foreground">{money(row.monthlyFgts)} por mês</dd>}
+            </div>
             <div className="rounded-lg border bg-background p-3"><dt className="text-xs text-muted-foreground">Avos de 13º</dt><dd className="mt-1 font-semibold tabular-nums">{dates.months}/12</dd></div>
             <div className="rounded-lg border bg-background p-3"><dt className="text-xs text-muted-foreground">Dias em aberto</dt><dd className="mt-1 font-semibold tabular-nums">{formatNumber(dates.openDays, 1)}</dd></div>
             <div className="rounded-lg border bg-background p-3"><dt className="text-xs text-muted-foreground">Dias proporcionais</dt><dd className="mt-1 font-semibold tabular-nums">{formatNumber(dates.proportionalDays, 1)}</dd></div>

@@ -32,7 +32,7 @@ export type Employee = {
   company_id?: string | null;
 };
 
-function addMonths(iso: string, months: number) {
+export function addMonths(iso: string, months: number) {
   const [year = 0, month = 1, day = 1] = iso.split("-").map(Number);
   const target = new Date(Date.UTC(year, month - 1 + months, 1));
   const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();

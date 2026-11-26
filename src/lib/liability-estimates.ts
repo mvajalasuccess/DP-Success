@@ -1,5 +1,5 @@
 import {
-  blockDays, entitledOf, getRegisteredVacationBlocks, getVacationCycles, proportionalEntitlement,
+  addMonths, blockDays, entitledOf, getRegisteredVacationBlocks, getVacationCycles, proportionalEntitlement,
   type Employee, type Vacation,
 } from "@/lib/vacation-periods";
 
@@ -9,6 +9,14 @@ export function employmentEnd(employee: LiabilityEmployee, reference: string): s
   if (employee.termination_date && employee.termination_date < reference) return employee.termination_date;
   if (!employee.termination_date && employee.status?.trim().toLowerCase() === "inativo") return null;
   return reference;
+}
+
+function countFgtsMonths(start: string, end: string): number {
+  if (end < start) return 0;
+  const [startYear, startMonth] = start.split("-").map(Number);
+  const [endYear, endMonth] = end.split("-").map(Number);
+  const elapsedMonths = (endYear! - startYear!) * 12 + endMonth! - startMonth!;
+  return elapsedMonths - (addMonths(start, elapsedMonths) > end ? 1 : 0);
 }
 
 export function countThirteenthMonths(start: string, end: string, year: number): number {
@@ -54,9 +62,11 @@ export function calculateLiability(employee: LiabilityEmployee, records: Vacatio
   const salary = hasSalary ? Math.round(Number(employee.salary) * 100) : null;
   const estimatesByDate = end && employee.hire_date ? {
     months: countThirteenthMonths(employee.hire_date, end, Number(reference.slice(0, 4))),
+    fgtsMonths: countFgtsMonths(employee.hire_date, end),
     ...getVacationDays(employee, records, end),
   } : null;
-  const fgts = salary === null ? null : Math.round(salary * 0.08);
+  const monthlyFgts = salary === null ? null : Math.round(salary * 0.08);
+  const fgts = monthlyFgts === null || !estimatesByDate ? null : monthlyFgts * estimatesByDate.fgtsMonths;
   const fine = fgts === null ? null : Math.round(fgts * 0.4);
   const thirteenth = salary === null || !estimatesByDate ? null : Math.round(salary * estimatesByDate.months / 12);
   const vacation = salary === null || !estimatesByDate ? null :
@@ -64,5 +74,5 @@ export function calculateLiability(employee: LiabilityEmployee, records: Vacatio
   const third = vacation === null ? null : Math.round(vacation / 3);
   const total = fine === null || thirteenth === null || vacation === null || third === null
     ? null : fine + thirteenth + vacation + third;
-  return { employee, salary, fgts, fine, thirteenth, vacation, third, total, dates: estimatesByDate };
+  return { employee, salary, monthlyFgts, fgts, fine, thirteenth, vacation, third, total, dates: estimatesByDate };
 }
