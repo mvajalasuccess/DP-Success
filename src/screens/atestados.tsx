@@ -38,6 +38,13 @@ function countDays(start: string, end: string) {
 type Declaration = { id: string; employee_id: string; occurrence_date: string; quantity: number; notes: string | null; employees?: { full_name: string } | null };
 type Period = { id: string; start_date: string; end_date: string; status?: string };
 type HistoricalBaseRow = { id: string; employee_id: string | null; employee_name: string; registration: string | null; period_id: string; reference_year: number; reference_month: number; certificate_minutes: number; declaration_minutes: number; period_start?: string; period_end?: string; certificate_type?: string | null; certificate_cid?: string | null; declaration_observation?: string | null; certificate_display_start?:string|null; certificate_display_end?:string|null; certificate_display_days?:number|null; certificate_display_notes?:string|null; declaration_display_start?:string|null; declaration_display_end?:string|null; declaration_display_minutes?:number|null; declaration_display_reason?:string|null };
+type ClosingAttendance = {
+  employee_id: string;
+  period_id: string;
+  certificate_minutes: number;
+  declaration_minutes: number;
+};
+
 type HistoricalAnnotationForm = { details:AttendanceDetail[]; row: HistoricalBaseRow; certificate_type: string; certificate_cid: string; declaration_observation: string; kind:"atestado"|"declaracao"; start:string; end:string; days:string; quantity:string; notes:string; reason:string };
 
 const declarationReasons = ["Acompanhante", "Consulta", "Exame", "Outros"];
@@ -46,6 +53,7 @@ export function Atestados() {
   const [rows, setRows] = useState<Certificate[]>([]);
   const [declarations, setDeclarations] = useState<Declaration[]>([]);
   const [historicalBaseRows, setHistoricalBaseRows] = useState<HistoricalBaseRow[]>([]);
+  const [closingAttendance, setClosingAttendance] = useState<ClosingAttendance[]>([]);
   const [historicalEdit, setHistoricalEdit] = useState<HistoricalAnnotationForm | null>(null);
   const [savingHistoricalAnnotation, setSavingHistoricalAnnotation] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -138,12 +146,31 @@ export function Atestados() {
     }
   }
 
+  async function loadClosingAttendance() {
+    const adjustments: ClosingAttendance[] = [];
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error: adjustmentError } = await (supabase as any).from("point_closing_overrides")
+        .select("employee_id,period_id,certificate_minutes,declaration_minutes")
+        .order("period_id").order("employee_id")
+        .range(offset, offset + pageSize - 1);
+      if (adjustmentError) {
+        setClosingAttendance([]);
+        setError(previous => previous || "Não foi possível carregar os ajustes do Fechamento de Ponto.");
+        return;
+      }
+      adjustments.push(...(data ?? []));
+      if ((data?.length ?? 0) < pageSize) break;
+    }
+    setClosingAttendance(adjustments);
+  }
+
   async function loadEmployees() {
     const { data } = await (supabase as any).from("employees").select("id,full_name,status,hire_date,termination_date,company_id").order("full_name");
     setEmployees((data ?? []) as Employee[]);
   }
 
-  useEffect(() => { void load(); void loadEmployees(); }, []);
+  useEffect(() => { void load(); void loadEmployees(); void loadClosingAttendance(); }, []);
 
   const selectedPeriod = periods.find(p => p.id === filterPeriod);
   const employeesById = new Map(employees.map(employee => [employee.id, employee]));
@@ -189,6 +216,32 @@ export function Atestados() {
 
   const historicalCertificates = expandAttendance(filteredHistoricalBaseRows.filter(row => Number(row.certificate_minutes ?? 0) > 0),"atestado");
   const historicalDeclarations = expandAttendance(filteredHistoricalBaseRows.filter(row => Number(row.declaration_minutes ?? 0) > 0),"declaracao");
+
+  const closingKey = (employeeId: string | null, periodId: string) => `${employeeId ?? ""}:${periodId}`;
+  const closingByEmployeePeriod = new Map(closingAttendance.map(row => [closingKey(row.employee_id, row.period_id), row]));
+  const historicalAttendanceKeys = new Set(filteredHistoricalBaseRows.map(row => closingKey(row.employee_id, row.period_id)));
+  const periodById = new Map(periods.map(period => [period.id, period]));
+  const visibleClosingAttendance = closingAttendance.flatMap(row => {
+    const period = periodById.get(row.period_id);
+    if (!period || !companyEmployeeIds.has(row.employee_id) ||
+      (filterEmployee !== "todos" && row.employee_id !== filterEmployee) ||
+      (selectedPeriod && row.period_id !== selectedPeriod.id)) return [];
+
+    const hasAttendance = row.certificate_minutes > 0 || row.declaration_minutes > 0 ||
+      historicalAttendanceKeys.has(closingKey(row.employee_id, row.period_id)) ||
+      filteredRows.some(record => record.employee_id === row.employee_id &&
+        record.start_date <= period.end_date && record.end_date >= period.start_date) ||
+      filteredDeclarations.some(record => record.employee_id === row.employee_id &&
+        record.occurrence_date >= period.start_date && record.occurrence_date <= period.end_date);
+    return hasAttendance ? [{ row, period, name: employeesById.get(row.employee_id)?.full_name ?? "Funcionário" }] : [];
+  }).sort((first, second) => compareNewestAttendanceFirst(first.period.start_date, second.period.start_date) ||
+    first.name.localeCompare(second.name, "pt-BR"));
+
+  function closingMinutes(row: HistoricalBaseRow, kind: "atestado" | "declaracao") {
+    const adjustment = closingByEmployeePeriod.get(closingKey(row.employee_id, row.period_id));
+    return kind === "atestado" ? adjustment?.certificate_minutes ?? row.certificate_minutes
+      : adjustment?.declaration_minutes ?? row.declaration_minutes;
+  }
 
   function historicalEmployeeName(row: HistoricalBaseRow) {
     return (row.employee_id ? employees.find(employee => employee.id === row.employee_id)?.full_name : null) || row.employee_name || "Funcionário não identificado";
@@ -262,7 +315,7 @@ export function Atestados() {
         "Data inicial": row.certificate_display_start ?? row.period_start ?? "",
         "Data final": row.certificate_display_end ?? row.period_end ?? "",
         "Dias": row.certificate_display_days ?? "",
-        "Horas abonadas": row.detail?"":formatHistoricalHours(row.certificate_minutes),
+        "Horas abonadas": row.detail ? "" : formatHistoricalHours(closingMinutes(row, "atestado")),
         "Tipo / motivo": row.certificate_type ? (({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[row.certificate_type] || row.certificate_type) : "Tipo não informado",
         "CID": row.certificate_cid ?? "",
         "Observação": row.certificate_display_notes ?? "",
@@ -284,7 +337,7 @@ export function Atestados() {
         "Data inicial": row.declaration_display_start ?? row.period_start ?? "",
         "Data final": row.declaration_display_end ?? row.period_end ?? "",
         "Dias": "",
-        "Horas abonadas": formatHistoricalHours(row.declaration_display_minutes??row.declaration_minutes),
+        "Horas abonadas": formatHistoricalHours(row.declaration_display_minutes ?? closingMinutes(row, "declaracao")),
         "Tipo / motivo": row.declaration_display_reason??"",
         "CID": "",
         "Observação": row.declaration_observation ?? "",
@@ -579,6 +632,36 @@ export function Atestados() {
         </button>
       </div>
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+      {visibleClosingAttendance.length > 0 && (
+        <Card className="mt-6 overflow-hidden">
+          <div className="border-b p-4">
+            <h2 className="font-semibold">Totais ajustados no Fechamento de Ponto</h2>
+            <p className="text-xs text-muted-foreground">Horas apuradas por competência. As datas dos documentos estão nas listas abaixo.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="bg-muted/70 text-xs text-muted-foreground">
+                <tr>
+                  <th scope="col" className="px-5 py-3">Funcionário</th>
+                  <th scope="col" className="px-5 py-3">Competência</th>
+                  <th scope="col" className="px-5 py-3">Atestados</th>
+                  <th scope="col" className="px-5 py-3">Declarações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {visibleClosingAttendance.map(({ row, period, name }) => (
+                  <tr key={closingKey(row.employee_id, row.period_id)}>
+                    <td className="px-5 py-3 font-medium">{name}</td>
+                    <td className="whitespace-nowrap px-5 py-3">{periodLabel(period)}</td>
+                    <td className="px-5 py-3 tabular-nums">{formatHistoricalHours(row.certificate_minutes)}</td>
+                    <td className="px-5 py-3 tabular-nums">{formatHistoricalHours(row.declaration_minutes)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
       <Card className="mt-6 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Atestados</h2><p className="text-xs text-muted-foreground">{filteredRows.length + historicalCertificates.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowCertificates(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showCertificates ? "Ocultar atestados" : "Mostrar atestados"} aria-label={showCertificates ? "Ocultar atestados" : "Mostrar atestados"}>{showCertificates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
         {showCertificates && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
@@ -591,7 +674,7 @@ export function Atestados() {
           ].sort((first, second) => compareNewestAttendanceFirst(first.date, second.date)).map(item => {
             if (item.historical) {
               const r = item.row;
-              return <tr key={"base-cert-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_start || r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_end || r.period_end || "")}</td><td className="px-5 py-4">{r.certificate_display_days??"—"}</td><td className="px-5 py-4">{(r.certificate_type ? ({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[r.certificate_type] || r.certificate_type : "Tipo não informado") + (r.detail?"":" · " + formatHistoricalHours(r.certificate_minutes) + " h")}</td><td className="px-5 py-4">{r.certificate_cid || "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "atestado")} className="rounded-md border p-2" title="Editar tipo e CID do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
+              return <tr key={"base-cert-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_start || r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_end || r.period_end || "")}</td><td className="px-5 py-4">{r.certificate_display_days??"—"}</td><td className="px-5 py-4">{(r.certificate_type ? ({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[r.certificate_type] || r.certificate_type : "Tipo não informado") + (r.detail?"":" · " + formatHistoricalHours(closingMinutes(r, "atestado")) + " h")}</td><td className="px-5 py-4">{r.certificate_cid || "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "atestado")} className="rounded-md border p-2" title="Editar tipo e CID do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
             }
             const r = item.row;
             return <tr key={r.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{r.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(r.start_date)}</td><td className="px-5 py-4">{formatDate(r.end_date)}</td><td className="px-5 py-4">{displayedDays(r)}</td><td className="px-5 py-4">{r.certificate_type}</td><td className="px-5 py-4">{r.cid ?? "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => void startEdit(r)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button data-role-sensitive onClick={() => void remove(r)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>;
@@ -604,7 +687,7 @@ export function Atestados() {
           ].sort((first, second) => compareNewestAttendanceFirst(first.date, second.date)).map(item => {
             if (item.historical) {
               const r = item.row;
-              return <tr key={"base-decl-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.declaration_display_start || r.period_start || "")} a {formatDate(r.declaration_display_end || r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_display_minutes??r.declaration_minutes)}</td><td className="px-5 py-4">{[r.declaration_display_reason,r.declaration_observation].filter(Boolean).join(" — ")||"—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "declaracao")} className="rounded-md border p-2" title="Editar observação do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
+              return <tr key={"base-decl-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.declaration_display_start || r.period_start || "")} a {formatDate(r.declaration_display_end || r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_display_minutes ?? closingMinutes(r, "declaracao"))}</td><td className="px-5 py-4">{[r.declaration_display_reason,r.declaration_observation].filter(Boolean).join(" — ")||"—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "declaracao")} className="rounded-md border p-2" title="Editar observação do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
             }
             const d = item.row;
             return <tr key={d.id} className="transition-colors hover:bg-muted/25"><td className="px-5 py-4 font-medium">{d.employees?.full_name ?? "—"}</td><td className="px-5 py-4">{formatDate(d.occurrence_date)}</td><td className="px-5 py-4">{String(Math.floor(Number(d.quantity) || 0)).padStart(2,"0")}:{String(Math.round(((Number(d.quantity)||0)%1)*60)).padStart(2,"0")}</td><td className="px-5 py-4">{d.notes ?? "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditDeclaration(d)} className="mr-2 rounded-md border p-2" title="Editar"><Pencil className="h-4 w-4" /></button><button data-role-sensitive onClick={() => void removeDeclaration(d)} className="rounded-md border p-2 text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></button></td></tr>;
