@@ -14,7 +14,7 @@ export const cardKinds = {
 };
 
 export type CardKind = keyof typeof cardKinds;
-export type EntryMode = "normal" | "overnight" | "absence" | "waived";
+export type EntryMode = "normal" | "overnight" | "absence" | "excused" | "waived";
 export type DayEntry = { punches: string[]; mode: EntryMode };
 export type ManualCard = {
   id: string;
@@ -50,18 +50,23 @@ function clockMinutes(value: string) {
 type DayResult = {
   expected: number;
   worked: number | null;
+  excused: number | null;
+  balance: number | null;
   status: "empty" | "reviewed" | "incomplete" | "invalid";
 };
 
 export function evaluateDay(entry: DayEntry, scheduled: number): DayResult {
   const expected = entry.mode === "waived" ? 0 : scheduled;
-  const result = (status: DayResult["status"], worked: number | null = null) =>
-    ({ expected, status, worked });
+  const result = (status: DayResult["status"], worked: number | null = null): DayResult => {
+    const excused = worked === null ? null : entry.mode === "excused" ? Math.max(0, expected - worked) : 0;
+    const balance = worked === null ? null : worked + (excused ?? 0) - expected;
+    return { expected, status, worked, excused, balance };
+  };
   if (entry.punches.length > 8) return result("invalid");
 
   const last = entry.punches.map(Boolean).lastIndexOf(true);
   if (entry.mode === "absence") return last < 0 ? result("reviewed", 0) : result("invalid");
-  if (last < 0) return entry.mode === "waived" ? result("reviewed", 0) : result("empty");
+  if (last < 0) return entry.mode === "waived" || entry.mode === "excused" ? result("reviewed", 0) : result("empty");
   if (last % 2 === 0) return result("incomplete");
 
   const times: number[] = [];
@@ -92,15 +97,15 @@ export function evaluateDay(entry: DayEntry, scheduled: number): DayResult {
 export function summarizeDays(days: DayResult[]) {
   const totals = { expected: 0, worked: 0, credit: 0, debit: 0, pending: 0, reviewed: 0 };
   for (const day of days) {
-    if (day.worked === null) {
+    if (day.worked === null || day.balance === null) {
       if (day.status !== "empty" || day.expected > 0) totals.pending++;
       continue;
     }
     totals.reviewed++;
     totals.expected += day.expected;
     totals.worked += day.worked;
-    totals.credit += Math.max(0, day.worked - day.expected);
-    totals.debit += Math.max(0, day.expected - day.worked);
+    totals.credit += Math.max(0, day.balance);
+    totals.debit += Math.max(0, -day.balance);
   }
   return { ...totals, balance: totals.credit - totals.debit };
 }

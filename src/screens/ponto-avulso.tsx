@@ -21,7 +21,7 @@ const cardColumns = summaryColumns + ",weekday_minutes,entries,revision";
 const cards = () => (supabase as any).from("manual_time_cards");
 const marks = ["Entrada 1", "Saída 1", "Entrada 2", "Saída 2", "Entrada 3", "Saída 3", "Entrada 4", "Saída 4"];
 const modes: Record<EntryMode, string> = {
-  normal: "Normal", overnight: "Virada de dia", absence: "Ausência", waived: "Dispensado",
+  normal: "Normal", overnight: "Virada de dia", absence: "Ausência", excused: "Abonado", waived: "Dispensado",
 };
 const fieldClass = "grid min-w-0 gap-1.5 text-sm font-medium";
 const tone = (value: number) => value > 0 ? "text-emerald-800 dark:text-emerald-300"
@@ -435,7 +435,7 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
           <p className="text-xs text-muted-foreground" aria-live="polite">{totals.reviewed} {totals.reviewed === 1 ? "dia apurado" : "dias apurados"} · {totals.pending} {totals.pending === 1 ? "pendência" : "pendências"}</p>
         </div>
         <div className="max-h-[58vh] overflow-auto">
-          <table className="w-full min-w-[1100px] text-left text-xs">
+          <table className="w-full min-w-[1180px] text-left text-xs">
             <thead className="sticky top-0 z-20 bg-muted">
               <tr>
                 <th scope="col" className="sticky left-0 z-10 min-w-[130px] bg-muted px-3 py-2">Data</th>
@@ -443,13 +443,14 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
                   className={`whitespace-nowrap px-2 py-2 text-center ${index % 2 === 1 ? "border-r border-border/60" : ""}`}>{label}</th>)}
                 <th scope="col" className="min-w-[122px] px-2 py-2">Tipo do dia</th>
                 <th scope="col" className="px-2 py-2 text-center">Previstas</th>
-                <th scope="col" className="px-2 py-2 text-center">Apuradas</th>
+                <th scope="col" className="px-2 py-2 text-center">Trabalhadas</th>
+                <th scope="col" className="px-2 py-2 text-center">Abonadas</th>
                 <th scope="col" className="min-w-[96px] px-2 py-2 text-center">Saldo</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/70">
               {rows.map(row => {
-                const balance = row.worked === null || !validSchedule ? null : row.worked - row.expected;
+                const balance = validSchedule ? row.balance : null;
                 const dateLabel = formatDate(row.date);
                 return (
                   <tr key={row.date} className={row.expected === 0 ? "bg-muted/30" : ""}>
@@ -474,6 +475,7 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
                     </td>
                     <td className="px-2 py-1 text-center tabular-nums">{validSchedule ? formatMinutes(row.expected) : "—"}</td>
                     <td className="px-2 py-1 text-center tabular-nums">{formatMinutes(row.worked)}</td>
+                    <td className="px-2 py-1 text-center tabular-nums">{validSchedule && row.entry.mode === "excused" ? formatMinutes(row.excused) : "—"}</td>
                     <td className={`px-2 py-1 text-center font-semibold tabular-nums ${tone(balance ?? 0)}`}>
                       {row.status === "invalid" ? <span className="text-rose-700 dark:text-rose-300">Revisar</span>
                         : row.status === "incomplete" ? <span className="text-amber-700 dark:text-amber-300">Incompleto</span>
@@ -486,7 +488,7 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
           </table>
         </div>
         <p className="border-t px-4 py-3 text-xs text-muted-foreground sm:px-5">
-          Preencha os pares em ordem. Use Ausência para registrar débito sem batidas, Dispensado para zerar a jornada do dia e Virada de dia para saídas após a meia-noite.
+          Preencha os pares em ordem. Use Ausência para registrar débito sem batidas, Abonado para cobrir as horas faltantes, Dispensado para zerar a jornada e Virada de dia para saídas após a meia-noite.
         </p>
       </Card>
 
