@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useBlocker } from "@tanstack/react-router";
-import { CalendarRange, Check, Clock3, FileClock, FileText, Pencil, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
+import { CalendarRange, Check, ChevronRight, Clock3, FileClock, FileText, Pencil, Plus, Save, SlidersHorizontal, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -28,6 +28,10 @@ const tone = (value: number) => value > 0 ? "text-emerald-800 dark:text-emerald-
   : value < 0 ? "text-rose-700 dark:text-rose-300" : "";
 
 type CardDraft = { person_name: string; kind: CardKind; start: string; end: string };
+
+function normalizePersonSearch(value: string) {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
+}
 
 function newCardDraft(): CardDraft {
   const today = new Intl.DateTimeFormat("sv-SE", {
@@ -148,6 +152,8 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
 
   function selectCard(id: string) {
     if (dirty) return;
+    setQuery("");
+    if (id === selectedId) return;
     setCard(null);
     setCardLoading(Boolean(id));
     setSelectedId(id);
@@ -173,7 +179,6 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
         return;
       }
       setList(current => [data, ...current]);
-      setQuery("");
       selectCard(data.id);
       setOpen(false);
     } finally {
@@ -192,8 +197,16 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
     setSelectedId(current => current === id ? "" : current);
   }
 
-  const results = list.filter(item => item.id === selectedId ||
-    item.person_name.toLocaleLowerCase("pt-BR").includes(query.trim().toLocaleLowerCase("pt-BR")));
+  const searchTerms = normalizePersonSearch(query).trim().split(/\s+/).filter(Boolean);
+  const searching = searchTerms.length > 0;
+  const results = searching ? list.filter(item => {
+    const name = normalizePersonSearch(item.person_name);
+    return searchTerms.every(term => name.includes(term));
+  }) : list;
+  const currentCard = list.find(item => item.id === selectedId);
+  const dropdownOptions = currentCard && !results.some(item => item.id === selectedId)
+    ? [currentCard, ...results]
+    : results;
 
   return (
     <ScreenShell section="Controle de jornada" title="Ponto Avulso" name="Ponto Avulso"
@@ -204,17 +217,48 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
       </button>}>
       <Card className="mb-4 grid items-end gap-3 rounded-2xl p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:p-5">
         <label className={fieldClass}>Buscar por pessoa
-          <input type="search" className={inputCls} value={query} onChange={event => setQuery(event.target.value)} placeholder="Nome da pessoa" />
+          <input type="search" className={inputCls} value={query} placeholder="Nome da pessoa"
+            onChange={event => setQuery(event.target.value)}
+            onKeyDown={event => {
+              const match = results[0];
+              if (event.key === "Enter" && searching && results.length === 1 && match) selectCard(match.id);
+            }} />
         </label>
         <label className={fieldClass}>Cartão
           <select className={inputCls} value={selectedId} disabled={dirty || listLoading || !list.length}
             onChange={event => selectCard(event.target.value)}>
             <option value="">{listLoading ? "Carregando cartões…" : "Selecione um cartão"}</option>
-            {results.map(item => <option key={item.id} value={item.id}>
+            {dropdownOptions.map(item => <option key={item.id} value={item.id}>
               {item.person_name} · {formatDate(item.start_date)} a {formatDate(item.end_date)} · {cardKinds[item.kind]}
             </option>)}
           </select>
         </label>
+        {searching && !listLoading && (
+          <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/25 sm:col-span-2">
+            <p role="status" className="px-3 py-2 text-sm text-muted-foreground">
+              {results.length === 0 ? "Nenhum cartão encontrado para esse nome."
+                : results.length === 1 ? "1 cartão encontrado" : `${results.length} cartões encontrados`}
+            </p>
+            {results.length > 0 && (
+              <ul aria-label="Cartões encontrados" className="max-h-60 divide-y divide-border/70 overflow-y-auto border-t border-border/70 bg-background">
+                {results.map(item => (
+                  <li key={item.id}>
+                    <button type="button" disabled={dirty} onClick={() => selectCard(item.id)}
+                      className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-primary/10 disabled:opacity-60">
+                      <span className="min-w-0">
+                        <span className="block break-words text-sm font-medium">{item.person_name}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {formatDate(item.start_date)} a {formatDate(item.end_date)} · {cardKinds[item.kind]}
+                        </span>
+                      </span>
+                      <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-primary-strong" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </Card>
       {error && <p role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</p>}
       {(listLoading || cardLoading) && <p role="status" className="py-10 text-center text-sm text-muted-foreground">Carregando Ponto Avulso…</p>}
