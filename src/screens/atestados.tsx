@@ -43,6 +43,7 @@ type ClosingAttendance = {
   period_id: string;
   certificate_minutes: number;
   declaration_minutes: number;
+  allowance_minutes: number;
 };
 
 type HistoricalAnnotationForm = { details:AttendanceDetail[]; row: HistoricalBaseRow; certificate_type: string; certificate_cid: string; declaration_observation: string; kind:"atestado"|"declaracao"; start:string; end:string; days:string; quantity:string; notes:string; reason:string };
@@ -151,7 +152,7 @@ export function Atestados() {
     const pageSize = 1000;
     for (let offset = 0; ; offset += pageSize) {
       const { data, error: adjustmentError } = await (supabase as any).from("point_closing_overrides")
-        .select("employee_id,period_id,certificate_minutes,declaration_minutes")
+        .select("employee_id,period_id,certificate_minutes,declaration_minutes,allowance_minutes")
         .order("period_id").order("employee_id")
         .range(offset, offset + pageSize - 1);
       if (adjustmentError) {
@@ -227,7 +228,7 @@ export function Atestados() {
       (filterEmployee !== "todos" && row.employee_id !== filterEmployee) ||
       (selectedPeriod && row.period_id !== selectedPeriod.id)) return [];
 
-    const hasAttendance = row.certificate_minutes > 0 || row.declaration_minutes > 0 ||
+    const hasAttendance = row.certificate_minutes > 0 || row.declaration_minutes > 0 || row.allowance_minutes > 0 ||
       historicalAttendanceKeys.has(closingKey(row.employee_id, row.period_id)) ||
       filteredRows.some(record => record.employee_id === row.employee_id &&
         record.start_date <= period.end_date && record.end_date >= period.start_date) ||
@@ -639,13 +640,14 @@ export function Atestados() {
             <p className="text-xs text-muted-foreground">Horas apuradas por competência. As datas dos documentos estão nas listas abaixo.</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
+            <table className="w-full min-w-[650px] text-left text-sm">
               <thead className="bg-muted/70 text-xs text-muted-foreground">
                 <tr>
                   <th scope="col" className="px-5 py-3">Funcionário</th>
                   <th scope="col" className="px-5 py-3">Competência</th>
                   <th scope="col" className="px-5 py-3">Atestados</th>
                   <th scope="col" className="px-5 py-3">Declarações</th>
+                  <th scope="col" className="px-5 py-3">Abonos</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -655,6 +657,7 @@ export function Atestados() {
                     <td className="whitespace-nowrap px-5 py-3">{periodLabel(period)}</td>
                     <td className="px-5 py-3 tabular-nums">{formatHistoricalHours(row.certificate_minutes)}</td>
                     <td className="px-5 py-3 tabular-nums">{formatHistoricalHours(row.declaration_minutes)}</td>
+                    <td className="px-5 py-3 tabular-nums">{formatHistoricalHours(row.allowance_minutes)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -698,7 +701,7 @@ export function Atestados() {
       <p className="mt-1 text-sm text-muted-foreground">Dados informativos para o histórico e dossiê. Os cálculos originais permanecem intactos.</p>
       <div className="mt-4 space-y-4">
         <label className="grid gap-1 text-sm">Funcionário<input readOnly className="rounded-lg border bg-muted px-3 py-2" value={historicalEmployeeName(historicalEdit.row)}/></label>
-        <div className="rounded-md border bg-muted/30 p-3 text-sm">Competência original: {formatDate(historicalEdit.row.period_start||"")} a {formatDate(historicalEdit.row.period_end||"")}<br/>Total histórico: {formatHistoricalHours(historicalEdit.kind==="atestado"?historicalEdit.row.certificate_minutes:historicalEdit.row.declaration_minutes)} h · {historicalEdit.details.length} registro(s)</div>
+        <div className="rounded-md border bg-muted/30 p-3 text-sm">Competência original: {formatDate(historicalEdit.row.period_start||"")} a {formatDate(historicalEdit.row.period_end||"")}<br/>{closingByEmployeePeriod.has(closingKey(historicalEdit.row.employee_id, historicalEdit.row.period_id)) ? "Total do fechamento" : "Total histórico"}: {formatHistoricalHours(closingMinutes(historicalEdit.row, historicalEdit.kind))} h · {historicalEdit.details.length} registro(s)</div>
         {historicalEdit.details.map((d,i)=>{
           const patch=(value:Partial<AttendanceDetail>)=>setHistoricalEdit(old=>old?{...old,details:old.details.map(x=>x.id===d.id?{...x,...value}:x)}:old);
           return <div key={d.id} className="rounded-lg border p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold">{historicalEdit.kind==="atestado"?"Atestado":"Declaração"} {i+1}</h3><button type="button" title="Excluir detalhe" onClick={()=>setHistoricalEdit(old=>old?{...old,details:old.details.filter(x=>x.id!==d.id)}:old)} className="rounded-md border p-2 text-destructive"><Trash2 className="h-4 w-4"/></button></div><div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
