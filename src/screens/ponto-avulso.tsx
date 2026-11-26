@@ -120,7 +120,6 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
         if ((data?.length ?? 0) < 500) break;
       }
       setList(result);
-      setSelectedId(current => current || result[0]?.id || "");
       setListLoading(false);
     })();
     return () => { ignore = true; };
