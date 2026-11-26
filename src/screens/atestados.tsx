@@ -239,7 +239,7 @@ export function Atestados() {
         "Horas abonadas": "",
         "Tipo / motivo": row.certificate_type ?? "",
         "CID": row.cid ?? "",
-        "Observações": row.notes ?? "",
+        "Observação": row.notes ?? "",
       })),
       ...historicalCertificates.map(row => ({
         "Tipo de registro": "Atestado",
@@ -250,7 +250,7 @@ export function Atestados() {
         "Horas abonadas": row.detail?"":formatHistoricalHours(row.certificate_minutes),
         "Tipo / motivo": row.certificate_type ? (({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[row.certificate_type] || row.certificate_type) : "Tipo não informado",
         "CID": row.certificate_cid ?? "",
-        "Observações": row.certificate_display_notes ?? "",
+        "Observação": row.certificate_display_notes ?? "",
       })),
       ...filteredDeclarations.map(row => ({
         "Tipo de registro": "Declaração de horas",
@@ -261,7 +261,7 @@ export function Atestados() {
         "Horas abonadas": formatHistoricalHours(Math.round(Number(row.quantity ?? 0) * 60)),
         "Tipo / motivo": "",
         "CID": "",
-        "Observações": row.notes ?? "",
+        "Observação": row.notes ?? "",
       })),
       ...historicalDeclarations.map(row => ({
         "Tipo de registro": "Declaração de horas",
@@ -272,7 +272,7 @@ export function Atestados() {
         "Horas abonadas": formatHistoricalHours(row.declaration_display_minutes??row.declaration_minutes),
         "Tipo / motivo": row.declaration_display_reason??"",
         "CID": "",
-        "Observações": row.declaration_observation ?? "",
+        "Observação": row.declaration_observation ?? "",
       })),
     ];
     return reportRows

@@ -95,7 +95,7 @@ function downloadReportPdf(title: string, rows: any[], subtitle: string) {
   const headers: Record<string, string> = {
     employee: "Funcionário", employee_name: "Funcionário", competence: "Competência", horario: "Horário (hh:mm)", date: "Data", end_date: "Data final",
     start_date: "Data inicial", type: "Tipo", quantity: "Quantidade", unit: "Unidade",
-    description: "Observações", registration: "Matrícula", department: "Departamento",
+    notes: "Observação", description: "Observações", registration: "Matrícula", department: "Departamento",
     department_name: "Departamento", days: "Dias", tipo: "Tipo", horas_abonadas: "Horas abonadas",
     motivo: "Motivo", certificate_type: "Tipo de atestado", cid: "CID",
   };
@@ -606,7 +606,7 @@ const standardReportColumns: Record<string, StandardReportColumn[]> = {
     { header: "Motivo", key: "motivo", width: 20 },
     { header: "Tipo de atestado", key: "certificate_type", width: 21 },
     { header: "CID", key: "cid", width: 14 },
-    { header: "Observações", key: "notes", width: 42 },
+    { header: "Observação", key: "notes", width: 42 },
   ],
   ocorrencias: [
     { header: "Funcionário", key: "employee", width: 32 },
