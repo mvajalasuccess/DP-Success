@@ -4,6 +4,7 @@ import { CalendarCheck, CalendarX, ChevronDown, ChevronLeft, ClipboardCheck, Clo
 import { Card } from "@/components/ui/card";
 import { getScreenIcon, ScreenBrand } from "@/components/screen-brand";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAttendanceCertificates } from "@/lib/attendance-certificates";
 import { CompanyFilter } from "@/components/company-filter";
 import { useAccountIdentity } from "@/hooks/use-account-identity";
 import { PLANNING_SCREEN, planningPublicUrl } from "@/lib/planning-url";
@@ -537,7 +538,7 @@ function DashboardHome() {
         ? await Promise.all([
             db.from("overtime_records").select("employee_id,minutes,period_id,launch_type").eq("period_id", competence.id),
             db.from("occurrences").select("employee_id,quantity,unit,occurrence_type_id,occurrence_date,end_date,period_id,occurrence_types(code)").eq("period_id", competence.id),
-            db.from("medical_certificates").select("id,employee_id,start_date,end_date,days").lte("start_date", competence.end_date).gte("end_date", competence.start_date),
+            fetchAttendanceCertificates(competence.start_date, competence.end_date),
             db.from("time_records").select("employee_id,period_id,expected_minutes,worked_minutes").eq("period_id", competence.id),
             db.from("bank_hours").select("employee_id,period_id,minutes,kind,adjustment_direction").eq("period_id", competence.id),
             db.from("work_schedules").select("id,weekly_minutes"),

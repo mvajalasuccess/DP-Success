@@ -2,6 +2,7 @@ import { ArrowLeft, Users, Clock3, CalendarX2, Percent, UserMinus, Info, WalletC
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAttendanceCertificates } from "@/lib/attendance-certificates";
 import { CompanyFilter } from "@/components/company-filter";
 import { balancesByEmployee, periodRangeLabel, type Period } from "@/lib/dp-model";
 import { countWorkingWeekdays } from "@/lib/feriados";
@@ -352,10 +353,7 @@ export function Kpis() {
               .in("period_id", currentPeriodIds)
           : Promise.resolve({ data: [], error: null }),
         currentPeriodIds.length
-          ? db.from("medical_certificates")
-              .select("employee_id,start_date,end_date,days")
-              .lte("start_date", rangeEnd)
-              .gte("end_date", rangeStart)
+          ? fetchAttendanceCertificates(rangeStart, rangeEnd)
           : Promise.resolve({ data: [], error: null }),
         db.from("work_schedules").select("id,weekly_minutes"),
         db.from("point_closing_overrides")
@@ -1101,7 +1099,7 @@ export function Kpis() {
           ? db.from("bank_hours").select("employee_id,period_id,minutes,kind").eq("kind","debito").in("period_id", currentIds)
           : Promise.resolve({ data: [] }),
         currentIds.length
-          ? db.from("medical_certificates").select("employee_id,start_date,end_date,days").lte("start_date", yearPeriods[yearPeriods.length - 1]?.end_date ?? "9999-12-31").gte("end_date", yearPeriods[0]?.start_date ?? "0001-01-01")
+          ? fetchAttendanceCertificates(yearPeriods[0]!.start_date, yearPeriods[yearPeriods.length - 1]!.end_date)
           : Promise.resolve({ data: [] }),
         yearPeriods.length
           ? db.from("point_closing_overrides").select("period_id,employee_id,expected_minutes,absence_quantity,certificate_minutes,declaration_minutes,allowance_minutes,debit_minutes").in("period_id", yearPeriods.map(p => p.id))
