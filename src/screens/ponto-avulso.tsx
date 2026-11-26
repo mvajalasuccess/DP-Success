@@ -476,10 +476,10 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
                     <td className="px-2 py-1 text-center tabular-nums">{validSchedule ? formatMinutes(row.expected) : "—"}</td>
                     <td className="px-2 py-1 text-center tabular-nums">{formatMinutes(row.worked)}</td>
                     <td className="px-2 py-1 text-center tabular-nums">{validSchedule && row.entry.mode === "excused" ? formatMinutes(row.excused) : "—"}</td>
-                    <td className={`px-2 py-1 text-center font-semibold tabular-nums ${tone(balance ?? 0)}`}>
+                    <td className="px-2 py-1 text-center font-semibold tabular-nums">
                       {row.status === "invalid" ? <span className="text-rose-700 dark:text-rose-300">Revisar</span>
                         : row.status === "incomplete" ? <span className="text-amber-700 dark:text-amber-300">Incompleto</span>
-                          : formatBalance(balance)}
+                          : <span className={tone(balance ?? 0)}>{formatBalance(balance)}</span>}
                     </td>
                   </tr>
                 );
