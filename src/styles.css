@@ -659,7 +659,8 @@ thead th {
   font-size: 0.75rem;
   letter-spacing: 0.025em;
 }
-tbody tr + tr td { border-top: 1px solid var(--dp-border); }
+tbody tr + tr td,
+.passivos-table tbody tr + tr th[scope="row"] { border-top: 1px solid var(--dp-border); }
 tbody tr:hover td { background-color: oklch(0.975 0.006 165); }
 
 /* Evita animações de interface para quem prefere movimento reduzido. */
@@ -742,7 +743,8 @@ table thead th {
   padding-bottom: 0.8rem;
 }
 
-table tbody td {
+table tbody td,
+.passivos-table tbody th[scope="row"] {
   padding-top: 0.7rem;
   padding-bottom: 0.7rem;
 }
@@ -908,7 +910,8 @@ table tbody tr {
 table tbody tr:hover {
   background-color: color-mix(in oklab, var(--color-primary) 5%, transparent);
 }
-table tbody tr + tr td {
+table tbody tr + tr td,
+.passivos-table tbody tr + tr th[scope="row"] {
   border-top-color: color-mix(in oklab, var(--color-border) 78%, white);
 }
 
@@ -1095,10 +1098,12 @@ main table thead th {
   letter-spacing: 0.045em;
   text-transform: uppercase;
 }
-main table tbody tr:hover td {
+main table tbody tr:hover td,
+main .passivos-table tbody tr:hover th[scope="row"] {
   background: oklch(0.97 0.018 165);
 }
-main table tbody td {
+main table tbody td,
+main .passivos-table tbody th[scope="row"] {
   color: color-mix(in oklab, var(--dp-premium-ink) 94%, white);
 }
 main hr {

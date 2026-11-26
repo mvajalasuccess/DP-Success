@@ -179,7 +179,7 @@ export function Passivos() {
                 </label>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1000px] text-sm">
+                <table className="passivos-table w-full min-w-[1000px] text-sm">
                   <thead>
                     <tr>
                       <th scope="col" className="px-4 py-3 text-left">Funcionário</th>
