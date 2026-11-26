@@ -546,7 +546,6 @@ function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
                 if (value >= start && value <= card.end_date) setEnd(value);
               }} />
           </label>
-          <button type="button" className={btnOutline} onClick={() => { setStart(card.start_date); setEnd(card.end_date); }}>Período inteiro</button>
         </div>
       </Card>
 
