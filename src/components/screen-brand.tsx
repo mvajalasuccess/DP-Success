@@ -24,7 +24,7 @@ const screenIcons: Readonly<Partial<Record<string, LucideIcon>>> = {
   "Parâmetros": SlidersHorizontal,
   "Análise": Gauge,
   "Ponto": Timer,
-  "Ponto avulso": FileClock,
+  "Ponto Avulso": FileClock,
   "Cadastro": FilePenLine,
   "Organização": FolderOpen,
   "Pessoas": UsersRound,

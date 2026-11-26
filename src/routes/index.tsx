@@ -261,7 +261,7 @@ function AppShell({
     items: group.items.map(([label, key]) => [label, key, getScreenIcon(label)] as const),
   }));
 
-  const ManualTimeIcon = getScreenIcon("Ponto avulso");
+  const ManualTimeIcon = getScreenIcon("Ponto Avulso");
   const activeGroup = groups.find(group => group.items.some(([, key]) => key === screen))?.id;
   const openCollapsedGroup = (event: MouseEvent<HTMLButtonElement>, groupId: string) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -307,7 +307,7 @@ function AppShell({
                 </section>
               ))}
               <button type="button" onClick={() => go("ponto-avulso")} aria-current={screen === "ponto-avulso" ? "page" : undefined} className={`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${screen === "ponto-avulso" ? "dp-sidebar-item-active font-semibold" : ""}`}>
-                <ManualTimeIcon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Ponto avulso</span>
+                <ManualTimeIcon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Ponto Avulso</span>
               </button>
             </nav>
             <SidebarProfile canOpenSettings={canOpenSettings} collapsed={false} onNavigate={go} />
@@ -380,9 +380,9 @@ function AppShell({
               )}
             </section>
           ))}
-          <button type="button" onClick={() => go("ponto-avulso")} aria-current={screen === "ponto-avulso" ? "page" : undefined} title={collapsed ? "Ponto avulso" : undefined} className={buttonClass("ponto-avulso")}>
+          <button type="button" onClick={() => go("ponto-avulso")} aria-current={screen === "ponto-avulso" ? "page" : undefined} title={collapsed ? "Ponto Avulso" : undefined} className={buttonClass("ponto-avulso")}>
             <ManualTimeIcon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
-            <span className={collapsed ? "sr-only" : "truncate"}>Ponto avulso</span>
+            <span className={collapsed ? "sr-only" : "truncate"}>Ponto Avulso</span>
           </button>
         </nav>
         <SidebarProfile canOpenSettings={canOpenSettings} collapsed={collapsed} onNavigate={go} />

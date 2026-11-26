@@ -84,7 +84,7 @@ function parseDuration(value: string) {
 
 function dbError(message: string, error: { code?: string; message?: string }) {
   return error.code === "PGRST205" || error.code === "42P01"
-    ? "O armazenamento do Ponto avulso ainda precisa ser ativado no banco."
+    ? "O armazenamento do Ponto Avulso ainda precisa ser ativado no banco."
     : `${message}${error.message ? " " + error.message : ""}`;
 }
 
@@ -196,7 +196,7 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
     item.person_name.toLocaleLowerCase("pt-BR").includes(query.trim().toLocaleLowerCase("pt-BR")));
 
   return (
-    <ScreenShell section="Controle de jornada" title="Ponto avulso" name="Ponto avulso"
+    <ScreenShell section="Controle de jornada" title="Ponto Avulso" name="Ponto Avulso"
       subtitle="Cartões manuais de jornada com apuração própria de horas e saldo."
       actions={canEdit && <button type="button" data-role-sensitive disabled={dirty || listLoading} className={btnPrimary}
         onClick={() => { setDraft(newCardDraft()); setCreateError(""); setOpen(true); }}>
@@ -217,7 +217,7 @@ export function PontoAvulso({ canEdit = false }: { canEdit?: boolean }) {
         </label>
       </Card>
       {error && <p role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</p>}
-      {(listLoading || cardLoading) && <p role="status" className="py-10 text-center text-sm text-muted-foreground">Carregando ponto avulso…</p>}
+      {(listLoading || cardLoading) && <p role="status" className="py-10 text-center text-sm text-muted-foreground">Carregando Ponto Avulso…</p>}
       {!listLoading && !cardLoading && !error && !card && (
         <Card className="grid place-items-center gap-2 rounded-2xl p-10 text-center">
           <FileClock aria-hidden="true" className="mb-1 h-8 w-8 text-primary-strong" />
