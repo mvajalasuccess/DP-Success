@@ -242,7 +242,7 @@ function AppShell({
     items: [string, ScreenKey][];
   }[] = [
     { id: "analysis", label: "Análise", Icon: Gauge, open: managementOpen, setOpen: setManagementOpen, items: [
-      ["Dashboard", "dashboard"], ["KPIs", "kpis"], ["Comparativos", "comparativos"], ["Relatórios", "relatorios"], ["Passivos", "passivos"],
+      ["Dashboard", "dashboard"], ["KPIs", "kpis"], ["Comparativos", "comparativos"], ["Relatórios", "relatorios"],
     ] },
     { id: "closing", label: "Ponto", Icon: Timer, open: closingMenuOpen, setOpen: setClosingMenuOpen, items: [
       ["Fechamento de Ponto", "fechamento-ponto"], ["Importar cartão de ponto", "importar-cartao-ponto"], ["Lançamentos", "lancamentos"], ["Banco de Horas", "banco-horas"], ["Pagamentos", "pagamentos"], ["Faltas e Folgas", "ocorrencias"], ["Declarações e Atestados", "atestados"],
@@ -254,7 +254,7 @@ function AppShell({
       ["Planejamento Mensal", "planejamento-mensal"], ["Tarefas", "tarefas"],
     ] },
     { id: "people", label: "Pessoas", Icon: UsersRound, open: peopleOpen, setOpen: setPeopleOpen, items: [
-      ["Férias", "ferias"], ["Diário de Ocorrências", "diario-ocorrencias"],
+      ["Férias", "ferias"], ["Diário de Ocorrências", "diario-ocorrencias"], ["Passivos", "passivos"],
     ] },
   ];
   const groups = sidebarGroups.map(group => ({

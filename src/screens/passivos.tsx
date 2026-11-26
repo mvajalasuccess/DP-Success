@@ -103,7 +103,7 @@ export function Passivos() {
   const missing = rows.filter(row => row.total === null).length;
 
   return (
-    <ScreenShell section="Análise" title="Passivos" name="Passivos"
+    <ScreenShell section="Pessoas" title="Passivos" name="Passivos"
       subtitle="Provisões do quadro CLT por funcionário e data-base."
       actions={
         <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-2">
