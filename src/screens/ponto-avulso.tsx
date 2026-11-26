@@ -434,9 +434,9 @@ function CardEditor({ card, canEdit, onDirty, onReload, onDelete }: {
           </div>
           <p className="text-xs text-muted-foreground" aria-live="polite">{totals.reviewed} {totals.reviewed === 1 ? "dia apurado" : "dias apurados"} · {totals.pending} {totals.pending === 1 ? "pendência" : "pendências"}</p>
         </div>
-        <div className="max-h-[58vh] overflow-auto">
+        <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px] text-left text-xs">
-            <thead className="sticky top-0 z-20 bg-muted">
+            <thead className="bg-muted">
               <tr>
                 <th scope="col" className="sticky left-0 z-10 min-w-[130px] bg-muted px-3 py-2">Data</th>
                 {marks.map((label, index) => <th key={label} scope="col"
