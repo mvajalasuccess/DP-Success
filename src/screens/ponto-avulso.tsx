@@ -524,7 +524,7 @@ function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
         </div>
       </Card>
 
-      <Card className="flex flex-col gap-3 rounded-2xl px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:px-5">
+      <Card className="flex flex-col gap-3 rounded-2xl px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:px-5">
         <div className="flex shrink-0 items-center gap-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary-strong">
             <CalendarRange aria-hidden="true" className="h-4 w-4" />
