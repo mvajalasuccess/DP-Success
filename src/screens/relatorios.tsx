@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees, minutesToHours } from "@/lib/dp-model";
+import { expandAttendance } from "@/lib/historical-attendance-details";
 
 import { ScreenBrand } from "@/components/screen-brand";
 type Period = {
@@ -1127,21 +1128,9 @@ export function Relatorios() {
           fetchAll((from, to) => db.from("medical_certificates").select("employee_id,start_date,end_date,days,certificate_type,cid,notes,employees(full_name)").order("start_date", { ascending: false }).range(from, to)),
           fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,end_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code,name)").eq("occurrence_types.code", "afastamento").order("occurrence_date", { ascending: false }).range(from, to)),
           fetchAll((from, to) => db.from("occurrences").select("employee_id,occurrence_date,quantity,unit,notes,employees(full_name),occurrence_types!inner(code)").eq("occurrence_types.code", "declaracao_horas").order("occurrence_date", { ascending: false }).range(from, to)),
-          fetchAll((from, to) => db.from("historical_kpi_data").select("id,employee_id,registration,employee_name,period_id,reference_year,reference_month,certificate_minutes,declaration_minutes").or("certificate_minutes.gt.0,declaration_minutes.gt.0").order("reference_year", { ascending: false }).range(from, to)),
+          fetchAll((from, to) => db.from("historical_kpi_data").select("id,employee_id,registration,employee_name,period_id,period_start,period_end,reference_year,reference_month,certificate_minutes,declaration_minutes").or("certificate_minutes.gt.0,declaration_minutes.gt.0").order("reference_year", { ascending: false }).order("id").range(from, to)),
         ]);
 
-        // O relatório também precisa incluir os totais históricos da BASE que aparecem
-        // na tela Declarações e Atestados. Esses totais são apenas informativos e não
-        // criam lançamentos operacionais nem alteram cálculos históricos.
-        const historicalIds = historicalRows.map((row: any) => row.id);
-        let historicalAnnotations: any[] = [];
-        if (historicalIds.length) {
-          const annotationResult = await db.from("historical_kpi_annotations")
-            .select("historical_kpi_data_id,certificate_type,certificate_cid,declaration_observation")
-            .in("historical_kpi_data_id", historicalIds);
-          if (!annotationResult.error) historicalAnnotations = annotationResult.data ?? [];
-        }
-        const annotationById = new Map(historicalAnnotations.map((row: any) => [String(row.historical_kpi_data_id), row]));
         const periodById = new Map(periods.map((period: Period) => [String(period.id), period]));
         const employeeByRegistration = new Map((companyEmployeeRows ?? [])
           .filter((employee: any) => employee.registration)
@@ -1158,6 +1147,23 @@ export function Relatorios() {
           const rowPeriod = periodById.get(String(row.period_id ?? ""));
           return !!rowPeriod && rowPeriod.start_date <= competence.end_date && rowPeriod.end_date >= competence.start_date;
         };
+        const selectedHistoricalRows = historicalRows.filter((row: any) =>
+          (!companyFilter || allowedEmployeeIds.has(resolveHistoricalEmployeeId(row))) && matchesCompetence(row));
+        const historicalIds = selectedHistoricalRows.map((row: any) => row.id);
+        const annotationById = new Map<string, Record<string, any>>();
+        const annotationColumns = [
+          "historical_kpi_data_id", "certificate_type", "certificate_cid", "certificate_details",
+          "certificate_display_start", "certificate_display_end", "certificate_display_days", "certificate_display_notes",
+          "declaration_details", "declaration_display_start", "declaration_display_end",
+          "declaration_display_minutes", "declaration_display_reason", "declaration_observation",
+        ].join(",");
+        for (let offset = 0; offset < historicalIds.length; offset += 100) {
+          const { data, error } = await db.from("historical_kpi_annotations")
+            .select(annotationColumns)
+            .in("historical_kpi_data_id", historicalIds.slice(offset, offset + 100));
+          if (error) throw new Error("Não foi possível carregar as datas corrigidas do histórico. " + error.message);
+          for (const annotation of data ?? []) annotationById.set(String(annotation.historical_kpi_data_id), annotation);
+        }
         const toClock = (value: unknown) => {
           const minutes = Math.max(0, Math.round(Number(value) || 0));
           return String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0");
@@ -1183,30 +1189,42 @@ export function Relatorios() {
               horas_abonadas: toClock(minutes), motivo: parts[0] ?? "", certificate_type: "", cid: "", notes: parts.slice(1).join(" — "),
             };
           }),
-          ...historicalRows.filter((row: any) => {
-            const employeeId = resolveHistoricalEmployeeId(row);
-            return (!companyFilter || allowedEmployeeIds.has(employeeId)) && matchesCompetence(row);
-          }).flatMap((row: any) => {
-            const annotation: any = annotationById.get(String(row.id)) ?? {};
+          ...selectedHistoricalRows.flatMap((row: any) => {
+            const historical = { ...row, ...annotationById.get(String(row.id)) };
             const period = periodById.get(String(row.period_id ?? ""));
             const isExceptionalJan2026 = Number(row.reference_year) === 2026 && Number(row.reference_month) === 1;
-            const fallbackStart = period?.start_date ?? (isExceptionalJan2026 ? "2025-12-11" : "");
-            const startDate = isExceptionalJan2026 ? "2025-12-11" : fallbackStart;
-            const endDate = period?.end_date ?? (isExceptionalJan2026 ? "2026-01-20" : "");
+            const startDate = isExceptionalJan2026 ? "2025-12-11" : period?.start_date ?? row.period_start ?? "";
+            const endDate = period?.end_date ?? row.period_end ?? (isExceptionalJan2026 ? "2026-01-20" : "");
             const employee = row.employee_name ?? (companyEmployeeRows ?? []).find((item: any) => String(item.id) === resolveHistoricalEmployeeId(row))?.full_name ?? "";
             const output: any[] = [];
             const certificateMinutes = Math.max(0, Number(row.certificate_minutes) || 0);
             const declarationMinutes = Math.max(0, Number(row.declaration_minutes) || 0);
-            if (certificateMinutes > 0) output.push({
-              tipo: "Atestado", employee, start_date: startDate, end_date: endDate, days: "",
-              horas_abonadas: toClock(certificateMinutes), motivo: "", certificate_type: annotation.certificate_type ?? "",
-              cid: annotation.certificate_cid ?? "", notes: "",
-            });
-            if (declarationMinutes > 0) output.push({
-              tipo: "Declaração de horas", employee, start_date: startDate, end_date: endDate, days: "",
-              horas_abonadas: toClock(declarationMinutes), motivo: annotation.declaration_observation ?? "",
-              certificate_type: "", cid: "", notes: "",
-            });
+
+            if (certificateMinutes > 0) {
+              for (const item of expandAttendance([historical], "atestado")) {
+                output.push({
+                  tipo: "Atestado", employee,
+                  start_date: item.certificate_display_start || startDate,
+                  end_date: item.certificate_display_end || endDate,
+                  days: item.certificate_display_days ?? "",
+                  horas_abonadas: item.detail ? "" : toClock(certificateMinutes), motivo: "",
+                  certificate_type: item.certificate_type ?? "", cid: item.certificate_cid ?? "",
+                  notes: item.certificate_display_notes ?? "",
+                });
+              }
+            }
+            if (declarationMinutes > 0) {
+              for (const item of expandAttendance([historical], "declaracao")) {
+                output.push({
+                  tipo: "Declaração de horas", employee,
+                  start_date: item.declaration_display_start || startDate,
+                  end_date: item.declaration_display_end || endDate, days: "",
+                  horas_abonadas: toClock(item.declaration_display_minutes ?? declarationMinutes),
+                  motivo: item.declaration_display_reason ?? "", certificate_type: "", cid: "",
+                  notes: item.declaration_observation ?? "",
+                });
+              }
+            }
             return output;
           }),
         ];
