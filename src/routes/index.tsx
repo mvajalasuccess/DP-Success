@@ -28,6 +28,7 @@ const PlanejamentoMensal = lazy(() => import("@/screens/planejamento-mensal").th
 const DiarioOcorrencias = lazy(() => import("@/screens/diario-ocorrencias").then(m => ({ default: m.DiarioOcorrencias })));
 const ImportarCartaoPonto = lazy(() => import("@/screens/importar-cartao-ponto").then(m => ({ default: m.ImportarCartaoPonto })));
 const Ferias = lazy(() => import("@/screens/ferias").then(m => ({ default: m.Ferias })));
+const PontoAvulso = lazy(() => import("@/screens/ponto-avulso").then(m => ({ default: m.PontoAvulso })));
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees } from "@/lib/dp-model";
 
@@ -43,13 +44,13 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importar-cartao-ponto" | "ferias";
+type ScreenKey = "dashboard" | "empresas" | "funcionarios" | "cargos" | "departamentos" | "jornadas-escalas" | "fechamento-ponto" | "lancamentos" | "banco-horas" | "pagamentos" | "atestados" | "ocorrencias" | "comparativos" | "kpis" | "relatorios" | "parametros" | "tarefas" | "planejamento-mensal" | "diario-ocorrencias" | "importar-cartao-ponto" | "ferias" | "ponto-avulso";
 
 const screenComponents = {
   empresas: Companies, funcionarios: Employees, cargos: Positions, departamentos: Departments, "jornadas-escalas": Schedules,
   "fechamento-ponto": PointClosing, lancamentos: Launches, "banco-horas": BankHours, pagamentos: Payments,
   atestados: Atestados, ocorrencias: Ocorrencias, comparativos: Comparativos, kpis: Kpis,
-  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importar-cartao-ponto": ImportarCartaoPonto, ferias: Ferias,
+  relatorios: Relatorios, parametros: Parametros, tarefas: Tarefas, "planejamento-mensal": PlanejamentoMensal, "diario-ocorrencias": DiarioOcorrencias, "importar-cartao-ponto": ImportarCartaoPonto, ferias: Ferias, "ponto-avulso": PontoAvulso,
 };
 
 
@@ -61,7 +62,7 @@ function fmt(minutes: number) {
 
 function getScreenFromUrl(search: string): ScreenKey {
   const value = new URLSearchParams(search).get("tela") as ScreenKey | null;
-  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importar-cartao-ponto", "ferias"];
+  const validScreens: ScreenKey[] = ["dashboard", "empresas", "funcionarios", "cargos", "departamentos", "jornadas-escalas", "fechamento-ponto", "lancamentos", "banco-horas", "pagamentos", "atestados", "ocorrencias", "comparativos", "kpis", "relatorios", "parametros", "tarefas", "planejamento-mensal", "diario-ocorrencias", "importar-cartao-ponto", "ferias", "ponto-avulso"];
   return value && validScreens.includes(value) ? value : PLANNING_SCREEN;
 }
 
@@ -156,7 +157,7 @@ function Dashboard() {
         </div>
       ) : Screen ? (
           <Suspense fallback={<div className="flex min-h-[60vh] items-center justify-center text-sm text-muted-foreground">Carregando tela...</div>}>
-            {screen === "parametros" ? <Parametros readOnly={isConsulta} /> : <Screen />}
+            {screen === "parametros" ? <Parametros readOnly={isConsulta} /> : screen === "ponto-avulso" ? <PontoAvulso canEdit={!isConsulta} /> : <Screen />}
           </Suspense>
         ) : <DashboardHome />}
     </AppShell>
@@ -260,6 +261,7 @@ function AppShell({
     items: group.items.map(([label, key]) => [label, key, getScreenIcon(label)] as const),
   }));
 
+  const ManualTimeIcon = getScreenIcon("Ponto avulso");
   const activeGroup = groups.find(group => group.items.some(([, key]) => key === screen))?.id;
   const openCollapsedGroup = (event: MouseEvent<HTMLButtonElement>, groupId: string) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -304,6 +306,9 @@ function AppShell({
                   </div>}
                 </section>
               ))}
+              <button type="button" onClick={() => go("ponto-avulso")} aria-current={screen === "ponto-avulso" ? "page" : undefined} className={`dp-sidebar-item relative flex min-h-10 w-full items-center gap-3 px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${screen === "ponto-avulso" ? "dp-sidebar-item-active font-semibold" : ""}`}>
+                <ManualTimeIcon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} /><span>Ponto avulso</span>
+              </button>
             </nav>
             <SidebarProfile canOpenSettings={canOpenSettings} collapsed={false} onNavigate={go} />
           </aside>
@@ -375,6 +380,10 @@ function AppShell({
               )}
             </section>
           ))}
+          <button type="button" onClick={() => go("ponto-avulso")} aria-current={screen === "ponto-avulso" ? "page" : undefined} title={collapsed ? "Ponto avulso" : undefined} className={buttonClass("ponto-avulso")}>
+            <ManualTimeIcon aria-hidden="true" className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
+            <span className={collapsed ? "sr-only" : "truncate"}>Ponto avulso</span>
+          </button>
         </nav>
         <SidebarProfile canOpenSettings={canOpenSettings} collapsed={collapsed} onNavigate={go} />
       </aside>
