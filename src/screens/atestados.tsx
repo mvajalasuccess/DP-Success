@@ -1,6 +1,6 @@
 import { canSelectNewAttendanceEmployee } from "@/lib/attendance-employee";
 // @ts-nocheck -- compact legacy code; strict index-signature checks disabled until refactor
-import {attendanceDetails,expandAttendance,type AttendanceDetail} from "@/lib/historical-attendance-details";
+import {attendanceDetails,compareAttendanceDates,expandAttendance,type AttendanceDetail} from "@/lib/historical-attendance-details";
 import { ArrowLeft, ChevronDown, ChevronUp, Download, FileSpreadsheet, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useEffect, useState } from "react";
@@ -229,12 +229,12 @@ export function Atestados() {
 
 
   function getFilteredReportRows() {
-    const reportRows: Record<string, unknown>[] = [
+    const reportRows = [
       ...filteredRows.map(row => ({
         "Tipo de registro": "Atestado",
         "Funcionário": row.employees?.full_name ?? "",
-        "Data inicial": formatDate(row.start_date),
-        "Data final": formatDate(row.end_date),
+        "Data inicial": row.start_date,
+        "Data final": row.end_date,
         "Dias": displayedDays(row),
         "Horas abonadas": "",
         "Tipo / motivo": row.certificate_type ?? "",
@@ -244,8 +244,8 @@ export function Atestados() {
       ...historicalCertificates.map(row => ({
         "Tipo de registro": "Atestado",
         "Funcionário": historicalEmployeeName(row),
-        "Data inicial": formatDate(row.certificate_display_start ?? row.period_start ?? ""),
-        "Data final": formatDate(row.certificate_display_end ?? row.period_end ?? ""),
+        "Data inicial": row.certificate_display_start ?? row.period_start ?? "",
+        "Data final": row.certificate_display_end ?? row.period_end ?? "",
         "Dias": row.certificate_display_days ?? "",
         "Horas abonadas": row.detail?"":formatHistoricalHours(row.certificate_minutes),
         "Tipo / motivo": row.certificate_type ? (({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[row.certificate_type] || row.certificate_type) : "Tipo não informado",
@@ -255,8 +255,8 @@ export function Atestados() {
       ...filteredDeclarations.map(row => ({
         "Tipo de registro": "Declaração de horas",
         "Funcionário": row.employees?.full_name ?? "",
-        "Data inicial": formatDate(row.occurrence_date),
-        "Data final": formatDate(row.occurrence_date),
+        "Data inicial": row.occurrence_date,
+        "Data final": row.occurrence_date,
         "Dias": "",
         "Horas abonadas": formatHistoricalHours(Math.round(Number(row.quantity ?? 0) * 60)),
         "Tipo / motivo": "",
@@ -266,8 +266,8 @@ export function Atestados() {
       ...historicalDeclarations.map(row => ({
         "Tipo de registro": "Declaração de horas",
         "Funcionário": historicalEmployeeName(row),
-        "Data inicial": formatDate(row.declaration_display_start ?? row.period_start ?? ""),
-        "Data final": formatDate(row.declaration_display_end ?? row.period_end ?? ""),
+        "Data inicial": row.declaration_display_start ?? row.period_start ?? "",
+        "Data final": row.declaration_display_end ?? row.period_end ?? "",
         "Dias": "",
         "Horas abonadas": formatHistoricalHours(row.declaration_display_minutes??row.declaration_minutes),
         "Tipo / motivo": row.declaration_display_reason??"",
@@ -275,7 +275,13 @@ export function Atestados() {
         "Observações": row.declaration_observation ?? "",
       })),
     ];
-    return reportRows;
+    return reportRows
+      .sort((first, second) => compareAttendanceDates(first["Data inicial"], second["Data inicial"]))
+      .map(row => ({
+        ...row,
+        "Data inicial": formatDate(row["Data inicial"]),
+        "Data final": formatDate(row["Data final"]),
+      }));
   }
 
   async function exportFilteredExcel() {

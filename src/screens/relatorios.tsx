@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CompanyFilter } from "@/components/company-filter";
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { balancesByEmployees, minutesToHours } from "@/lib/dp-model";
-import { expandAttendance } from "@/lib/historical-attendance-details";
+import { compareAttendanceDates, expandAttendance } from "@/lib/historical-attendance-details";
 
 import { ScreenBrand } from "@/components/screen-brand";
 type Period = {
@@ -1227,7 +1227,7 @@ export function Relatorios() {
             }
             return output;
           }),
-        ];
+        ].sort((first, second) => compareAttendanceDates(first.start_date, second.start_date));
       }
 
       if (kind === "ocorrencias") {

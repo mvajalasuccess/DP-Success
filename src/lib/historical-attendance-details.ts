@@ -17,3 +17,9 @@ export function expandAttendance<T extends Row>(rows:T[],kind:AttendanceKind):(T
  ...(kind==="atestado"?{certificate_display_start:detail.start,certificate_display_end:detail.end,certificate_display_days:detail.days,certificate_type:detail.category,certificate_cid:detail.cid,certificate_display_notes:detail.notes}:{declaration_display_start:detail.start,declaration_display_end:detail.end,declaration_display_minutes:detail.minutes,declaration_display_reason:detail.category,declaration_observation:detail.notes})}));
  });
 }
+
+export function compareAttendanceDates(first?: string | null, second?: string | null): number {
+  if (!first) return second ? 1 : 0;
+  if (!second) return -1;
+  return first.localeCompare(second);
+}
