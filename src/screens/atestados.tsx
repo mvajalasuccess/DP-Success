@@ -24,6 +24,10 @@ function formatDate(value: string) {
   return `${day}/${month}/${year}`;
 }
 
+function compareNewestAttendanceFirst(first?: string | null, second?: string | null) {
+  return first && second ? compareAttendanceDates(second, first) : compareAttendanceDates(first, second);
+}
+
 function countDays(start: string, end: string) {
   if (!start || !end) return 0;
   const a = new Date(start + "T00:00:00");
@@ -187,7 +191,7 @@ export function Atestados() {
   function startEditHistorical(row: HistoricalBaseRow, kind: "atestado" | "declaracao") {
     row=historicalBaseRows.find(r=>r.id===row.id)??row;
     const details = attendanceDetails(row, kind)
-      .sort((first, second) => compareAttendanceDates(first.start, second.start));
+      .sort((first, second) => compareNewestAttendanceFirst(first.start, second.start));
     setHistoricalEdit({
       details:details.length?details:[{id:crypto.randomUUID(),start:"",end:"",category:kind==="atestado"?row.certificate_type||"medico":row.declaration_display_reason||"Outros",cid:row.certificate_cid||"",notes:kind==="atestado"?row.certificate_display_notes||"":row.declaration_observation||"",...(kind==="declaracao"?{minutes:row.declaration_display_minutes??row.declaration_minutes}: {})}],
       row,kind,
@@ -215,7 +219,7 @@ export function Atestados() {
     }
     const details = h.details
       .map(detail => ({ ...detail, ...(h.kind === "atestado" ? { days: detail.days ?? countDays(detail.start, detail.end) } : {}) }))
-      .sort((first, second) => compareAttendanceDates(first.start, second.start));
+      .sort((first, second) => compareNewestAttendanceFirst(first.start, second.start));
     setSavingHistoricalAnnotation(true);setError("");
     const payload={historical_kpi_data_id:h.row.id,updated_at:new Date().toISOString(),...(h.kind==="atestado"?{certificate_details:details,certificate_display_start:null,certificate_display_end:null,certificate_display_days:null,certificate_display_notes:null}:{declaration_details:details,declaration_display_start:null,declaration_display_end:null,declaration_display_minutes:null,declaration_display_reason:null})};
     const { error: saveError } = await (supabase as any)
@@ -563,7 +567,7 @@ export function Atestados() {
           {[
             ...filteredRows.map(row => ({ historical: false as const, row, date: row.start_date })),
             ...historicalCertificates.map(row => ({ historical: true as const, row, date: row.certificate_display_start || row.period_start })),
-          ].sort((first, second) => compareAttendanceDates(first.date, second.date)).map(item => {
+          ].sort((first, second) => compareNewestAttendanceFirst(first.date, second.date)).map(item => {
             if (item.historical) {
               const r = item.row;
               return <tr key={"base-cert-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_start || r.period_start || "")}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.certificate_display_end || r.period_end || "")}</td><td className="px-5 py-4">{r.certificate_display_days??"—"}</td><td className="px-5 py-4">{(r.certificate_type ? ({ medico: "Médico", odontologico: "Odontológico", acompanhamento: "Acompanhamento", outro: "Outro" } as Record<string, string>)[r.certificate_type] || r.certificate_type : "Tipo não informado") + (r.detail?"":" · " + formatHistoricalHours(r.certificate_minutes) + " h")}</td><td className="px-5 py-4">{r.certificate_cid || "—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "atestado")} className="rounded-md border p-2" title="Editar tipo e CID do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
@@ -576,7 +580,7 @@ export function Atestados() {
       <Card className="mt-6 overflow-hidden"><div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Declarações</h2><p className="text-xs text-muted-foreground">{filteredDeclarations.length + historicalDeclarations.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowDeclarations(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"} aria-label={showDeclarations ? "Ocultar declarações" : "Mostrar declarações"}>{showDeclarations ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>{showDeclarations && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr><th className="px-5 py-3">Funcionário</th><th className="px-5 py-3">Data</th><th className="px-5 py-3">Horas abonadas</th><th className="px-5 py-3">Observação</th><th data-role-sensitive className="px-5 py-3 text-right">Ações</th></tr></thead><tbody className="divide-y">{filteredDeclarations.length === 0 && historicalDeclarations.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-muted-foreground">Nenhuma declaração encontrada para os filtros selecionados.</td></tr>}{[
             ...filteredDeclarations.map(row => ({ historical: false as const, row, date: row.occurrence_date })),
             ...historicalDeclarations.map(row => ({ historical: true as const, row, date: row.declaration_display_start || row.period_start })),
-          ].sort((first, second) => compareAttendanceDates(first.date, second.date)).map(item => {
+          ].sort((first, second) => compareNewestAttendanceFirst(first.date, second.date)).map(item => {
             if (item.historical) {
               const r = item.row;
               return <tr key={"base-decl-" + r.detailKey} className="bg-muted/20"><td className="px-5 py-4 font-medium">{historicalEmployeeName(r)}</td><td className="whitespace-nowrap px-5 py-4">{formatDate(r.declaration_display_start || r.period_start || "")} a {formatDate(r.declaration_display_end || r.period_end || "")}</td><td className="px-5 py-4">{formatHistoricalHours(r.declaration_display_minutes??r.declaration_minutes)}</td><td className="px-5 py-4">{[r.declaration_display_reason,r.declaration_observation].filter(Boolean).join(" — ")||"—"}</td><td data-role-sensitive className="px-5 py-4 text-right"><button data-role-sensitive onClick={() => startEditHistorical(r, "declaracao")} className="rounded-md border p-2" title="Editar observação do histórico"><Pencil className="h-4 w-4" /></button></td></tr>;
