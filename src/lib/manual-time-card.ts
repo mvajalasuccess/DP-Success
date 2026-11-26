@@ -9,7 +9,7 @@ export const weekDays = [
 
 export const cardKinds = {
   freelancer: "Freelancer",
-  sold_vacation: "Férias vendidas",
+  sold_vacation: "Férias",
   other: "Outro",
 };
 
