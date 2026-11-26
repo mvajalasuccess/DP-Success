@@ -531,22 +531,22 @@ function CardEditor({ card, canEdit, onDirty, onReload, onUpdate, onDelete }: {
           </span>
           <h2 className="text-sm font-semibold">Período em exibição</h2>
         </div>
-        <div className="grid min-w-0 grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
-          <label className={fieldClass}>De
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:ml-auto sm:justify-end">
+          <label className="flex items-center gap-2 text-sm font-medium"><span>De:</span>
             <input type="date" className={inputCls} value={start} min={card.start_date} max={end || card.end_date}
               onChange={event => {
                 const value = event.target.value;
                 if (value >= card.start_date && value <= (end || card.end_date)) setStart(value);
               }} />
           </label>
-          <label className={fieldClass}>Até
+          <label className="flex items-center gap-2 text-sm font-medium"><span>Até:</span>
             <input type="date" className={inputCls} value={end} min={start} max={card.end_date}
               onChange={event => {
                 const value = event.target.value;
                 if (value >= start && value <= card.end_date) setEnd(value);
               }} />
           </label>
-          <button type="button" className={btnOutline + " col-span-2 justify-self-start"} onClick={() => { setStart(card.start_date); setEnd(card.end_date); }}>Período inteiro</button>
+          <button type="button" className={btnOutline} onClick={() => { setStart(card.start_date); setEnd(card.end_date); }}>Período inteiro</button>
         </div>
       </Card>
 
