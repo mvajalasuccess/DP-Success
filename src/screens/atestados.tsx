@@ -43,7 +43,6 @@ type ClosingAttendance = {
   period_id: string;
   certificate_minutes: number;
   declaration_minutes: number;
-  allowance_minutes: number;
 };
 
 type HistoricalAnnotationForm = { details:AttendanceDetail[]; row: HistoricalBaseRow; certificate_type: string; certificate_cid: string; declaration_observation: string; kind:"atestado"|"declaracao"; start:string; end:string; days:string; quantity:string; notes:string; reason:string };
@@ -152,7 +151,7 @@ export function Atestados() {
     const pageSize = 1000;
     for (let offset = 0; ; offset += pageSize) {
       const { data, error: adjustmentError } = await (supabase as any).from("point_closing_overrides")
-        .select("employee_id,period_id,certificate_minutes,declaration_minutes,allowance_minutes")
+        .select("employee_id,period_id,certificate_minutes,declaration_minutes")
         .order("period_id").order("employee_id")
         .range(offset, offset + pageSize - 1);
       if (adjustmentError) {
@@ -220,24 +219,6 @@ export function Atestados() {
 
   const closingKey = (employeeId: string | null, periodId: string) => `${employeeId ?? ""}:${periodId}`;
   const closingByEmployeePeriod = new Map(closingAttendance.map(row => [closingKey(row.employee_id, row.period_id), row]));
-  const historicalAttendanceKeys = new Set(filteredHistoricalBaseRows.map(row => closingKey(row.employee_id, row.period_id)));
-  const periodById = new Map(periods.map(period => [period.id, period]));
-  const visibleClosingAttendance = closingAttendance.flatMap(row => {
-    const period = periodById.get(row.period_id);
-    if (!period || !companyEmployeeIds.has(row.employee_id) ||
-      (filterEmployee !== "todos" && row.employee_id !== filterEmployee) ||
-      (selectedPeriod && row.period_id !== selectedPeriod.id)) return [];
-
-    const hasAttendance = row.certificate_minutes > 0 || row.declaration_minutes > 0 || row.allowance_minutes > 0 ||
-      historicalAttendanceKeys.has(closingKey(row.employee_id, row.period_id)) ||
-      filteredRows.some(record => record.employee_id === row.employee_id &&
-        record.start_date <= period.end_date && record.end_date >= period.start_date) ||
-      filteredDeclarations.some(record => record.employee_id === row.employee_id &&
-        record.occurrence_date >= period.start_date && record.occurrence_date <= period.end_date);
-    return hasAttendance ? [{ row, period, name: employeesById.get(row.employee_id)?.full_name ?? "Funcionário" }] : [];
-  }).sort((first, second) => compareNewestAttendanceFirst(first.period.start_date, second.period.start_date) ||
-    first.name.localeCompare(second.name, "pt-BR"));
-
   function closingMinutes(row: HistoricalBaseRow, kind: "atestado" | "declaracao") {
     const adjustment = closingByEmployeePeriod.get(closingKey(row.employee_id, row.period_id));
     return kind === "atestado" ? adjustment?.certificate_minutes ?? row.certificate_minutes
@@ -633,38 +614,6 @@ export function Atestados() {
         </button>
       </div>
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-      {visibleClosingAttendance.length > 0 && (
-        <Card className="mt-6 overflow-hidden">
-          <div className="border-b p-4">
-            <h2 className="font-semibold">Totais ajustados no Fechamento de Ponto</h2>
-            <p className="text-xs text-muted-foreground">Horas apuradas por competência. As datas dos documentos estão nas listas abaixo.</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[650px] text-left text-sm">
-              <thead className="bg-muted/70 text-xs text-muted-foreground">
-                <tr>
-                  <th scope="col" className="px-5 py-3">Funcionário</th>
-                  <th scope="col" className="px-5 py-3">Competência</th>
-                  <th scope="col" className="px-5 py-3">Atestados</th>
-                  <th scope="col" className="px-5 py-3">Declarações</th>
-                  <th scope="col" className="px-5 py-3">Abonos</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {visibleClosingAttendance.map(({ row, period, name }) => (
-                  <tr key={closingKey(row.employee_id, row.period_id)}>
-                    <td className="px-5 py-3 font-medium">{name}</td>
-                    <td className="whitespace-nowrap px-5 py-3">{periodLabel(period)}</td>
-                    <td className="px-5 py-3 tabular-nums">{formatHistoricalHours(row.certificate_minutes)}</td>
-                    <td className="px-5 py-3 tabular-nums">{formatHistoricalHours(row.declaration_minutes)}</td>
-                    <td className="px-5 py-3 tabular-nums">{formatHistoricalHours(row.allowance_minutes)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
       <Card className="mt-6 overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Atestados</h2><p className="text-xs text-muted-foreground">{filteredRows.length + historicalCertificates.length} registro(s), incluindo histórico consolidado</p></div><button type="button" onClick={() => setShowCertificates(v => !v)} className="rounded-md border p-2 hover:bg-muted" title={showCertificates ? "Ocultar atestados" : "Mostrar atestados"} aria-label={showCertificates ? "Ocultar atestados" : "Mostrar atestados"}>{showCertificates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</button></div>
         {showCertificates && <div className="max-h-[calc(100vh-300px)] overflow-auto"><table className="w-full text-left text-sm"><thead className="sticky top-0 z-10 bg-muted/95 text-xs text-muted-foreground backdrop-blur"><tr>
