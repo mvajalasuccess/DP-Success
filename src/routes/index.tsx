@@ -1,6 +1,7 @@
 import { createFileRoute, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { CalendarCheck, CalendarX, ChevronDown, ChevronLeft, ClipboardCheck, Clock3, FilePenLine, FolderOpen, Gauge, LogOut, Settings, Menu, UsersRound, WalletCards, Save, TrendingUp, Stethoscope, Timer, X, Pencil, Trash2, CheckCircle2, RotateCcw, type LucideIcon } from "lucide-react";
+import { ChartEmployeesDialog, useChartEmployees, type ChartEmployee } from "@/components/chart-employees-dialog";
 import { Card } from "@/components/ui/card";
 import { getScreenIcon, ScreenBrand } from "@/components/screen-brand";
 import { supabase } from "@/integrations/supabase/client";
@@ -444,14 +445,43 @@ function SidebarProfile({ collapsed, onNavigate, canOpenSettings }: { collapsed:
   );
 }
 
+function EmployeeDonut({ label, slices, colors, onSelect }: {
+  label: string;
+  slices: { name: string; minutes: number; contributors: ChartEmployee[]; id?: string }[];
+  colors: string[];
+  onSelect: (name: string, people: ChartEmployee[]) => void;
+}) {
+  const total = slices.reduce((sum, item) => sum + Math.max(0, item.minutes), 0);
+  let angle = 0;
+  const point = (radians: number) => `${100 + 72 * Math.cos(radians)} ${100 + 72 * Math.sin(radians)}`;
+  return (
+    <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90" role="group" aria-label={label}>
+      {slices.map((item, index) => {
+        if (item.minutes <= 0 || !total) return null;
+        const sweep = item.minutes / total * 2 * Math.PI;
+        const start = angle;
+        angle += sweep;
+        const props = {
+          fill: "none", stroke: colors[index % colors.length], strokeWidth: 28,
+          className: "cursor-pointer", onClick: () => onSelect(item.name, item.contributors),
+        };
+        return item.minutes === total
+          ? <circle key={item.id ?? item.name} cx="100" cy="100" r="72" {...props} />
+          : <path key={item.id ?? item.name} d={`M ${point(start)} A 72 72 0 ${sweep > Math.PI ? 1 : 0} 1 ${point(angle)}`} {...props} />;
+      })}
+    </svg>
+  );
+}
+
 function DashboardHome() {
+  const chart = useChartEmployees();
   const navigate = useNavigate();
   const [companyFilter, setCompanyFilter] = useState("");
   const [metrics, setMetrics] = useState({ employees: 0, overtime: 0, absenceDays: 0, certificates: 0, absenteeism: 0, turnover: 0, admissions: 0, terminations: 0, bankBalance: 0, period: "Nenhuma competência" });
-  const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number }>>([]);
+  const [departments, setDepartments] = useState<Array<{ name: string; employees: number; minutes: number; contributors: ChartEmployee[] }>>([]);
   const [positiveBalances, setPositiveBalances] = useState<Array<{ name: string; minutes: number }>>([]);
-  const [individualDebits, setIndividualDebits] = useState<Array<{ name: string; minutes: number }>>([]);
-  const [occurrenceHours, setOccurrenceHours] = useState<Array<{ name: string; minutes: number }>>([]);
+  const [individualDebits, setIndividualDebits] = useState<Array<ChartEmployee & { minutes: number }>>([]);
+  const [occurrenceHours, setOccurrenceHours] = useState<Array<{ name: string; minutes: number; contributors: ChartEmployee[] }>>([]);
   const [absencePeople, setAbsencePeople] = useState<Array<{ name: string; count: number }>>([]);
   const [folgaPeople, setFolgaPeople] = useState<Array<{ name: string; count: number }>>([]);
   const [declarationPeople, setDeclarationPeople] = useState<Array<{ name: string; count: number }>>([]);
@@ -614,7 +644,7 @@ function DashboardHome() {
       const folgaRows = currentOccurrences.filter((x: any) => ["folga_abonada", "folga_descontada"].includes(codeOf(x)));
       const declarationRows = currentOccurrences.filter((x: any) => codeOf(x) === "declaracao_horas");
       const absenceDays = absenceRows.reduce((sum: number, x: any) => sum + Number(x.quantity || 0), 0);
-      const employeeMap = new Map(allEmployees.map((e: any) => [String(e.id), String(e.full_name || "Funcionário")]));
+      const employeeMap = new Map<string, string>(allEmployees.map((e: any) => [String(e.id), String(e.full_name || "Funcionário")]));
       const countByEmployee = (rows: any[]) => {
         const counts = new Map<string, number>();
         rows.forEach((row: any) => counts.set(String(row.employee_id), (counts.get(String(row.employee_id)) ?? 0) + 1));
@@ -635,24 +665,37 @@ function DashboardHome() {
         return Math.round(unit.startsWith("dia") ? quantity * dailyMinutes(String(row.employee_id)) : unit.startsWith("hor") ? quantity * 60 : quantity);
       };
       const overriddenIds = new Set(overrides.map((row: any) => String(row.employee_id)));
-      const occurrenceAbsenceMinutes = absenceRows
-        .filter((row: any) => !overriddenIds.has(String(row.employee_id)))
-        .reduce((sum: number, row: any) => sum + minutesForOccurrence(row), 0)
-        + overrides.reduce((sum: number, row: any) => sum + Math.round(Number(row.absence_quantity || 0) * dailyMinutes(String(row.employee_id))), 0);
-      const occurrenceFolgaMinutes = folgaRows.reduce((sum: number, row: any) => sum + minutesForOccurrence(row), 0);
-      const occurrenceCertificateMinutes = certificateRows
-        .filter((row: any) => !overriddenIds.has(String(row.employee_id)))
-        .reduce((sum: number, row: any) => sum + Math.round(Number(row.days || 0) * dailyMinutes(String(row.employee_id))), 0)
-        + overrides.reduce((sum: number, row: any) => sum + Number(row.certificate_minutes || 0), 0);
-      const occurrenceDeclarationMinutes = declarationRows
-        .filter((row: any) => !overriddenIds.has(String(row.employee_id)))
-        .reduce((sum: number, row: any) => sum + minutesForOccurrence(row), 0)
-        + overrides.reduce((sum: number, row: any) => sum + Number(row.declaration_minutes || 0), 0);
+      const summarizeOccurrence = (
+        name: string,
+        rows: any[],
+        minutesFor: (row: any) => number,
+        minutesForOverride?: (row: any) => number,
+      ) => {
+        let minutes = 0;
+        const contributors: ChartEmployee[] = [];
+        const add = (row: any, value: number) => {
+          minutes += value;
+          const id = String(row.employee_id);
+          const employeeName = employeeMap.get(id);
+          if (value && employeeName) contributors.push({ id, name: employeeName });
+        };
+        for (const row of rows) {
+          if (!minutesForOverride || !overriddenIds.has(String(row.employee_id))) add(row, minutesFor(row));
+        }
+        if (minutesForOverride) {
+          for (const row of overrides) add(row, minutesForOverride(row));
+        }
+        return { name, minutes, contributors };
+      };
       setOccurrenceHours([
-        { name: "Faltas", minutes: occurrenceAbsenceMinutes },
-        { name: "Folgas", minutes: occurrenceFolgaMinutes },
-        { name: "Atestados", minutes: occurrenceCertificateMinutes },
-        { name: "Declarações de horas", minutes: occurrenceDeclarationMinutes },
+        summarizeOccurrence("Faltas", absenceRows, minutesForOccurrence,
+          row => Math.round(Number(row.absence_quantity || 0) * dailyMinutes(String(row.employee_id)))),
+        summarizeOccurrence("Folgas", folgaRows, minutesForOccurrence),
+        summarizeOccurrence("Atestados", certificateRows,
+          row => Math.round(Number(row.days || 0) * dailyMinutes(String(row.employee_id))),
+          row => Number(row.certificate_minutes || 0)),
+        summarizeOccurrence("Declarações de horas", declarationRows, minutesForOccurrence,
+          row => Number(row.declaration_minutes || 0)),
       ]);
       const certificateDays = certificateRows.reduce((sum: number, x: any) => sum + Number(x.days || 0), 0);
       setCertificatePeople(countByEmployee(certificateRows));
@@ -720,17 +763,22 @@ function DashboardHome() {
       const departmentByEmployee = new Map(
         employees.map((employee: any) => [String(employee.id), employee.departments?.name || "Sem departamento"]),
       );
-      const deptMap = new Map<string, { name: string; employees: number; minutes: number }>();
+      const deptMap = new Map<string, { name: string; employees: number; minutes: number; contributors: ChartEmployee[] }>();
       employees.forEach((x: any) => {
         const name = x.departments?.name || "Sem departamento";
-        const d = deptMap.get(name) || { name, employees: 0, minutes: 0 };
+        const d = deptMap.get(name) || { name, employees: 0, minutes: 0, contributors: [] };
         d.employees++;
         deptMap.set(name, d);
       });
       currentOvertime.forEach((x: any) => {
         const name = departmentByEmployee.get(String(x.employee_id)) || "Sem departamento";
         const department = deptMap.get(name);
-        if (department) department.minutes += Math.abs(Number(x.minutes || 0));
+        if (!department) return;
+        const minutes = Math.abs(Number(x.minutes || 0));
+        department.minutes += minutes;
+        const id = String(x.employee_id);
+        const employeeName = employeeMap.get(id);
+        if (minutes && employeeName) department.contributors.push({ id, name: employeeName });
       });
       setDepartments([...deptMap.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 6));
       // Renderiza os indicadores principais antes do cálculo mais pesado do Banco de Horas.
@@ -785,7 +833,7 @@ function DashboardHome() {
       });
       setIndividualDebits([...debitByEmployee.entries()]
         .filter(([, minutes]) => minutes > 0)
-        .map(([id, minutes]) => ({ name: employeeMap.get(id) || "Funcionário", minutes }))
+        .map(([id, minutes]) => ({ id, name: employeeMap.get(id) || "Funcionário", minutes }))
         .sort((a, b) => b.minutes - a.minutes || a.name.localeCompare(b.name, "pt-BR")));
       const bankBalance = positiveResults.reduce((sum, item) => sum + (item?.minutes ?? 0), 0);
       setPositiveBalances(positiveResults.filter((item): item is { name: string; minutes: number } => Boolean(item)).sort((a, b) => b.minutes - a.minutes));
@@ -918,6 +966,16 @@ function DashboardHome() {
   async function signOut() {
     await supabase.auth.signOut();
     window.location.href = "/login";
+  }
+
+  const debitSegments = individualDebits.slice(0, 5).map(item => ({ ...item, contributors: [item] }));
+  const otherDebits = individualDebits.slice(5);
+  if (otherDebits.length) {
+    debitSegments.push({
+      id: "outros", name: "Outros",
+      minutes: otherDebits.reduce((sum, item) => sum + item.minutes, 0),
+      contributors: otherDebits,
+    });
   }
 
   const cards = [
@@ -1098,21 +1156,9 @@ function DashboardHome() {
               <p className="mt-1 text-xs text-muted-foreground">Comparativo de horas de faltas, folgas, atestados e declarações, considerando a competência e a empresa selecionadas.</p>
               <div className="mt-5 grid items-center gap-6 md:grid-cols-[220px_minmax(0,1fr)]">
                 <div className="relative mx-auto h-52 w-52">
-                  <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90" role="img" aria-label="Gráfico de rosca das horas por tipo de ocorrência">
-                    {(() => {
-                      const colors = ["#06CAA0", "#3B82F6", "#8B5CF6", "#F59E0B"];
-                      const total = occurrenceHours.reduce((sum, item) => sum + item.minutes, 0);
-                      let offset = 0;
-                      return occurrenceHours.map((item, index) => {
-                        const fraction = total > 0 ? item.minutes / total : 0;
-                        const dash = fraction * 2 * Math.PI * 72;
-                        const circle = <circle key={item.name} cx="100" cy="100" r="72" fill="none" stroke={colors[index]} strokeWidth="28" strokeDasharray={`${dash} ${2 * Math.PI * 72 - dash}`} strokeDashoffset={-offset} />;
-                        offset += dash;
-                        return circle;
-                      });
-                    })()}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <EmployeeDonut label="Gráfico de rosca das horas por tipo de ocorrência" slices={occurrenceHours}
+                    colors={["#06CAA0", "#3B82F6", "#8B5CF6", "#F59E0B"]} onSelect={chart.show} />
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-xs text-muted-foreground">Total de horas</span>
                     <span className="text-xl font-bold tabular-nums">{fmt(occurrenceHours.reduce((sum, item) => sum + item.minutes, 0))}</span>
                   </div>
@@ -1122,12 +1168,12 @@ function DashboardHome() {
                     const colors = ["#06CAA0", "#3B82F6", "#8B5CF6", "#F59E0B"];
                     const total = occurrenceHours.reduce((sum, value) => sum + value.minutes, 0);
                     const percent = total > 0 ? Math.round(item.minutes / total * 100) : 0;
-                    return <div key={item.name} className="flex items-center gap-3 border-b pb-3 last:border-0">
+                    return <button type="button" key={item.name} onClick={() => chart.show(item.name, item.contributors)} className="flex w-full items-center gap-3 border-b pb-3 text-left hover:bg-muted/40 last:border-0">
                       <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: colors[index] }} />
                       <span className="min-w-0 flex-1 text-sm font-medium">{item.name}</span>
                       <span className="text-sm font-semibold tabular-nums">{fmt(item.minutes)}</span>
                       <span className="w-10 text-right text-xs text-muted-foreground">{percent}%</span>
-                    </div>;
+                    </button>;
                   })}
                 </div>
               </div>
@@ -1144,7 +1190,7 @@ function DashboardHome() {
                   const total = Math.max(metrics.overtime, 1);
                   const width = Math.min(100, (d.minutes / total) * 100);
                   return (
-                    <div key={d.name}>
+                    <button type="button" key={d.name} onClick={() => chart.show(`Horas extras · ${d.name}`, d.contributors)} className="block w-full rounded text-left hover:bg-muted/40">
                       <div className="flex items-center justify-between gap-3 text-sm">
                         <span className="truncate font-medium">{d.name}</span>
                         <span className="font-semibold">{fmt(d.minutes)}</span>
@@ -1152,7 +1198,7 @@ function DashboardHome() {
                       <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
                         <div className="h-full rounded-full bg-primary/70" style={{ width: width + "%" }} />
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
                 {!departments.length && <p className="py-6 text-sm text-muted-foreground">Nenhum departamento com horas extras registradas.</p>}
@@ -1164,41 +1210,25 @@ function DashboardHome() {
               <p className="mt-1 text-xs text-muted-foreground">Débitos registrados por funcionário na competência selecionada.</p>
               <div className="mt-4 grid min-h-0 flex-1 items-center gap-4 sm:grid-cols-[170px_minmax(0,1fr)]">
                 <div className="relative mx-auto h-40 w-40">
-                  <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90" role="img" aria-label="Gráfico de rosca dos débitos por funcionário">
-                    {(() => {
-                      const top = individualDebits.slice(0, 5);
-                      const other = individualDebits.slice(5).reduce((sum, item) => sum + item.minutes, 0);
-                      const values = [...top, ...(other > 0 ? [{ name: "Outros", minutes: other }] : [])];
-                      const colors = ["#06CAA0", "#3B82F6", "#8B5CF6", "#F97316", "#EF4444", "#FBBF24"];
-                      const total = values.reduce((sum, item) => sum + item.minutes, 0);
-                      let offset = 0;
-                      return values.map((item, index) => {
-                        const fraction = total > 0 ? item.minutes / total : 0;
-                        const dash = fraction * 2 * Math.PI * 72;
-                        const circle = <circle key={item.name} cx="100" cy="100" r="72" fill="none" stroke={colors[index % colors.length]} strokeWidth="28" strokeDasharray={`${dash} ${2 * Math.PI * 72 - dash}`} strokeDashoffset={-offset} />;
-                        offset += dash;
-                        return circle;
-                      });
-                    })()}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <EmployeeDonut label="Gráfico de rosca dos débitos por funcionário" slices={debitSegments}
+                    colors={["#06CAA0", "#3B82F6", "#8B5CF6", "#F97316", "#EF4444", "#FBBF24"]}
+                    onSelect={(name, people) => chart.show(`Débitos · ${name}`, people)} />
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-xs text-muted-foreground">Total de débitos</span>
                     <span className="text-lg font-bold tabular-nums">{fmt(-individualDebits.reduce((sum, item) => sum + item.minutes, 0))}</span>
                   </div>
                 </div>
                 <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
                   {(() => {
-                    const top = individualDebits.slice(0, 5);
-                    const other = individualDebits.slice(5).reduce((sum, item) => sum + item.minutes, 0);
-                    const values = [...top, ...(other > 0 ? [{ name: "Outros", minutes: other }] : [])];
+                    const values = debitSegments;
                     const colors = ["#06CAA0", "#3B82F6", "#8B5CF6", "#F97316", "#EF4444", "#FBBF24"];
                     const total = values.reduce((sum, item) => sum + item.minutes, 0);
-                    return values.map((item, index) => <div key={item.name} className="flex items-center gap-2 border-b pb-2 text-sm last:border-0">
+                    return values.map((item, index) => <button type="button" key={item.id} onClick={() => chart.show(`Débitos · ${item.name}`, item.contributors)} className="flex w-full items-center gap-2 border-b pb-2 text-left text-sm hover:bg-muted/40 last:border-0">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />
                       <span className="min-w-0 flex-1 truncate">{item.name}</span>
                       <span className="shrink-0 font-semibold tabular-nums">{fmt(-item.minutes)}</span>
                       <span className="w-9 text-right text-xs text-muted-foreground">{total > 0 ? Math.round(item.minutes / total * 100) : 0}%</span>
-                    </div>);
+                    </button>);
                   })()}
                   {!individualDebits.length && <p className="py-5 text-sm text-muted-foreground">Nenhum débito individual registrado nesta competência.</p>}
                 </div>
@@ -1213,6 +1243,7 @@ function DashboardHome() {
           </section>
 
         </div>
+      <ChartEmployeesDialog selection={chart.selection} close={chart.close} />
     </div>
   );
 }

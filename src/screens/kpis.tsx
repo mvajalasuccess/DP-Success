@@ -1,4 +1,5 @@
 import { ArrowLeft, Users, Clock3, CalendarX2, Percent, UserMinus, Info, WalletCards, FileText, TrendingUp, AlertTriangle, ChevronDown } from "lucide-react";
+import { ChartEmployeesDialog, useChartEmployees, type ChartEmployee } from "@/components/chart-employees-dialog";
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,6 +69,18 @@ const emptyMetrics = {
 };
 
 type Metrics = typeof emptyMetrics;
+
+type ContributorKey = "lost" | "debits" | "absences" | "allowances" | "certificates" | "declarations" | "daysOff" | "overtime" | keyof typeof emptyOvertime;
+type MonthlyKpi = {
+  periodId: string;
+  label: string;
+  rate: number;
+  expected: number;
+  lost: number;
+  debits: number;
+  total: number;
+  contributors: Partial<Record<ContributorKey, ChartEmployee[]>>;
+};
 
 const HISTORICAL_CUTOFF = "2026-07-20";
 const DEFAULT_DAILY_MINUTES = 528;
@@ -168,6 +181,7 @@ function employeeMatches(
 }
 
 export function Kpis() {
+  const chart = useChartEmployees();
   const [metrics, setMetrics] = useState<Metrics>(emptyMetrics);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -199,8 +213,8 @@ export function Kpis() {
   const [isLoadingPage, setIsLoadingPage] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
   const [interjornadaStatus, setInterjornadaStatus] = useState<"ativo" | "inativo" | "todos">("todos");
-  const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<Array<{ periodId: string; label: string; rate: number; expected: number; lost: number; debits: number }>>([]);
-  const [monthlyOvertime, setMonthlyOvertime] = useState<Array<{ periodId: string; label: string; total: number }>>([]);
+  const [monthlyAbsenteeism, setMonthlyAbsenteeism] = useState<MonthlyKpi[]>([]);
+  const [monthlyOvertime, setMonthlyOvertime] = useState<MonthlyKpi[]>([]);
   const [showAbsenceCalculation, setShowAbsenceCalculation] = useState(false);
 
   useEffect(() => {
@@ -454,10 +468,18 @@ export function Kpis() {
         const selected = selectedPeriodIds.has(period.id);
         const attendance = { ...emptyAttendance };
         const overtimeTotals = { ...emptyOvertime };
+        const contributors: MonthlyKpi["contributors"] = {};
+        const record = (employee: ChartEmployee, values: Partial<Record<ContributorKey, number>>) => {
+          if (!employee.id || !employee.name) return;
+          for (const [key, value] of Object.entries(values) as [ContributorKey, number][]) {
+            if (value) (contributors[key] ??= []).push({ id: employee.id, name: employee.name });
+          }
+        };
         const manualByEmployee = new Map((overridesByPeriod.get(period.id) ?? [])
           .map(row => [String(row.employee_id), row]));
 
-        const addOvertime = (employee: Employee | undefined, values: Partial<typeof emptyOvertime>) => {
+        const addOvertime = (employee: Employee | undefined, values: Partial<typeof emptyOvertime>, person: ChartEmployee | undefined = employee) => {
+          if (person) record(person, { ...values, overtime: overtimeTotal({ ...emptyOvertime, ...values }) });
           for (const key of Object.keys(overtimeTotals) as (keyof typeof emptyOvertime)[]) {
             overtimeTotals[key] += values[key] ?? 0;
           }
@@ -500,8 +522,14 @@ export function Kpis() {
             attendance.declaracoesMinutes += Number(source.declaration_minutes || 0);
             // A BASE histórica já contém os abonos consolidados usados nos indicadores validados.
             attendance.abonosMinutes += Number(source.allowance_minutes || 0);
-            attendance.debitMinutes += Math.abs(Number(source.debit_minutes || 0));
-            addOvertime(employee, closingOvertime(source));
+            const debits = Math.abs(Number(source.debit_minutes || 0));
+            const absences = Math.round(faltaDays * DEFAULT_DAILY_MINUTES);
+            const allowances = Number(source.allowance_minutes || 0);
+            attendance.debitMinutes += debits;
+            const person = employee ?? { id: employeeKey, name: String(row.employee_name ?? "") };
+            record(person, { lost: absences + allowances + debits, debits, absences, allowances,
+              certificates: certificateMinutes, declarations: Number(source.declaration_minutes || 0) });
+            addOvertime(employee, closingOvertime(source), person);
           }
           const unfiltered = !appliedCompanyFilter && !appliedEmployees.length && appliedDepartment === "todos";
           const isValidatedJuly = period.reference_year === 2026 && period.reference_month === 7;
@@ -536,6 +564,7 @@ export function Kpis() {
               if (code === "folga_abonada" || code === "folga_descontada" || code === "folga") {
                 attendance.folgasDays += minutes / daily;
                 attendance.folgasMinutes += minutes;
+                record(employee, { daysOff: minutes });
               }
               if (manual && code !== "declaracao_horas" && code !== "declaracao") continue;
               if (absenceCodes.has(code)) {
@@ -581,6 +610,10 @@ export function Kpis() {
             }
 
             const abonos = allowance + declarations + certificateMinutes;
+            record(employee, {
+              lost: absence + abonos + debit, debits: debit, absences: absence,
+              allowances: abonos, certificates: certificateMinutes, declarations,
+            });
             attendance.expected += expected;
             attendance.worked += worked ?? Math.max(0, expected - absence - abonos - debit);
             attendance.faltasDays += absenceDays;
@@ -643,6 +676,7 @@ export function Kpis() {
           lost: attendance.absenceMinutes,
           debits: attendance.debitMinutes,
           total: overtimeTotal(overtimeTotals),
+          contributors,
         };
       });
 
@@ -733,6 +767,9 @@ export function Kpis() {
   }, [periods, employees, appliedYear, appliedMonth, appliedDepartment, appliedEmployees, appliedCompanyFilter]);
 
   const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
+  const selectedContributors = (key: ContributorKey) => monthlyOvertime.flatMap(row => row.contributors[key] ?? []);
+  const showMonth = (title: string, key: ContributorKey, row: MonthlyKpi) =>
+    chart.show(`${title} · ${row.label}/${appliedYear}`, row.contributors[key] ?? []);
   const totalOvertime = overtimeTotal(metrics);
   const employeesWithOvertime = overtimeEmployees.filter(item => item.total > 0);
   const defaultKpiYear = periods.length ? Math.max(...periods.map(p => p.reference_year)) : new Date().getFullYear();
@@ -752,31 +789,35 @@ export function Kpis() {
   };
   const absenteeismTone = absenteeismRate >= KPI_THRESHOLDS.absenteeismCritical ? "critical" : absenteeismRate >= KPI_THRESHOLDS.absenteeismAttention ? "warning" : "neutral";
   const turnoverTone = metrics.turnover >= turnoverThresholds.critical ? "critical" : metrics.turnover >= turnoverThresholds.attention ? "warning" : "neutral";
+  const turnoverEmployees = employees.filter(employee =>
+    (!appliedCompanyFilter || employee.companyId === appliedCompanyFilter) &&
+    employeeMatches(employee, appliedEmployees, appliedDepartment)
+  );
   const monthlyTurnover = Array.from({ length: 12 }, (_, index) => {
-    const month = String(index + 1).padStart(2, "0");
-    const monthEmployees = employees.filter(e =>
-      (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
-      (appliedDepartment === "todos" || e.department === appliedDepartment) &&
-      (!appliedEmployees.length || appliedEmployees.includes(e.id))
-    );
+    const prefix = `${appliedYear}-${String(index + 1).padStart(2, "0")}-`;
+    const admitted = turnoverEmployees.filter(e => e.hireDate?.startsWith(prefix));
+    const terminated = turnoverEmployees.filter(e => e.terminationDate?.startsWith(prefix));
     return {
       month: new Date(appliedYear, index, 1).toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
-      admissions: monthEmployees.filter(e => e.hireDate?.startsWith(`${appliedYear}-${month}-`)).length,
-      terminations: monthEmployees.filter(e => e.terminationDate?.startsWith(`${appliedYear}-${month}-`)).length,
+      admissions: admitted.length, terminations: terminated.length, admitted, terminated,
     };
   });
-  const terminationGenderBase = employees.filter(e =>
-    e.terminationDate?.startsWith(`${appliedYear}-`) &&
-    (!appliedCompanyFilter || e.companyId === appliedCompanyFilter) &&
-    (appliedDepartment === "todos" || e.department === appliedDepartment) &&
-    (!appliedEmployees.length || appliedEmployees.includes(e.id))
-  );
+  const terminationGenderBase = turnoverEmployees.filter(e => e.terminationDate?.startsWith(`${appliedYear}-`));
   const normalizeGender = (value: string | null) =>
     String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  const maleGenderValues = ["m", "masculino", "masc", "homem", "male"];
+  const femaleGenderValues = ["f", "feminino", "fem", "mulher", "female"];
   const terminationsByGender = [
-    { gender: "Homens", total: terminationGenderBase.filter(e => ["m", "masculino", "masc", "homem", "male"].includes(normalizeGender(e.gender))).length, fill: "#06b6d4" },
-    { gender: "Mulheres", total: terminationGenderBase.filter(e => ["f", "feminino", "fem", "mulher", "female"].includes(normalizeGender(e.gender))).length, fill: "#ec4899" },
-    { gender: "Não informado", total: terminationGenderBase.filter(e => !["m", "masculino", "masc", "homem", "male", "f", "feminino", "fem", "mulher", "female"].includes(normalizeGender(e.gender))).length, fill: "#94a3b8" },
+    { gender: "Homens", fill: "#06b6d4", people: terminationGenderBase.filter(e => maleGenderValues.includes(normalizeGender(e.gender))) },
+    { gender: "Mulheres", fill: "#ec4899", people: terminationGenderBase.filter(e => femaleGenderValues.includes(normalizeGender(e.gender))) },
+    { gender: "Não informado", fill: "#94a3b8", people: terminationGenderBase.filter(e => ![...maleGenderValues, ...femaleGenderValues].includes(normalizeGender(e.gender))) },
+  ].map(row => ({ ...row, total: row.people.length }));
+  const turnoverPeriods = periods.filter(p => p.reference_year === appliedYear && (appliedMonth === "todos" || p.id === appliedMonth));
+  const isInTurnoverSelection = (date: string | null) => date !== null &&
+    turnoverPeriods.some(period => date >= period.start_date && date <= period.end_date);
+  const turnoverMovements = [
+    { name: "Admissões", value: metrics.admissions, people: turnoverEmployees.filter(e => isInTurnoverSelection(e.hireDate)) },
+    { name: "Desligamentos", value: metrics.terminations, people: turnoverEmployees.filter(e => isInTurnoverSelection(e.terminationDate)) },
   ];
   const bankTone = Math.abs(bankBalance) >= KPI_THRESHOLDS.bankCriticalMinutes ? "critical" : Math.abs(bankBalance) >= KPI_THRESHOLDS.bankAttentionMinutes ? "warning" : "neutral";
   const hasKpiData = metrics.expected > 0 || metrics.employees > 0 || metrics.admissions > 0 || metrics.terminations > 0;
@@ -1045,18 +1086,52 @@ export function Kpis() {
               const tenure = base.filter(e => e.hireDate).map(e => Math.max(0, ((new Date((e.terminationDate || today.toISOString().slice(0,10)) + "T00:00:00").getTime() - new Date((e.hireDate as string) + "T00:00:00").getTime()) / 86400000) / 365.25));
               const genderLabels = ["Feminino", "Masculino", "Outro", "Não informado"];
               const genderColors = ["#ec4899", "#3b82f6", "#8b5cf6", "#94a3b8"];
-              const genderData = genderLabels.map((name, i) => ({ name, value: base.filter(e => i === 0 ? e.gender === "feminino" : i === 1 ? e.gender === "masculino" : i === 2 ? e.gender === "outro" : !e.gender || !["feminino","masculino","outro"].includes(e.gender)).length, fill: genderColors[i] })).filter(x => x.value > 0);
-              const ageData = [{ faixa: "Até 25", total: ages.filter(n => n <= 25).length }, { faixa: "26–35", total: ages.filter(n => n >= 26 && n <= 35).length }, { faixa: "36–45", total: ages.filter(n => n >= 36 && n <= 45).length }, { faixa: "46–55", total: ages.filter(n => n >= 46 && n <= 55).length }, { faixa: "56+", total: ages.filter(n => n >= 56).length }];
-              const tenureData = [{ faixa: "Menos de 1 ano", total: tenure.filter(n => n < 1).length }, { faixa: "1–3 anos", total: tenure.filter(n => n >= 1 && n < 3).length }, { faixa: "3–5 anos", total: tenure.filter(n => n >= 3 && n < 5).length }, { faixa: "5+ anos", total: tenure.filter(n => n >= 5).length }];
-              const deptData = [...new Set(base.map(e => e.department || "Sem setor"))].map(name => ({ setor: name, total: base.filter(e => (e.department || "Sem setor") === name).length })).sort((a,b) => b.total-a.total).slice(0,8);
-              const genderByAgeData = ageData.map(item => {
-                const matchingAges = base.filter(e => e.birthDate && (() => { const age = ageOf(e.birthDate as string); return item.faixa === "Até 25" ? age <= 25 : item.faixa === "26–35" ? age >= 26 && age <= 35 : item.faixa === "36–45" ? age >= 36 && age <= 45 : item.faixa === "46–55" ? age >= 46 && age <= 55 : age >= 56; })());
-                return { faixa: item.faixa, feminino: matchingAges.filter(e => ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: matchingAges.filter(e => ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length, outros: matchingAges.filter(e => String(e.gender ?? "").toLowerCase() === "outro").length };
+              const genderData = genderLabels.map((name, i) => {
+                const people = base.filter(e => i === 0 ? e.gender === "feminino" : i === 1 ? e.gender === "masculino" : i === 2 ? e.gender === "outro" : !e.gender || !["feminino", "masculino", "outro"].includes(e.gender));
+                return { name, people, value: people.length, fill: genderColors[i] };
+              }).filter(row => row.value > 0);
+              const ageRanges = [
+                { faixa: "Até 25", min: 0, max: 25 },
+                { faixa: "26–35", min: 26, max: 35 },
+                { faixa: "36–45", min: 36, max: 45 },
+                { faixa: "46–55", min: 46, max: 55 },
+                { faixa: "56+", min: 56, max: 119 },
+              ];
+              const ageData = ageRanges.map(({ faixa, min, max }) => {
+                const people = base.filter(e => {
+                  const age = e.birthDate ? ageOf(e.birthDate) : NaN;
+                  return age >= min && age <= max;
+                });
+                return { faixa, people, total: people.length };
               });
-              const deptGenderData = deptData.map(item => {
-                const rows = base.filter(e => (e.department || "Sem setor") === item.setor);
-                return { setor: item.setor, feminino: rows.filter(e => ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: rows.filter(e => ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length, outros: rows.filter(e => String(e.gender ?? "").toLowerCase() === "outro").length };
+              const tenureData = [
+                { faixa: "Menos de 1 ano", min: 0, max: 1 },
+                { faixa: "1–3 anos", min: 1, max: 3 },
+                { faixa: "3–5 anos", min: 3, max: 5 },
+                { faixa: "5+ anos", min: 5, max: Infinity },
+              ].map(({ faixa, min, max }) => {
+                const people = base.filter(e => {
+                  if (!e.hireDate) return false;
+                  const end = new Date((e.terminationDate || today.toISOString().slice(0, 10)) + "T00:00:00");
+                  const years = Math.max(0, (end.getTime() - new Date(e.hireDate + "T00:00:00").getTime()) / 86400000 / 365.25);
+                  return years >= min && years < max;
+                });
+                return { faixa, people, total: people.length };
               });
+              const deptData = [...new Set(base.map(e => e.department || "Sem setor"))].map(setor => {
+                const people = base.filter(e => (e.department || "Sem setor") === setor);
+                return { setor, people, total: people.length };
+              }).sort((a, b) => b.total - a.total).slice(0, 8);
+              const byGender = (people: Employee[]) => {
+                const groups = {
+                  feminino: people.filter(e => ["feminino", "fem", "f", "mulher", "female"].includes(String(e.gender ?? "").toLowerCase())),
+                  masculino: people.filter(e => ["masculino", "masc", "m", "homem", "male"].includes(String(e.gender ?? "").toLowerCase())),
+                  outros: people.filter(e => String(e.gender ?? "").toLowerCase() === "outro"),
+                };
+                return { groups, feminino: groups.feminino.length, masculino: groups.masculino.length, outros: groups.outros.length };
+              };
+              const genderByAgeData = ageData.map(row => ({ faixa: row.faixa, ...byGender(row.people) }));
+              const deptGenderData = deptData.map(row => ({ setor: row.setor, ...byGender(row.people) }));
               const ageTenurePoints = base.flatMap(e => {
                 if (!e.birthDate || !e.hireDate) return [];
                 const age = ageOf(e.birthDate);
@@ -1066,11 +1141,11 @@ export function Kpis() {
                 if (!Number.isFinite(years)) return [];
                 const g = String(e.gender ?? "").toLowerCase();
                 const group = ["feminino","fem","f","mulher","female"].includes(g) ? "Feminino" : ["masculino","masc","m","homem","male"].includes(g) ? "Masculino" : "Outro / não informado";
-                return [{ nome: e.name, idade: age, tempo: Number(years.toFixed(2)), sexo: group, setor: e.department || "Sem setor" }];
+                return [{ id: e.id, name: e.name, nome: e.name, idade: age, tempo: Number(years.toFixed(2)), sexo: group, setor: e.department || "Sem setor" }];
               });
-              const tenureByAgeData = ageData.map(item => {
-                const values = ageTenurePoints.filter(e => item.faixa === "Até 25" ? e.idade <= 25 : item.faixa === "26–35" ? e.idade >= 26 && e.idade <= 35 : item.faixa === "36–45" ? e.idade >= 36 && e.idade <= 45 : item.faixa === "46–55" ? e.idade >= 46 && e.idade <= 55 : e.idade >= 56);
-                return { faixa: item.faixa, media: values.length ? values.reduce((sum,e)=>sum+e.tempo,0)/values.length : 0, quantidade: values.length };
+              const tenureByAgeData = ageRanges.map(({ faixa, min, max }) => {
+                const people = ageTenurePoints.filter(e => e.idade >= min && e.idade <= max);
+                return { faixa, people, media: people.length ? people.reduce((sum,e)=>sum+e.tempo,0)/people.length : 0, quantidade: people.length };
               });
               const average = (values: number[]) => values.length ? values.reduce((a,b)=>a+b,0)/values.length : 0;
               const ageAverage = average(ages);
@@ -1091,24 +1166,24 @@ export function Kpis() {
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Distribuição por sexo</h3><p className="text-xs text-muted-foreground">Quantidade e proporção de cada categoria cadastrada.</p>
-                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={genderData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={88} innerRadius={48} paddingAngle={3} label={({name,percent})=>`${name} ${((percent||0)*100).toFixed(0)}%`}><Cell fill="#ec4899"/><Cell fill="#3b82f6"/><Cell fill="#8b5cf6"/><Cell fill="#94a3b8"/></Pie><Tooltip formatter={(value: number) => [value, "Funcionários"]}/><Legend /></PieChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie {...chart.click(genderData, row => chart.show(row.name, row.people))} data={genderData} dataKey="value" nameKey="name" cx="50%" cy="45%" outerRadius={88} innerRadius={48} paddingAngle={3} label={({name,percent})=>`${name} ${((percent||0)*100).toFixed(0)}%`}>{genderData.map(row => <Cell key={row.name} fill={row.fill}/>)}</Pie><Tooltip formatter={(value: number) => [value, "Funcionários"]}/><Legend /></PieChart></ResponsiveContainer></div>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Faixas etárias</h3><p className="text-xs text-muted-foreground">Distribuição por idade; considera apenas cadastros com data de nascimento válida.</p>
-                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={ageData} margin={{top:12,right:8,left:-18,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar dataKey="total" name="Funcionários" radius={[7,7,0,0]}>{ageData.map((_,i)=><Cell key={i} fill={["#f97316","#eab308","#22c55e","#06b6d4","#6366f1"][i]}/>)}</Bar></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={ageData} margin={{top:12,right:8,left:-18,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:11}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar {...chart.click(ageData, row => chart.show(row.faixa, row.people))} dataKey="total" name="Funcionários" radius={[7,7,0,0]}>{ageData.map((_,i)=><Cell key={i} fill={["#f97316","#eab308","#22c55e","#06b6d4","#6366f1"][i]}/>)}</Bar></BarChart></ResponsiveContainer></div>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Tempo de empresa</h3><p className="text-xs text-muted-foreground">Faixas calculadas a partir da admissão até hoje ou até o desligamento cadastrado.</p>
-                    <div className="mt-3 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={tenureData} layout="vertical" margin={{top:4,right:16,left:24,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="faixa" width={105} tick={{fontSize:11}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar dataKey="total" name="Funcionários" radius={[0,7,7,0]}>{tenureData.map((_,i)=><Cell key={i} fill={["#14b8a6","#0ea5e9","#a855f7","#f43f5e"][i]}/>)}</Bar></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={tenureData} layout="vertical" margin={{top:4,right:16,left:24,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="faixa" width={105} tick={{fontSize:11}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar {...chart.click(tenureData, row => chart.show(row.faixa, row.people))} dataKey="total" name="Funcionários" radius={[0,7,7,0]}>{tenureData.map((_,i)=><Cell key={i} fill={["#14b8a6","#0ea5e9","#a855f7","#f43f5e"][i]}/>)}</Bar></BarChart></ResponsiveContainer></div>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Funcionários por setor</h3><p className="text-xs text-muted-foreground">Até 8 setores com maior número de pessoas na seleção.</p>
-                    <div className="mt-3 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptData} layout="vertical" margin={{top:4,right:16,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar dataKey="total" name="Funcionários" fill="#8b5cf6" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptData} layout="vertical" margin={{top:4,right:16,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[value,"Funcionários"]}/><Bar {...chart.click(deptData, row => chart.show(row.setor, row.people))} dataKey="total" name="Funcionários" fill="#8b5cf6" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
                   </Card>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Faixa etária por sexo</h3><p className="text-xs text-muted-foreground">Compara quantos funcionários de cada sexo existem em cada faixa etária.</p>
-                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={genderByAgeData} margin={{top:12,right:8,left:-18,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Legend/><Bar dataKey="feminino" name="Feminino" stackId="a" fill="#ec4899"/><Bar dataKey="masculino" name="Masculino" stackId="a" fill="#3b82f6"/><Bar dataKey="outros" name="Outro" stackId="a" fill="#8b5cf6"/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={genderByAgeData} margin={{top:12,right:8,left:-18,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis allowDecimals={false} tick={{fontSize:11}}/><Tooltip/><Legend/><Bar {...chart.click(genderByAgeData, row => chart.show(`${row.faixa} · Feminino`, row.groups.feminino))} dataKey="feminino" name="Feminino" stackId="a" fill="#ec4899"/><Bar {...chart.click(genderByAgeData, row => chart.show(`${row.faixa} · Masculino`, row.groups.masculino))} dataKey="masculino" name="Masculino" stackId="a" fill="#3b82f6"/><Bar {...chart.click(genderByAgeData, row => chart.show(`${row.faixa} · Outro`, row.groups.outros))} dataKey="outros" name="Outro" stackId="a" fill="#8b5cf6"/></BarChart></ResponsiveContainer></div>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Composição por sexo nos principais setores</h3><p className="text-xs text-muted-foreground">Compara a distribuição por sexo nos até 8 setores com mais funcionários.</p>
-                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptGenderData} layout="vertical" margin={{top:4,right:16,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip/><Legend/><Bar dataKey="feminino" name="Feminino" stackId="a" fill="#ec4899"/><Bar dataKey="masculino" name="Masculino" stackId="a" fill="#3b82f6"/><Bar dataKey="outros" name="Outro" stackId="a" fill="#8b5cf6"/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={deptGenderData} layout="vertical" margin={{top:4,right:16,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" allowDecimals={false}/><YAxis type="category" dataKey="setor" width={112} tick={{fontSize:10}}/><Tooltip/><Legend/><Bar {...chart.click(deptGenderData, row => chart.show(`${row.setor} · Feminino`, row.groups.feminino))} dataKey="feminino" name="Feminino" stackId="a" fill="#ec4899"/><Bar {...chart.click(deptGenderData, row => chart.show(`${row.setor} · Masculino`, row.groups.masculino))} dataKey="masculino" name="Masculino" stackId="a" fill="#3b82f6"/><Bar {...chart.click(deptGenderData, row => chart.show(`${row.setor} · Outro`, row.groups.outros))} dataKey="outros" name="Outro" stackId="a" fill="#8b5cf6"/></BarChart></ResponsiveContainer></div>
                   </Card>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
@@ -1126,7 +1201,8 @@ export function Kpis() {
                             labelFormatter={(_, payload) => payload?.[0]?.payload?.nome || ""}
                           />
                           {profileSeries.map(({ name, color }) => (
-                            <Scatter key={name} name={name} data={ageTenurePoints.filter(point => point.sexo === name)} fill={color} />
+                            <Scatter key={name} name={name} data={ageTenurePoints.filter(point => point.sexo === name)}
+                              {...chart.click(ageTenurePoints.filter(point => point.sexo === name), row => chart.show("Idade e tempo de empresa", [row]))} fill={color} />
                           ))}
                         </ScatterChart>
                       </ResponsiveContainer>
@@ -1143,7 +1219,7 @@ export function Kpis() {
                     <p className="text-xs text-muted-foreground">Considera somente funcionários com nascimento e admissão preenchidos. Para inativos, o tempo vai até a data de desligamento cadastrada.</p>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Tempo médio de empresa por faixa etária</h3><p className="text-xs text-muted-foreground">Ajuda a perceber se o quadro mais jovem tem menor permanência ou se há retenção em faixas etárias específicas.</p>
-                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={tenureByAgeData} margin={{top:12,right:8,left:0,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>v.toLocaleString("pt-BR",{maximumFractionDigits:1})+" a"} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[Number(v).toLocaleString("pt-BR",{maximumFractionDigits:2})+" anos","Tempo médio"]}/><Bar dataKey="media" name="Tempo médio (anos)" fill="#14b8a6" radius={[7,7,0,0]}/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={tenureByAgeData} margin={{top:12,right:8,left:0,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>v.toLocaleString("pt-BR",{maximumFractionDigits:1})+" a"} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[Number(v).toLocaleString("pt-BR",{maximumFractionDigits:2})+" anos","Tempo médio"]}/><Bar {...chart.click(tenureByAgeData, row => chart.show(row.faixa, row.people))} dataKey="media" name="Tempo médio (anos)" fill="#14b8a6" radius={[7,7,0,0]}/></BarChart></ResponsiveContainer></div>
                     <p className="text-xs text-muted-foreground">A quantidade de pessoas em cada faixa é mostrada abaixo do gráfico.</p><div className="mt-2 flex flex-wrap gap-2">{tenureByAgeData.map(e=><span key={e.faixa} className="rounded-full bg-muted px-3 py-1 text-xs">{e.faixa}: {e.quantidade} pessoa(s)</span>)}</div>
                   </Card>
                 </div>
@@ -1164,20 +1240,27 @@ export function Kpis() {
               const pensionTotal = pensioned.reduce((s,e)=>s+e.pensionAmount,0);
               const money = (n:number) => n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
               const salaryRanges = [{faixa:"Até R$ 2 mil",total:salaries.filter(e=>(e.salary||0)<=2000).length},{faixa:"R$ 2–3 mil",total:salaries.filter(e=>(e.salary||0)>2000&&(e.salary||0)<=3000).length},{faixa:"R$ 3–5 mil",total:salaries.filter(e=>(e.salary||0)>3000&&(e.salary||0)<=5000).length},{faixa:"R$ 5–8 mil",total:salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000).length},{faixa:"Acima de R$ 8 mil",total:salaries.filter(e=>(e.salary||0)>8000).length}];
-              const deptSalaries = [...new Set(salaries.map(e=>e.department||"Sem setor"))].map(setor=>{const values=salaries.filter(e=>(e.department||"Sem setor")===setor);return {setor,media:values.reduce((s,e)=>s+(e.salary||0),0)/values.length,quantidade:values.length};}).sort((a,b)=>b.media-a.media).slice(0,10);
-              const topSalaries = [...salaries].sort((a,b)=>(b.salary||0)-(a.salary||0)).slice(0,8).map(e=>({funcionario:e.name,salario:e.salary||0}));
+              const deptSalaries = [...new Set(salaries.map(e=>e.department||"Sem setor"))].map(setor=>{const values=salaries.filter(e=>(e.department||"Sem setor")===setor);return {setor,media:values.reduce((s,e)=>s+(e.salary||0),0)/values.length,quantidade:values.length, people:values};}).sort((a,b)=>b.media-a.media).slice(0,10);
+              const salaryPoints = salaries.map(e => ({ id: e.id, name: e.name, funcionario: e.name, salario: e.salary }));
+              const topSalaries = [...salaryPoints].sort((a,b) => b.salario - a.salario).slice(0,8);
+              const bottomSalaries = [...salaryPoints].sort((a,b) => a.salario - b.salario).slice(0,8);
               const genderSalaryRows = [
                 { genero: "Feminino", valores: salaries.filter(e => ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())) },
                 { genero: "Masculino", valores: salaries.filter(e => ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())) },
                 { genero: "Outro / não informado", valores: salaries.filter(e => !["feminino","fem","f","mulher","female","masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())) },
-              ].map(g => ({ genero: g.genero, quantidade: g.valores.length, media: g.valores.length ? g.valores.reduce((sum,e)=>sum+(e.salary||0),0)/g.valores.length : 0, folha: g.valores.reduce((sum,e)=>sum+(e.salary||0),0) }));
+              ].map(g => ({ genero: g.genero, people: g.valores, quantidade: g.valores.length, media: g.valores.length ? g.valores.reduce((sum,e)=>sum+(e.salary||0),0)/g.valores.length : 0, folha: g.valores.reduce((sum,e)=>sum+(e.salary||0),0) }));
               const salaryRangeGenderData = [
-                { faixa: "Até R$ 2 mil", feminino: salaries.filter(e=>(e.salary||0)<=2000 && ["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)<=2000 && ["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
-                { faixa: "R$ 2–3 mil", feminino: salaries.filter(e=>(e.salary||0)>2000&&(e.salary||0)<=3000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>2000&&(e.salary||0)<=3000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
-                { faixa: "R$ 3–5 mil", feminino: salaries.filter(e=>(e.salary||0)>3000&&(e.salary||0)<=5000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>3000&&(e.salary||0)<=5000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
-                { faixa: "R$ 5–8 mil", feminino: salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>5000&&(e.salary||0)<=8000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
-                { faixa: "Acima de R$ 8 mil", feminino: salaries.filter(e=>(e.salary||0)>8000&&["feminino","fem","f","mulher","female"].includes(String(e.gender ?? "").toLowerCase())).length, masculino: salaries.filter(e=>(e.salary||0)>8000&&["masculino","masc","m","homem","male"].includes(String(e.gender ?? "").toLowerCase())).length },
-              ];
+                { faixa: "Até R$ 2 mil", min: 0, max: 2000 },
+                { faixa: "R$ 2–3 mil", min: 2000, max: 3000 },
+                { faixa: "R$ 3–5 mil", min: 3000, max: 5000 },
+                { faixa: "R$ 5–8 mil", min: 5000, max: 8000 },
+                { faixa: "Acima de R$ 8 mil", min: 8000, max: Infinity },
+              ].map(({ faixa, min, max }) => {
+                const inRange = (e: { salary: number }) => e.salary > min && e.salary <= max;
+                const women = (genderSalaryRows[0]?.people ?? []).filter(inRange);
+                const men = (genderSalaryRows[1]?.people ?? []).filter(inRange);
+                return { faixa, women, men, feminino: women.length, masculino: men.length };
+              });
               const salaryAgeData = [
                 { faixa: "Até 25", min: 0, max: 25 },
                 { faixa: "26–35", min: 26, max: 35 },
@@ -1192,7 +1275,7 @@ export function Kpis() {
                   const age = now.getFullYear() - birth.getFullYear() - (now < new Date(now.getFullYear(), birth.getMonth(), birth.getDate()) ? 1 : 0);
                   return age >= range.min && age <= range.max;
                 });
-                return { faixa: range.faixa, media: values.length ? values.reduce((sum,e)=>sum+(e.salary||0),0)/values.length : 0, quantidade: values.length };
+                return { faixa: range.faixa, media: values.length ? values.reduce((sum,e)=>sum+(e.salary||0),0)/values.length : 0, quantidade: values.length, people: values };
               });
               const salaryTenurePoints = salaries.flatMap(e => {
                 if (!e.hireDate) return [];
@@ -1200,7 +1283,7 @@ export function Kpis() {
                 const years = Math.max(0,(new Date(endDate+"T00:00:00").getTime()-new Date(e.hireDate+"T00:00:00").getTime())/86400000/365.25);
                 const gender = String(e.gender ?? "").toLowerCase();
                 const sexo = ["feminino","fem","f","mulher","female"].includes(gender) ? "Feminino" : ["masculino","masc","m","homem","male"].includes(gender) ? "Masculino" : "Outro / não informado";
-                return Number.isFinite(years) ? [{ nome:e.name, tempo:Number(years.toFixed(2)), salario:Number(e.salary||0), sexo, setor:e.department||"Sem setor" }] : [];
+                return Number.isFinite(years) ? [{ id:e.id, name:e.name, nome:e.name, tempo:Number(years.toFixed(2)), salario:Number(e.salary||0), sexo, setor:e.department||"Sem setor" }] : [];
               });
               const salaryColors = ["#06b6d4","#8b5cf6","#f97316","#22c55e","#ec4899"];
               return <>
@@ -1214,33 +1297,33 @@ export function Kpis() {
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Distribuição por faixa salarial e sexo</h3><p className="text-xs text-muted-foreground">Quantidade de funcionários por faixa, comparando feminino e masculino.</p>
-                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={salaryRangeGenderData} margin={{top:12,right:8,left:0,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:9}} interval={0} angle={-10} textAnchor="end" height={55}/><YAxis allowDecimals={false} tick={{fontSize:10}}/><Tooltip/><Legend/><Bar dataKey="feminino" name="Feminino" fill="#ec4899" radius={[5,5,0,0]}/><Bar dataKey="masculino" name="Masculino" fill="#3b82f6" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={salaryRangeGenderData} margin={{top:12,right:8,left:0,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:9}} interval={0} angle={-10} textAnchor="end" height={55}/><YAxis allowDecimals={false} tick={{fontSize:10}}/><Tooltip/><Legend/><Bar {...chart.click(salaryRangeGenderData, row => chart.show(`${row.faixa} · Feminino`, row.women))} dataKey="feminino" name="Feminino" fill="#ec4899" radius={[5,5,0,0]}/><Bar {...chart.click(salaryRangeGenderData, row => chart.show(`${row.faixa} · Masculino`, row.men))} dataKey="masculino" name="Masculino" fill="#3b82f6" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Salário médio por sexo</h3><p className="text-xs text-muted-foreground">Compara salário médio, total de salários e quantidade de pessoas em cada categoria.</p>
-                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={genderSalaryRows} margin={{top:12,right:8,left:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="genero" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[money(v),"Salário médio"]}/><Bar dataKey="media" name="Salário médio" radius={[7,7,0,0]}>{genderSalaryRows.map(item => <Cell key={item.genero} fill={/fem|mulher/i.test(item.genero) ? "#ec4899" : /masc|homem/i.test(item.genero) ? "#3b82f6" : "#8b5cf6"}/>)}</Bar></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={genderSalaryRows} margin={{top:12,right:8,left:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="genero" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[money(v),"Salário médio"]}/><Bar {...chart.click(genderSalaryRows, row => chart.show(row.genero, row.people))} dataKey="media" name="Salário médio" radius={[7,7,0,0]}>{genderSalaryRows.map(item => <Cell key={item.genero} fill={/fem|mulher/i.test(item.genero) ? "#ec4899" : /masc|homem/i.test(item.genero) ? "#3b82f6" : "#8b5cf6"}/>)}</Bar></BarChart></ResponsiveContainer></div>
                     <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">{genderSalaryRows.map(item=><div key={item.genero} className="rounded-lg bg-muted/40 p-2"><p className="text-xs text-muted-foreground">{item.genero}</p><p className="text-sm font-semibold">{item.quantidade} pessoa(s)</p><p className="text-xs text-muted-foreground">{money(item.folha)} de folha</p></div>)}</div>
                   </Card>
                 </div>
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
                   <Card className="p-5 xl:col-span-2"><h3 className="font-bold">Salário médio por setor</h3><p className="text-xs text-muted-foreground">Comparação da média salarial entre os setores da seleção.</p>
-                    <div className="mt-3 h-[34rem]"><ResponsiveContainer width="100%" height="100%"><PieChart margin={{top:8,right:12,bottom:8,left:12}}><Pie data={deptSalaries} dataKey="media" nameKey="setor" cx="50%" cy="43%" outerRadius={150} stroke="#ffffff" strokeWidth={2} labelLine={{stroke:"currentColor",strokeWidth:1.2}} label={({name})=>name} style={{fontSize:12,fontWeight:500}}><Cell fill="#06b6d4"/><Cell fill="#8b5cf6"/><Cell fill="#f97316"/><Cell fill="#22c55e"/><Cell fill="#ec4899"/><Cell fill="#eab308"/><Cell fill="#3b82f6"/><Cell fill="#14b8a6"/><Cell fill="#64748b"/><Cell fill="#a3e635"/></Pie><Tooltip formatter={(value:number)=>[money(value),"Salário médio"]}/><Legend layout="horizontal" verticalAlign="bottom" align="center" iconSize={13} formatter={(value:string)=><span style={{fontSize:"13px",lineHeight:"18px",color:"var(--foreground)"}}>{value}</span>} wrapperStyle={{width:"100%",paddingTop:"10px",paddingLeft:"8px",paddingRight:"8px"}}/></PieChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-[34rem]"><ResponsiveContainer width="100%" height="100%"><PieChart margin={{top:8,right:12,bottom:8,left:12}}><Pie {...chart.click(deptSalaries, row => chart.show(row.setor, row.people))} data={deptSalaries} dataKey="media" nameKey="setor" cx="50%" cy="43%" outerRadius={150} stroke="#ffffff" strokeWidth={2} labelLine={{stroke:"currentColor",strokeWidth:1.2}} label={({name})=>name} style={{fontSize:12,fontWeight:500}}><Cell fill="#06b6d4"/><Cell fill="#8b5cf6"/><Cell fill="#f97316"/><Cell fill="#22c55e"/><Cell fill="#ec4899"/><Cell fill="#eab308"/><Cell fill="#3b82f6"/><Cell fill="#14b8a6"/><Cell fill="#64748b"/><Cell fill="#a3e635"/></Pie><Tooltip formatter={(value:number)=>[money(value),"Salário médio"]}/><Legend layout="horizontal" verticalAlign="bottom" align="center" iconSize={13} formatter={(value:string)=><span style={{fontSize:"13px",lineHeight:"18px",color:"var(--foreground)"}}>{value}</span>} wrapperStyle={{width:"100%",paddingTop:"10px",paddingLeft:"8px",paddingRight:"8px"}}/></PieChart></ResponsiveContainer></div>
                   </Card>
                 </div>
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Maiores salários cadastrados</h3><p className="text-xs text-muted-foreground">Até 8 registros de maior valor na seleção atual.</p>
-                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={topSalaries} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><YAxis type="category" dataKey="funcionario" width={140} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[money(value),"Salário"]}/><Bar dataKey="salario" name="Salário" fill="#f97316" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={topSalaries} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><YAxis type="category" dataKey="funcionario" width={140} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[money(value),"Salário"]}/><Bar {...chart.click(topSalaries, row => chart.show("Maiores salários", [row]))} dataKey="salario" name="Salário" fill="#f97316" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Menores salários cadastrados</h3><p className="text-xs text-muted-foreground">Até 8 registros de menor valor na seleção atual.</p>
-                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={[...salaries].sort((a,b)=>(a.salary||0)-(b.salary||0)).slice(0,8).map(e=>({funcionario:e.name,salario:e.salary||0}))} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><YAxis type="category" dataKey="funcionario" width={140} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[money(value),"Salário"]}/><Bar dataKey="salario" name="Salário" fill="#0d9488" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={bottomSalaries} layout="vertical" margin={{top:4,right:20,left:8,bottom:4}}><CartesianGrid strokeDasharray="3 3" horizontal={false}/><XAxis type="number" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><YAxis type="category" dataKey="funcionario" width={140} tick={{fontSize:10}}/><Tooltip formatter={(value:number)=>[money(value),"Salário"]}/><Bar {...chart.click(bottomSalaries, row => chart.show("Menores salários", [row]))} dataKey="salario" name="Salário" fill="#0d9488" radius={[0,7,7,0]}/></BarChart></ResponsiveContainer></div>
                   </Card>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                   <Card className="p-5"><h3 className="font-bold">Remuneração × tempo de empresa</h3><p className="text-xs text-muted-foreground">Cada ponto representa um funcionário. Os eixos mostram salário e tempo de empresa.</p>
-                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:12,right:16,bottom:18,left:8}}><CartesianGrid strokeDasharray="3 3"/><XAxis type="number" dataKey="tempo" name="Tempo de empresa" tick={{fontSize:10}} label={{value:"Tempo de empresa (anos)",position:"insideBottom",offset:-12,fontSize:11}}/><YAxis type="number" dataKey="salario" name="Salário" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><ZAxis range={[55,55]}/><Tooltip formatter={(value:number,name:string)=>[name==="Salário"?money(value):Number(value).toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos",name]} labelFormatter={(_,payload)=>payload?.[0]?.payload?.nome || ""}/><Legend/><Scatter name="Feminino" data={salaryTenurePoints.filter(e=>e.sexo==="Feminino")} fill="#ec4899"/><Scatter name="Masculino" data={salaryTenurePoints.filter(e=>e.sexo==="Masculino")} fill="#3b82f6"/><Scatter name="Outro / não informado" data={salaryTenurePoints.filter(e=>e.sexo==="Outro / não informado")} fill="#8b5cf6"/></ScatterChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:12,right:16,bottom:18,left:8}}><CartesianGrid strokeDasharray="3 3"/><XAxis type="number" dataKey="tempo" name="Tempo de empresa" tick={{fontSize:10}} label={{value:"Tempo de empresa (anos)",position:"insideBottom",offset:-12,fontSize:11}}/><YAxis type="number" dataKey="salario" name="Salário" tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><ZAxis range={[55,55]}/><Tooltip formatter={(value:number,name:string)=>[name==="Salário"?money(value):Number(value).toLocaleString("pt-BR",{maximumFractionDigits:1})+" anos",name]} labelFormatter={(_,payload)=>payload?.[0]?.payload?.nome || ""}/><Legend/><Scatter name="Feminino" data={salaryTenurePoints.filter(e=>e.sexo==="Feminino")} {...chart.click(salaryTenurePoints.filter(e=>e.sexo==="Feminino"), row => chart.show("Remuneração e tempo de empresa", [row]))} fill="#ec4899"/><Scatter name="Masculino" data={salaryTenurePoints.filter(e=>e.sexo==="Masculino")} {...chart.click(salaryTenurePoints.filter(e=>e.sexo==="Masculino"), row => chart.show("Remuneração e tempo de empresa", [row]))} fill="#3b82f6"/><Scatter name="Outro / não informado" data={salaryTenurePoints.filter(e=>e.sexo==="Outro / não informado")} {...chart.click(salaryTenurePoints.filter(e=>e.sexo==="Outro / não informado"), row => chart.show("Remuneração e tempo de empresa", [row]))} fill="#8b5cf6"/></ScatterChart></ResponsiveContainer></div>
                     <p className="text-xs text-muted-foreground">Usa salário cadastrado e tempo desde a admissão (até hoje ou até o desligamento). Não inclui encargos, benefícios ou adicionais.</p>
                   </Card>
                   <Card className="p-5"><h3 className="font-bold">Salário médio por faixa etária</h3><p className="text-xs text-muted-foreground">Mostra como a média salarial varia entre faixas de idade; considere também função, jornada, senioridade e setor ao interpretar.</p>
-                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={salaryAgeData} margin={{top:12,right:8,left:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[money(Number(v)),"Salário médio"]}/><Bar dataKey="media" name="Salário médio" fill="#8b5cf6" radius={[7,7,0,0]}/></BarChart></ResponsiveContainer></div>
+                    <div className="mt-3 h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={salaryAgeData} margin={{top:12,right:8,left:4,bottom:4}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="faixa" tick={{fontSize:10}}/><YAxis tickFormatter={(v:number)=>money(v)} tick={{fontSize:10}}/><Tooltip formatter={(v:number)=>[money(Number(v)),"Salário médio"]}/><Bar {...chart.click(salaryAgeData, row => chart.show(row.faixa, row.people))} dataKey="media" name="Salário médio" fill="#8b5cf6" radius={[7,7,0,0]}/></BarChart></ResponsiveContainer></div>
                     <div className="mt-2 flex flex-wrap gap-2">{salaryAgeData.map(e=><span key={e.faixa} className="rounded-full bg-muted px-3 py-1 text-xs">{e.faixa}: {e.quantidade} pessoa(s)</span>)}</div>
                   </Card>
                 </div>
@@ -1285,7 +1368,11 @@ export function Kpis() {
               </div>
               <div className="mt-5 h-56">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={monthlyAbsenteeism} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+                  <AreaChart data={monthlyAbsenteeism} style={{ cursor: "pointer" }}
+                    onClick={state => {
+                      const row = monthlyAbsenteeism[Number(state?.activeTooltipIndex)];
+                      if (row) showMonth("Absenteísmo", "lost", row);
+                    }} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
                     <defs><linearGradient id="absenteeismFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.75}/><stop offset="95%" stopColor="#f97316" stopOpacity={0.05}/></linearGradient></defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false}/>
                     <XAxis dataKey="label" tick={{ fontSize: 10 }}/>
@@ -1302,18 +1389,18 @@ export function Kpis() {
               <h3 className="font-bold">Composição das horas perdidas</h3>
               <p className="text-xs text-muted-foreground">Débitos, faltas e abonos que compõem o absenteísmo.</p>
               {(() => {
-                const parts: [string, number][] = [
-                  ["Débitos", metrics.debitMinutes],
-                  ["Faltas", Math.max(0, metrics.faltasMinutes)],
-                  ["Abonos", Math.max(0, metrics.abonosMinutes)],
+                const parts: [string, number, ContributorKey][] = [
+                  ["Débitos", metrics.debitMinutes, "debits"],
+                  ["Faltas", Math.max(0, metrics.faltasMinutes), "absences"],
+                  ["Abonos", Math.max(0, metrics.abonosMinutes), "allowances"],
                 ];
                 const total = parts.reduce((sum, [, value]) => sum + value, 0);
                 return <div className="mt-5 space-y-4">
-                  {parts.map(([label, value]) => (
-                    <div key={label}>
+                  {parts.map(([label, value, key]) => (
+                    <button type="button" key={key} onClick={() => chart.show(label, selectedContributors(key))} className="block w-full rounded text-left hover:bg-muted/40">
                       <div className="flex justify-between gap-3 text-sm"><span>{label}</span><strong>{fmt(value)}{total > 0 ? ` · ${(value / total * 100).toFixed(1)}%` : ""}</strong></div>
                       <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${total ? Math.min(100, value / total * 100) : 0}%` }} /></div>
-                    </div>
+                    </button>
                   ))}
                 </div>;
               })()}
@@ -1327,16 +1414,16 @@ export function Kpis() {
               <p className="text-xs text-muted-foreground">Participação de cada tipo no total de horas das ocorrências registradas no período selecionado.</p>
               {(() => {
                 const items = [
-                  { name: "Atestados", value: Math.max(0, metrics.atestadosMinutes), display: daysFmt(metrics.atestadosDays), color: "#06CAA0" },
-                  { name: "Declarações de horas", value: Math.max(0, metrics.declaracoesMinutes), display: fmt(metrics.declaracoesMinutes), color: "#3B82F6" },
-                  { name: "Faltas", value: Math.max(0, metrics.faltasMinutes), display: fmt(metrics.faltasMinutes), color: "#8B5CF6" },
-                  { name: "Folgas", value: Math.max(0, metrics.folgasMinutes), display: daysFmt(metrics.folgasDays), color: "#F59E0B" },
+                  { name: "Atestados", key: "certificates" as const, value: Math.max(0, metrics.atestadosMinutes), display: daysFmt(metrics.atestadosDays), color: "#06CAA0" },
+                  { name: "Declarações de horas", key: "declarations" as const, value: Math.max(0, metrics.declaracoesMinutes), display: fmt(metrics.declaracoesMinutes), color: "#3B82F6" },
+                  { name: "Faltas", key: "absences" as const, value: Math.max(0, metrics.faltasMinutes), display: fmt(metrics.faltasMinutes), color: "#8B5CF6" },
+                  { name: "Folgas", key: "daysOff" as const, value: Math.max(0, metrics.folgasMinutes), display: daysFmt(metrics.folgasDays), color: "#F59E0B" },
                 ];
                 const total = items.reduce((sum, item) => sum + item.value, 0);
                 return <div className="mt-4 grid items-center gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
                   <div className="relative mx-auto h-48 w-48">
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart><Pie data={items} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={58} outerRadius={86} paddingAngle={2} stroke="none">
+                      <PieChart><Pie {...chart.click(items, item => chart.show(item.name, selectedContributors(item.key)))} data={items} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={58} outerRadius={86} paddingAngle={2} stroke="none">
                         {items.map(item => <Cell key={item.name} fill={item.color}/>)}
                       </Pie><Tooltip formatter={(value:number, name:string) => [`${total ? (Number(value) / total * 100).toFixed(1) : "0.0"}%`, name]}/></PieChart>
                     </ResponsiveContainer>
@@ -1362,7 +1449,7 @@ export function Kpis() {
                   <XAxis dataKey="label" tick={{fontSize:10}}/>
                   <YAxis tickFormatter={(value:number) => fmt(value)} tick={{fontSize:10}}/>
                   <Tooltip formatter={(value:number) => [fmt(value), "Débitos"]}/>
-                  <Bar dataKey="debits" name="Débitos" fill="#0D9488" radius={[6,6,0,0]} activeBar={{ fill: "#0F766E" }}/>
+                  <Bar {...chart.click(monthlyAbsenteeism, row => showMonth("Débitos", "debits", row))} dataKey="debits" name="Débitos" fill="#0D9488" radius={[6,6,0,0]} activeBar={{ fill: "#0F766E" }}/>
                 </BarChart>
               </ResponsiveContainer></div>
               {!monthlyAbsenteeism.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem dados históricos para o ano selecionado.</p>}
@@ -1453,7 +1540,7 @@ export function Kpis() {
                       <XAxis dataKey="label" tick={{ fontSize: 10 }}/>
                       <YAxis tickFormatter={(value:number) => fmt(value)} tick={{ fontSize: 10 }}/>
                       <Tooltip formatter={(value:number) => [fmt(value), "Horas extras"]}/>
-                      <Bar dataKey="total" name="Horas extras" fill="#8b5cf6" radius={[7,7,0,0]} activeBar={{ fill: "#6d28d9" }}/>
+                      <Bar {...chart.click(monthlyOvertime, row => showMonth("Horas extras", "overtime", row))} dataKey="total" name="Horas extras" fill="#8b5cf6" radius={[7,7,0,0]} activeBar={{ fill: "#6d28d9" }}/>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1464,41 +1551,42 @@ export function Kpis() {
                 <h3 className="font-bold">Distribuição por tipo</h3>
                 <p className="text-xs text-muted-foreground">Composição das horas extras selecionadas.</p>
                 {(() => {
-                  const parts = [
-                    ["HE 60%", metrics.he60],
-                    ["HE 60% + 20%", metrics.he60Night],
-                    ["HE 100%", metrics.he100],
-                    ["HE 100% + 20%", metrics.he100Night],
-                    ["HE 20%", metrics.he20],
-                  ] as [string, number][];
-                  const total = parts.reduce((sum, [, value]) => sum + value, 0);
-                  let cursor = 0;
                   const colors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
-                  const stops = parts.map(([label, value], index) => {
-                    const segmentStart = total ? (cursor / total) * 360 : 0;
-                    cursor += value;
-                    const segmentEnd = total ? (cursor / total) * 360 : 0;
-                    return `${colors[index]} ${segmentStart}deg ${segmentEnd}deg`;
-                  }).join(", ");
+                  const parts = [
+                    { name: "HE 60%", key: "he60" },
+                    { name: "HE 60% + 20%", key: "he60Night" },
+                    { name: "HE 100%", key: "he100" },
+                    { name: "HE 100% + 20%", key: "he100Night" },
+                    { name: "HE 20%", key: "he20" },
+                  ] as const;
+                  const items = parts.map((item, index) => ({ ...item, value: metrics[item.key], color: colors[index] }));
                   return (
-                    <div className="mt-5 flex items-center gap-6">
-                      <div
-                        className="relative h-36 w-36 shrink-0 rounded-full"
-                        style={{ background: total ? `conic-gradient(${stops})` : "var(--muted)" }}
-                      >
-                        <div className="absolute inset-6 flex items-center justify-center rounded-full bg-card text-center">
-                          <div><p className="text-xs text-muted-foreground">Total</p><p className="text-sm font-bold">{fmt(total)}</p></div>
+                    <div className="mt-5 flex flex-wrap items-center gap-4">
+                      <div className="relative h-36 w-36 shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie {...chart.click(items, row => chart.show(row.name, selectedContributors(row.key)))}
+                              data={items} dataKey="value" nameKey="name" innerRadius={45} outerRadius={69} stroke="none">
+                              {items.map(item => <Cell key={item.key} fill={item.color}/>)}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => fmt(value)}/>
+                          </PieChart>
+                        </ResponsiveContainer>
+                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+                          <p className="text-xs text-muted-foreground">Total</p>
+                          <p className="text-sm font-bold">{fmt(totalOvertime)}</p>
                         </div>
                       </div>
-                      <div className="min-w-0 flex-1 space-y-2 text-xs">
-                        {parts.map(([label, value], index) => (
-                          <div key={label} className="flex items-center justify-between gap-3">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colors[index] }} />
-                              <span className="truncate">{label}</span>
-                            </div>
-                            <strong>{fmt(value)}</strong>
-                          </div>
+                      <div className="min-w-0 flex-1 space-y-1 text-xs">
+                        {items.map(item => (
+                          <button type="button" key={item.key} onClick={() => chart.show(item.name, selectedContributors(item.key))}
+                            className="flex w-full items-center justify-between gap-3 rounded p-1 text-left hover:bg-muted/40">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: item.color }} />
+                              <span>{item.name}</span>
+                            </span>
+                            <strong>{fmt(item.value)}</strong>
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -1513,13 +1601,15 @@ export function Kpis() {
                 <p className="text-xs text-muted-foreground">{employeesWithOvertime.length} {employeesWithOvertime.length === 1 ? "funcionário com crédito" : "funcionários com crédito"} no período selecionado.</p>
                 <div role="region" aria-labelledby="kpi-overtime-employees" tabIndex={0} className="mt-5 max-h-96 space-y-3 overflow-y-auto pr-2">
                   {employeesWithOvertime.map((item, index) => (
-                    <div key={item.employeeId}>
+                    <button type="button" key={item.employeeId}
+                      onClick={() => chart.show("Horas extras por funcionário", [{ id: item.employeeId, name: item.name }])}
+                      className="block w-full rounded text-left hover:bg-muted/40">
                       <div className="flex items-center justify-between gap-3 text-sm">
                         <span className="truncate">{index + 1}. {item.name}</span>
                         <strong>{fmt(item.total)}</strong>
                       </div>
                       <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, item.total / Math.max(employeesWithOvertime[0]?.total ?? 0, 1) * 100)}%` }} /></div>
-                    </div>
+                    </button>
                   ))}
                   {!employeesWithOvertime.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem horas extras.</p>}
                 </div>
@@ -1585,8 +1675,8 @@ export function Kpis() {
                       <YAxis allowDecimals={false} tick={{ fontSize: 11 }}/>
                       <Tooltip formatter={(value:number, name:string) => [value, name]}/>
                       <Legend/>
-                      <Bar dataKey="admissions" name="Admissões" fill="#06b6d4" radius={[5,5,0,0]} activeBar={{ fill: "#0891b2" }}/>
-                      <Bar dataKey="terminations" name="Desligamentos" fill="#f43f5e" radius={[5,5,0,0]} activeBar={{ fill: "#e11d48" }}/>
+                      <Bar {...chart.click(monthlyTurnover, row => chart.show(`Admissões · ${row.month}/${appliedYear}`, row.admitted))} dataKey="admissions" name="Admissões" fill="#06b6d4" radius={[5,5,0,0]} activeBar={{ fill: "#0891b2" }}/>
+                      <Bar {...chart.click(monthlyTurnover, row => chart.show(`Desligamentos · ${row.month}/${appliedYear}`, row.terminated))} dataKey="terminations" name="Desligamentos" fill="#f43f5e" radius={[5,5,0,0]} activeBar={{ fill: "#e11d48" }}/>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1598,7 +1688,7 @@ export function Kpis() {
                   {metrics.admissions + metrics.terminations > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                        <Pie data={[{ name: "Admissões", value: metrics.admissions }, { name: "Desligamentos", value: metrics.terminations }]} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={88} paddingAngle={4} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                        <Pie {...chart.click(turnoverMovements, row => chart.show(row.name, row.people))} data={turnoverMovements} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={88} paddingAngle={4} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                           <Cell fill="#06b6d4"/><Cell fill="#f43f5e"/>
                         </Pie>
                         <Tooltip formatter={(value:number) => [value, "Funcionários"]}/>
@@ -1619,7 +1709,7 @@ export function Kpis() {
                     <XAxis dataKey="gender" tick={{ fontSize: 11 }}/>
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }}/>
                     <Tooltip formatter={(value: number) => [value, "Desligamentos"]}/>
-                    <Bar dataKey="total" name="Desligamentos" radius={[6, 6, 0, 0]}>
+                    <Bar {...chart.click(terminationsByGender, row => chart.show(`Desligamentos · ${row.gender}`, row.people))} dataKey="total" name="Desligamentos" radius={[6, 6, 0, 0]}>
                       {terminationsByGender.map(item => <Cell key={item.gender} fill={item.fill}/>)}
                     </Bar>
                   </BarChart>
@@ -1637,6 +1727,7 @@ export function Kpis() {
           </section>
         )}
       </main>
+      <ChartEmployeesDialog selection={isCalculating ? null : chart.selection} close={chart.close} />
     </div>
   );
 }

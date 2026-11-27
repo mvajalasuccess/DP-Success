@@ -1,4 +1,5 @@
 import { ArrowLeft, Search, BarChart3, Users, CalendarRange, Clock3, FileSpreadsheet, TrendingUp, Check, ListChecks, SlidersHorizontal } from "lucide-react";
+import { ChartEmployeesDialog, useChartEmployees } from "@/components/chart-employees-dialog";
 import { Card } from "@/components/ui/card";
 import { useEffect, useId, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -146,6 +147,7 @@ function ComparisonPicker({
 }
 
 export function Comparativos() {
+  const chart = useChartEmployees();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
@@ -395,10 +397,12 @@ export function Comparativos() {
     { name: "HE 20%", key: "he20" as const },
   ].map(item => ({
     name: item.name,
+    key: item.key,
     horas: selectedEmployeeRows.reduce((sum, row) => sum + row.totals[item.key], 0) / 60,
   })), [selectedEmployeeRows]);
   const chartEmployees = useMemo(() => selectedEmployeeRows
     .map(row => ({
+      id: row.id,
       name: row.employee!.full_name,
       he60: row.totals.he60 / 60,
       he60_20: row.totals.he60_20 / 60,
@@ -414,10 +418,14 @@ export function Comparativos() {
   const sumDays = (key: "faltas" | "atestados") =>
     selectedEmployeeRows.reduce((sum, row) => sum + row.totals[key], 0);
   const occurrenceChart = [
-    { name: "Débitos", quantidade: sumHours("debitos") / 60 },
-    { name: "Faltas", quantidade: sumDays("faltas") },
-    { name: "Atestados", quantidade: sumDays("atestados") },
+    { name: "Débitos", key: "debitos" as const, quantidade: sumHours("debitos") / 60 },
+    { name: "Faltas", key: "faltas" as const, quantidade: sumDays("faltas") },
+    { name: "Atestados", key: "atestados" as const, quantidade: sumDays("atestados") },
   ];
+  const showContributors = (title: string, key: keyof Totals) => {
+    chart.show(title, selectedEmployeeRows.filter(row => row.totals[key] !== 0)
+      .map(row => ({ id: row.id, name: row.employee!.full_name })));
+  };
   const hasChartData = selectedEmployeeRows.length > 0 && selectedPeriods.length > 0;
 
   return <div className="dp-screen min-h-screen bg-background">
@@ -534,7 +542,7 @@ export function Comparativos() {
               <XAxis dataKey="name" tick={{fontSize:11}} interval={0} />
               <YAxis tick={{fontSize:11}} />
               <Tooltip formatter={(value) => [fmtNumber(Number(value)) + " h", "Horas"]} />
-              <Bar dataKey="horas" name="Horas" fill="#06CAA0" radius={[6,6,0,0]} maxBarSize={48} />
+              <Bar {...chart.click(chartCategories, row => showContributors(row.name, row.key))} dataKey="horas" name="Horas" fill="#06CAA0" radius={[6,6,0,0]} maxBarSize={48} />
             </BarChart></ResponsiveContainer>
           </div> : <div className="flex h-[280px] flex-col items-center justify-center rounded-xl bg-muted/20 text-center"><BarChart3 className="mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-medium">Sem valores para exibir</p><p className="mt-1 text-xs text-muted-foreground">Selecione colaboradores e competências com dados.</p></div>}
         </Card>
@@ -547,10 +555,10 @@ export function Comparativos() {
               <YAxis tick={{fontSize:11}} />
               <Tooltip formatter={(value) => [fmtNumber(Number(value)) + " h", "Horas"]} />
               <Legend wrapperStyle={{fontSize:11}} />
-              <Bar dataKey="he60" name="HE 60%" stackId="he" fill="#06CAA0" />
-              <Bar dataKey="he60_20" name="HE 60% + noturno" stackId="he" fill="#0D9488" />
-              <Bar dataKey="he100" name="HE 100%" stackId="he" fill="#64748B" />
-              <Bar dataKey="he20" name="HE 20%" stackId="he" fill="#A7B7C7" radius={[4,4,0,0]} />
+              <Bar {...chart.click(chartEmployees, row => chart.show("HE 60%", row.he60 ? [row] : []))} dataKey="he60" name="HE 60%" stackId="he" fill="#06CAA0" />
+              <Bar {...chart.click(chartEmployees, row => chart.show("HE 60% + noturno", row.he60_20 ? [row] : []))} dataKey="he60_20" name="HE 60% + noturno" stackId="he" fill="#0D9488" />
+              <Bar {...chart.click(chartEmployees, row => chart.show("HE 100%", row.he100 ? [row] : []))} dataKey="he100" name="HE 100%" stackId="he" fill="#64748B" />
+              <Bar {...chart.click(chartEmployees, row => chart.show("HE 20%", row.he20 ? [row] : []))} dataKey="he20" name="HE 20%" stackId="he" fill="#A7B7C7" radius={[4,4,0,0]} />
             </BarChart></ResponsiveContainer>
           </div> : <div className="flex h-[280px] flex-col items-center justify-center rounded-xl bg-muted/20 text-center"><Users className="mb-3 h-8 w-8 text-muted-foreground/50" /><p className="text-sm font-medium">Sem valores para comparar</p><p className="mt-1 text-xs text-muted-foreground">Os gráficos aparecem quando houver valores no recorte.</p></div>}
         </Card>
@@ -562,7 +570,7 @@ export function Comparativos() {
           <ResponsiveContainer width="100%" height="100%"><BarChart data={occurrenceChart} margin={{top:8,right:12,left:0,bottom:8}}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" tick={{fontSize:12}} /><YAxis tick={{fontSize:11}} />
             <Tooltip formatter={(value) => [fmtNumber(Number(value)), "Quantidade"]} />
-            <Bar dataKey="quantidade" name="Quantidade" fill="#0D9488" radius={[6,6,0,0]} maxBarSize={56} />
+            <Bar {...chart.click(occurrenceChart, row => showContributors(row.name, row.key))} dataKey="quantidade" name="Quantidade" fill="#0D9488" radius={[6,6,0,0]} maxBarSize={56} />
           </BarChart></ResponsiveContainer>
         </div> : <div className="flex h-[220px] items-center justify-center rounded-xl bg-muted/20 text-center text-sm text-muted-foreground">Sem ocorrências no recorte selecionado.</div>}
       </Card>
@@ -598,5 +606,6 @@ export function Comparativos() {
       </Card>
       <p className="mt-4 text-xs text-muted-foreground">Os gráficos usam os mesmos valores carregados para a tabela. Interjornada permanece em coluna própria e não é incorporada às categorias de horas extras.</p>
     </main>
+    <ChartEmployeesDialog selection={chart.selection} close={chart.close} />
   </div>
 }
