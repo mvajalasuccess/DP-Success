@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAttendanceCertificates } from "@/lib/attendance-certificates";
 import { CompanyFilter } from "@/components/company-filter";
-import { balancesByEmployee, occurrenceMinutes, periodRangeLabel, type Period } from "@/lib/dp-model";
+import { balancesByEmployee, occurrenceMinutes, periodForDate, periodRangeLabel, type Period } from "@/lib/dp-model";
 import { countWorkingWeekdays } from "@/lib/feriados";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, ScatterChart, Scatter, ZAxis } from "recharts";
 
@@ -378,8 +378,9 @@ export function Kpis() {
           : noRows,
         currentPeriodIds.length
           ? fetchAllKpiRows((from, to) => db.from("overtime_records")
-              .select("employee_id,period_id,minutes,launch_type,launch_group_id,notes")
-              .in("period_id", currentPeriodIds).order("id").range(from, to))
+              .select("employee_id,period_id,reference_date,minutes,launch_type,launch_group_id,notes")
+              .or(`period_id.in.(${currentPeriodIds.join(",")}),and(period_id.is.null,reference_date.gte.${currentPeriods[0]!.start_date},reference_date.lte.${currentPeriods.at(-1)!.end_date})`)
+              .order("id").range(from, to))
           : noRows,
         currentPeriodIds.length
           ? fetchAllKpiRows((from, to) => db.from("time_records")
@@ -411,7 +412,9 @@ export function Kpis() {
       if (loadError) throw new Error(loadError.message);
 
       const historicalByMonth = groupBy(historical.data, row => String(row.reference_month));
-      const overtimeByPeriod = groupBy(overtime.data, row => String(row.period_id));
+      const overtimeByPeriod = groupBy(overtime.data, row =>
+        row.period_id ?? periodForDate(currentPeriods, row.reference_date)?.id ?? ""
+      );
       const timeByPeriod = groupBy(timeRecords.data, row => String(row.period_id));
       const occurrencesByPeriod = groupBy(occurrences.data, row => String(row.period_id));
       const debitsByPeriod = groupBy(debits.data, row => String(row.period_id));
@@ -663,7 +666,7 @@ export function Kpis() {
       next.turnover = next.activeHeadcount ? ((admissions + terminations) / 2) / next.activeHeadcount * 100 : 0;
 
       const comparisonRows = [...comparison.values()].map(item => ({ ...item, total: overtimeTotal(item) }))
-        .sort((a, b) => b.total - a.total);
+        .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "pt-BR"));
       setOvertimeEmployees(comparisonRows);
       setMonthlyAbsenteeism(monthly);
       setMonthlyOvertime(monthly.filter(row => selectedPeriodIds.has(row.periodId)));
@@ -731,6 +734,7 @@ export function Kpis() {
 
   const absenteeismRate = metrics.expected > 0 ? (metrics.absenceMinutes / metrics.expected) * 100 : 0;
   const totalOvertime = overtimeTotal(metrics);
+  const employeesWithOvertime = overtimeEmployees.filter(item => item.total > 0);
   const defaultKpiYear = periods.length ? Math.max(...periods.map(p => p.reference_year)) : new Date().getFullYear();
 
   // Faixas gerenciais de referência, não limites oficiais universais.
@@ -829,7 +833,7 @@ export function Kpis() {
     : activeSection === "horas-extras"
     ? [
         { label: "Horas extras", value: fmt(Math.max(0, totalOvertime)), support: "Horas trabalhadas além da jornada prevista", tone: "neutral", title: "Soma dos tipos de hora extra já apurados nesta seleção.", primary: true },
-        { label: "Funcionários com HE", value: String(overtimeEmployees.filter(item => item.total - item.interjornada > 0).length), support: "Quantidade de pessoas que registraram horas extras no período", tone: "neutral", title: "Contagem de funcionários com horas extras na seleção." },
+        { label: "Funcionários com HE", value: String(employeesWithOvertime.length), support: "Quantidade de pessoas que registraram horas extras no período", tone: "neutral", title: "Contagem de funcionários com horas extras na seleção." },
         { label: "Interjornada", value: fmt(metrics.interjornada), support: "Horas registradas de descanso insuficiente entre jornadas", tone: "neutral", title: "Interjornada é exibida separadamente e não compõe o saldo." },
         { label: "Banco de horas", value: fmt(bankBalance), support: "Diferença acumulada entre créditos e débitos até o fim do período", tone: "neutral", title: "Saldo apurado pelo modelo atual de Banco de Horas." },
       ]
@@ -1370,7 +1374,7 @@ export function Kpis() {
               <div className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-primary" /><h3 className="font-bold">Atenção do RH</h3></div>
               <p className="mt-1 text-xs text-muted-foreground">Pontos operacionais para acompanhar nesta competência.</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Funcionários com HE</p><p className="mt-1 text-2xl font-bold">{overtimeEmployees.length}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas com lançamentos na apuração de horas extras.</p></div>
+                <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Funcionários com HE</p><p className="mt-1 text-2xl font-bold">{employeesWithOvertime.length}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas com lançamentos na apuração de horas extras.</p></div>
                 <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Horas abonadas</p><p className="mt-1 text-2xl font-bold">{fmt(metrics.abonosMinutes)}</p><p className="mt-1 text-xs text-muted-foreground">Horas de ausência justificadas e registradas como abono.</p></div>
                 <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Desligamentos</p><p className="mt-1 text-2xl font-bold">{metrics.terminations}</p><p className="mt-1 text-xs text-muted-foreground">Pessoas cujo vínculo terminou durante o período.</p></div>
               </div>
@@ -1505,19 +1509,19 @@ export function Kpis() {
 
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
-                <h3 className="font-bold">Funcionários com maior volume de HE</h3>
-                <p className="text-xs text-muted-foreground">Até 10 funcionários, considerando o período selecionado.</p>
-                <div className="mt-5 space-y-3">
-                  {overtimeEmployees.filter(item => item.total > 0).slice(0, 10).map((item, index) => (
+                <h3 id="kpi-overtime-employees" className="font-bold">Horas extras por funcionário</h3>
+                <p className="text-xs text-muted-foreground">{employeesWithOvertime.length} {employeesWithOvertime.length === 1 ? "funcionário com crédito" : "funcionários com crédito"} no período selecionado.</p>
+                <div role="region" aria-labelledby="kpi-overtime-employees" tabIndex={0} className="mt-5 max-h-96 space-y-3 overflow-y-auto pr-2">
+                  {employeesWithOvertime.map((item, index) => (
                     <div key={item.employeeId}>
                       <div className="flex items-center justify-between gap-3 text-sm">
                         <span className="truncate">{index + 1}. {item.name}</span>
                         <strong>{fmt(item.total)}</strong>
                       </div>
-                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, item.total / Math.max(overtimeEmployees[0]?.total ?? 0, 1) * 100)}%` }} /></div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.min(100, item.total / Math.max(employeesWithOvertime[0]?.total ?? 0, 1) * 100)}%` }} /></div>
                     </div>
                   ))}
-                  {!overtimeEmployees.some(item => item.total > 0) && <p className="py-8 text-center text-sm text-muted-foreground">Sem horas extras.</p>}
+                  {!employeesWithOvertime.length && <p className="py-8 text-center text-sm text-muted-foreground">Sem horas extras.</p>}
                 </div>
               </Card>
 
