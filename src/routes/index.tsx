@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAttendanceCertificates } from "@/lib/attendance-certificates";
 import { CompanyFilter } from "@/components/company-filter";
 import { useAccountIdentity } from "@/hooks/use-account-identity";
-import { PLANNING_SCREEN, planningPublicUrl } from "@/lib/planning-url";
+import { PLANNING_PATH, PLANNING_SCREEN, planningPublicUrl } from "@/lib/planning-url";
 const Employees = lazy(() => import("@/screens/funcionarios").then(m => ({ default: m.Employees })));
 const Companies = lazy(() => import("@/screens/empresas").then(m => ({ default: m.Companies })));
 const Positions = lazy(() => import("@/screens/cargos").then(m => ({ default: m.Positions })));
@@ -191,6 +191,18 @@ function AppShell({
     setCollapsedFlyout(null);
   };
 
+  const planningBrandLink = {
+    href: PLANNING_PATH,
+    "aria-label": "DP Success, abrir Planejamento Mensal",
+    title: "Abrir Planejamento Mensal",
+    onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey ||
+          event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      go(PLANNING_SCREEN);
+    },
+  };
+
   // Mantém todos os grupos recolhidos ao entrar; navegar entre telas não os expande automaticamente.
   useEffect(() => {
     setCollapsedFlyout(null);
@@ -273,10 +285,10 @@ function AppShell({
   return (
     <div className={isConsulta ? "role-consulta min-h-screen bg-background" : "min-h-screen bg-background"}>
       <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/95 px-4 shadow-sm backdrop-blur lg:hidden">
-        <div className="flex min-w-0 items-center gap-2.5">
+        <a {...planningBrandLink} className="flex min-w-0 items-center gap-2.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Clock3 className="h-5 w-5 shrink-0 dp-sidebar-brand-icon" strokeWidth={1.8} aria-hidden="true" />
           <span className="truncate font-display text-sm font-semibold tracking-tight dp-sidebar-brand-title">DPSUCCESS</span>
-        </div>
+        </a>
         <button type="button" onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen} aria-haspopup="dialog" className="inline-flex min-h-10 items-center gap-2 border px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <Menu className="h-4 w-4" /> Menu
         </button>
@@ -287,10 +299,10 @@ function AppShell({
           <button type="button" className="absolute inset-0 h-full w-full cursor-default" onClick={() => setMobileMenuOpen(false)} aria-label="Fechar menu de navegação" />
           <aside role="dialog" aria-modal="true" aria-label="Menu de navegação" className="dp-sidebar relative z-10 flex h-full w-[min(88vw,22rem)] flex-col border-r">
             <div className="dp-sidebar-header flex h-[76px] shrink-0 items-center justify-between border-b px-4">
-              <div className="flex min-w-0 items-center gap-3">
+              <a {...planningBrandLink} className="flex min-w-0 items-center gap-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
                 <Clock3 className="h-5 w-5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
                 <div className="min-w-0"><p className="font-display text-base font-bold tracking-tight">DP SUCCESS</p><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em]">RH · DP · GESTÃO</p></div>
-              </div>
+              </a>
               <button type="button" onClick={() => setMobileMenuOpen(false)} className="flex h-10 w-10 shrink-0 items-center justify-center transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Fechar menu"><X className="h-5 w-5" strokeWidth={1.8} /></button>
             </div>
             <nav aria-label="Navegação principal" className="dp-sidebar-nav sidebar-scrollbar-hidden flex-1 overflow-y-auto p-3">
@@ -320,13 +332,13 @@ function AppShell({
       <aside aria-label="Barra lateral principal" className={`dp-sidebar ${collapsed ? "dp-sidebar-collapsed" : ""} fixed inset-y-0 left-0 z-40 hidden border-r transition-[width] duration-300 ease-in-out lg:flex lg:flex-col ${collapsed ? "w-[76px]" : "w-[248px]"}`}>
         <div className={`dp-sidebar-header flex h-[82px] shrink-0 items-center border-b ${collapsed ? "flex-col justify-center gap-1 px-2" : "justify-between px-4"}`}>
           {!collapsed && (
-            <div className="flex min-w-0 items-center gap-3">
+            <a {...planningBrandLink} className="flex min-w-0 items-center gap-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
               <Clock3 className="h-8 w-8 shrink-0 dp-sidebar-brand-icon" strokeWidth={1.7} aria-hidden="true" />
               <div className="min-w-0">
                 <div className="font-display text-[17px] font-bold leading-none tracking-[-0.035em] dp-sidebar-brand-title">DPSUCCESS</div>
                 <div className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.12em] dp-sidebar-brand-subtitle">RH · DP · GESTÃO</div>
               </div>
-            </div>
+            </a>
           )}
           <button
             type="button"
